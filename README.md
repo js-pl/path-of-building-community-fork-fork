@@ -9,7 +9,8 @@ The goals are the same numbers as upstream, enforced by equivalence tests
 against upstream itself, and much faster recalcs and power calculations
 (node, anoint, items, gems). Daily jobs port new upstream commits.
 
-**Status:** planning. Nothing is implemented yet. See [docs/design.md](docs/design.md).
+**Status:** phase 0, the test harness. Upstream runs as an oracle in CI; the
+engine is not started yet. See [docs/design.md](docs/design.md).
 
 ## Disclaimer
 
@@ -24,7 +25,11 @@ repository but generated from the upstream submodule at build time.
 | --- | --- |
 | `src/` | Rust engine (empty for now; becomes `crates/` next to a `web/` frontend, see the design) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
+| `oracle/` | Runs upstream headless to produce expected outputs, coverage and benchmarks |
+| `corpus/corpus.toml` | Builds the oracle runs, with source and license |
+| `tests/oracle/` | Upstream's outputs per corpus build (generated, never edited) |
 | `docs/design.md` | Plan, architecture and phases |
+| `docs/baseline.md` | Upstream performance baseline |
 | `docs/repository-settings.md` | How `main` is protected |
 
 ## Getting started
@@ -32,6 +37,7 @@ repository but generated from the upstream submodule at build time.
 ```sh
 git clone --recurse-submodules https://github.com/js-pl/path-of-building-community-fork-fork
 cargo build
+oracle/setup.sh && oracle/run.py check   # optional: run the upstream oracle
 ```
 
 ## License

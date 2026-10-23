@@ -8,6 +8,8 @@ See `docs/design.md` before making architectural decisions.
 - `src/` holds the Rust engine
 - `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a release tag; never edit it
 - `docs/` holds design decisions
+- `oracle/` runs upstream headless as the test oracle; `tests/oracle` is its
+  generated output, see `oracle/README.md`
 
 ## Coding guidelines
 - code and comments are written in english

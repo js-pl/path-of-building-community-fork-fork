@@ -1,1 +1,3 @@
 /target
+/.oracle
+__pycache__/

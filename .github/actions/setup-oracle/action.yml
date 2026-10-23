@@ -1,0 +1,14 @@
+name: Set up oracle
+description: Builds LuaJIT and the Lua rocks the upstream oracle needs
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: .oracle
+        key: oracle-${{ runner.os }}-${{ hashFiles('oracle/setup.sh', 'upstream/PathOfBuilding/Dockerfile') }}
+    - shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q luarocks
+        oracle/setup.sh

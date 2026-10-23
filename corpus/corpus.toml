@@ -1,0 +1,41 @@
+# Builds the oracle runs. Paths are relative to the repository root.
+# Each build records where it comes from and under which license, see
+# docs/design.md#corpus. Builds may be PoB XML (.xml) or PoE API character
+# JSON (.json).
+
+[[build]]
+id = "3.13-dual-savior"
+path = "upstream/PathOfBuilding/spec/TestBuilds/3.13/Dual Savior.xml"
+source = "upstream spec/TestBuilds"
+license = "MIT, upstream"
+
+[[build]]
+id = "3.13-dual-wield-cospris-coc"
+path = "upstream/PathOfBuilding/spec/TestBuilds/3.13/Dual Wield Cospris CoC.xml"
+source = "upstream spec/TestBuilds"
+license = "MIT, upstream"
+
+[[build]]
+id = "3.13-generals-perforate-zerker"
+path = "upstream/PathOfBuilding/spec/TestBuilds/3.13/Generals Perforate Zerker.xml"
+source = "upstream spec/TestBuilds"
+license = "MIT, upstream"
+
+[[build]]
+id = "3.13-mirage-archer-toxic-rain"
+path = "upstream/PathOfBuilding/spec/TestBuilds/3.13/Mirage Archer Toxic Rain.xml"
+source = "upstream spec/TestBuilds"
+license = "MIT, upstream"
+
+[[build]]
+id = "3.13-occ-vortex"
+path = "upstream/PathOfBuilding/spec/TestBuilds/3.13/OccVortex.xml"
+source = "upstream spec/TestBuilds"
+license = "MIT, upstream"
+
+# Current tree (3.29, Mirage league), imported from PoE API character JSON
+[[build]]
+id = "sample-character-hierophant"
+path = "upstream/PathOfBuilding/spec/System/SampleCharacter.json"
+source = "upstream spec/System/SampleCharacter.json"
+license = "MIT, upstream"

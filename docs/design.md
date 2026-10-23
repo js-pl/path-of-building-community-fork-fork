@@ -117,8 +117,10 @@ rules it does not know, so upstream changes cannot drift in silently.
 
 Upstream itself, at the pinned commit, run headless with
 `src/HeadlessWrapper.lua` on LuaJIT in CI. A dumper script writes upstream's
-results as JSON. Expected values always come from the oracle and are never
-written by hand.
+results as JSON to `tests/oracle/`, and CI checks that upstream reproduces
+them exactly. Expected values always come from the oracle and are never
+written by hand. Details, the JSON format and the determinism checks are in
+[oracle/README.md](../oracle/README.md).
 
 ### Layers
 
@@ -150,7 +152,9 @@ written by hand.
 
 ### Corpus
 
-- The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13).
+- Listed in `corpus/corpus.toml`.
+- The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13), and
+  upstream's `spec/System/SampleCharacter.json` on the current tree.
 - A curated set of current builds covering every class, ascendancy, main skill
   type and major unique interaction, plus generated builds for gaps.
 - Build sources and licensing are recorded. The corpus may live outside this
@@ -206,7 +210,7 @@ each step small.
 
 ## Performance targets
 
-Set after the phase 0 baseline:
+Set against the phase 0 baseline in [baseline.md](baseline.md):
 
 - recalc after a build change on a big Full DPS build,
 - full node power,
@@ -219,6 +223,9 @@ Measured against desktop PoB and pob.cool on the same builds.
 
 0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
    coverage reporting, baseline benchmarks (desktop PoB, pob.cool).
+   Done: oracle, dumper and determinism check in CI, coverage report, LuaJIT
+   baseline. Open: current builds for the corpus (Full DPS, minions, every
+   class), desktop and pob.cool measurements, see [baseline.md](baseline.md).
 1. **Data and mod parser.** Importer and mod parser at full parity.
 2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
    `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole
