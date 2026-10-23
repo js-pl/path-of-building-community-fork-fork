@@ -92,6 +92,9 @@ local unordered = {
 		Slot = function(n) return "Slot\0" .. n.attrib.name end,
 		SocketIdURL = function(n) return "SocketIdURL\0" .. n.attrib.name end,
 	},
+	Calcs = {
+		Input = function(n) return n.attrib.name end,
+	},
 	Sockets = {
 		Socket = function(n) return string.format("%08d", tonumber(n.attrib.nodeId)) end,
 	},

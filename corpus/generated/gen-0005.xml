@@ -101,8 +101,8 @@
 		<TimelessData devotionVariant1="1" devotionVariant2="1" searchList="" searchListFallback=""/>
 	</Build>
 	<Calcs>
-		<Input name="skill_number" number="1"/>
 		<Input name="misc_buffMode" string="EFFECTIVE"/>
+		<Input name="skill_number" number="1"/>
 		<Section collapsed="false" id="SkillSelect" subsection="ViewSkillDetails"/>
 		<Section collapsed="false" id="HitDamage" subsection="SkillHitDamage"/>
 		<Section collapsed="false" id="Warcries" subsection="ExertingWarcries"/>
