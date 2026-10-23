@@ -14,8 +14,8 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
-  # Upstream reproduces tests/oracle exactly, in two processes with different
-  # hash seeds
+  # The generator reproduces corpus/generated, and upstream reproduces
+  # tests/oracle exactly, in two runs with different hash seeds
   oracle:
     runs-on: ubuntu-latest
     steps:
@@ -23,6 +23,8 @@ jobs:
         with:
           submodules: true
       - uses: ./.github/actions/setup-oracle
+      - run: oracle/run.py generate
+      - run: git status --porcelain -- corpus/generated && test -z "$(git status --porcelain -- corpus/generated)"
       - run: oracle/run.py check
 
   coverage:
@@ -45,18 +47,3 @@ jobs:
             target/oracle-coverage/summary.txt
             target/oracle-coverage/uncovered.txt
             target/oracle-coverage/luacov.report.out
-
-  # Shared runners are noisy, so benchmarks are not run on pull requests
-  bench:
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: ./.github/actions/setup-oracle
-      - run: oracle/run.py bench --out target/oracle-bench.json --repeats 5
-      - uses: actions/upload-artifact@v4
-        with:
-          name: oracle-bench
-          path: target/oracle-bench.json

@@ -25,11 +25,10 @@ repository but generated from the upstream submodule at build time.
 | --- | --- |
 | `src/` | Rust engine (empty for now; becomes `crates/` next to a `web/` frontend, see the design) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
-| `oracle/` | Runs upstream headless to produce expected outputs, coverage and benchmarks |
-| `corpus/corpus.toml` | Builds the oracle runs, with source and license |
+| `oracle/` | Runs upstream headless to produce expected outputs and coverage |
+| `corpus/` | Builds the oracle runs (`corpus.toml`) and the build generator |
 | `tests/oracle/` | Upstream's outputs per corpus build (generated, never edited) |
 | `docs/design.md` | Plan, architecture and phases |
-| `docs/baseline.md` | Upstream performance baseline |
 | `docs/repository-settings.md` | How `main` is protected |
 
 ## Getting started

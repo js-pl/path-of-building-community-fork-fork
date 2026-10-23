@@ -155,6 +155,10 @@ written by hand. Details, the JSON format and the determinism checks are in
 - Listed in `corpus/corpus.toml`.
 - The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13), and
   upstream's `spec/System/SampleCharacter.json` on the current tree.
+- Generated builds on the current tree (`corpus/generate.lua`), cycling
+  through every class, ascendancy and kind of main skill, with random trees,
+  items, jewels, flasks, configs, minions and Full DPS. Grow the count, or add
+  targeted builds, wherever coverage shows gaps.
 - A curated set of current builds covering every class, ascendancy, main skill
   type and major unique interaction, plus generated builds for gaps.
 - Build sources and licensing are recorded. The corpus may live outside this
@@ -210,22 +214,18 @@ each step small.
 
 ## Performance targets
 
-Set against the phase 0 baseline in [baseline.md](baseline.md):
+Upstream takes 50 to 230 ms per recalc and 10 to 46 s for full node power on
+the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 
 - recalc after a build change on a big Full DPS build,
 - full node power,
 - anoint power,
 - data download and startup time.
 
-Measured against desktop PoB and pob.cool on the same builds.
-
 ## Phases
 
 0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
-   coverage reporting, baseline benchmarks (desktop PoB, pob.cool).
-   Done: oracle, dumper and determinism check in CI, coverage report, LuaJIT
-   baseline. Open: current builds for the corpus (Full DPS, minions, every
-   class), desktop and pob.cool measurements, see [baseline.md](baseline.md).
+   coverage reporting. Done.
 1. **Data and mod parser.** Importer and mod parser at full parity.
 2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
    `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole

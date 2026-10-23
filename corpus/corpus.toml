@@ -1,4 +1,13 @@
 # Builds the oracle runs. Paths are relative to the repository root.
+#
+# Generated builds come from corpus/generate.lua (`oracle/run.py generate`),
+# one per seed, written to corpus/generated/gen-<seed>.xml. They cycle through
+# every class and ascendancy and every kind of main skill, with random trees,
+# uniques and rares, jewels, flasks, supports, configs, minions and Full DPS.
+[generated]
+first_seed = 1
+count = 56
+
 # Each build records where it comes from and under which license, see
 # docs/design.md#corpus. Builds may be PoB XML (.xml) or PoE API character
 # JSON (.json).

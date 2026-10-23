@@ -1,4 +1,4 @@
--- Starts upstream headless and loads builds. Shared by dump.lua and bench.lua.
+-- Starts upstream headless and loads builds. Shared by dump.lua and corpus/generate.lua.
 -- Must run with upstream's src/ as the working directory.
 
 local headless = { }

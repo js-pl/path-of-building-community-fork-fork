@@ -11,12 +11,14 @@ git submodule update --init
 oracle/setup.sh            # LuaJIT + rocks into .oracle/ (needs luarocks, make, cc)
 oracle/run.py dump         # write tests/oracle/<id>.json for every corpus build
 oracle/run.py check        # what CI runs: dump twice, compare with tests/oracle
-oracle/run.py coverage     # line coverage, ~10 min, see below
-oracle/run.py bench        # baseline timings, see docs/baseline.md
+oracle/run.py coverage     # line coverage, ~25 min on 4 cores, see below
+oracle/run.py generate     # regenerate corpus/generated, see corpus/corpus.toml
 ```
 
-Only run `dump` when the submodule, the corpus or the dumper changed, and
-commit the result in the same PR. Never edit `tests/oracle` by hand; CI fails
+Every command splits the corpus over one LuaJIT process per CPU (`--jobs N`).
+
+Only run `generate` and `dump` when the submodule, the corpus, the generator
+or the dumper changed, and commit the result in the same PR. Never edit `tests/oracle` by hand; CI fails
 if the files differ from what upstream produces.
 
 ## Files
@@ -25,8 +27,8 @@ if the files differ from what upstream produces.
 | --- | --- |
 | `setup.sh` | Builds LuaJIT at the commit upstream's `Dockerfile` names, installs `luautf8` and `luacov` |
 | `headless.lua` | Starts upstream via `src/HeadlessWrapper.lua` and loads builds |
+| `../corpus/generate.lua` | Generates corpus builds with upstream's build API |
 | `dump.lua` | Writes calc outputs as JSON |
-| `bench.lua` | Times startup, build load, recalc and node power |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
 
@@ -65,13 +67,24 @@ Encoding:
 - **No ModCache.** Upstream skips `Data/ModCache.lua` when `CI` is set, so every
   mod line goes through `ModParser`, which is what the port has to match and
   what coverage has to see. Upstream's own CI checks that the ModCache equals
-  live parsing. The benchmark does load the ModCache, like desktop PoB.
+  live parsing.
 - **Build import.** `.xml` builds go through `loadBuildFromXML`. `.json`
   character files go through the same `ImportTab` calls as upstream's
   `TestImport_spec`; `HeadlessWrapper`'s own `loadBuildFromJSON` does not
   handle the API's nesting under `character`.
 - **Build codes** cannot be loaded headless (`Inflate` is a stub), so the corpus
   stores XML.
+
+## Generated builds
+
+`corpus/generate.lua` builds characters through upstream's own API (class and
+ascendancy selection, `AllocNode`, socket groups, `ItemsTab:AddItem` with
+uniques and rare templates from upstream's item databases, config inputs) and
+saves them with upstream's `Save` functions, so every generated build is one
+upstream can load. All randomness comes from a seeded xorshift PRNG over
+sorted lists, and saving swaps in a sorted `pairs()` because upstream writes
+XML attributes, config entries and item text in hash order. CI regenerates
+the corpus and fails if it differs from `corpus/generated`.
 
 ## Determinism
 
@@ -82,17 +95,19 @@ Measured at upstream `v2.67.2` on the initial corpus:
 
 - outputs are byte-identical across separate processes (5 runs),
 - byte-identical whether a build is loaded alone or after other builds, in any
-  order,
+  order (`check` splits the corpus over a different number of processes in
+  each of its two runs),
 - byte-identical under the coverage hook, where LuaJIT mostly interprets
   instead of running JIT-compiled traces.
 
-`run.py check` repeats the first check on every CI run. If a build ever turns
+`run.py check` repeats these checks on every CI run. If a build ever turns
 out to be order dependent, that is a finding for the comparison rules, not
 something to paper over in `tests/tolerances.toml`.
 
 ## Coverage
 
-`run.py coverage` reruns the dumper under luacov (the pure Lua hook: `cluacov`
+`run.py coverage` reruns the dumper under luacov, one stats file per process,
+merged afterwards (the pure Lua hook: `cluacov`
 is built against PUC Lua internals and crashes under LuaJIT), checks that the
 outputs are unchanged and writes to `target/oracle-coverage/`:
 
