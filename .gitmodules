@@ -1,0 +1,4 @@
+[submodule "upstream/PathOfBuilding"]
+	path = upstream/PathOfBuilding
+	url = https://github.com/PathOfBuildingCommunity/PathOfBuilding.git
+	shallow = true
