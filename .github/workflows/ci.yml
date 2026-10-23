@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  # The generator reproduces corpus/generated, and upstream reproduces
+  # tests/oracle exactly, in two runs with different hash seeds
+  oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: ./.github/actions/setup-oracle
+      - run: oracle/run.py generate
+      - run: git status --porcelain -- corpus/generated && test -z "$(git status --porcelain -- corpus/generated)"
+      - run: oracle/run.py check
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: ./.github/actions/setup-oracle
+      - run: oracle/run.py coverage --out target/oracle-coverage
+      - run: |
+          echo '### Oracle line coverage' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat target/oracle-coverage/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oracle-coverage
+          path: |
+            target/oracle-coverage/summary.txt
+            target/oracle-coverage/uncovered.txt
+            target/oracle-coverage/luacov.report.out

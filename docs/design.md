@@ -117,8 +117,10 @@ rules it does not know, so upstream changes cannot drift in silently.
 
 Upstream itself, at the pinned commit, run headless with
 `src/HeadlessWrapper.lua` on LuaJIT in CI. A dumper script writes upstream's
-results as JSON. Expected values always come from the oracle and are never
-written by hand.
+results as JSON to `tests/oracle/`, and CI checks that upstream reproduces
+them exactly. Expected values always come from the oracle and are never
+written by hand. Details, the JSON format and the determinism checks are in
+[oracle/README.md](../oracle/README.md).
 
 ### Layers
 
@@ -150,7 +152,13 @@ written by hand.
 
 ### Corpus
 
-- The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13).
+- Listed in `corpus/corpus.toml`.
+- The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13), and
+  upstream's `spec/System/SampleCharacter.json` on the current tree.
+- Generated builds on the current tree (`corpus/generate.lua`), cycling
+  through every class, ascendancy and kind of main skill, with random trees,
+  items, jewels, flasks, configs, minions and Full DPS. Grow the count, or add
+  targeted builds, wherever coverage shows gaps.
 - A curated set of current builds covering every class, ascendancy, main skill
   type and major unique interaction, plus generated builds for gaps.
 - Build sources and licensing are recorded. The corpus may live outside this
@@ -206,19 +214,18 @@ each step small.
 
 ## Performance targets
 
-Set after the phase 0 baseline:
+Upstream takes 50 to 230 ms per recalc and 10 to 46 s for full node power on
+the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 
 - recalc after a build change on a big Full DPS build,
 - full node power,
 - anoint power,
 - data download and startup time.
 
-Measured against desktop PoB and pob.cool on the same builds.
-
 ## Phases
 
 0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
-   coverage reporting, baseline benchmarks (desktop PoB, pob.cool).
+   coverage reporting. Done.
 1. **Data and mod parser.** Importer and mod parser at full parity.
 2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
    `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole
