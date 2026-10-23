@@ -8,7 +8,8 @@ The goal is fast calcs for endgame characters, especially node power and
 anoint power, while staying as data-driven as upstream so new PoB releases can
 be picked up with little work.
 
-**Status:** planning. Nothing is implemented yet. See [docs/design.md](docs/design.md).
+**Status:** phase 0 (baseline) done, see [docs/phase0-baseline.md](docs/phase0-baseline.md).
+The Rust engine is not implemented yet. See [docs/design.md](docs/design.md).
 
 ## Disclaimer
 
@@ -22,8 +23,10 @@ repository but read from the upstream submodule.
 | Path | Purpose |
 | --- | --- |
 | `src/` | Rust engine (empty for now) |
+| `bench/` | Phase 0 baseline: benchmarks upstream and parallel LuaJIT workers |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
 | `docs/design.md` | Plan, architecture and phases |
+| `docs/phase0-baseline.md` | Phase 0 results |
 | `docs/repository-settings.md` | How `main` is protected |
 
 ## Getting started
