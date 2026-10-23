@@ -1,3 +1,3 @@
-//! Unofficial Rust rewrite of the Path of Building Community calculation engine.
+//! Unofficial rewrite of Path of Building Community: the Rust engine.
 //!
 //! Nothing is implemented yet. See `docs/design.md` for the plan.

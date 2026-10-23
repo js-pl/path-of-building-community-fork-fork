@@ -2,7 +2,7 @@
 name = "path-of-building-community-fork-fork"
 version = "0.0.0"
 edition = "2024"
-description = "Unofficial Rust rewrite of the Path of Building Community calculation engine (Path of Exile 1)"
+description = "Unofficial Rust and WebAssembly rewrite of Path of Building Community (Path of Exile 1)"
 license = "MIT"
 repository = "https://github.com/js-pl/path-of-building-community-fork-fork"
 # Not published: the name belongs to the PoB Community project, see README.
