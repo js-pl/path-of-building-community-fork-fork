@@ -1,12 +1,13 @@
 # Path of Building Community Fork Fork
 
-An unofficial Rust rewrite of the calculation engine of
+An unofficial rewrite of
 [Path of Building Community](https://github.com/PathOfBuildingCommunity/PathOfBuilding)
-for Path of Exile 1.
+for Path of Exile 1 as a web app: a Rust engine compiled to WebAssembly and a
+TypeScript frontend.
 
-The goal is fast calcs for endgame characters, especially node power and
-anoint power, while staying as data-driven as upstream so new PoB releases can
-be picked up with little work.
+The goals are the same numbers as upstream, enforced by equivalence tests
+against upstream itself, and much faster recalcs and power calculations
+(node, anoint, items, gems). Daily jobs port new upstream commits.
 
 **Status:** planning. Nothing is implemented yet. See [docs/design.md](docs/design.md).
 
@@ -14,14 +15,14 @@ be picked up with little work.
 
 This project is not affiliated with or endorsed by Grinding Gear Games or the
 Path of Building Community team. Path of Exile is a trademark of Grinding Gear
-Games. Game data is (c) Grinding Gear Games; it is not stored in this
-repository but read from the upstream submodule.
+Games. Game data and art are (c) Grinding Gear Games; they are not stored in this
+repository but generated from the upstream submodule at build time.
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `src/` | Rust engine (empty for now) |
+| `src/` | Rust engine (empty for now; becomes `crates/` next to a `web/` frontend, see the design) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
 | `docs/design.md` | Plan, architecture and phases |
 | `docs/repository-settings.md` | How `main` is protected |

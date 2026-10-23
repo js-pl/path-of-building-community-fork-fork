@@ -2,88 +2,255 @@
 
 ## Goal
 
-A headless Rust calc engine that produces the same numbers as Path of Building
-Community (PoE 1), but much faster for workloads that run many calcs per
-build: node power, anoint power, item and gem comparisons.
+A full rewrite of Path of Building Community (PoE 1) as a web app:
 
-Out of scope for now: UI, PoE 2, character import from the GGG API.
+- **Engine** in Rust, compiled to WebAssembly for the browser and natively for
+  tools and tests.
+- **Frontend** in TypeScript.
+- **Same numbers as upstream.** For every build, the engine produces the same
+  outputs as upstream at the pinned commit. This is enforced by tests, see
+  [Equivalence testing](#equivalence-testing).
+- **Fast.** Recalcs after a build change and power calculations (node, anoint,
+  item, gem) must feel instant on big endgame builds.
+- **Kept up to date** by daily LLM jobs that port upstream commits, see
+  [Keeping up with upstream](#keeping-up-with-upstream).
+
+Out of scope for now: PoE 2, a native desktop app.
+
+## Prior art: pob.cool
+
+[pob-web](https://github.com/atty303/pob-web) (MIT, hosted at pob.cool) runs
+unmodified upstream Lua in a Lua 5.2 interpreter compiled to WebAssembly, with
+a reimplementation of SimpleGraphic and a WebGL renderer, all inside a Web
+Worker. It tracks upstream hourly and supports PoE 1, PoE 2 and Last Epoch.
+
+Where it falls short, and where this project has to be better:
+
+- **Speed.** An interpreter instead of LuaJIT, and the same algorithms as
+  upstream. Its own measurements put Lua at ~12.5 ms (Chromium) and ~34.5 ms
+  (Firefox) per frame just for dragging the tree
+  (`docs/rust-lua-vm-experiment-plan.md` in pob-web).
+- **UI.** The desktop UI drawn pixel by pixel on a canvas: no text selection,
+  accessibility, deep links or native mobile layout.
+
+Lessons to take over: one shared CORS proxy IP gets rate limited; `POESESSID`
+must never be used; OAuth character import works from the browser.
 
 ## Why upstream is slow
 
-All numbers refer to upstream `v2.67.2`.
+Numbers refer to upstream `v2.67.2`.
 
-- Node power (`src/Classes/CalcsTab.lua`, `PowerBuilder`) uses
-  `calcs.getMiscCalculator` (`src/Modules/Calcs.lua`). For every candidate node
-  it runs `calcs.initEnv` and `calcs.perform` from scratch, often followed by
-  `calcs.calcFullDPS`.
-- It runs one node at a time, in a coroutine on the UI thread that yields
-  every 100 ms.
-- Anoint power and item/gem comparisons use the same calculator.
-- Modifier lookups go through string-keyed tables (`ModDB`, `ModStore`).
+- **Build changes.** Every change runs synchronously on the UI thread
+  (`buildMode:OnFrame` in `src/Modules/Build.lua`): `calcs.buildOutput` for
+  `MAIN` and `CALCS`, plus `getNodeCalculator` and `getMiscCalculator`. Each
+  runs `initEnv`, `perform` and `calcFullDPS`, and `calcFullDPS` runs another
+  `initEnv` plus one full `perform` per Full DPS skill. With N Full DPS skills
+  that is ~8 `initEnv` and ~4(N+1) `perform` calls per change.
+- **Power calculations.** `CalcsTab:PowerBuilder` runs `initEnv` and `perform`
+  from scratch per candidate node, often followed by `calcFullDPS`, one node at
+  a time in a coroutine on the UI thread.
+- **Data layout.** Modifier lookups go through string-keyed tables (`ModDB`,
+  `ModStore`).
 
 ## Where the speedup comes from
 
-1. **Parallelism.** Candidates are independent, so they can run on all cores
-   (`rayon`). LuaJIT states cannot share a build between threads.
-2. **Incremental calcs.** Build the base environment once, clone it cheaply
-   and apply only the diff for each candidate instead of rebuilding.
-3. **Data layout.** Interned stat IDs and typed modifier storage instead of
-   string lookups.
+1. **Incremental calcs.** Build the base environment once, clone it cheaply and
+   apply only the diff (a node, an item, a Full DPS skill).
+2. **No redundant work.** Compute shared results such as Full DPS once per
+   change, not four times.
+3. **Data layout.** Interned stat IDs and typed modifier storage.
+4. **Parallelism.** Independent calcs (candidate nodes, Full DPS skills) run on
+   a pool of Web Workers in the browser and on threads (`rayon`) natively.
+5. **Off the UI thread.** The engine always runs in a worker, so the UI never
+   freezes.
 
-Expected: roughly 3-10x single-threaded (LuaJIT is already fast), multiplied by
-core count for power calculations.
+None of these may change results; the optimised paths are tested against the
+straightforward path, see [Equivalence testing](#equivalence-testing).
 
-## Staying data-driven
+## Architecture
 
-Upstream is only partly data-driven:
+```text
+web/ (TypeScript)                       crates/
++-- UI: tree, items, skills, config,    +-- importer  build time: upstream Lua data -> typed data
+|   calcs, notes, import/export         +-- engine    data model, mod parser, calcs, power calcs
++-- engine client (RPC)                 +-- wasm      wasm-bindgen API over engine
+`-- worker pool --- engine.wasm ------> `-- cli       native runner for tests and benchmarks
+```
 
-| Part | Size | Nature |
-| --- | --- | --- |
-| `src/Data`, `src/TreeData` | ~760 MB on disk, incl. tree images | Lua tables (uniques, bases, gems, mods, tree). ~190 embedded Lua functions in skill data. |
-| `src/Modules/ModParser.lua` | ~7k lines | ~4,000 pattern-to-function rules turning mod text into modifiers |
-| `src/Modules/Calc*.lua` | ~20k lines | Imperative calc code |
+- **Engine API.** Load data, load or save a build (PoB XML and build codes,
+  compatible with upstream in both directions), apply edits, get outputs and
+  breakdowns, run power calculations. The engine does no I/O.
+- **Data delivery.** The importer writes versioned, compressed data files. The
+  site serves them as static assets and the browser caches them. They are not
+  compiled into the wasm module.
+- **Workers.** One engine instance per worker, communicating by messages.
+  Shared-memory wasm threads would need cross-origin isolation (COOP/COEP)
+  and are left as a later option.
+- **Frontend.** Mirrors upstream's tabs and features, but uses web-native UI
+  instead of copying the desktop UI pixel by pixel.
 
-In the 12 months before `v2.67.2`, 271 upstream commits touched the calc
-modules and the mod parser (about 5 a week).
+## Mirroring upstream
 
-Approach:
+Every upstream file that holds logic maps to one Rust or TypeScript module
+that keeps upstream's file and function names, so an upstream diff maps
+directly to a port diff.
 
-- **Upstream as a submodule.** `upstream/PathOfBuilding` is pinned to a release
-  tag. Updating means bumping the submodule.
-- **Build-time importer.** Loads upstream's Lua data files with embedded Lua
-  (`mlua`, LuaJIT) and writes typed, compact data for the engine. No GGG data
-  is committed to this repository.
-- **Fail loudly.** The importer errors on embedded Lua functions or mod parser
-  rules it does not know, so upstream changes cannot drift in silently.
-- **Mirror upstream structure.** Port the calc modules file by file, keeping
-  upstream function names, and record the upstream commit each module is in
-  sync with. Upstream diffs then map directly to Rust diffs.
-- **Parity tests against real PoB.** Upstream ships `src/HeadlessWrapper.lua`
-  and `spec/TestBuilds`. CI runs upstream headless on a corpus of builds and
-  fails when the Rust output differs.
+| Upstream | Port |
+| --- | --- |
+| `src/Data`, `src/TreeData` | `crates/importer` (no port, read at build time) |
+| `src/Modules/Calc*.lua`, `ModParser.lua`, `ModTools.lua`, `ItemTools.lua` | `crates/engine` |
+| Logic classes: `ModDB`, `ModList`, `ModStore`, `Item`, `PassiveSpec`, `PassiveTree`, ... | `crates/engine` |
+| UI classes: `*Tab.lua`, `*Control.lua`, `PassiveTreeView.lua`, ... | `web/` |
+| `src/Modules/Build.lua`, `Main.lua` | split between `crates/engine` (state) and `web/` (UI) |
+
+`sync/manifest.toml` lists every upstream file with its port location and the
+upstream commit it is in sync with. Files that are deliberately not ported are
+listed too, with a reason. CI fails if an upstream file is missing from the
+manifest.
+
+**Fail loudly.** The importer errors on embedded Lua functions or mod parser
+rules it does not know, so upstream changes cannot drift in silently.
+
+## Equivalence testing
+
+### Oracle
+
+Upstream itself, at the pinned commit, run headless with
+`src/HeadlessWrapper.lua` on LuaJIT in CI. A dumper script writes upstream's
+results as JSON. Expected values always come from the oracle and are never
+written by hand.
+
+### Layers
+
+1. **Data.** Every imported table matches the Lua table it came from.
+2. **Mod parser.** Every mod line upstream knows (tree nodes, uniques, base and
+   crafted mods, cluster and timeless jewels, ...) parses to the same modifier
+   list as `modLib.parseMod`. This covers all of it, not a sample.
+3. **Upstream specs.** `spec/System/*_spec.lua` is ported to Rust tests.
+4. **Whole builds.** For every build in the corpus: all of `player.output`,
+   `minion.output` and the Full DPS table, in both `MAIN` and `CALCS` mode, plus
+   breakdowns once the calcs tab is ported.
+5. **Variants.** Each corpus build is mutated the way users mutate builds:
+   - allocate or deallocate each node,
+   - toggle each config option,
+   - pick each skill as the main skill,
+   - add each skill to Full DPS,
+   - change gem levels and qualities,
+   - swap items.
+
+   Random mutation sequences are fuzzed against the oracle, and failures are
+   shrunk to a minimal reproduction.
+6. **Power calculations.** Node, anoint, item and gem power match upstream's
+   results.
+7. **Fast path vs simple path.** Incremental, deduplicated and parallel
+   results equal a from-scratch single-threaded calc. Engine-only, so it also
+   runs on inputs the oracle cannot handle quickly.
+8. **Round trip.** Builds saved by the engine load in upstream with identical
+   outputs, and the other way round.
+
+### Corpus
+
+- The 5 builds in upstream's `spec/TestBuilds`, which are old (3.13).
+- A curated set of current builds covering every class, ascendancy, main skill
+  type and major unique interaction, plus generated builds for gaps.
+- Build sources and licensing are recorded. The corpus may live outside this
+  repository.
+
+### Coverage gates
+
+- The oracle runs with Lua line coverage (`luacov`) on `Calc*.lua` and
+  `ModParser.lua`. Lines the corpus never reaches are listed, and the corpus
+  grows until the list is empty or every remaining line is justified.
+- Every mod parser rule must be hit at least once.
+
+### Comparison rules
+
+- Integers, strings and flags compare exactly.
+- Numbers compare bitwise. Differences are only allowed for results of
+  transcendental functions (`pow`, `log`, ...), which may differ by a few ULP
+  between LuaJIT and Rust's libm. Each allowed case is listed in
+  `tests/tolerances.toml` with a reason.
+- A missing or extra output key is a failure.
+
+## Keeping up with upstream
+
+### Catch-up
+
+Port against one pinned tag until all equivalence tests pass. Upstream keeps
+moving during that time (about 5 calc or mod parser commits a week), so the
+manifest records per module which commit it is in sync with.
+
+### Daily sync job
+
+Once caught up, an LLM job runs every day:
+
+1. Fetch upstream `dev` and list the new commits.
+2. Data-only changes: re-run the importer. No LLM needed.
+3. For each commit that touches ported files, look up the port locations in the
+   manifest and port the diff, commit by commit.
+4. Bump the submodule, regenerate the oracle outputs, run all equivalence
+   tests.
+5. Open a PR with the bump, the port and the upstream commit links. If tests
+   still fail after a bounded number of attempts, open an issue with the
+   upstream diff and the failing tests instead.
+
+The deployed site follows upstream release tags; tracking `dev` daily keeps
+each step small.
+
+### Guardrails
+
+- The job may not edit oracle outputs, the corpus, `tests/tolerances.toml` or
+  the comparison rules. CI rejects PRs from the job that touch them.
+- Every PR needs green CI and is merged by the owner.
+- Commit messages and port headers reference the upstream commit.
+
+## Performance targets
+
+Set after the phase 0 baseline:
+
+- recalc after a build change on a big Full DPS build,
+- full node power,
+- anoint power,
+- data download and startup time.
+
+Measured against desktop PoB and pob.cool on the same builds.
 
 ## Phases
 
-0. **Baseline.** Benchmark upstream node and anoint power on endgame builds.
-   Prototype parallel LuaJIT workers (one build per worker, candidates split
-   between them) as a cheap, exact speedup and a reference point.
-1. **Importer and parity harness.** Data import from the submodule; headless
-   upstream runner producing reference outputs.
-2. **Core port.** Modifier database, mod parser and a first calc slice (hits,
-   defences), verified against upstream.
-3. **Power calculations.** Parallel, incremental node and anoint power.
-4. **Later, maybe.** A UI, or integration with
-   [rusty-path-of-building](https://github.com/meehl/rusty-path-of-building).
+0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
+   coverage reporting, baseline benchmarks (desktop PoB, pob.cool).
+1. **Data and mod parser.** Importer and mod parser at full parity.
+2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
+   `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole
+   builds and variants match.
+3. **Engine API and WASM.** Build load and save, edits, incremental and parallel
+   calcs, power calculations, worker pool.
+4. **Frontend MVP.** Import a build code, stat sidebar, passive tree with node
+   power, calcs tab with breakdowns.
+5. **Full frontend.** Skills, items (including crafting), config, notes, party,
+   compare and the remaining features. Character import via OAuth, then trade.
+6. **Daily sync.** Starts once the first modules are at parity and is fully on
+   after phase 2.
+
+## Open questions
+
+- Frontend framework.
+- Worker pool vs wasm threads, and memory per engine instance.
+- Corpus sources and where to store them.
+- Hosting, and the site's name.
+- PoE 2 later.
 
 ## Legal notes
 
 - Upstream code is MIT (Copyright (c) 2016 David Gowor). Ported code keeps that
-  notice, see `LICENSE`.
+  notice, see `LICENSE`. pob-web is MIT as well.
 - Upstream bundles libraries under other licenses (e.g. LGPL `base64.lua`,
   libcurl). None of them are copied here.
-- Game data and art are (c) Grinding Gear Games. Data is read from the
-  submodule at build time; no art is used.
-- The project is unofficial and non-commercial, and is not published to
-  crates.io under the PoB name.
-- If GGG API access is ever added: registered OAuth app, identifiable
-  User-Agent, documented endpoints only.
+- Game data and art are (c) Grinding Gear Games and are never committed to this
+  repository; they are generated from the submodule at build time.
+- **Change from the original plan:** the deployed site has to serve game data
+  and passive tree art, as PoB and pob.cool do. It stays unofficial and
+  non-commercial, shows a GGG disclaimer and complies with takedown requests.
+- The site and packages do not use the Path of Building name as their own.
+- GGG API access: registered OAuth app, identifiable User-Agent, documented
+  endpoints only, respect rate limits, never `POESESSID`.

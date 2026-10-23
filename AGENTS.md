@@ -1,6 +1,7 @@
 # Path of Building Community Fork Fork
 
-Unofficial Rust rewrite of the Path of Building Community calc engine (PoE 1).
+Unofficial rewrite of Path of Building Community (PoE 1): Rust engine compiled to
+WebAssembly plus a TypeScript web frontend.
 See `docs/design.md` before making architectural decisions.
 
 ## Project overview
@@ -12,6 +13,8 @@ See `docs/design.md` before making architectural decisions.
 - code and comments are written in english
 - keep ported modules aligned with upstream file and function names, and note the upstream commit they are in sync with
 - never commit GGG game data or art; read data from the submodule at build time
+- expected test values come from the upstream oracle only; never edit oracle
+  outputs, the corpus or `tests/tolerances.toml` to make a test pass
 
 ## Git workflows
 - trunk based development
