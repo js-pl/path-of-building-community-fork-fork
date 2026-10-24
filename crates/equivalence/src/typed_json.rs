@@ -322,6 +322,19 @@ pub fn normalise(v: &J, in_tag: bool) -> J {
                     .filter(|(k, x)| !(is_tag && **x == J::Bool(false) && !k.ends_with("Cond")))
                     .map(|(k, x)| {
                         let tag_field = is_tag && k != "type" && !k.ends_with("Cond");
+                        // Upstream visits skillTypeList with pairs, so a
+                        // sparse one is its values in order
+                        if k == "skillTypeList"
+                            && let J::Object(sparse) = x
+                        {
+                            let mut keyed: Vec<(i64, &J)> = sparse
+                                .iter()
+                                .filter_map(|(i, v)| Some((i.parse().ok()?, v)))
+                                .collect();
+                            keyed.sort_by_key(|(i, _)| *i);
+                            let list = keyed.into_iter().map(|(_, v)| normalise(v, true)).collect();
+                            return (k.clone(), J::Array(list));
+                        }
                         (k.clone(), normalise(x, tag_field))
                     })
                     .collect(),
