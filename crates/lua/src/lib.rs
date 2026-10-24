@@ -5,6 +5,7 @@
 pub mod ast;
 pub mod env;
 pub mod format;
+pub mod gc;
 pub mod lexer;
 pub mod parser;
 pub mod pattern;

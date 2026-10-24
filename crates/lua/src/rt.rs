@@ -29,7 +29,23 @@ pub fn func(name: &str, f: impl Fn(&[Value]) -> LResult<Vec<Value>> + 'static) -
     Value::Function(Rc::new(Function {
         name: name.into(),
         f: Box::new(f),
+        upvalues: Vec::new(),
     }))
+}
+
+/// A translated closure, with the cells it captures (which `f` holds too).
+pub fn func_up(
+    name: &str,
+    upvalues: Vec<Cell>,
+    f: impl Fn(&[Value]) -> LResult<Vec<Value>> + 'static,
+) -> Value {
+    let r = Rc::new(Function {
+        name: name.into(),
+        f: Box::new(f),
+        upvalues,
+    });
+    crate::gc::register_function(&r);
+    Value::Function(r)
 }
 
 /// `obj[key]`, with `__index`.
@@ -371,7 +387,9 @@ pub fn tset(t: &mut crate::value::Table, k: Value, v: Value) -> LResult<()> {
 pub type Cell = Rc<RefCell<Value>>;
 
 pub fn cell(v: Value) -> Cell {
-    Rc::new(RefCell::new(v))
+    let c = Rc::new(RefCell::new(v));
+    crate::gc::register_cell(&c);
+    c
 }
 
 /// How a block of translated statements ended.

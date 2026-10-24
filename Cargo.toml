@@ -24,3 +24,8 @@ opt-level = 3
 
 [profile.release.build-override]
 opt-level = 3
+
+# The browser build (web/scripts/build-wasm.mjs): no symbols, as served
+[profile.web]
+inherits = "release"
+strip = true

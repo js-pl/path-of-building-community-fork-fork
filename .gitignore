@@ -1,3 +1,8 @@
 /target
 /.oracle
 __pycache__/
+/web/node_modules
+/web/dist
+/web/public/engine.wasm
+/web/public/data
+/web/public/art

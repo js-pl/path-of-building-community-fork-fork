@@ -1,0 +1,3 @@
+# The translated program recurses deeply; give wasm the stack native code has
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=-zstack-size=16777216"]
