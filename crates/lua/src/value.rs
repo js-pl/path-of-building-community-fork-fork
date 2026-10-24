@@ -81,10 +81,20 @@ pub struct FuncRef {
     pub file: Rc<str>,
     /// First line of the function in that file
     pub line: u32,
+    /// Byte offset of the function in that file
+    pub offset: u32,
     /// Where the function is stored, e.g. `skills["Fireball"]["preDamageFunc"]`
     pub key: Rc<str>,
-    /// Hash of the function's source text, so changes upstream are noticed
+    /// [`fnv1a`] of the function's source text, so changes upstream are noticed
     pub source_hash: u64,
+}
+
+/// A closure made by ported code: the name of the Rust function that runs
+/// it plus its captured values, like a Lua closure's upvalues.
+#[derive(Debug)]
+pub struct Closure {
+    pub name: Rc<str>,
+    pub upvalues: Vec<Value>,
 }
 
 #[derive(Clone, Default)]
@@ -95,7 +105,10 @@ pub enum Value {
     Number(f64),
     Str(LuaStr),
     Table(TableRef),
+    /// A Lua function from upstream's source
     Func(Rc<FuncRef>),
+    /// A closure built by ported code
+    Closure(Rc<Closure>),
 }
 
 impl Value {
@@ -140,7 +153,7 @@ impl Value {
             Value::Number(_) => "number",
             Value::Str(_) => "string",
             Value::Table(_) => "table",
-            Value::Func(_) => "function",
+            Value::Func(_) | Value::Closure(_) => "function",
         }
     }
 
@@ -153,6 +166,7 @@ impl Value {
             (Value::Str(a), Value::Str(b)) => a == b,
             (Value::Table(a), Value::Table(b)) => Rc::ptr_eq(&a.0, &b.0),
             (Value::Func(a), Value::Func(b)) => Rc::ptr_eq(a, b),
+            (Value::Closure(a), Value::Closure(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -219,8 +233,19 @@ impl fmt::Debug for Value {
                     .finish()
             }
             Value::Func(r) => write!(f, "function<{}:{} {}>", r.file, r.line, r.key),
+            Value::Closure(c) => write!(f, "closure<{}>", c.name),
         }
     }
+}
+
+/// 64 bit FNV-1a, a hash that stays the same across Rust versions.
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in bytes {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }
 
 /// Lua's `tostring` for numbers (`%.14g`).
@@ -239,6 +264,21 @@ pub enum Key {
     Str(LuaStr),
     Table(TablePtr),
     Func(FuncPtr),
+    Closure(ClosurePtr),
+}
+
+#[derive(Clone, Debug)]
+pub struct ClosurePtr(pub Rc<Closure>);
+impl PartialEq for ClosurePtr {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for ClosurePtr {}
+impl Hash for ClosurePtr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (Rc::as_ptr(&self.0) as *const u8 as usize).hash(state)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -288,6 +328,7 @@ impl Key {
             Value::Str(s) => Key::Str(s.clone()),
             Value::Table(t) => Key::Table(TablePtr(t.clone())),
             Value::Func(f) => Key::Func(FuncPtr(f.clone())),
+            Value::Closure(c) => Key::Closure(ClosurePtr(c.clone())),
         })
     }
 
@@ -299,6 +340,7 @@ impl Key {
             Key::Str(s) => Value::Str(s.clone()),
             Key::Table(t) => Value::Table(t.0.clone()),
             Key::Func(f) => Value::Func(f.0.clone()),
+            Key::Closure(c) => Value::Closure(c.0.clone()),
         }
     }
 }

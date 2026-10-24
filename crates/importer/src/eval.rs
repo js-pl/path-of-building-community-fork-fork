@@ -7,7 +7,6 @@ use lua::ast::*;
 use lua::value::{FuncRef, Key, LuaStr, TableRef, Value};
 use std::collections::HashMap;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +54,7 @@ impl Env {
         Value::Func(Rc::new(FuncRef {
             file: NATIVE_FILE.into(),
             line: self.natives.len() as u32 - 1,
+            offset: 0,
             key: name.into(),
             source_hash: 0,
         }))
@@ -138,6 +138,45 @@ impl Env {
             }
         }
         Ok(out)
+    }
+
+    /// Evaluates only the assignments to the given targets (written as
+    /// dotted names, e.g. `data.keystones`), in file order; for modules that
+    /// mix data with code, such as `Modules/Data.lua`.
+    pub fn eval_assigns(&mut self, file: &str, src: &[u8], targets: &[&str]) -> Result<()> {
+        let block = lua::parser::parse(src).map_err(|e| EvalError {
+            file: file.into(),
+            line: e.line,
+            msg: e.msg,
+        })?;
+        let mut ev = Evaluator {
+            env: self,
+            file: Rc::from(file),
+            src,
+            scopes: vec![HashMap::new()],
+            varargs: vec![],
+            line: 0,
+        };
+        let mut found = 0;
+        for (stat, line) in block.stats.iter().zip(&block.lines) {
+            ev.line = *line;
+            if let Stat::Assign { targets: t, .. } = stat
+                && t.len() == 1
+                && let Some(name) = dotted_name(&t[0])
+                && targets.contains(&name.as_str())
+            {
+                ev.stat(stat)?;
+                found += 1;
+            }
+        }
+        if found < targets.len() {
+            return Err(EvalError {
+                file: file.into(),
+                line: 0,
+                msg: format!("not all of {targets:?} assigned"),
+            });
+        }
+        Ok(())
     }
 
     fn call_native(&self, f: &FuncRef, args: &[Value]) -> std::result::Result<Vec<Value>, String> {
@@ -296,13 +335,12 @@ impl Evaluator<'_> {
     fn func_ref(&mut self, func: &FuncBody, key: &str) -> Value {
         self.line = func.line;
         let text = &self.src[func.span.0..func.span.1];
-        let mut h = std::collections::hash_map::DefaultHasher::new();
-        text.hash(&mut h);
         Value::Func(Rc::new(FuncRef {
             file: self.file.clone(),
             line: func.line,
+            offset: func.span.0 as u32,
             key: key.into(),
-            source_hash: h.finish(),
+            source_hash: lua::value::fnv1a(text),
         }))
     }
 
@@ -493,6 +531,22 @@ fn key_label(k: &Value) -> String {
         Value::Str(s) => format!("{:?}", s.to_str_lossy()),
         Value::Number(n) => lua::value::format_number(*n),
         v => v.type_name().to_string(),
+    }
+}
+
+/// `a.b.c` for a chain of names and constant string fields.
+fn dotted_name(e: &Expr) -> Option<String> {
+    match e {
+        Expr::Name(n) => Some(n.clone()),
+        Expr::Index(obj, key) => match &**key {
+            Expr::Str(s) => Some(format!(
+                "{}.{}",
+                dotted_name(obj)?,
+                std::str::from_utf8(s).ok()?
+            )),
+            _ => None,
+        },
+        _ => None,
     }
 }
 

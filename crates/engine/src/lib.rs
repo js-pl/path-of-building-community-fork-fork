@@ -1,3 +1,9 @@
-//! Unofficial rewrite of Path of Building Community: the Rust engine.
+//! Unofficial rewrite of Path of Building Community: the engine.
 //!
-//! Nothing is implemented yet. See `docs/design.md` for the plan.
+//! Modules mirror upstream's files, see docs/design.md.
+
+pub mod common;
+pub mod data;
+pub mod mod_parser;
+pub mod mod_tools;
+pub mod rt;

@@ -5,6 +5,8 @@
 //! `Data.lua` does on top of them is ported in the engine.
 
 pub mod eval;
+pub mod mod_parser;
+pub mod portgen;
 
 use eval::{Env, EvalError};
 use lua::{TableRef, Value};
@@ -49,6 +51,16 @@ pub const ITEM_TYPES: &[&str] = &[
     "axe", "bow", "claw", "dagger", "fishing", "mace", "staff", "sword", "wand", "helmet", "body",
     "gloves", "boots", "shield", "quiver", "amulet", "ring", "belt", "jewel", "flask", "tincture",
     "graft",
+];
+
+/// Tables `Modules/Data.lua` assigns as literals.
+pub const DATA_LUA_CONSTANTS: &[&str] = &[
+    "data.keystones",
+    "data.ailmentTypeList",
+    "data.elementalAilmentTypeList",
+    "data.nonDamagingAilmentTypeList",
+    "data.nonElementalAilmentTypeList",
+    "data.nonDamagingAilment",
 ];
 
 /// Skill files, in `Data.lua`'s `skillTypes` order.
@@ -232,6 +244,10 @@ pub fn import(src_dir: &Path) -> Result<Raw> {
 
     im.load("Data/Global", vec![])?;
     im.load("Data/Misc", vec![Value::Table(data.clone())])?;
+    // Constants Modules/Data.lua defines itself
+    let data_lua = im.read("Modules/Data.lua")?;
+    im.env
+        .eval_assigns("Modules/Data.lua", &data_lua, DATA_LUA_CONSTANTS)?;
     set("modScalability", im.load1("Data/ModScalability", vec![])?);
 
     let item_mods = TableRef::new();

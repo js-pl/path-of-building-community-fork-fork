@@ -1,0 +1,14 @@
+[package]
+name = "equivalence"
+description = "Equivalence tests of the engine against the upstream oracle, see docs/design.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+lua.workspace = true
+engine.workspace = true
+importer.workspace = true
+serde_json.workspace = true

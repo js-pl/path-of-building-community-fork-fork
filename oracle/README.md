@@ -74,18 +74,20 @@ line:
 {"extra": <unparsed rest or false>, "line": <mod line>, "mods": <mod list or false>}
 ```
 
-`false` stands for nil. Lines come from everything upstream parses on startup
-(uniques, rares, the latest tree), every tree version, every item mod,
-enchantment and crafting table, and the corpus builds. Jewel functions inside
+`false` stands for nil. Lines come from upstream's ModCache, everything
+upstream parses on startup (uniques, rares, the latest tree), every tree
+version, every item mod, enchantment and crafting table, and the corpus
+builds. Each line is parsed live, with the ModCache emptied first. Jewel functions inside
 `JewelFunc` mods are closures and are written as `{"$func": true}`; what they
 do is tested through whole builds.
 
 ## How upstream is run
 
-- **No ModCache.** Upstream skips `Data/ModCache.lua` when `CI` is set, so every
-  mod line goes through `ModParser`, which is what the port has to match and
-  what coverage has to see. Upstream's own CI checks that the ModCache equals
-  live parsing.
+- **ModCache.** Upstream preloads `Data/ModCache.lua`, the parse results of
+  every mod line it ships, written with 14 significant digits. Builds are
+  calculated with it, as on desktop, so the engine preloads the same cache.
+  (`HeadlessWrapper.lua` says setting `CI` skips the cache, but the flag it
+  sets is never read.) The mod parser outputs bypass the cache, see above.
 - **Build import.** `.xml` builds go through `loadBuildFromXML`. `.json`
   character files go through the same `ImportTab` calls as upstream's
   `TestImport_spec`; `HeadlessWrapper`'s own `loadBuildFromJSON` does not

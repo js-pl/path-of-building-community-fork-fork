@@ -6,6 +6,14 @@ version = 4
 name = "engine"
 version = "0.0.0"
 dependencies = [
+ "lua",
+]
+
+[[package]]
+name = "equivalence"
+version = "0.0.0"
+dependencies = [
+ "engine",
  "importer",
  "lua",
  "serde_json",
@@ -15,6 +23,7 @@ dependencies = [
 name = "importer"
 version = "0.0.0"
 dependencies = [
+ "engine",
  "lua",
 ]
 

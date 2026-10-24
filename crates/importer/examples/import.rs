@@ -17,4 +17,25 @@ fn main() {
         );
     }
     println!("globals: {}", raw.globals.borrow().len_pairs());
+    let mut im = importer::Importer::new(&dir);
+    let t0 = std::time::Instant::now();
+    let tables = importer::mod_parser::import(&mut im, &raw).unwrap_or_else(|e| panic!("{e}"));
+    println!("mod parser tables in {:?}", t0.elapsed());
+    let mut funcs = 0;
+    for (k, v) in tables.entries() {
+        let t = v.as_table().unwrap();
+        let f = t
+            .entries()
+            .iter()
+            .filter(|(_, v)| matches!(v, lua::Value::Func(_)))
+            .count();
+        funcs += f;
+        println!(
+            "{} {} entries, {} functions",
+            k.to_value().as_str().unwrap(),
+            t.borrow().len_pairs(),
+            f
+        );
+    }
+    println!("{funcs} functions");
 }

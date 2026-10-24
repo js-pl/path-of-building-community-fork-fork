@@ -11,9 +11,7 @@ local oracleDir = arg[0]:match("^(.*)/[^/]+$") or "."
 local headless = dofile(oracleDir .. "/headless.lua")
 local builds = headless.parseBuildArgs({ select(2, unpack(arg)) })
 
--- Without the ModCache every mod line goes through ModParser, which is what
--- the port has to match and what coverage has to see
-headless.start(false)
+headless.start()
 
 local toJSON = dofile(oracleDir .. "/json.lua")
 

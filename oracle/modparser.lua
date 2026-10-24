@@ -3,9 +3,10 @@
 --   {"line": <line>, "mods": <mod list or false>, "extra": <string or false>}
 -- where false stands for nil.
 --
--- Lines come from everything upstream parses while starting (uniques, rares,
--- the latest tree), every tree version, every item mod, enchantment and
--- crafting table in data, and the given builds.
+-- Lines come from upstream's ModCache, everything upstream parses while
+-- starting (uniques, rares, the latest tree), every tree version, every item
+-- mod, enchantment and crafting table in data, and the given builds. Every
+-- line is parsed live, bypassing the ModCache.
 --
 -- Run from upstream's src/ directory, usually through oracle/run.py:
 --   luajit <repo>/oracle/modparser.lua <out file> <id>=<build file>...
@@ -16,12 +17,11 @@ local headless = dofile(oracleDir .. "/headless.lua")
 local toJSON = dofile(oracleDir .. "/json.lua")
 local builds = headless.parseBuildArgs({ select(2, unpack(arg)) })
 
--- Live parsing, so every line goes through ModParser
-headless.start(false)
+headless.start()
 
 -- modLib.parseMod memoises every line in its cache, including everything
 -- parsed during startup
-local parseMod = modLib.parseMod
+local parseMod
 local lines = { }
 for line in pairs(modLib.parseModCache) do
 	lines[line] = true
@@ -86,6 +86,13 @@ table.sort(sorted)
 local function funcValue()
 	return { ["$func"] = true }
 end
+
+-- A fresh ModParser: its memo cache is not preloaded from Data/ModCache.lua,
+-- so every line is parsed live. Being fresh also matters because parseMod
+-- modifies some of its tables while parsing (the DOUBLED form writes into a
+-- modNameList entry), so results can depend on earlier lines; parsing in
+-- sorted order from a fresh state makes them reproducible.
+parseMod = LoadModule("Modules/ModParser", launch)
 
 local f = assert(io.open(outFile, "wb"))
 for _, line in ipairs(sorted) do
