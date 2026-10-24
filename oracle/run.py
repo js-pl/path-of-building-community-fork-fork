@@ -2,7 +2,8 @@
 """Runs the upstream oracle over the corpus. See oracle/README.md.
 
   run.py generate                regenerate corpus/generated/ from corpus/generate.lua
-  run.py dump [--out DIR]        write oracle outputs (default: tests/oracle)
+  run.py dump [--out DIR]        write oracle outputs (default: tests/oracle),
+                                 including modparser.jsonl
   run.py check                   dump twice and compare with tests/oracle
   run.py coverage [--out DIR]    dump with luacov and write a coverage report
 
@@ -106,29 +107,43 @@ def parallel(func, items):
         return list(pool.map(func, items))
 
 
-def dump(out, jobs, lua_opts=(), env_for_shard=None):
+def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
     # luajit runs in upstream/src, so paths must be absolute
     out = out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("*.json"):
         f.unlink()
     builds = corpus()
+    if modparser:
+        # Runs next to the build dumps; it parses the corpus builds' lines too
+        (out / "modparser.jsonl").unlink(missing_ok=True)
+        jobs = max(1, jobs - 1)
 
     def run(indexed):
         index, shard = indexed
         env = env_for_shard(index) if env_for_shard else None
         luajit(ORACLE / "dump.lua", [str(out), *build_args(shard)], lua_opts, env)
 
-    parallel(run, list(enumerate(shards(builds, jobs))))
+    tasks = list(enumerate(shards(builds, jobs)))
+    if modparser:
+        tasks.append((-1, None))
+
+    def run_task(task):
+        if task[1] is None:
+            luajit(ORACLE / "modparser.lua", [str(out / "modparser.jsonl"), *build_args(builds)])
+        else:
+            run(task)
+
+    parallel(run_task, tasks)
     written = sorted(f.stem for f in out.glob("*.json"))
     expected = sorted(b["id"] for b in builds)
     if written != expected:
         sys.exit(f"dumper wrote {written}, expected {expected}")
 
 
-def compare(a, b):
+def compare(a, b, pattern="*.json*"):
     """Returns the files that differ between two output directories."""
-    names = sorted({f.name for f in a.glob("*.json")} | {f.name for f in b.glob("*.json")})
+    names = sorted({f.name for f in a.glob(pattern)} | {f.name for f in b.glob(pattern)})
     return [n for n in names
             if not (a / n).exists() or not (b / n).exists() or not filecmp.cmp(a / n, b / n, shallow=False)]
 
@@ -147,7 +162,7 @@ def cmd_generate(args):
 
 
 def cmd_dump(args):
-    dump(Path(args.out), args.jobs)
+    dump(Path(args.out), args.jobs, modparser=True)
 
 
 def cmd_check(args):
@@ -158,7 +173,7 @@ def cmd_check(args):
     with tempfile.TemporaryDirectory() as tmp:
         for run, jobs in (("1", args.jobs), ("2", max(1, args.jobs - 1))):
             out = Path(tmp) / run
-            dump(out, jobs)
+            dump(out, jobs, modparser=True)
             diff = compare(OUTPUTS, out)
             if diff:
                 failed = True
@@ -204,7 +219,7 @@ def cmd_coverage(args):
         shard_dirs.append(d)
     dump(out / "outputs", args.jobs, ["-lluacov"], shard_env)
     # Coverage hooks keep LuaJIT mostly interpreting; results must not change
-    diff = compare(OUTPUTS, out / "outputs")
+    diff = compare(OUTPUTS, out / "outputs", "*.json")
     if diff:
         sys.exit(f"outputs under coverage differ from tests/oracle: {', '.join(diff)}")
 

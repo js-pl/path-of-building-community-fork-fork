@@ -29,6 +29,8 @@ if the files differ from what upstream produces.
 | `headless.lua` | Starts upstream via `src/HeadlessWrapper.lua` and loads builds |
 | `../corpus/generate.lua` | Generates corpus builds with upstream's build API |
 | `dump.lua` | Writes calc outputs as JSON |
+| `modparser.lua` | Writes mod parser outputs as JSON lines |
+| `json.lua` | The exact JSON encoder both use |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
 
@@ -61,6 +63,22 @@ Encoding:
   names upstream shows for them.
 - Anything else that is not plain data (functions, cycles, class instances)
   makes the dumper fail, so new kinds of output cannot slip through unnoticed.
+
+## Mod parser outputs
+
+`tests/oracle/modparser.jsonl` (`modparser.lua`) holds `modLib.parseMod`'s
+result for every mod line upstream knows, one JSON object per line, sorted by
+line:
+
+```text
+{"extra": <unparsed rest or false>, "line": <mod line>, "mods": <mod list or false>}
+```
+
+`false` stands for nil. Lines come from everything upstream parses on startup
+(uniques, rares, the latest tree), every tree version, every item mod,
+enchantment and crafting table, and the corpus builds. Jewel functions inside
+`JewelFunc` mods are closures and are written as `{"$func": true}`; what they
+do is tested through whole builds.
 
 ## How upstream is run
 

@@ -1,12 +1,18 @@
-[package]
-name = "path-of-building-community-fork-fork"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.0.0"
 edition = "2024"
-description = "Unofficial Rust and WebAssembly rewrite of Path of Building Community (Path of Exile 1)"
 license = "MIT"
 repository = "https://github.com/js-pl/path-of-building-community-fork-fork"
 # Not published: the name belongs to the PoB Community project, see README.
 publish = false
-exclude = ["upstream/"]
 
-[dependencies]
+[workspace.dependencies]
+lua = { path = "crates/lua" }
+importer = { path = "crates/importer" }
+engine = { path = "crates/engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -1,0 +1,96 @@
+-- Mod parser oracle: writes modLib.parseMod's result for every mod line
+-- upstream knows as JSON lines, one object per line, sorted:
+--   {"line": <line>, "mods": <mod list or false>, "extra": <string or false>}
+-- where false stands for nil.
+--
+-- Lines come from everything upstream parses while starting (uniques, rares,
+-- the latest tree), every tree version, every item mod, enchantment and
+-- crafting table in data, and the given builds.
+--
+-- Run from upstream's src/ directory, usually through oracle/run.py:
+--   luajit <repo>/oracle/modparser.lua <out file> <id>=<build file>...
+
+local outFile = assert(arg[1], "usage: modparser.lua <out file> <id>=<build file>...")
+local oracleDir = arg[0]:match("^(.*)/[^/]+$") or "."
+local headless = dofile(oracleDir .. "/headless.lua")
+local toJSON = dofile(oracleDir .. "/json.lua")
+local builds = headless.parseBuildArgs({ select(2, unpack(arg)) })
+
+-- Live parsing, so every line goes through ModParser
+headless.start(false)
+
+-- modLib.parseMod memoises every line in its cache, including everything
+-- parsed during startup
+local parseMod = modLib.parseMod
+local lines = { }
+for line in pairs(modLib.parseModCache) do
+	lines[line] = true
+end
+local function add(line)
+	for part in line:gmatch("[^\n]+") do
+		lines[part] = true
+	end
+end
+
+-- Every tree version, as builds on old trees parse their nodes
+for _, treeVersion in ipairs(treeVersionList) do
+	main:LoadTree(treeVersion)
+end
+for line in pairs(modLib.parseModCache) do
+	lines[line] = true
+end
+
+-- Strings in the array part of mod entries: { "line 1", "line 2", type = ... }
+local function addModTable(t, seen)
+	seen = seen or { }
+	if seen[t] then
+		return
+	end
+	seen[t] = true
+	for _, v in ipairs(t) do
+		if type(v) == "string" then
+			add(v)
+		end
+	end
+	for k, v in pairs(t) do
+		if type(v) == "table" and k ~= "modTags" and k ~= "types" and k ~= "weightKey" and k ~= "weightVal" then
+			addModTable(v, seen)
+		end
+	end
+end
+for _, modTable in pairs(data.itemMods) do
+	addModTable(modTable)
+end
+addModTable(data.masterMods)
+addModTable(data.enchantments)
+addModTable(data.veiledMods)
+addModTable(data.necropolisMods)
+addModTable(data.crucible)
+addModTable(data.mapMods)
+
+for _, b in ipairs(builds) do
+	headless.loadBuild(b.id, b.path)
+end
+for line in pairs(modLib.parseModCache) do
+	lines[line] = true
+end
+
+local sorted = { }
+for line in pairs(lines) do
+	sorted[#sorted + 1] = line
+end
+table.sort(sorted)
+
+-- Jewel functions are closures; only their presence is recorded here, what
+-- they do is tested through whole builds
+local function funcValue()
+	return { ["$func"] = true }
+end
+
+local f = assert(io.open(outFile, "wb"))
+for _, line in ipairs(sorted) do
+	local mods, extra = parseMod(line)
+	f:write(toJSON({ line = line, mods = mods or false, extra = extra or false }, funcValue), "\n")
+end
+f:close()
+print(string.format("%d lines", #sorted))
