@@ -8,6 +8,7 @@ pub mod data;
 pub mod mod_parser;
 pub mod mod_store;
 pub mod mod_tools;
+pub mod mods;
 pub mod rt;
 
 /// Replaces translated parts of upstream's running program with the
