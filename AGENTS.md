@@ -21,7 +21,10 @@ See `docs/design.md` before making architectural decisions.
 
 ## Coding guidelines
 - code and comments are written in english
-- keep ported modules aligned with upstream file and function names, and note the upstream commit they are in sync with
+- the typed engine is free-form, not mirrored on upstream's files; record in
+  `sync/manifest.toml` where each upstream file is ported and the upstream
+  commit it is in sync with
+- sync with upstream through the `/sync` skill
 - never commit GGG game data or art; read data from the submodule at build time
 - expected test values come from the upstream oracle only; never edit oracle
   outputs, the corpus or `tests/tolerances.toml` to make a test pass
