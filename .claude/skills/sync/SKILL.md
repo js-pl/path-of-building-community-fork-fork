@@ -1,7 +1,6 @@
 ---
 name: sync
-description: Bump the upstream submodule and port upstream's changes
-disable-model-invocation: true
+description: Bump the upstream PathOfBuilding submodule and port upstream's changes. Use only when the user explicitly asks to sync with upstream, now or at a later time ("sync", "sync with upstream", "wait 10 hours then sync"), or when a scheduled task or check-in asks for a sync. Never on your own initiative, e.g. because upstream looks outdated or a test fails.
 argument-hint: "[upstream ref, default: origin/dev]"
 ---
 

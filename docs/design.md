@@ -245,7 +245,7 @@ upstream commit its port is in sync with.
 ### Daily sync job
 
 An LLM job runs every day with the `sync` skill
-(`.claude/skills/sync/SKILL.md`, invoked as `/sync`):
+(`.claude/skills/sync/SKILL.md`):
 
 1. Fetch upstream `dev` and list the new commits.
 2. Data-only changes: bump and regenerate. No porting needed.
