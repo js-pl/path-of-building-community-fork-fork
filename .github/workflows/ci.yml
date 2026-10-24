@@ -23,6 +23,35 @@ jobs:
       # Equivalence tests are slow in debug builds
       - run: cargo test --release
 
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+
+  # The browser engine gives the same results as the native one
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo build --release -p cli
+      - run: node web/scripts/build-wasm.mjs
+      - run: node web/scripts/build-data.mjs
+      - run: node --test web/tests/*.test.mjs
+
   # The generator reproduces corpus/generated, and upstream reproduces
   # tests/oracle exactly, in two runs with different hash seeds
   oracle:

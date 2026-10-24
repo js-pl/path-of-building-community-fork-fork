@@ -70,27 +70,41 @@ straightforward path, see [Equivalence testing](#equivalence-testing).
 ## Architecture
 
 ```text
-web/ (TypeScript)                       crates/
+web/ (TypeScript, Preact)               crates/
 +-- UI: tree, items, skills, config,    +-- importer  build time: upstream Lua data -> typed data
 |   calcs, notes, import/export         +-- engine    data model, mod parser, calcs, power calcs
-+-- engine client (RPC)                 +-- wasm      wasm-bindgen API over engine
-`-- worker pool --- engine.wasm ------> +-- cli       native runner for tests and benchmarks
++-- engine client (RPC)                 +-- session   engine API: build sessions, JSON commands
+`-- worker pool --- engine.wasm ------> +-- wasm      C ABI over session for the browser
+                                        +-- cli       `pob`: native runner, data bundles, benchmarks
                                         +-- lua       Lua values, patterns, parser and runtime
                                         +-- upstream  upstream's program translated to Rust (luagen)
                                         `-- equivalence  tests against the oracle
 ```
 
-- **Engine API.** Load data, load or save a build (PoB XML and build codes,
-  compatible with upstream in both directions), apply edits, get outputs and
-  breakdowns, run power calculations. The engine does no I/O.
-- **Data delivery.** The importer writes versioned, compressed data files. The
-  site serves them as static assets and the browser caches them. They are not
-  compiled into the wasm module.
-- **Workers.** One engine instance per worker, communicating by messages.
+- **Engine API** (`crates/session`). Load or save a build (PoB XML and build
+  codes, compatible with upstream in both directions), apply edits, get the
+  sidebar, calcs tab cells and breakdowns, tooltips, run power calculations.
+  A session runs upstream's translated program and takes JSON requests
+  (`{"cmd": ...}`), answered by a Lua bridge (`crates/session/lua/session.lua`,
+  translated by `luagen` like upstream) that calls the same functions as
+  upstream's controls and tabs do, so every result is upstream's. Upstream's
+  own controls (sidebar skill selection, config options, calcs tab options)
+  are addressed by name and changed through their handlers. The engine does
+  no I/O.
+- **Data delivery.** `pob bundle` writes the data files the engine reads when
+  starting and loading a build on the current tree into one compressed bundle
+  (`core.bin`), and every tree version as separate files. The site serves them
+  as static assets; files the engine finds missing (older trees) are fetched
+  and the request retried. They are not compiled into the wasm module.
+- **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
+  `result_ptr`/`result_len`, ...), so no generated bindings are needed.
+- **Workers.** One engine instance per worker, communicating by messages: a
+  main worker holds the build being edited, a background worker runs slow
+  calculations (node power) on a copy, so edits never wait for them.
   Shared-memory wasm threads would need cross-origin isolation (COOP/COEP)
   and are left as a later option.
-- **Frontend.** Mirrors upstream's tabs and features, but uses web-native UI
-  instead of copying the desktop UI pixel by pixel.
+- **Frontend** (`web/`, Preact and Vite). Mirrors upstream's tabs and features,
+  but uses web-native UI instead of copying the desktop UI pixel by pixel.
 
 ## Mirroring upstream
 
@@ -130,7 +144,10 @@ host (`crates/upstream/src/host.rs`, a port of `HeadlessWrapper.lua`) runs it
 like the oracle does. Data files are not translated: the importer evaluates
 them at run time, and the functions they contain are translated by `luagen`
 like the rest. Generated functions are split into segment functions, since
-rustc's borrow checker is superlinear in function size.
+rustc's borrow checker is superlinear in function size. Values are reference
+counted; a cycle collector (`lua::gc`) frees the cyclic environments upstream's
+calcs build on every calculation, following tables, closures and the cells
+they capture.
 
 The translation gives exact parity with upstream from the start, and it is
 the reference the typed engine is built against: hot paths (`ModDB`/`ModStore`
@@ -266,18 +283,29 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    program (see [Mirroring upstream](#mirroring-upstream)): every corpus build
    calculates to the oracle's outputs exactly, in `MAIN` and `CALCS` mode
    (`crates/equivalence/tests/calcs.rs`). Variants follow with the engine API.
-3. **Engine API and WASM.** Build load and save, edits, incremental and parallel
-   calcs, power calculations, worker pool.
-4. **Frontend MVP.** Import a build code, stat sidebar, passive tree with node
-   power, calcs tab with breakdowns.
+3. **Engine API and WASM.** Done on the translation: build load and save
+   (XML and build codes), edits, outputs, sidebar, calcs tab and breakdowns,
+   tooltips and node power, natively and in the browser
+   (`crates/session/tests`, `web/tests` compares the wasm engine with the
+   native one). Open: incremental and parallel calcs and the performance
+   targets, which come with the typed engine, and the wasm size (78 MB, 15 MB
+   gzipped).
+4. **Frontend MVP.** Done: import a build code or XML, stat sidebar, passive
+   tree with node power, calcs tab with breakdowns.
 5. **Full frontend.** Skills, items (including crafting), config, notes, party,
    compare and the remaining features. Character import via OAuth, then trade.
+   Done: skills (socket groups, gems, main skill, Full DPS), items (slots,
+   item sets, items from text, unique and rare templates, tooltips, and
+   crafting with upstream's item editor: bases, affixes, variants, quality,
+   influences, catalysts, cluster jewels, enchants, anoints, corruption),
+   config, notes, party, tree, skill and config sets, export (code, link, XML)
+   and builds saved in the browser. Open: compare, character import via
+   OAuth, trade, art for the tree, node power split over several workers.
 6. **Daily sync.** Starts once the first modules are at parity and is fully on
    after phase 2.
 
 ## Open questions
 
-- Frontend framework.
 - Worker pool vs wasm threads, and memory per engine instance.
 - Corpus sources and where to store them.
 - Hosting, and the site's name.

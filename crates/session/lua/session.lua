@@ -52,7 +52,9 @@ local function controlHosts()
 		skills = b.skillsTab.controls,
 		items = b.itemsTab.controls,
 		config = b.configTab.varControls,
+		party = b.partyTab.controls,
 		calcs = { },
+		popup = main.popups[1] and main.popups[1].controls or { },
 	}
 	for _, section in ipairs(b.calcsTab.sectionList) do
 		for name, control in pairs(section.controls) do
@@ -90,9 +92,14 @@ local function describeControl(control)
 	elseif control._className == "EditControl" or control._className == "ResizableEditControl" then
 		c.text = control.buf
 		c.placeholder = control.placeholder
+		c.multiline = control.lineHeight ~= nil or nil
 	elseif control._className == "CheckBoxControl" then
 		c.state = control.state and true or false
 	elseif control._className == "ButtonControl" then
+		c.label = control:GetProperty("label")
+	elseif control._className == "SliderControl" then
+		c.val = control.val
+	elseif control._className == "LabelControl" then
 		c.label = control:GetProperty("label")
 	end
 	local label = control.label
@@ -120,6 +127,8 @@ function api.control(req)
 		end
 	elseif req.click then
 		control.onClick()
+	elseif req.val then
+		control:SetVal(req.val)
 	end
 	return { }
 end
@@ -137,6 +146,42 @@ end
 
 -- Popups upstream opened (confirmations, messages)
 
+-- Controls of a host in layout order (top to bottom, left to right), with
+-- the label upstream draws next to each
+local function layoutControls(controls, prefix, filter)
+	local out = { }
+	for name, control in pairs(controls) do
+		-- Labels of other controls go with them
+		local labelOf = type(name) == "string" and control._className == "LabelControl" and controls[(name:gsub("Label(%d*)$", "%1"))]
+		if labelOf == control then
+			labelOf = nil
+		end
+		if type(name) == "string" and not labelOf and (not filter or filter(name, control)) and control.IsShown and control:IsShown() then
+			local cls = control._className
+			if cls == "DropDownControl" or cls == "EditControl" or cls == "ResizableEditControl" or cls == "CheckBoxControl"
+				or cls == "ButtonControl" or cls == "SliderControl" or (cls == "LabelControl" and filter) then
+				local x, y = control:GetPos()
+				local d = describeControl(control)
+				d.path = prefix .. name
+				d.x, d.y = x, y
+				local label = controls[name .. "Label"] or controls[name:gsub("(%d+)$", "Label%1")]
+				if label and label ~= control and label._className == "LabelControl" and label:IsShown() then
+					d.label = label:GetProperty("label")
+				end
+				t_insert(out, d)
+			end
+		end
+	end
+	table.sort(out, function(a, b)
+		if a.y ~= b.y then return a.y < b.y end
+		return a.x < b.x
+	end)
+	for _, d in ipairs(out) do
+		d.x, d.y = nil, nil
+	end
+	return setmetatable(out, { __jsontype = "array" })
+end
+
 local function describePopups()
 	return arrayOf(main.popups, function(popup)
 		local p = { title = popup.title, lines = { }, buttons = { } }
@@ -146,11 +191,15 @@ local function describePopups()
 			end
 		end
 		for name, control in pairs(popup.controls) do
-			if type(name) == "string" and control._className == "ButtonControl" then
-				t_insert(p.buttons, { name = name, label = control:GetProperty("label") })
+			if type(name) == "string" and control._className == "ButtonControl" and control:IsShown() then
+				t_insert(p.buttons, { name = name, label = control:GetProperty("label"), enabled = control:GetProperty("enabled") ~= false })
 			end
 		end
 		table.sort(p.buttons, function(a, b) return a.name < b.name end)
+		-- Inputs, as "popup.<name>" controls
+		p.controls = layoutControls(popup.controls, "popup.", function(name, control)
+			return control._className ~= "ButtonControl" and control._className ~= "LabelControl"
+		end)
 		return p
 	end)
 end
@@ -748,11 +797,13 @@ end
 
 function api.items()
 	local tab = build().itemsTab
+	-- Labels and activity of jewel sockets, as drawing the tab updates them
+	tab:UpdateSockets()
 	local items = arrayOf(tab.itemOrderList, function(id)
 		return describeItem(tab.items[id])
 	end)
 	local slots = arrayOf(tab.orderedSlots, function(slot)
-		local shown = slot:IsShown() and true or false
+		local shown = slot:IsShown() and not slot.inactive and true or false
 		return {
 			name = slot.slotName,
 			label = slot.label,
@@ -839,8 +890,8 @@ function api.editItem(req)
 		error("unrecognised item")
 	end
 	item.id = old.id
-	tab.items[old.id] = item
-	item:BuildModList()
+	-- AddItem replaces it, rebuilding cluster jewel graphs if needed
+	tab:AddItem(item, true)
 	itemsChanged()
 	return { }
 end
@@ -885,7 +936,85 @@ function api.itemDb(req)
 	return setmetatable(out, { __jsontype = "array" })
 end
 
+-- The item editor: upstream's display item and its controls (variants,
+-- affixes of crafted items, quality, influences, catalysts, cluster jewels,
+-- and the buttons that open enchant, anoint and corrupt popups)
+
+function api.displayItem()
+	local tab = build().itemsTab
+	local item = tab.displayItem
+	if not item then
+		return { }
+	end
+	local tooltip = newTooltip()
+	tab:AddItemTooltip(tooltip, item)
+	return {
+		item = describeItem(item),
+		existing = item.id and tab.items[item.id] and true or false,
+		lines = tooltipLines(tooltip),
+		controls = layoutControls(tab.controls, "items.", function(name, control)
+			return name:match("^displayItem") and not name:match("Label%d*$") and not name:match("^displayItemSection")
+				and name ~= "displayItemTooltipAnchor" and name ~= "displayItemBuySimilar" and control._className ~= "LabelControl"
+				or name == "displayItemQuality"
+		end),
+	}
+end
+
+-- Opens an item in the editor: one of the build's (a copy, as double
+-- clicking it does), or one from its text
+function api.setDisplayItem(req)
+	local tab = build().itemsTab
+	if req.id then
+		local item = tab.items[req.id]
+		if not item then
+			error("no item " .. tostring(req.id))
+		end
+		local copy = new("Item", item:BuildRaw())
+		copy.id = item.id
+		tab:SetDisplayItem(copy)
+	elseif req.text then
+		tab:CreateDisplayItemFromRaw(req.text, true)
+		if not tab.displayItem then
+			error("unrecognised item")
+		end
+	else
+		tab:SetDisplayItem()
+	end
+	return { }
+end
+
+-- ItemsTab:CraftItem, which opens upstream's base picker popup
+function api.craftItem()
+	build().itemsTab:CraftItem()
+	return { }
+end
+
+-- Saves the display item: adds it, or replaces the item it was opened from
+function api.saveDisplayItem()
+	local tab = build().itemsTab
+	if not tab.displayItem then
+		error("no item in the editor")
+	end
+	local id = tab.displayItem.id
+	tab:AddDisplayItem()
+	return { id = id }
+end
+
 -- Configuration: the config tab's sections and options, in its order
+
+-- Option labels, which upstream draws as separate label controls
+local configLabels
+local function configLabel(var)
+	if not configLabels then
+		configLabels = { }
+		for _, varData in ipairs(LoadModule("Modules/ConfigOptions")) do
+			if varData.var then
+				configLabels[varData.var] = varData.label
+			end
+		end
+	end
+	return configLabels[var]
+end
 
 function api.config()
 	local tab = build().configTab
@@ -899,6 +1028,7 @@ function api.config()
 					if d.shown then
 						d.var = var
 						d.value = input[var]
+						d.label = configLabel(var) or d.label
 						t_insert(vars, d)
 					end
 					break
@@ -1013,6 +1143,17 @@ function api.breakdown(req)
 	end)
 	calcsTab:ClearDisplayStat()
 	return { sections = sections }
+end
+
+-- Party tab: upstream's controls (importing party members, their auras,
+-- curses, warcries, links and enemy conditions), in its layout
+
+function api.party()
+	return {
+		controls = layoutControls(build().partyTab.controls, "party.", function(name, control)
+			return control._className ~= "ScrollBarControl"
+		end),
+	}
 end
 
 -- Notes

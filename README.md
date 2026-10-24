@@ -9,9 +9,10 @@ The goals are the same numbers as upstream, enforced by equivalence tests
 against upstream itself, and much faster recalcs and power calculations
 (node, anoint, items, gems). Daily jobs port new upstream commits.
 
-**Status:** phase 2 done: upstream's program, translated to Rust, calculates
-every corpus build exactly as upstream does. Next are the engine API and WASM.
-See [docs/design.md](docs/design.md).
+**Status:** phases 2 to 4 done and much of 5: upstream's program, translated
+to Rust, calculates every corpus build exactly as upstream does, natively and
+in the browser, and the web app has the tree, skills, items, calcs, config,
+notes and import/export. See [docs/design.md](docs/design.md) for what is open.
 
 ## Disclaimer
 
@@ -24,7 +25,8 @@ repository but generated from the upstream submodule at build time.
 
 | Path | Purpose |
 | --- | --- |
-| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `equivalence` (oracle tests) |
+| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `session` (engine API), `wasm` (the engine for the browser), `cli` (`pob`, native runner), `equivalence` (oracle tests) |
+| `web/` | The web app (TypeScript, Preact, Vite) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
 | `oracle/` | Runs upstream headless to produce expected outputs and coverage |
 | `corpus/` | Builds the oracle runs (`corpus.toml`) and the build generator |
@@ -39,6 +41,17 @@ repository but generated from the upstream submodule at build time.
 git clone --recurse-submodules https://github.com/js-pl/path-of-building-community-fork-fork
 cargo build
 oracle/setup.sh && oracle/run.py check   # optional: run the upstream oracle
+```
+
+The web app (needs `rustup target add wasm32-unknown-unknown` and Node 22):
+
+```sh
+cd web
+npm install
+npm run build:wasm   # public/engine.wasm
+npm run build:data   # public/data, generated from the submodule, never committed
+npm run dev
+npm test             # the wasm engine against the native one (cargo build --release -p cli first)
 ```
 
 ## License
