@@ -317,6 +317,14 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    refactor and optimise freely toward the performance targets, and drop the
    translation, `luagen` and the Lua runtime. The engine API keeps its JSON
    commands, with `session.lua` replaced by Rust.
+   Replacements are installed into the running translation
+   (`engine::install`) and replace its methods; `POB_TRANSLATED=1` turns
+   them off to compare. Done: the queries of `ModStore`, `ModDB` and
+   `ModList` (`crates/engine/src/mod_store.rs`), about 25% off edits and
+   node power. Where the time goes now (20 edits on a generated build):
+   `PassiveSpec:BuildAllDependsAndPaths` 37%, the cycle collector 16%,
+   `calcs.perform` only 8%; table lookups and allocation dominate the
+   runtime.
 
 ## Open questions
 

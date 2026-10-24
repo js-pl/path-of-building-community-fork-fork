@@ -430,6 +430,7 @@ impl Ctx {
 
     /// The first matching mod of `mod_type` for which `take` gives a value:
     /// `FlagInternal` and `OverrideInternal`.
+    #[allow(clippy::too_many_arguments)]
     fn first_internal(
         &self,
         method: &str,
