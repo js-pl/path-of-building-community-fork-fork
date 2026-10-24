@@ -171,13 +171,41 @@ type NativeFn = dyn Fn(&[Value]) -> LResult<Vec<Value>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvalidKey;
 
+/// An object the cycle collector ([`crate::gc`]) tracks, with its place in
+/// the collection running or last run.
+pub struct Gc<T> {
+    pub(crate) slot: std::cell::Cell<u64>,
+    inner: T,
+}
+
+impl<T> Gc<T> {
+    pub fn new(inner: T) -> Self {
+        Gc {
+            slot: std::cell::Cell::new(0),
+            inner,
+        }
+    }
+}
+
+impl<T> std::ops::Deref for Gc<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.inner
+    }
+}
+
+/// A local captured by a closure, shared between them.
+pub type CellRef = Rc<Gc<RefCell<Value>>>;
+
 /// A callable Lua function: generated from upstream code or native.
 pub struct Function {
     pub name: Rc<str>,
     pub f: Box<NativeFn>,
     /// Cells of the locals a translated closure captures, which its native
     /// closure holds too; the cycle collector ([`crate::gc`]) follows them
-    pub upvalues: Vec<Rc<RefCell<Value>>>,
+    pub upvalues: Vec<CellRef>,
+    pub(crate) slot: std::cell::Cell<u64>,
 }
 
 impl Function {
@@ -733,7 +761,7 @@ impl Table {
 /// Shared, mutable table, like a Lua table reference. Tables are registered
 /// with the cycle collector ([`crate::gc`]).
 #[derive(Clone)]
-pub struct TableRef(pub Rc<RefCell<Table>>);
+pub struct TableRef(pub Rc<Gc<RefCell<Table>>>);
 
 impl Default for TableRef {
     fn default() -> Self {
@@ -747,7 +775,7 @@ impl TableRef {
     }
 
     pub fn from_table(t: Table) -> Self {
-        let r = Rc::new(RefCell::new(t));
+        let r = Rc::new(Gc::new(RefCell::new(t)));
         crate::gc::register_table(&r);
         TableRef(r)
     }

@@ -18,21 +18,23 @@
 //! survive a few collections are old, and only a full collection, once the
 //! old generation doubled, looks at them again.
 
-use crate::value::{Function, Key, Table, Value};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use crate::value::{Function, Gc, Key, Table, Value};
+use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+type TableBox = Gc<RefCell<Table>>;
+type CellBox = Gc<RefCell<Value>>;
+
 enum Node {
-    Table(Weak<RefCell<Table>>),
+    Table(Weak<TableBox>),
     Function(Weak<Function>),
-    Cell(Weak<RefCell<Value>>),
+    Cell(Weak<CellBox>),
 }
 
 enum Live {
-    Table(Rc<RefCell<Table>>),
+    Table(Rc<TableBox>),
     Function(Rc<Function>),
-    Cell(Rc<RefCell<Value>>),
+    Cell(Rc<CellBox>),
 }
 
 impl Node {
@@ -62,11 +64,12 @@ impl Live {
         }
     }
 
-    fn ptr(&self) -> *const u8 {
+    /// Where the object's index in the running collection is kept
+    fn slot(&self) -> &Cell<u64> {
         match self {
-            Live::Table(r) => Rc::as_ptr(r) as *const u8,
-            Live::Function(r) => Rc::as_ptr(r) as *const u8,
-            Live::Cell(r) => Rc::as_ptr(r) as *const u8,
+            Live::Table(r) => &r.slot,
+            Live::Function(r) => &r.slot,
+            Live::Cell(r) => &r.slot,
         }
     }
 
@@ -78,9 +81,9 @@ impl Live {
         }
     }
 
-    /// Calls `f` with every object this one references and how many
-    /// references that edge stands for; false when it cannot be read now
-    fn children(&self, f: &mut impl FnMut(*const u8, usize)) -> bool {
+    /// Calls `f` with the slot of every object this one references and how
+    /// many references that edge stands for; false when it cannot be read now
+    fn children(&self, f: &mut impl FnMut(&Cell<u64>, usize)) -> bool {
         match self {
             Live::Table(t) => {
                 let Ok(t) = t.try_borrow() else {
@@ -91,21 +94,21 @@ impl Live {
                 }
                 for (k, v) in t.raw_entries() {
                     match k {
-                        Key::Table(k) => f(Rc::as_ptr(&k.0.0) as *const u8, 1),
-                        Key::Function(k) => f(Rc::as_ptr(&k.0) as *const u8, 1),
+                        Key::Table(k) => f(&k.0.0.slot, 1),
+                        Key::Function(k) => f(&k.0.slot, 1),
                         _ => {}
                     }
                     value(v, f);
                 }
                 if let Some(m) = &t.meta {
-                    f(Rc::as_ptr(&m.0) as *const u8, 1);
+                    f(&m.0.slot, 1);
                 }
                 true
             }
             // Each cell is held by the closure's upvalue struct too
             Live::Function(func) => {
                 for c in &func.upvalues {
-                    f(Rc::as_ptr(c) as *const u8, 2);
+                    f(&c.slot, 2);
                 }
                 true
             }
@@ -140,10 +143,10 @@ enum Garbage {
     Value(#[allow(dead_code)] Value),
 }
 
-fn value(v: &Value, f: &mut impl FnMut(*const u8, usize)) {
+fn value(v: &Value, f: &mut impl FnMut(&Cell<u64>, usize)) {
     match v {
-        Value::Table(t) => f(Rc::as_ptr(&t.0) as *const u8, 1),
-        Value::Function(func) => f(Rc::as_ptr(func) as *const u8, 1),
+        Value::Table(t) => f(&t.0.slot, 1),
+        Value::Function(func) => f(&func.slot, 1),
         _ => {}
     }
 }
@@ -180,6 +183,8 @@ thread_local! {
         })
     };
     static TOTAL: RefCell<(usize, usize)> = const { RefCell::new((0, 0)) };
+    /// Number of the running or last collection
+    static EPOCH: Cell<u64> = const { Cell::new(0) };
 }
 
 fn register(node: Node) {
@@ -198,7 +203,7 @@ fn register(node: Node) {
     }
 }
 
-pub(crate) fn register_table(t: &Rc<RefCell<Table>>) {
+pub(crate) fn register_table(t: &Rc<TableBox>) {
     register(Node::Table(Rc::downgrade(t)));
 }
 
@@ -206,7 +211,7 @@ pub(crate) fn register_function(f: &Rc<Function>) {
     register(Node::Function(Rc::downgrade(f)));
 }
 
-pub(crate) fn register_cell(c: &Rc<RefCell<Value>>) {
+pub(crate) fn register_cell(c: &Rc<CellBox>) {
     register(Node::Cell(Rc::downgrade(c)));
 }
 
@@ -261,20 +266,24 @@ fn run(full: bool) -> Stats {
         (live, ages)
     });
     let n = live.len();
-    let mut index: HashMap<
-        *const u8,
-        usize,
-        std::hash::BuildHasherDefault<crate::value::FxHasher>,
-    > = HashMap::with_capacity_and_hasher(n, Default::default());
+    // Each object looked at keeps its index, stamped with this collection
+    let epoch = EPOCH.with(|e| {
+        e.set(e.get() + 1);
+        e.get()
+    });
     for (i, o) in live.iter().enumerate() {
-        index.insert(o.ptr(), i);
+        o.slot().set((epoch << 32) | i as u64);
     }
+    let index = |slot: &Cell<u64>| {
+        let v = slot.get();
+        (v >> 32 == epoch).then_some((v & 0xffff_ffff) as usize)
+    };
     // References from the other objects looked at
     let mut internal = vec![0usize; n];
     let mut readable = vec![false; n];
     for (i, o) in live.iter().enumerate() {
         readable[i] = o.children(&mut |p, count| {
-            if let Some(&j) = index.get(&p) {
+            if let Some(j) = index(p) {
                 internal[j] += count;
             }
         });
@@ -291,7 +300,7 @@ fn run(full: bool) -> Stats {
     }
     while let Some(i) = stack.pop() {
         live[i].children(&mut |p, _| {
-            if let Some(&j) = index.get(&p)
+            if let Some(j) = index(p)
                 && !marked[j]
             {
                 marked[j] = true;
