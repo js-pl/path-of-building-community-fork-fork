@@ -40,7 +40,6 @@ dependencies = [
 name = "importer"
 version = "0.0.0"
 dependencies = [
- "engine",
  "lua",
  "serde_json",
 ]

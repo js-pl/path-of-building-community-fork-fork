@@ -36,7 +36,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Classes/GemSelectControl.lua" = { status = "todo" }
 "Classes/GemTooltip.lua" = { status = "todo" }
 "Classes/ImportTab.lua" = { status = "partial", port = "web/src/ui/ImportTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Classes/Item.lua" = { status = "todo" }
+"Classes/Item.lua" = { status = "partial", port = "crates/engine/src/item.rs crates/engine/src/item_data.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/ItemDBControl.lua" = { status = "todo" }
 "Classes/ItemListControl.lua" = { status = "todo" }
 "Classes/ItemSetListControl.lua" = { status = "todo" }
@@ -315,10 +315,10 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/DataJewelFileLoader.lua" = { status = "todo" }
 "Modules/DataLegionLookUpTableHelper.lua" = { status = "todo" }
 "Modules/ItemSlotHelper.lua" = { status = "todo" }
-"Modules/ItemTools.lua" = { status = "todo" }
+"Modules/ItemTools.lua" = { status = "partial", port = "crates/engine/src/item_tools.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/Main.lua" = { status = "todo" }
 "Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Modules/ModTools.lua" = { status = "partial", port = "crates/engine/src/mod_tools.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/ModTools.lua" = { status = "partial", port = "crates/lua/src/modlib.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/PantheonTools.lua" = { status = "todo" }
 "Modules/StatDescriber.lua" = { status = "todo" }
 "Modules/ToastNotification.lua" = { status = "todo" }

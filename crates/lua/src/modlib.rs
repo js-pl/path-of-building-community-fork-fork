@@ -1,6 +1,10 @@
-//! Port of upstream `src/Modules/ModTools.lua` (v2.67.2).
+//! `modLib.createMod` of upstream's `Modules/ModTools.lua` on Lua values:
+//! for the importer, which reads upstream's ModParser tables, and the mod
+//! parser, whose tables still build mods as Lua values. Here, not in the
+//! engine, so the importer (and the translation built with it) does not
+//! depend on the engine.
 
-use lua::{TableRef, Value};
+use crate::{TableRef, Value};
 
 /// `modLib.createMod(modName, modType, modVal, ...)`.
 ///
@@ -53,33 +57,52 @@ pub fn create_mod_args(args: &[Value]) -> TableRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rt::*;
+
+    fn s(x: &str) -> Value {
+        Value::str(x)
+    }
 
     #[test]
     fn create_mod_args_like_upstream() {
         // mod("Life", "BASE", 5)
-        let m = create_mod_args(&[s("Life"), s("BASE"), n(5.0)]);
+        let m = create_mod_args(&[s("Life"), s("BASE"), Value::Number(5.0)]);
         assert_eq!(m.get_str("flags").as_number(), Some(0.0));
         // mod("Damage", "INC", 10, nil, ModFlag.Attack, KeywordFlag.Hit, tag)
-        let tag = tbl(vec![(s("type"), s("Condition"))], vec![]);
+        let tag = Value::Table(TableRef::new());
+        if let Value::Table(t) = &tag {
+            t.set_str("type", s("Condition"));
+        }
         let m = create_mod_args(&[
             s("Damage"),
             s("INC"),
-            n(10.0),
-            nil(),
-            n(1.0),
-            n(4.0),
+            Value::Number(10.0),
+            Value::Nil,
+            Value::Number(1.0),
+            Value::Number(4.0),
             tag.clone(),
         ]);
         assert_eq!(m.get_str("flags").as_number(), Some(1.0));
         assert_eq!(m.get_str("keywordFlags").as_number(), Some(4.0));
         assert!(m.get_int(1).raw_eq(&tag));
         // mod("X", "BASE", 1, "Source", tag)
-        let m = create_mod_args(&[s("X"), s("BASE"), n(1.0), s("Source"), tag.clone()]);
+        let m = create_mod_args(&[
+            s("X"),
+            s("BASE"),
+            Value::Number(1.0),
+            s("Source"),
+            tag.clone(),
+        ]);
         assert_eq!(m.get_str("source").as_str().unwrap().to_string(), "Source");
         assert!(m.get_int(1).raw_eq(&tag));
         // mod("X", "BASE", 1, nil, nil, tag): tags start at the first extra argument
-        let m = create_mod_args(&[s("X"), s("BASE"), n(1.0), nil(), nil(), tag.clone()]);
+        let m = create_mod_args(&[
+            s("X"),
+            s("BASE"),
+            Value::Number(1.0),
+            Value::Nil,
+            Value::Nil,
+            tag.clone(),
+        ]);
         assert!(m.get_int(1).is_nil());
         assert!(m.get_int(3).raw_eq(&tag));
     }
