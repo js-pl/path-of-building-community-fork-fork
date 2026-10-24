@@ -134,6 +134,7 @@ dependencies = [
 name = "session"
 version = "0.0.0"
 dependencies = [
+ "engine",
  "importer",
  "lua",
  "miniz_oxide",
