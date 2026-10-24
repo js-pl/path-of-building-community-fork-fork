@@ -1,0 +1,15 @@
+[package]
+name = "wasm"
+description = "The engine API for the browser: a C ABI over session, see docs/design.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+session = { path = "../session" }
+upstream.workspace = true
