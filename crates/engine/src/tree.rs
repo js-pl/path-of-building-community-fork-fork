@@ -339,19 +339,20 @@ fn process_stats(
             i += 1;
         }
     }
-    let mods: Vec<StatLine> = mods
+    let mut mods: Vec<StatLine> = mods
         .into_iter()
         .map(|m| m.ok_or("a stat line without a parse"))
         .collect::<std::result::Result<_, _>>()?;
+    // Upstream sets the source on the parsed mods themselves, so the lines
+    // carry it too
     let mut mod_list = Vec::new();
-    for line in &mods {
-        if let (Some(list), None) = (&line.list, &line.extra) {
+    for line in &mut mods {
+        if let (Some(list), None) = (&mut line.list, &line.extra) {
             for m in list {
-                let mut m = m.clone();
                 if let Some(s) = source {
-                    set_source(&mut m, s);
+                    set_source(m, s);
                 }
-                mod_list.push(m);
+                mod_list.push(m.clone());
             }
         }
     }
