@@ -1,0 +1,383 @@
+# Every Lua file in upstream's src/, where it is ported and the upstream commit
+# the port is in sync with. Checked by sync/check.py; see docs/design.md.
+#
+# status: ported (fully), partial, data (read by the importer), todo, skip
+# port: paths in this repository, separated by spaces
+
+upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
+
+[files]
+"Classes/BuildListControl.lua" = { status = "todo" }
+"Classes/ButtonControl.lua" = { status = "todo" }
+"Classes/CalcBreakdownControl.lua" = { status = "todo" }
+"Classes/CalcSectionControl.lua" = { status = "todo" }
+"Classes/CalcsTab.lua" = { status = "todo" }
+"Classes/CheckBoxControl.lua" = { status = "todo" }
+"Classes/CompareBuySimilar.lua" = { status = "todo" }
+"Classes/CompareCalcsHelpers.lua" = { status = "todo" }
+"Classes/CompareEntry.lua" = { status = "todo" }
+"Classes/ComparePowerReportListControl.lua" = { status = "todo" }
+"Classes/CompareTab.lua" = { status = "todo" }
+"Classes/ConfigSetListControl.lua" = { status = "todo" }
+"Classes/ConfigTab.lua" = { status = "todo" }
+"Classes/Control.lua" = { status = "todo" }
+"Classes/ControlHost.lua" = { status = "todo" }
+"Classes/DraggerControl.lua" = { status = "todo" }
+"Classes/DropDownControl.lua" = { status = "todo" }
+"Classes/EditControl.lua" = { status = "todo" }
+"Classes/ExtBuildListControl.lua" = { status = "todo" }
+"Classes/ExtBuildListProvider.lua" = { status = "todo" }
+"Classes/FolderListControl.lua" = { status = "todo" }
+"Classes/GemSelectControl.lua" = { status = "todo" }
+"Classes/GemTooltip.lua" = { status = "todo" }
+"Classes/ImportTab.lua" = { status = "todo" }
+"Classes/Item.lua" = { status = "todo" }
+"Classes/ItemDBControl.lua" = { status = "todo" }
+"Classes/ItemListControl.lua" = { status = "todo" }
+"Classes/ItemSetListControl.lua" = { status = "todo" }
+"Classes/ItemSlotControl.lua" = { status = "todo" }
+"Classes/ItemsTab.lua" = { status = "todo" }
+"Classes/LabelControl.lua" = { status = "todo" }
+"Classes/ListControl.lua" = { status = "todo" }
+"Classes/MinionListControl.lua" = { status = "todo" }
+"Classes/MinionSearchListControl.lua" = { status = "todo" }
+"Classes/ModDB.lua" = { status = "todo" }
+"Classes/ModList.lua" = { status = "todo" }
+"Classes/ModStore.lua" = { status = "todo" }
+"Classes/NotableDBControl.lua" = { status = "todo" }
+"Classes/NotesTab.lua" = { status = "todo" }
+"Classes/PartyTab.lua" = { status = "todo" }
+"Classes/PassiveMasteryControl.lua" = { status = "todo" }
+"Classes/PassiveSpec.lua" = { status = "todo" }
+"Classes/PassiveSpecListControl.lua" = { status = "todo" }
+"Classes/PassiveTree.lua" = { status = "todo" }
+"Classes/PassiveTreeView.lua" = { status = "todo" }
+"Classes/PathControl.lua" = { status = "todo" }
+"Classes/PoBArchivesProvider.lua" = { status = "todo" }
+"Classes/PoEAPI.lua" = { status = "todo" }
+"Classes/PopupDialog.lua" = { status = "todo" }
+"Classes/PowerReportListControl.lua" = { status = "todo" }
+"Classes/RectangleOutlineControl.lua" = { status = "todo" }
+"Classes/ResizableEditControl.lua" = { status = "todo" }
+"Classes/ScrollBarControl.lua" = { status = "todo" }
+"Classes/SearchHost.lua" = { status = "todo" }
+"Classes/SectionControl.lua" = { status = "todo" }
+"Classes/SharedItemListControl.lua" = { status = "todo" }
+"Classes/SharedItemSetListControl.lua" = { status = "todo" }
+"Classes/SkillListControl.lua" = { status = "todo" }
+"Classes/SkillSetListControl.lua" = { status = "todo" }
+"Classes/SkillsTab.lua" = { status = "todo" }
+"Classes/SliderControl.lua" = { status = "todo" }
+"Classes/TextListControl.lua" = { status = "todo" }
+"Classes/TimelessJewelListControl.lua" = { status = "todo" }
+"Classes/TimelessJewelSocketControl.lua" = { status = "todo" }
+"Classes/Tooltip.lua" = { status = "todo" }
+"Classes/TooltipHost.lua" = { status = "todo" }
+"Classes/TradeHelpers.lua" = { status = "todo" }
+"Classes/TradeQuery.lua" = { status = "todo" }
+"Classes/TradeQueryGenerator.lua" = { status = "todo" }
+"Classes/TradeQueryRateLimiter.lua" = { status = "todo" }
+"Classes/TradeQueryRequests.lua" = { status = "todo" }
+"Classes/TradeStatWeightMultiplierListControl.lua" = { status = "todo" }
+"Classes/TreeTab.lua" = { status = "todo" }
+"Classes/UndoHandler.lua" = { status = "todo" }
+"Data/Bases/amulet.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/axe.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/belt.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/body.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/boots.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/bow.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/claw.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/dagger.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/fishing.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/flask.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/gloves.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/graft.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/helmet.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/jewel.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/mace.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/quiver.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/ring.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/shield.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/staff.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/sword.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/tincture.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bases/wand.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/BeastCraft.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/BossSkills.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Bosses.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ClusterJewels.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Costs.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Crucible.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/CurrencyNames.lua" = { status = "todo" }
+"Data/EnchantmentBelt.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentBody.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentBoots.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentFlask.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentGloves.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentHelmet.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/EnchantmentWeapon.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Essence.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/FlavourText.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Gems.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Global.lua" = { status = "partial", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Minions.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Misc.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModCache.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModCorrupted.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModDelve.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModEldritch.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModExplicit.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModFlask.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModFoulborn.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModFoulbornMap.lua" = { status = "todo" }
+"Data/ModGraft.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModItemExclusive.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModJewel.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModJewelAbyss.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModJewelCharm.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModJewelCluster.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModMap.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModMaster.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModNecropolis.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModScalability.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModScourge.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModSynthesis.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModTincture.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModVeiled.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Pantheons.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/QueryMods.lua" = { status = "todo" }
+"Data/Rares.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/SkillStatMap.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_dex.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_int.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_str.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/glove.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/minion.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/other.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/spectre.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/sup_dex.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/sup_int.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/sup_str.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Spectres.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/StatDescriptions/active_skill_gem_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/aura_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/banner_aura_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/beam_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/brand_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/buff_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/curse_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/debuff_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/gem_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/graft_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/minion_attack_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/minion_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/minion_spell_damage_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/minion_spell_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/monster_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/offering_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/secondary_debuff_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/single_minion_spell_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/skill_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/tincture_stat_descriptions.lua" = { status = "todo" }
+"Data/StatDescriptions/variable_duration_skill_stat_descriptions.lua" = { status = "todo" }
+"Data/TattooPassives.lua" = { status = "todo" }
+"Data/TimelessJewelData/AbyssNotableNames.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/TimelessJewelData/LegionPassives.lua" = { status = "todo" }
+"Data/TimelessJewelData/LegionTradeIds.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/TimelessJewelData/NodeIndexMapping.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/TradeSiteStats.lua" = { status = "todo" }
+"Data/Uniques/Special/BoundByDestiny.lua" = { status = "todo" }
+"Data/Uniques/Special/Generated.lua" = { status = "todo" }
+"Data/Uniques/Special/New.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/Special/WatchersEye.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/Special/race.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/amulet.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/axe.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/belt.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/body.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/boots.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/bow.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/claw.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/dagger.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/fishing.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/flask.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/gloves.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/graft.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/helmet.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/jewel.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/mace.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/quiver.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/ring.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/shield.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/staff.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/sword.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/tincture.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Uniques/wand.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Export/Classes/Dat64File.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/DatFile.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/DatListControl.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/GGPKData.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/GGPKSourceListControl.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/RowListControl.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/ScriptListControl.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Classes/SpecColListControl.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Launch.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Main.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/bases.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/bossData.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/cluster.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/costs.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/crucible.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/enchant.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/enums.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/essence.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/flavourText.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/legionPassives.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/legionSprites.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/mapUniqueToFoulborn.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/masters.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/minions.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/miscdata.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/modScalability.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/mods.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/pantheons.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/skillGemList.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/skills.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/statdesc.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/tattooPassives.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/uModsToText.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Scripts/uTextToMods.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Tree/GimpBatch/gimp_batch.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Tree/tree.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Tree/tree_in.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/ModTextMap.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/amulet.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/axe.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/belt.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/body.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/boots.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/bow.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/claw.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/dagger.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/fishing.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/flask.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/gloves.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/helmet.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/jewel.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/mace.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/quiver.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/ring.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/shield.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/staff.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/sword.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/tincture.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/Uniques/wand.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/browse.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/essenceMatch.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/passives.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/psg.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/spec.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"Export/statdesc.lua" = { status = "skip", reason = "exports data from the game files; the data reaches us through Data/" }
+"GameVersions.lua" = { status = "todo" }
+"HeadlessWrapper.lua" = { status = "skip", reason = "runs upstream as the oracle" }
+"Launch.lua" = { status = "skip", reason = "desktop launcher and updater" }
+"LaunchInstall.lua" = { status = "skip", reason = "desktop launcher and updater" }
+"LaunchServer.lua" = { status = "skip", reason = "desktop launcher and updater" }
+"Modules/Build.lua" = { status = "todo" }
+"Modules/BuildDisplayStats.lua" = { status = "todo" }
+"Modules/BuildList.lua" = { status = "todo" }
+"Modules/BuildListHelpers.lua" = { status = "todo" }
+"Modules/BuildSiteTools.lua" = { status = "todo" }
+"Modules/CalcActiveSkill.lua" = { status = "todo" }
+"Modules/CalcBreakdown.lua" = { status = "todo" }
+"Modules/CalcDefence.lua" = { status = "todo" }
+"Modules/CalcFormat.lua" = { status = "todo" }
+"Modules/CalcMirages.lua" = { status = "todo" }
+"Modules/CalcOffence.lua" = { status = "todo" }
+"Modules/CalcPerform.lua" = { status = "todo" }
+"Modules/CalcSections.lua" = { status = "todo" }
+"Modules/CalcSetup.lua" = { status = "todo" }
+"Modules/CalcTools.lua" = { status = "todo" }
+"Modules/CalcTriggers.lua" = { status = "todo" }
+"Modules/Calcs.lua" = { status = "todo" }
+"Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/ConfigOptions.lua" = { status = "todo" }
+"Modules/ConfigVisibility.lua" = { status = "todo" }
+"Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/DataAbyssJewelLookUpTableHelper.lua" = { status = "todo" }
+"Modules/DataJewelFileLoader.lua" = { status = "todo" }
+"Modules/DataLegionLookUpTableHelper.lua" = { status = "todo" }
+"Modules/ItemSlotHelper.lua" = { status = "todo" }
+"Modules/ItemTools.lua" = { status = "todo" }
+"Modules/Main.lua" = { status = "todo" }
+"Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/ModTools.lua" = { status = "partial", port = "crates/engine/src/mod_tools.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/PantheonTools.lua" = { status = "todo" }
+"Modules/StatDescriber.lua" = { status = "todo" }
+"Modules/ToastNotification.lua" = { status = "todo" }
+"Modules/Utils.lua" = { status = "todo" }
+"TreeData/2_6/tree.lua" = { status = "todo" }
+"TreeData/3_10/tree.lua" = { status = "todo" }
+"TreeData/3_11/tree.lua" = { status = "todo" }
+"TreeData/3_12/tree.lua" = { status = "todo" }
+"TreeData/3_13/tree.lua" = { status = "todo" }
+"TreeData/3_14/tree.lua" = { status = "todo" }
+"TreeData/3_15/tree.lua" = { status = "todo" }
+"TreeData/3_16/tree.lua" = { status = "todo" }
+"TreeData/3_17/tree.lua" = { status = "todo" }
+"TreeData/3_18/tree.lua" = { status = "todo" }
+"TreeData/3_19/Assets.lua" = { status = "todo" }
+"TreeData/3_19/tree.lua" = { status = "todo" }
+"TreeData/3_20/tree.lua" = { status = "todo" }
+"TreeData/3_21/tree.lua" = { status = "todo" }
+"TreeData/3_22/tree.lua" = { status = "todo" }
+"TreeData/3_22_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_23/tree.lua" = { status = "todo" }
+"TreeData/3_23_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_24/tree.lua" = { status = "todo" }
+"TreeData/3_24_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_25/sprites.lua" = { status = "todo" }
+"TreeData/3_25/tree.lua" = { status = "todo" }
+"TreeData/3_25_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_25_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_25_ruthless/sprites.lua" = { status = "todo" }
+"TreeData/3_25_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_25_ruthless_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_25_ruthless_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_26/sprites.lua" = { status = "todo" }
+"TreeData/3_26/tree.lua" = { status = "todo" }
+"TreeData/3_26_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_26_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_26_ruthless/sprites.lua" = { status = "todo" }
+"TreeData/3_26_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_26_ruthless_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_26_ruthless_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_27/sprites.lua" = { status = "todo" }
+"TreeData/3_27/tree.lua" = { status = "todo" }
+"TreeData/3_27_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_27_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_27_ruthless/sprites.lua" = { status = "todo" }
+"TreeData/3_27_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_27_ruthless_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_27_ruthless_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_28/sprites.lua" = { status = "todo" }
+"TreeData/3_28/tree.lua" = { status = "todo" }
+"TreeData/3_28_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_28_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_28_ruthless/sprites.lua" = { status = "todo" }
+"TreeData/3_28_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_28_ruthless_alternate/sprites.lua" = { status = "todo" }
+"TreeData/3_28_ruthless_alternate/tree.lua" = { status = "todo" }
+"TreeData/3_29/sprites.lua" = { status = "todo" }
+"TreeData/3_29/tree.lua" = { status = "todo" }
+"TreeData/3_29_ruthless/sprites.lua" = { status = "todo" }
+"TreeData/3_29_ruthless/tree.lua" = { status = "todo" }
+"TreeData/3_6/tree.lua" = { status = "todo" }
+"TreeData/3_7/tree.lua" = { status = "todo" }
+"TreeData/3_8/tree.lua" = { status = "todo" }
+"TreeData/3_9/tree.lua" = { status = "todo" }
+"TreeData/legion/tree-legion.lua" = { status = "todo" }
+"UpdateApply.lua" = { status = "skip", reason = "desktop launcher and updater" }
+"UpdateCheck.lua" = { status = "skip", reason = "desktop launcher and updater" }

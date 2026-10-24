@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - run: sync/check.py
+      - run: sync/check.py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       # Generated ports must match upstream's source
