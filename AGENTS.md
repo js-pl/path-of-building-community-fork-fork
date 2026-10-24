@@ -10,7 +10,7 @@ See `docs/design.md` before making architectural decisions.
   runtime), `upstream` (upstream's whole program translated to Rust by luagen
   in its build script; never edit generated code, fix luagen or the runtime),
   `equivalence` (tests against the oracle)
-- `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a release tag; never edit it
+- `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a commit on upstream `dev`; never edit it
 - `docs/` holds design decisions
 - `oracle/` runs upstream headless as the test oracle; `tests/oracle` is its
   generated output, see `oracle/README.md`

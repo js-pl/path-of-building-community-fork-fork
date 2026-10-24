@@ -27,7 +27,7 @@ repository but generated from the upstream submodule at build time.
 | --- | --- |
 | `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `session` (engine API), `wasm` (the engine for the browser), `cli` (`pob`, native runner), `equivalence` (oracle tests) |
 | `web/` | The web app (TypeScript, Preact, Vite) |
-| `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
+| `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a commit on `dev` (git submodule) |
 | `oracle/` | Runs upstream headless to produce expected outputs and coverage |
 | `corpus/` | Builds the oracle runs (`corpus.toml`) and the build generator |
 | `tests/oracle/` | Upstream's outputs per corpus build, mod line and data table (generated, never edited) |
