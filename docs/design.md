@@ -319,12 +319,16 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    commands, with `session.lua` replaced by Rust.
    Replacements are installed into the running translation
    (`engine::install`) and replace its methods; `POB_TRANSLATED=1` turns
-   them off to compare. Done: the queries of `ModStore`, `ModDB` and
-   `ModList` (`crates/engine/src/mod_store.rs`), about 25% off edits and
-   node power. Where the time goes now (20 edits on a generated build):
-   `PassiveSpec:BuildAllDependsAndPaths` 37%, the cycle collector 16%,
-   `calcs.perform` only 8%; table lookups and allocation dominate the
-   runtime.
+   them off to compare. Native code that still works on the program's Lua
+   tables is only faster where it saves the translation's dispatch: the
+   queries of `ModStore`, `ModDB` and `ModList`
+   (`crates/engine/src/mod_store.rs`) took about 25% off edits and node
+   power, a native `PassiveSpec:BuildPathFromNode` nothing. Bigger wins need
+   typed data. The cycle collector is generational, which took another 39%
+   off node power. Where the time goes now: table lookups and allocation in
+   the runtime; per edit `PassiveSpec:BuildAllDependsAndPaths` (37%), per
+   calculation `initEnv` building a ModList per tree node (35%), while
+   `calcs.perform` is under 25%.
 
 ## Open questions
 
