@@ -5,47 +5,12 @@
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
-use equivalence::{oracle_dir, root, upstream_src};
+use equivalence::{corpus, oracle_dir, upstream_src};
 use lua::rt::{self, first};
 use lua::{LResult, LuaError, TableRef, Value};
-use std::path::PathBuf;
 use std::rc::Rc;
 use upstream::host::Host;
 use upstream::imported::Imported;
-
-/// Corpus builds as `oracle/run.py` lists them: (id, path).
-fn corpus() -> Vec<(String, PathBuf)> {
-    let text = std::fs::read_to_string(root().join("corpus/corpus.toml")).unwrap();
-    let value = |line: &str| {
-        line.split_once('=')
-            .map(|(_, v)| v.trim().trim_matches('"').to_string())
-    };
-    let mut builds = Vec::new();
-    let mut id = None;
-    let (mut first_seed, mut count) = (0, 0);
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with("id =") {
-            id = value(line);
-        } else if line.starts_with("path =") {
-            builds.push((
-                id.take().expect("id before path"),
-                root().join(value(line).unwrap()),
-            ));
-        } else if line.starts_with("first_seed =") {
-            first_seed = value(line).unwrap().parse().unwrap();
-        } else if line.starts_with("count =") {
-            count = value(line).unwrap().parse().unwrap();
-        }
-    }
-    for seed in first_seed..first_seed + count {
-        builds.push((
-            format!("gen-{seed:04}"),
-            root().join(format!("corpus/generated/gen-{seed:04}.xml")),
-        ));
-    }
-    builds
-}
 
 fn s(x: &str) -> Value {
     Value::str(x)
