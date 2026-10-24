@@ -158,7 +158,7 @@ fn mod_queries() {
             cfgs.push(get(&skill, "skillCfg"));
         }
         let mut run = Run {
-                conv: Converter {
+            conv: Converter {
                 originals: &b.originals,
             },
             failures: Vec::new(),
@@ -322,6 +322,11 @@ fn mod_queries() {
         failures.extend(run.failures);
     }
     assert!(ran > 0, "no build matches CALCS_FILTER={filter}");
+    bridge::UNKNOWN.with(|u| {
+        for (k, n) in u.borrow().iter() {
+            eprintln!("unknown {k}: {n}");
+        }
+    });
     eprintln!("{queries} queries on {ran} builds");
     assert!(
         failures.is_empty(),

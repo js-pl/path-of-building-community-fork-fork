@@ -108,6 +108,8 @@ pub struct Mod {
     pub flags: u32,
     pub keyword_flags: u32,
     pub source: Option<Rc<str>>,
+    /// The item slot a mod from an item comes from (`sourceSlot`)
+    pub source_slot: Option<Rc<str>>,
     /// Conditions and scaling, applied in order by `EvalMod`
     pub tags: Vec<Tag>,
 }

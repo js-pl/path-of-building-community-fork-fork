@@ -94,9 +94,18 @@ fn keys(t: &TableRef) -> Vec<String> {
         .collect()
 }
 
+thread_local! {
+    /// With `MODS_SURVEY` set, unknown fields are collected here instead
+    pub static UNKNOWN: RefCell<std::collections::BTreeMap<String, usize>> = Default::default();
+}
+
 fn check_fields(t: &TableRef, what: &str, known: &[&str]) -> Result<(), String> {
     for k in keys(t) {
         if !known.contains(&k.as_str()) {
+            if std::env::var_os("MODS_SURVEY").is_some() {
+                UNKNOWN.with(|u| *u.borrow_mut().entry(format!("{what}: {k}")).or_default() += 1);
+                continue;
+            }
             return Err(format!("{what}: unknown field '{k}'"));
         }
     }
@@ -167,19 +176,14 @@ impl Converter<'_> {
                 "flags",
                 "keywordFlags",
                 "source",
+                "sourceSlot",
                 "replaced",
                 "converted",
             ],
         )?;
         let typ = ModType::new(&text(&get(v, "type"))?);
         let raw = get(v, "value");
-        let value = match (&raw, typ) {
-            // Numeric strings: arithmetic coerces them, so they are numbers
-            (Value::Str(_), ModType::Base | ModType::Inc | ModType::More | ModType::Override) => {
-                ModValue::Number(number(&raw)?)
-            }
-            _ => self.value(&raw)?,
-        };
+        let value = self.value(&raw)?;
         let mut tags = Vec::new();
         for tag in array(v) {
             tags.push(self.tag(&tag)?);
@@ -191,6 +195,10 @@ impl Converter<'_> {
             flags: flags(&get(v, "flags"))?,
             keyword_flags: flags(&get(v, "keywordFlags"))?,
             source: match get(v, "source") {
+                Value::Nil => None,
+                x => Some(text(&x)?),
+            },
+            source_slot: match get(v, "sourceSlot") {
                 Value::Nil => None,
                 x => Some(text(&x)?),
             },

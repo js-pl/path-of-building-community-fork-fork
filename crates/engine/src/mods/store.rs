@@ -184,11 +184,46 @@ fn max(a: f64, b: f64) -> f64 {
     if b > a { b } else { a }
 }
 
+/// A value in arithmetic: a number, or a string upstream's runtime coerces
+/// (upstream's data has a few numbers as strings, e.g. `"10"`)
 fn num(v: &ModValue) -> Result<f64> {
     match v {
         ModValue::Number(n) => Ok(*n),
+        ModValue::Str(s) => coerce(s)
+            .ok_or_else(|| format!("attempt to perform arithmetic on a string value ({s:?})")),
         v => Err(format!("attempt to perform arithmetic on {v:?}")),
     }
+}
+
+/// Lua's string to number coercion: decimal or `0x` hex, surrounding
+/// whitespace allowed, no `inf` or `nan`
+pub fn coerce(s: &str) -> Option<f64> {
+    let t = s.trim_matches(|c: char| c.is_ascii_whitespace());
+    let (neg, body) = match t.strip_prefix('-') {
+        Some(b) => (true, b),
+        None => (false, t),
+    };
+    let v = if let Some(hex) = body.strip_prefix("0x").or_else(|| body.strip_prefix("0X")) {
+        if hex.is_empty() || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        hex.bytes().fold(0.0, |acc, b| {
+            acc * 16.0 + (b as char).to_digit(16).unwrap() as f64
+        })
+    } else {
+        if !body
+            .bytes()
+            .all(|b| b.is_ascii_digit() || matches!(b, b'.' | b'e' | b'E' | b'+' | b'-'))
+            || !body
+                .bytes()
+                .next()
+                .is_some_and(|b| b.is_ascii_digit() || b == b'.')
+        {
+            return None;
+        }
+        body.parse::<f64>().ok()?
+    };
+    Some(if neg { -v } else { v })
 }
 
 /// Queries over a calculation's stores.
