@@ -3,7 +3,6 @@
 //! Free-form ports of upstream, replacing its translation piece by piece,
 //! see docs/design.md.
 
-pub mod class;
 pub mod common;
 pub mod data;
 pub mod mod_parser;
@@ -18,8 +17,7 @@ pub fn install(env: &std::rc::Rc<lua::env::Env>) -> lua::LResult<()> {
     if std::env::var_os("POB_TRANSLATED").is_some() {
         return Ok(());
     }
-    mod_store::install(env)?;
-    class::install(env)
+    mod_store::install(env)
 }
 
 /// Upstream's class `name` (`common.classes[name]`), loaded as `getClass`
