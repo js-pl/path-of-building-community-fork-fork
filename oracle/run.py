@@ -134,7 +134,8 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
 
     def run_task(task):
         if task[1] == "modparser":
-            luajit(ORACLE / "modparser.lua", [str(out / "modparser.jsonl"), *build_args(builds)])
+            luajit(ORACLE / "modparser.lua",
+                   [str(out / "modparser.jsonl"), str(CORPUS / "synthetic_mod_lines.txt"), *build_args(builds)])
         elif task[1] == "data":
             luajit(ORACLE / "data.lua", [str(out / "data.jsonl")])
         else:

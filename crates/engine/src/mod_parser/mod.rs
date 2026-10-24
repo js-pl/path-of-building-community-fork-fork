@@ -48,6 +48,8 @@ impl Entry {
 struct List {
     entries: Vec<(LuaStr, Entry)>,
     index: HashMap<LuaStr, usize>,
+    /// Which entries a scan has selected, for rule coverage
+    hits: RefCell<Vec<bool>>,
 }
 
 impl List {
@@ -623,6 +625,33 @@ impl ModParser {
         })
     }
 
+    /// Patterns no scan has selected so far, by table: rule coverage of the
+    /// lines parsed with this parser.
+    pub fn unhit_rules(&self) -> Vec<(&'static str, String)> {
+        let lists: [(&'static str, &List); 10] = [
+            ("formList", &self.form_list),
+            ("modNameList", &self.mod_name_list),
+            ("modFlagList", &self.mod_flag_list),
+            ("preFlagList", &self.pre_flag_list),
+            ("modTagList", &self.mod_tag_list),
+            ("specialModList", &self.special_mod_list),
+            ("suffixTypes", &self.suffix_types),
+            ("flagTypes", &self.flag_types),
+            ("skillNameList", &self.skill_name_list),
+            ("preSkillNameList", &self.pre_skill_name_list),
+        ];
+        let mut out = Vec::new();
+        for (name, list) in lists {
+            let hits = list.hits.borrow();
+            for (i, (pattern, _)) in list.entries.iter().enumerate() {
+                if !hits.get(i).copied().unwrap_or(false) {
+                    out.push((name, pattern.to_string()));
+                }
+            }
+        }
+        out
+    }
+
     /// Preloads the memo cache with upstream's `Data/ModCache.lua` (line ->
     /// `{ modList, extra }`), as upstream does on startup. Cached results are
     /// what desktop PoB uses for every line it ships.
@@ -664,7 +693,8 @@ impl ModParser {
         let lower_line = lower(line);
         let lower_bytes = lower_line.as_str().expect("string").as_bytes().to_vec();
         let mut best: Option<(usize, usize, usize, &Entry, Vec<Value>)> = None;
-        for (pattern, val) in &list.entries {
+        let mut best_i = 0;
+        for (i, (pattern, val)) in list.entries.iter().enumerate() {
             let found = lua::pattern::lua_find(&lower_bytes, pattern.as_bytes(), 1, plain)
                 .unwrap_or_else(|e| panic!("bad pattern {pattern:?}: {e:?}"));
             if let Some((index, end, caps)) = found {
@@ -679,8 +709,16 @@ impl ModParser {
                     let mut caps = caps;
                     caps.truncate(5);
                     best = Some((index, end, pattern.len(), val, caps));
+                    best_i = i;
                 }
             }
+        }
+        if best.is_some() {
+            let mut hits = list.hits.borrow_mut();
+            if hits.len() < list.entries.len() {
+                hits.resize(list.entries.len(), false);
+            }
+            hits[best_i] = true;
         }
         match best {
             Some((start, end, _, val, caps)) => {

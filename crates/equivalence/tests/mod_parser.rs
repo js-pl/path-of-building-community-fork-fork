@@ -19,10 +19,18 @@ fn every_line_matches_upstream() {
         total += 1;
         let record: serde_json::Value = serde_json::from_str(oracle_line).expect("oracle JSON");
         let line = record["line"].as_str().expect("line");
+        let upstream_error = record.get("error").is_some();
         let (mods, extra) = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             parser.parse(line.as_bytes())
         })) {
+            Ok(_) if upstream_error => {
+                failures.push(format!(
+                    "{line:?}: upstream raises an error, the engine does not"
+                ));
+                continue;
+            }
             Ok(r) => r,
+            Err(_) if upstream_error => continue,
             Err(e) => {
                 let msg = e
                     .downcast_ref::<String>()
@@ -41,6 +49,21 @@ fn every_line_matches_upstream() {
         if got != oracle_line {
             failures.push(format!("expected {oracle_line}\n     got {got}"));
         }
+    }
+    // Rule coverage: patterns no known line reaches are listed in the
+    // report, so tests can be added for them (see docs/design.md)
+    let unhit = parser.unhit_rules();
+    let mut by_list = std::collections::BTreeMap::new();
+    for (list, _) in &unhit {
+        *by_list.entry(*list).or_insert(0) += 1;
+    }
+    eprintln!(
+        "mod parser rules no known line reaches: {} ({by_list:?})",
+        unhit.len()
+    );
+    if let Some(dir) = std::env::var_os("RULE_COVERAGE_OUT") {
+        let text: String = unhit.iter().map(|(l, p)| format!("{l}\t{p}\n")).collect();
+        std::fs::write(dir, text).unwrap();
     }
     let shown: Vec<&String> = failures.iter().take(30).collect();
     assert!(

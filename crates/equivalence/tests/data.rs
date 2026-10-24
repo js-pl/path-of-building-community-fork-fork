@@ -10,7 +10,10 @@ use lua::{TableRef, Value};
 fn path(raw: &importer::Raw, path: &[&str]) -> Value {
     let mut v = Value::Table(raw.data.clone());
     for p in path {
-        v = v.as_table().unwrap_or_else(|| panic!("{path:?}")).get_str(p);
+        v = v
+            .as_table()
+            .unwrap_or_else(|| panic!("{path:?}"))
+            .get_str(p);
     }
     v
 }
@@ -21,7 +24,8 @@ fn every_table_matches_upstream() {
     let mut im = importer::Importer::new(&upstream_src());
     let mut fresh = |file: &str| {
         let t = TableRef::new();
-        im.load(&format!("Data/{file}"), vec![Value::Table(t.clone())]).unwrap_or_else(|e| panic!("{e}"));
+        im.load(&format!("Data/{file}"), vec![Value::Table(t.clone())])
+            .unwrap_or_else(|e| panic!("{e}"));
         Value::Table(t)
     };
     let misc = fresh("Misc");
@@ -80,19 +84,34 @@ fn every_table_matches_upstream() {
         }
     };
     let json_dir = std::env::var_os("DATA_JSON_DIR").map(std::path::PathBuf::from);
-    let text = std::fs::read_to_string(oracle_dir().join("data.jsonl")).expect("tests/oracle/data.jsonl");
+    let text =
+        std::fs::read_to_string(oracle_dir().join("data.jsonl")).expect("tests/oracle/data.jsonl");
     let mut failures = Vec::new();
     for line in text.lines() {
         let record: serde_json::Value = serde_json::from_str(line).unwrap();
         let key = record["key"].as_str().unwrap();
         let json = to_json_with_funcs(&lookup(key));
         if let Some(dir) = &json_dir {
-            std::fs::write(dir.join(format!("{}.json", key.replace('/', "_"))), format!("{json}\n")).unwrap();
+            std::fs::write(
+                dir.join(format!("{}.json", key.replace('/', "_"))),
+                format!("{json}\n"),
+            )
+            .unwrap();
         }
         let fnv = format!("{:016x}", lua::value::fnv1a(json.as_bytes()));
-        if fnv != record["fnv"].as_str().unwrap() || json.len() as u64 != record["bytes"].as_u64().unwrap() {
-            failures.push(format!("{key}: {} bytes, upstream {} bytes", json.len(), record["bytes"]));
+        if fnv != record["fnv"].as_str().unwrap()
+            || json.len() as u64 != record["bytes"].as_u64().unwrap()
+        {
+            failures.push(format!(
+                "{key}: {} bytes, upstream {} bytes",
+                json.len(),
+                record["bytes"]
+            ));
         }
     }
-    assert!(failures.is_empty(), "tables differ from upstream:\n{}", failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "tables differ from upstream:\n{}",
+        failures.join("\n")
+    );
 }
