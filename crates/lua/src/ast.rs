@@ -136,3 +136,71 @@ pub enum UnOp {
     Not,
     Len,
 }
+
+/// The value of an expression LuaJIT's parser folds to a constant: literals,
+/// and `-`, `not` and arithmetic on constants, except where folding would
+/// give NaN or -0 (lj_parse.c `foldarith`, `bcemit_unop`).
+pub fn constant(e: &Expr) -> Option<Constant> {
+    match e {
+        Expr::Nil => Some(Constant::Nil),
+        Expr::True => Some(Constant::Bool(true)),
+        Expr::False => Some(Constant::Bool(false)),
+        Expr::Number(n) => Some(Constant::Number(*n)),
+        Expr::Str(_) => Some(Constant::Str),
+        Expr::Paren(e) => constant(e),
+        Expr::Unary(UnOp::Neg, e) => match constant(e)? {
+            Constant::Number(n) if n != 0.0 => Some(Constant::Number(-n)),
+            _ => None,
+        },
+        Expr::Unary(UnOp::Not, e) => match constant(e)? {
+            Constant::Nil | Constant::Bool(false) => Some(Constant::Bool(true)),
+            _ => Some(Constant::Bool(false)),
+        },
+        Expr::Binary(op, a, b) => {
+            let (Constant::Number(x), Constant::Number(y)) = (constant(a)?, constant(b)?) else {
+                return None;
+            };
+            let n = match op {
+                BinOp::Add => x + y,
+                BinOp::Sub => x - y,
+                BinOp::Mul => x * y,
+                BinOp::Div => x / y,
+                BinOp::Mod => x - (x / y).floor() * y,
+                BinOp::Pow => x.powf(y),
+                _ => return None,
+            };
+            if n.is_nan() || (n == 0.0 && n.is_sign_negative()) {
+                None
+            } else {
+                Some(Constant::Number(n))
+            }
+        }
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Constant {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    Str,
+}
+
+/// The order in which a table constructor's fields are stored, as LuaJIT
+/// does it: fields with a constant key and value go into a template table
+/// the constructor copies, the others are stored afterwards in source order.
+/// This only matters for duplicate keys: `{ a = f(), a = 1 }` keeps `f()`.
+pub fn constructor_order(fields: &[Field]) -> Vec<usize> {
+    let template = |f: &Field| match f {
+        Field::Keyed(k, v) => {
+            !matches!(constant(k), None | Some(Constant::Nil)) && constant(v).is_some()
+        }
+        Field::Item(v) => constant(v).is_some(),
+    };
+    let mut order: Vec<usize> = (0..fields.len())
+        .filter(|&i| template(&fields[i]))
+        .collect();
+    order.extend((0..fields.len()).filter(|&i| !template(&fields[i])));
+    order
+}

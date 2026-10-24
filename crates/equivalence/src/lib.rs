@@ -91,7 +91,7 @@ fn encode(v: &Value, out: &mut String, func: &dyn Fn(&Value) -> String) {
             }
         }
         Value::Str(s) => encode_str(s.as_bytes(), out),
-        Value::Func(_) | Value::Closure(_) => out.push_str(&func(v)),
+        Value::Func(_) | Value::Closure(_) | Value::Function(_) => out.push_str(&func(v)),
         Value::Table(t) => {
             let entries = t.entries();
             let n = entries.len();

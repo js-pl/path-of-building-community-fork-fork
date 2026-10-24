@@ -97,6 +97,101 @@ pub struct Closure {
     pub upvalues: Vec<Value>,
 }
 
+/// Error raised by Lua code (`error(value)`) or by an operation Lua rejects.
+/// Boxed, so results stay small in generated code.
+#[derive(Clone)]
+pub struct LuaError(Box<ErrorData>);
+
+#[derive(Clone)]
+pub struct ErrorData {
+    pub value: Value,
+    /// Function names from the innermost call outwards, for messages
+    pub traceback: Vec<Rc<str>>,
+}
+
+impl LuaError {
+    pub fn new(value: Value) -> LuaError {
+        LuaError(Box::new(ErrorData {
+            value,
+            traceback: vec![],
+        }))
+    }
+
+    pub fn msg(msg: impl Into<String>) -> LuaError {
+        LuaError::new(Value::Str(LuaStr::from(msg.into())))
+    }
+
+    /// The error value, as `pcall` returns it.
+    pub fn value(&self) -> &Value {
+        &self.0.value
+    }
+
+    pub fn into_value(self) -> Value {
+        self.0.value
+    }
+
+    pub fn traceback(&self) -> &[Rc<str>] {
+        &self.0.traceback
+    }
+
+    /// Adds a frame to the traceback, innermost first.
+    pub fn push_frame(&mut self, name: Rc<str>) {
+        if self.0.traceback.len() < 64 {
+            self.0.traceback.push(name);
+        }
+    }
+}
+
+impl fmt::Debug for LuaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for LuaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0.value {
+            Value::Str(s) => write!(f, "{s}")?,
+            v => write!(f, "{v:?}")?,
+        }
+        for t in &self.0.traceback {
+            write!(f, "\n  in {t}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for LuaError {}
+
+pub type LResult<T> = Result<T, LuaError>;
+
+type NativeFn = dyn Fn(&[Value]) -> LResult<Vec<Value>>;
+
+/// `next` was given a key that is not in the table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidKey;
+
+/// A callable Lua function: generated from upstream code or native.
+pub struct Function {
+    pub name: Rc<str>,
+    pub f: Box<NativeFn>,
+}
+
+impl Function {
+    pub fn call(&self, args: &[Value]) -> LResult<Vec<Value>> {
+        (self.f)(args).map_err(|mut e| {
+            e.push_frame(self.name.clone());
+            e
+        })
+    }
+}
+
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "function<{}>", self.name)
+    }
+}
+
 #[derive(Clone, Default)]
 pub enum Value {
     #[default]
@@ -105,10 +200,12 @@ pub enum Value {
     Number(f64),
     Str(LuaStr),
     Table(TableRef),
-    /// A Lua function from upstream's source
+    /// A Lua function from upstream's source, not callable by itself
     Func(Rc<FuncRef>),
     /// A closure built by ported code
     Closure(Rc<Closure>),
+    /// A callable function
+    Function(Rc<Function>),
 }
 
 impl Value {
@@ -153,7 +250,7 @@ impl Value {
             Value::Number(_) => "number",
             Value::Str(_) => "string",
             Value::Table(_) => "table",
-            Value::Func(_) | Value::Closure(_) => "function",
+            Value::Func(_) | Value::Closure(_) | Value::Function(_) => "function",
         }
     }
 
@@ -167,6 +264,7 @@ impl Value {
             (Value::Table(a), Value::Table(b)) => Rc::ptr_eq(&a.0, &b.0),
             (Value::Func(a), Value::Func(b)) => Rc::ptr_eq(a, b),
             (Value::Closure(a), Value::Closure(b)) => Rc::ptr_eq(a, b),
+            (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -234,6 +332,7 @@ impl fmt::Debug for Value {
             }
             Value::Func(r) => write!(f, "function<{}:{} {}>", r.file, r.line, r.key),
             Value::Closure(c) => write!(f, "closure<{}>", c.name),
+            Value::Function(func) => write!(f, "function<{}>", func.name),
         }
     }
 }
@@ -265,6 +364,21 @@ pub enum Key {
     Table(TablePtr),
     Func(FuncPtr),
     Closure(ClosurePtr),
+    Function(FunctionPtr),
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionPtr(pub Rc<Function>);
+impl PartialEq for FunctionPtr {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for FunctionPtr {}
+impl Hash for FunctionPtr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (Rc::as_ptr(&self.0) as *const u8 as usize).hash(state)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -329,6 +443,7 @@ impl Key {
             Value::Table(t) => Key::Table(TablePtr(t.clone())),
             Value::Func(f) => Key::Func(FuncPtr(f.clone())),
             Value::Closure(c) => Key::Closure(ClosurePtr(c.clone())),
+            Value::Function(f) => Key::Function(FunctionPtr(f.clone())),
         })
     }
 
@@ -341,6 +456,7 @@ impl Key {
             Key::Table(t) => Value::Table(t.0.clone()),
             Key::Func(f) => Value::Func(f.0.clone()),
             Key::Closure(c) => Value::Closure(c.0.clone()),
+            Key::Function(f) => Value::Function(f.0.clone()),
         }
     }
 }
@@ -363,7 +479,46 @@ pub struct Table {
     array: Vec<Value>,
     /// Hash part in insertion order; removed entries leave a None
     entries: Vec<Option<(Key, Value)>>,
-    index: HashMap<Key, usize>,
+    /// Slot of every key ever set in the hash part; a removed key keeps its
+    /// slot, so `next` can continue from it, as in Lua
+    index: HashMap<Key, usize, std::hash::BuildHasherDefault<FxHasher>>,
+    /// Number of live entries in the hash part
+    live: usize,
+    pub meta: Option<TableRef>,
+}
+
+/// The fast, non-cryptographic hasher rustc uses.
+#[derive(Default, Clone, Copy)]
+pub struct FxHasher {
+    hash: u64,
+}
+
+impl Hasher for FxHasher {
+    fn write(&mut self, bytes: &[u8]) {
+        for chunk in bytes.chunks(8) {
+            let mut b = [0u8; 8];
+            b[..chunk.len()].copy_from_slice(chunk);
+            self.add(u64::from_le_bytes(b));
+        }
+    }
+
+    fn write_u64(&mut self, i: u64) {
+        self.add(i);
+    }
+
+    fn write_usize(&mut self, i: usize) {
+        self.add(i as u64);
+    }
+
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+}
+
+impl FxHasher {
+    fn add(&mut self, word: u64) {
+        self.hash = (self.hash.rotate_left(5) ^ word).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+    }
 }
 
 impl Table {
@@ -442,10 +597,16 @@ impl Table {
             return;
         }
         match self.index.get(&key) {
-            Some(&i) => self.entries[i] = Some((key, value)),
+            Some(&i) => {
+                if self.entries[i].is_none() {
+                    self.live += 1;
+                }
+                self.entries[i] = Some((key, value))
+            }
             None => {
                 self.index.insert(key.clone(), self.entries.len());
                 self.entries.push(Some((key, value)));
+                self.live += 1;
             }
         }
     }
@@ -455,9 +616,16 @@ impl Table {
     }
 
     fn remove_hash(&mut self, key: &Key) -> Option<Value> {
-        let i = self.index.remove(key)?;
+        let i = *self.index.get(key)?;
         let (_, v) = self.entries[i].take()?;
+        self.live -= 1;
         Some(v)
+    }
+
+    /// `#t`: a border of the table. The array part never ends in nil, so its
+    /// length is one.
+    pub fn border(&self) -> usize {
+        self.array.len()
     }
 
     /// `#t`: the length of the array part.
@@ -466,12 +634,12 @@ impl Table {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.array.is_empty() && self.index.is_empty()
+        self.array.is_empty() && self.live == 0
     }
 
     /// Number of non-nil entries.
     pub fn len_pairs(&self) -> usize {
-        self.array.iter().filter(|v| !v.is_nil()).count() + self.index.len()
+        self.array.iter().filter(|v| !v.is_nil()).count() + self.live
     }
 
     /// `t[#t + 1] = value`
@@ -501,6 +669,46 @@ impl Table {
     /// The array part, `t[1..#t]`.
     pub fn array(&self) -> &[Value] {
         &self.array
+    }
+
+    /// `next(t, key)`: the entry after `key` (the first for nil), array part
+    /// first, then the hash part in insertion order. Err for a key that is
+    /// not in the table.
+    pub fn next(&self, key: &Value) -> Result<Option<(Value, Value)>, InvalidKey> {
+        // Position to start scanning: array index, or hash slot + array len
+        let mut pos = match key {
+            Value::Nil => 0,
+            k => {
+                let k = Key::from_value(k).ok_or(InvalidKey)?;
+                match k {
+                    Key::Int(i) if i >= 1 && (i as usize) <= self.array.len() => i as usize,
+                    k => match self.index.get(&k) {
+                        Some(&slot) => self.array.len() + slot + 1,
+                        // An array index past the end: the array part shrank
+                        // after the key was set to nil, continue with the hash part
+                        None if matches!(k, Key::Int(i) if i >= 1) => self.array.len(),
+                        None => return Err(InvalidKey),
+                    },
+                }
+            }
+        };
+        while pos < self.array.len() {
+            if !self.array[pos].is_nil() {
+                return Ok(Some((
+                    Value::Number((pos + 1) as f64),
+                    self.array[pos].clone(),
+                )));
+            }
+            pos += 1;
+        }
+        let mut h = pos - self.array.len();
+        while h < self.entries.len() {
+            if let Some((k, v)) = &self.entries[h] {
+                return Ok(Some((k.to_value(), v.clone())));
+            }
+            h += 1;
+        }
+        Ok(None)
     }
 
     /// Array part first, then the hash part in insertion order.

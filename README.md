@@ -9,8 +9,9 @@ The goals are the same numbers as upstream, enforced by equivalence tests
 against upstream itself, and much faster recalcs and power calculations
 (node, anoint, items, gems). Daily jobs port new upstream commits.
 
-**Status:** phase 1 done: the data importer and the mod parser match upstream
-exactly. Next are the calcs. See [docs/design.md](docs/design.md).
+**Status:** phase 2 done: upstream's program, translated to Rust, calculates
+every corpus build exactly as upstream does. Next are the engine API and WASM.
+See [docs/design.md](docs/design.md).
 
 ## Disclaimer
 
@@ -23,7 +24,7 @@ repository but generated from the upstream submodule at build time.
 
 | Path | Purpose |
 | --- | --- |
-| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics and parser), `equivalence` (oracle tests) |
+| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `equivalence` (oracle tests) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
 | `oracle/` | Runs upstream headless to produce expected outputs and coverage |
 | `corpus/` | Builds the oracle runs (`corpus.toml`) and the build generator |

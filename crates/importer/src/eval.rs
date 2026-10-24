@@ -32,11 +32,25 @@ pub type Native = Rc<dyn Fn(&[Value]) -> std::result::Result<Vec<Value>, String>
 /// Natives are passed around as function values whose file is `<native>`.
 const NATIVE_FILE: &str = "<native>";
 
+/// Globals of a running program, which data files read and write when
+/// evaluated for it rather than for an import.
+pub trait Globals {
+    fn get(&self, name: &str) -> Value;
+    fn set(&self, name: &str, v: Value);
+}
+
+/// Turns a data file's function into a callable value, given the file's
+/// locals at the point of its definition.
+pub type MakeFunction = Rc<dyn Fn(&FuncRef, &dyn Fn(&str) -> Value) -> Option<Value>>;
+
 /// Evaluation environment shared by the files of one import.
 #[derive(Default, Clone)]
 pub struct Env {
     pub globals: HashMap<String, Value>,
     natives: Vec<Native>,
+    /// Globals not in `globals`, and where global assignments go
+    pub program: Option<Rc<dyn Globals>>,
+    pub make_function: Option<MakeFunction>,
 }
 
 impl Env {
@@ -209,7 +223,15 @@ impl Evaluator<'_> {
                 return v.clone();
             }
         }
-        self.env.globals.get(name).cloned().unwrap_or_default()
+        match self.env.globals.get(name) {
+            Some(v) => v.clone(),
+            None => self
+                .env
+                .program
+                .as_ref()
+                .map(|p| p.get(name))
+                .unwrap_or_default(),
+        }
     }
 
     fn assign_name(&mut self, name: &str, v: Value) {
@@ -219,7 +241,12 @@ impl Evaluator<'_> {
                 return;
             }
         }
-        self.env.globals.insert(name.to_string(), v);
+        match &self.env.program {
+            Some(p) if !self.env.globals.contains_key(name) => p.set(name, v),
+            _ => {
+                self.env.globals.insert(name.to_string(), v);
+            }
+        }
     }
 
     fn block(&mut self, b: &Block) -> Result<Vec<Value>> {
@@ -335,13 +362,19 @@ impl Evaluator<'_> {
     fn func_ref(&mut self, func: &FuncBody, key: &str) -> Value {
         self.line = func.line;
         let text = &self.src[func.span.0..func.span.1];
-        Value::Func(Rc::new(FuncRef {
+        let r = FuncRef {
             file: self.file.clone(),
             line: func.line,
             offset: func.span.0 as u32,
             key: key.into(),
             source_hash: lua::value::fnv1a(text),
-        }))
+        };
+        if let Some(make) = self.env.make_function.clone()
+            && let Some(f) = make(&r, &|n| self.lookup(n))
+        {
+            return f;
+        }
+        Value::Func(Rc::new(r))
     }
 
     /// Evaluates expressions, expanding the last one if it returns several values.
@@ -422,6 +455,10 @@ impl Evaluator<'_> {
                 Err(msg) => self.err(format!("{}: {msg}", r.key)),
             },
             Value::Func(r) => self.err(format!("cannot call Lua function {} from data", r.key)),
+            Value::Function(func) => match func.call(args) {
+                Ok(v) => Ok(v),
+                Err(e) => self.err(lua::to_string(e.value()).to_string()),
+            },
             _ => self.err(format!("attempt to call a {} value", f.type_name())),
         }
     }
@@ -495,8 +532,18 @@ impl Evaluator<'_> {
 
     fn table(&mut self, fields: &[Field], path: &str) -> Result<TableRef> {
         let t = TableRef::new();
-        let mut n = 0i64;
+        // Positions of positional fields, in source order
+        let mut positions = vec![0i64; fields.len()];
+        let mut count = 0;
         for (i, f) in fields.iter().enumerate() {
+            if let Field::Item(_) = f {
+                count += 1;
+                positions[i] = count;
+            }
+        }
+        for i in lua::ast::constructor_order(fields) {
+            let f = &fields[i];
+            let mut n = positions[i] - 1;
             match f {
                 Field::Keyed(k, v) => {
                     let key = self.expr1(k, "")?;

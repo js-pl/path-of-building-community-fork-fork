@@ -3,6 +3,10 @@
 #
 # status: ported (fully), partial, data (read by the importer), todo, skip
 # port: paths in this repository, separated by spaces
+#
+# Statuses track the engine's typed port. Independently of them, crates/upstream
+# translates upstream's whole program to Rust at build time (luagen), so that
+# translation is always in sync with the submodule; see docs/design.md.
 
 upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 
