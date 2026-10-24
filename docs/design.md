@@ -323,12 +323,20 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    tables is only faster where it saves the translation's dispatch: the
    queries of `ModStore`, `ModDB` and `ModList`
    (`crates/engine/src/mod_store.rs`) took about 25% off edits and node
-   power, a native `PassiveSpec:BuildPathFromNode` nothing. Bigger wins need
-   typed data. The cycle collector is generational, which took another 39%
-   off node power. Where the time goes now: table lookups and allocation in
-   the runtime; per edit `PassiveSpec:BuildAllDependsAndPaths` (37%), per
-   calculation `initEnv` building a ModList per tree node (35%), while
-   `calcs.perform` is under 25%.
+   power, a native `PassiveSpec:BuildPathFromNode` nothing. Speedups to the
+   translation's runtime (generational cycle collection, hashed strings)
+   go with it; the lasting work is the typed engine.
+
+   The typed engine starts with the mod core (`crates/engine/src/mods`):
+   interned names, typed mods, tags and values, ModDB and ModList stores in
+   one arena, and their queries, in plain Rust. `crates/equivalence/tests/mods.rs`
+   converts the stores of every corpus build's calculation and runs every
+   query for every mod name and type present, with no cfg and with each
+   active skill's, against the translated stores (565k queries, all equal).
+   What the queries need from the rest of the engine (actors, outputs,
+   items and gems) is the `Actors` trait, which the test answers from the
+   translation until those parts are typed. Next: the mod parser producing
+   typed mods, then `initEnv` building typed stores.
 
 ## Open questions
 
