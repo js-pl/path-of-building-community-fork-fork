@@ -902,7 +902,7 @@ impl<'a> Query<'a> {
                 };
                 *value = ModValue::Number(min(num(value)?, limit));
             }
-            TagKind::Condition { vars, neg } => {
+            TagKind::Condition { vars, neg, .. } => {
                 let skill_cond = |v: Sym| {
                     cfg.and_then(|c| c.skill_cond.as_ref())
                         .is_some_and(|s| s.contains(&v))

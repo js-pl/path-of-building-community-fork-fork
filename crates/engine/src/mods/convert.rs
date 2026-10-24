@@ -188,6 +188,14 @@ impl Converter<'_> {
         for tag in array(v) {
             tags.push(self.tag(&tag)?);
         }
+        let mut unreached_tags = Vec::new();
+        for (k, tag) in t.entries() {
+            if let Key::Int(i) = k
+                && i as usize > tags.len() + 1
+            {
+                unreached_tags.push((i as usize, self.tag(&tag)?));
+            }
+        }
         Ok(Mod {
             name: sym(&get(v, "name"))?,
             typ,
@@ -203,6 +211,7 @@ impl Converter<'_> {
                 x => Some(text(&x)?),
             },
             tags,
+            unreached_tags,
         })
     }
 
@@ -368,10 +377,11 @@ impl Converter<'_> {
                 }
             }
             "Condition" => {
-                check(&["var", "varList", "neg"])?;
+                check(&["var", "varList", "neg", "actor"])?;
                 TagKind::Condition {
                     vars: names(&g("var"), &g("varList"))?.ok_or("Condition tag without var")?,
                     neg: flag(&g("neg")),
+                    actor: opt_sym(&g("actor"))?,
                 }
             }
             "ActorCondition" => {

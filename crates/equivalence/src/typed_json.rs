@@ -154,9 +154,10 @@ pub fn tag(t: &Tag) -> J {
             opt_sym(&mut m, "limitVar", *limit_var);
             "Limit".into()
         }
-        TagKind::Condition { vars, neg } => {
+        TagKind::Condition { vars, neg, actor } => {
             names(&mut m, "var", "varList", &Some(vars.clone()));
             yes(&mut m, "neg", *neg);
+            opt_sym(&mut m, "actor", *actor);
             "Condition".into()
         }
         TagKind::ActorCondition { actor, vars, neg } => {
@@ -295,6 +296,9 @@ pub fn mod_(m: &Mod) -> J {
     }
     for (i, t) in m.tags.iter().enumerate() {
         o.insert((i + 1).to_string(), tag(t));
+    }
+    for (i, t) in &m.unreached_tags {
+        o.insert(i.to_string(), tag(t));
     }
     J::Object(o)
 }

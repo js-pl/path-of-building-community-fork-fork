@@ -48,6 +48,8 @@ pub enum TagKind {
     Condition {
         vars: Names,
         neg: bool,
+        /// Set by a few of upstream's mod lines, read by nothing
+        actor: Option<Sym>,
     },
     ActorCondition {
         actor: Option<Sym>,

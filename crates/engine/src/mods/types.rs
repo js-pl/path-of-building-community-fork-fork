@@ -112,6 +112,10 @@ pub struct Mod {
     pub source_slot: Option<Rc<str>>,
     /// Conditions and scaling, applied in order by `EvalMod`
     pub tags: Vec<Tag>,
+    /// Tags after a gap in upstream's tag list (`mod[2]` without `mod[1]`),
+    /// by index: upstream's `ipairs` never reaches them, so they have no
+    /// effect, but they are kept
+    pub unreached_tags: Vec<(usize, Tag)>,
 }
 
 impl Mod {
