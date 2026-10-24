@@ -10,6 +10,7 @@ pub mod mod_store;
 pub mod mod_tools;
 pub mod mods;
 pub mod rt;
+pub mod spec;
 pub mod tree;
 
 /// Replaces translated parts of upstream's running program with the

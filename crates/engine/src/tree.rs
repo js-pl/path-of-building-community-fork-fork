@@ -71,6 +71,16 @@ pub struct MasteryEffect {
     pub mod_list: Vec<Mod>,
 }
 
+/// A cluster jewel socket's `expansionJewel`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExpansionJewel {
+    pub size: f64,
+    pub index: f64,
+    pub proxy: Option<Rc<str>>,
+    /// The socket this one is nested in
+    pub parent: Option<Rc<str>>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: u32,
@@ -96,6 +106,8 @@ pub struct Node {
     pub is_multiple_choice_option: bool,
     pub is_ascendancy_start: bool,
     pub charm_socket: bool,
+    /// Cluster jewel socket data (`expansionJewel`)
+    pub expansion_jewel: Option<ExpansionJewel>,
     /// Effect ids of a mastery's choices
     pub mastery_effects: Vec<f64>,
     /// The parse of each stat line
@@ -151,6 +163,9 @@ pub struct PassiveTree {
     /// Jewel sockets, in the data's order
     pub sockets: Vec<u32>,
     pub mastery_effects: HashMap<u64, MasteryEffect>,
+    /// `alternate_ascendancies` by index, without the legacy ones; `None`
+    /// when the tree has none
+    pub alternate_ascendancies: Option<Vec<(i64, Ascendancy)>>,
 }
 
 /// `(inner, outer)` of upstream's jewel radii for a tree version
@@ -260,11 +275,26 @@ type Parse = (Option<Vec<Mod>>, Option<Rc<str>>);
 /// Parses stat lines as `PassiveTreeClass:ProcessStats` does: multi-line
 /// stats are split, and a line the parser does not fully understand is
 /// combined with the lines after it until the combination parses.
-fn process_stats(
+pub(crate) fn process_stats(
     parser: &ModParser,
     sd: &mut Vec<Rc<str>>,
     source: Option<&str>,
 ) -> Result<(Vec<StatLine>, Vec<Mod>, bool, bool)> {
+    let mut mods = Vec::new();
+    let (mod_list, unknown, extra) = process_stats_from(parser, sd, &mut mods, 0, source)?;
+    Ok((mods, mod_list, unknown, extra))
+}
+
+/// `ProcessStats(node, startIndex)`: parses the lines from `start` on into
+/// `mods` (the lines before are kept), giving the mods of those lines and
+/// whether one was unknown or understood only partly.
+pub(crate) fn process_stats_from(
+    parser: &ModParser,
+    sd: &mut Vec<Rc<str>>,
+    out: &mut Vec<StatLine>,
+    start: usize,
+    source: Option<&str>,
+) -> Result<(Vec<Mod>, bool, bool)> {
     let conv = Converter::default();
     let parse = |line: &str| -> Result<Parse> {
         let (list, extra) = parser.parse(line.as_bytes());
@@ -283,9 +313,9 @@ fn process_stats(
         };
         Ok((list, extra))
     };
-    let mut mods: Vec<Option<StatLine>> = Vec::new();
+    let mut mods: Vec<Option<StatLine>> = out.drain(..).map(Some).collect();
     let (mut unknown, mut extra_flag) = (false, false);
-    let mut i = 0;
+    let mut i = start;
     while i < sd.len() {
         if sd[i].contains('\n') {
             let lines: Vec<Rc<str>> = sd[i]
@@ -346,7 +376,7 @@ fn process_stats(
     // Upstream sets the source on the parsed mods themselves, so the lines
     // carry it too
     let mut mod_list = Vec::new();
-    for line in &mut mods {
+    for line in mods.iter_mut().skip(start) {
         if let (Some(list), None) = (&mut line.list, &line.extra) {
             for m in list {
                 if let Some(s) = source {
@@ -356,7 +386,8 @@ fn process_stats(
             }
         }
     }
-    Ok((mods, mod_list, unknown, extra_flag))
+    *out = mods;
+    Ok((mod_list, unknown, extra_flag))
 }
 
 impl PassiveTree {
@@ -504,7 +535,22 @@ impl PassiveTree {
             class_notables: HashMap::new(),
             sockets: Vec::new(),
             mastery_effects: HashMap::new(),
+            alternate_ascendancies: None,
         };
+        if !alternates.is_empty() {
+            let mut list = Vec::new();
+            for (i, asc) in &alternates {
+                list.push((
+                    *i,
+                    Ascendancy {
+                        id: Some(text(&get(asc, "id"))?),
+                        name: text(&get(asc, "name"))?,
+                        start_node_id: None,
+                    },
+                ));
+            }
+            tree.alternate_ascendancies = Some(list);
+        }
 
         // Nodes, without the root and the legacy alternate ascendancies'
         let mut node_tables = Vec::new();
@@ -609,6 +655,11 @@ impl PassiveTree {
                             if asc.id.as_deref() == Some(a.as_str()) || &*asc.name == a.as_str() {
                                 asc.start_node_id = Some(id);
                             }
+                        }
+                    }
+                    for (_, asc) in tree.alternate_ascendancies.iter_mut().flatten() {
+                        if asc.id.as_deref() == Some(a.as_str()) {
+                            asc.start_node_id = Some(id);
                         }
                     }
                 }
@@ -726,6 +777,22 @@ impl PassiveTree {
                 is_multiple_choice: truthy(nt, "isMultipleChoice"),
                 is_multiple_choice_option,
                 is_ascendancy_start: truthy(nt, "isAscendancyStart"),
+                expansion_jewel: match get(nt, "expansionJewel") {
+                    Value::Nil => None,
+                    ej => {
+                        let t = |k: &str| match get(&ej, k) {
+                            Value::Nil => Ok(None),
+                            Value::Number(n) => Ok(Some(lua::format::format_g(n, 14).into())),
+                            x => text(&x).map(Some),
+                        };
+                        Some(ExpansionJewel {
+                            size: number(&get(&ej, "size"))?,
+                            index: number(&get(&ej, "index"))?,
+                            proxy: t("proxy")?,
+                            parent: t("parent")?,
+                        })
+                    }
+                },
                 charm_socket: kind == NodeType::Socket
                     && get(nt, "name").raw_eq(&Value::str("Charm Socket")),
                 mastery_effects,
