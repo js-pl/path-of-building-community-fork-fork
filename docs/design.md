@@ -108,9 +108,11 @@ web/ (TypeScript, Preact)               crates/
 
 ## Mirroring upstream
 
-Every upstream file that holds logic maps to one Rust or TypeScript module
-that keeps upstream's file and function names, so an upstream diff maps
-directly to a port diff.
+Every upstream file that holds logic maps to the Rust or TypeScript modules
+that port it. The typed engine is free-form: it does not keep upstream's file
+and function names, so it can be refactored and laid out for speed. Upstream
+diffs are ported by behaviour, located through the manifest and checked by the
+equivalence tests.
 
 | Upstream | Port |
 | --- | --- |
@@ -150,10 +152,15 @@ calcs build on every calculation, following tables, closures and the cells
 they capture.
 
 The translation gives exact parity with upstream from the start, and it is
-the reference the typed engine is built against: hot paths (`ModDB`/`ModStore`
-lookups, `initEnv`, `perform`, Full DPS) are replaced by typed Rust one at a
-time, each tested against the translation and the oracle, and the speedups
-above come from those replacements, not from the translation.
+the reference the typed engine is built against. It is scaffolding: the goal
+is to replace all of it with typed Rust, hot paths first (`ModDB`/`ModStore`
+lookups, `initEnv`, `perform`, Full DPS), each replacement tested against the
+translation and the oracle. Once nothing shipped runs on it, the engine is
+refactored and optimised freely; the speedups above come from that work, not
+from the translation. Long term the translation is dropped: `crates/upstream`,
+`luagen` and the Lua runtime go, the oracle is the only reference, and Lua is
+left only in the importer (reading upstream's data at build time) and in the
+oracle itself.
 
 **Fail loudly.** The importer errors on embedded Lua functions or mod parser
 rules it does not know, so upstream changes cannot drift in silently.
@@ -229,22 +236,23 @@ written by hand. Details, the JSON format and the determinism checks are in
 
 ## Keeping up with upstream
 
-### Catch-up
-
-Port against one pinned tag until all equivalence tests pass. Upstream keeps
-moving during that time (about 5 calc or mod parser commits a week), so the
-manifest records per module which commit it is in sync with.
+Upstream moves about 5 calc or mod parser commits a week. Syncing starts
+now, while most of the program still runs translated: those parts follow
+upstream for free on every bump, and each typed replacement only has to catch
+up with the commits since it was written. The manifest records per file which
+upstream commit its port is in sync with.
 
 ### Daily sync job
 
-Once caught up, an LLM job runs every day:
+An LLM job runs every day with the `sync` skill
+(`.claude/skills/sync/SKILL.md`):
 
 1. Fetch upstream `dev` and list the new commits.
-2. Data-only changes: re-run the importer. No LLM needed.
+2. Data-only changes: bump and regenerate. No porting needed.
 3. For each commit that touches ported files, look up the port locations in the
-   manifest and port the diff, commit by commit.
-4. Bump the submodule, regenerate the oracle outputs, run all equivalence
-   tests.
+   manifest and port the change, commit by commit.
+4. Bump the submodule, regenerate the oracle outputs, the corpus and the
+   generated ports, run all equivalence tests.
 5. Open a PR with the bump, the port and the upstream commit links. If tests
    still fail after a bounded number of attempts, open an issue with the
    upstream diff and the failing tests instead.
@@ -254,8 +262,10 @@ each step small.
 
 ### Guardrails
 
-- The job may not edit oracle outputs, the corpus, `tests/tolerances.toml` or
-  the comparison rules. CI rejects PRs from the job that touch them.
+- The job never edits oracle outputs, the corpus, `tests/tolerances.toml` or
+  the comparison rules by hand. Oracle outputs and the generated corpus are
+  only regenerated with their tools, in the PR that bumps the submodule, and
+  CI fails if they differ from what upstream produces.
 - Every PR needs green CI and is merged by the owner.
 - Commit messages and port headers reference the upstream commit.
 
@@ -301,8 +311,12 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    config, notes, party, tree, skill and config sets, export (code, link, XML)
    and builds saved in the browser. Open: compare, character import via
    OAuth, trade, art for the tree, node power split over several workers.
-6. **Daily sync.** Starts once the first modules are at parity and is fully on
-   after phase 2.
+6. **Daily sync.** Starts now, with the `sync` skill, alongside phase 7.
+7. **Typed engine.** Replace the whole translation with typed Rust, hot paths
+   first, each step at parity with the translation and the oracle. Then
+   refactor and optimise freely toward the performance targets, and drop the
+   translation, `luagen` and the Lua runtime. The engine API keeps its JSON
+   commands, with `session.lua` replaced by Rust.
 
 ## Open questions
 
