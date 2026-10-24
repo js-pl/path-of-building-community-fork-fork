@@ -29,6 +29,9 @@ if the files differ from what upstream produces.
 | `headless.lua` | Starts upstream via `src/HeadlessWrapper.lua` and loads builds |
 | `../corpus/generate.lua` | Generates corpus builds with upstream's build API |
 | `dump.lua` | Writes calc outputs as JSON |
+| `modparser.lua` | Writes mod parser outputs as JSON lines |
+| `data.lua` | Writes hashes of upstream's raw data tables |
+| `json.lua` | The exact JSON encoder both use |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
 
@@ -62,12 +65,44 @@ Encoding:
 - Anything else that is not plain data (functions, cycles, class instances)
   makes the dumper fail, so new kinds of output cannot slip through unnoticed.
 
+## Mod parser outputs
+
+`tests/oracle/modparser.jsonl` (`modparser.lua`) holds `modLib.parseMod`'s
+result for every mod line upstream knows, one JSON object per line, sorted by
+line:
+
+```text
+{"extra": <unparsed rest or false>, "line": <mod line>, "mods": <mod list or false>}
+```
+
+`false` stands for nil. Lines come from upstream's ModCache, everything
+upstream parses on startup (uniques, rares, the latest tree), every tree
+version, every item mod, enchantment and crafting table, and the corpus
+builds. Each line is parsed live, with the ModCache emptied first. Jewel functions inside
+`JewelFunc` mods are closures and are written as `{"$func": true}`; what they
+do is tested through whole builds.
+
+## Data outputs
+
+`tests/oracle/data.jsonl` (`data.lua`) holds, for every table `Data.lua`
+loads from `src/Data` (plus the constants it defines itself and the
+`ModFlag`, `KeywordFlag` and `SkillType` globals), the FNV-1a hash and length
+of its canonical JSON, with functions written as `{"$func": "<file>:<line>"}`:
+
+```text
+{"bytes": <length>, "fnv": "<16 hex digits>", "key": "Skills"}
+```
+
+Hashes keep the file small; `run.py data-json` writes the full JSON to
+`target/oracle-data/` for comparing when a table differs.
+
 ## How upstream is run
 
-- **No ModCache.** Upstream skips `Data/ModCache.lua` when `CI` is set, so every
-  mod line goes through `ModParser`, which is what the port has to match and
-  what coverage has to see. Upstream's own CI checks that the ModCache equals
-  live parsing.
+- **ModCache.** Upstream preloads `Data/ModCache.lua`, the parse results of
+  every mod line it ships, written with 14 significant digits. Builds are
+  calculated with it, as on desktop, so the engine preloads the same cache.
+  (`HeadlessWrapper.lua` says setting `CI` skips the cache, but the flag it
+  sets is never read.) The mod parser outputs bypass the cache, see above.
 - **Build import.** `.xml` builds go through `loadBuildFromXML`. `.json`
   character files go through the same `ImportTab` calls as upstream's
   `TestImport_spec`; `HeadlessWrapper`'s own `loadBuildFromJSON` does not

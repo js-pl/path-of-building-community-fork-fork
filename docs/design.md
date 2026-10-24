@@ -74,7 +74,9 @@ web/ (TypeScript)                       crates/
 +-- UI: tree, items, skills, config,    +-- importer  build time: upstream Lua data -> typed data
 |   calcs, notes, import/export         +-- engine    data model, mod parser, calcs, power calcs
 +-- engine client (RPC)                 +-- wasm      wasm-bindgen API over engine
-`-- worker pool --- engine.wasm ------> `-- cli       native runner for tests and benchmarks
+`-- worker pool --- engine.wasm ------> +-- cli       native runner for tests and benchmarks
+                                        +-- lua       Lua values, patterns and parser
+                                        `-- equivalence  tests against the oracle
 ```
 
 - **Engine API.** Load data, load or save a build (PoB XML and build codes,
@@ -106,7 +108,14 @@ directly to a port diff.
 `sync/manifest.toml` lists every upstream file with its port location and the
 upstream commit it is in sync with. Files that are deliberately not ported are
 listed too, with a reason. CI fails if an upstream file is missing from the
-manifest.
+manifest (`sync/check.py`).
+
+**Data from source.** Where upstream mixes data with code, the data is read
+from upstream's source rather than copied: the importer evaluates the literal
+tables of `ModParser.lua`, and its closures are translated to Rust by
+`portgen` (`cargo run -p importer --bin portgen`) or ported by hand. Every
+ported closure records the hash of the Lua it came from, and the engine
+refuses to start when upstream's source no longer matches.
 
 **Fail loudly.** The importer errors on embedded Lua functions or mod parser
 rules it does not know, so upstream changes cannot drift in silently.
@@ -227,6 +236,11 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
    coverage reporting. Done.
 1. **Data and mod parser.** Importer and mod parser at full parity.
+   Done: every table `Data.lua` loads imports byte-identical to upstream's;
+   all 41601 mod lines (every line upstream ships plus synthetic lines for
+   rules no real line reaches) parse identically, and the engine preloads
+   upstream's ModCache as upstream does. Tree data, stat descriptions and
+   timeless jewel data are imported with the phases that need them.
 2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
    `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole
    builds and variants match.

@@ -10,9 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - run: sync/check.py
+      - run: sync/check.py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test
+      # Generated ports must match upstream's source
+      - run: cargo run --release -p importer --bin portgen
+      - run: cargo run --release -p importer --bin synthlines
+      - run: git diff --exit-code -- crates/engine/src/mod_parser/generated.rs corpus/synthetic_mod_lines.txt
+      # Equivalence tests are slow in debug builds
+      - run: cargo test --release
 
   # The generator reproduces corpus/generated, and upstream reproduces
   # tests/oracle exactly, in two runs with different hash seeds

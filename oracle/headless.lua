@@ -15,22 +15,14 @@ function headless.parseBuildArgs(args)
 	return list
 end
 
--- useModCache: desktop PoB loads the ModCache, while upstream skips it
--- whenever the CI environment variable is set and parses every mod line live
-function headless.start(useModCache)
+-- Upstream loads Data/ModCache.lua, as desktop PoB does. (HeadlessWrapper
+-- says setting CI skips it, but the flag it sets is never read.)
+function headless.start()
 	-- Upstream's Main treats arg[1] as a build link to download
 	arg = { }
 	-- HeadlessWrapper waits for input on startup errors
 	io.read = function() return nil end
-	local getenv = os.getenv
-	os.getenv = function(name)
-		if name == "CI" then
-			return not useModCache and "1" or nil
-		end
-		return getenv(name)
-	end
 	dofile("HeadlessWrapper.lua")
-	os.getenv = getenv
 	assert(build, "upstream failed to start")
 end
 

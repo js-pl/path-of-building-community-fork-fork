@@ -9,8 +9,8 @@ The goals are the same numbers as upstream, enforced by equivalence tests
 against upstream itself, and much faster recalcs and power calculations
 (node, anoint, items, gems). Daily jobs port new upstream commits.
 
-**Status:** phase 0, the test harness. Upstream runs as an oracle in CI; the
-engine is not started yet. See [docs/design.md](docs/design.md).
+**Status:** phase 1 done: the data importer and the mod parser match upstream
+exactly. Next are the calcs. See [docs/design.md](docs/design.md).
 
 ## Disclaimer
 
@@ -23,11 +23,12 @@ repository but generated from the upstream submodule at build time.
 
 | Path | Purpose |
 | --- | --- |
-| `src/` | Rust engine (empty for now; becomes `crates/` next to a `web/` frontend, see the design) |
+| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics and parser), `equivalence` (oracle tests) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a release tag (git submodule) |
 | `oracle/` | Runs upstream headless to produce expected outputs and coverage |
 | `corpus/` | Builds the oracle runs (`corpus.toml`) and the build generator |
-| `tests/oracle/` | Upstream's outputs per corpus build (generated, never edited) |
+| `tests/oracle/` | Upstream's outputs per corpus build, mod line and data table (generated, never edited) |
+| `sync/manifest.toml` | Every upstream file, where it is ported and the commit it is in sync with |
 | `docs/design.md` | Plan, architecture and phases |
 | `docs/repository-settings.md` | How `main` is protected |
 

@@ -10,7 +10,7 @@ local firstSeed = assert(tonumber(arg[2]), "first seed must be a number")
 local count = assert(tonumber(arg[3]), "count must be a number")
 local repoDir = arg[0]:match("^(.*)/corpus/[^/]+$") or "../../.."
 local headless = dofile(repoDir .. "/oracle/headless.lua")
-headless.start(true)
+headless.start()
 
 local bit = require("bit")
 
