@@ -3,13 +3,17 @@
 //! uses to read upstream's data files.
 
 pub mod ast;
+pub mod env;
 pub mod format;
 pub mod lexer;
 pub mod parser;
 pub mod pattern;
+pub mod rt;
 pub mod value;
 
-pub use value::{Closure, FuncRef, Key, LuaStr, Table, TableRef, Value};
+pub use value::{
+    Closure, FuncRef, Function, Key, LResult, LuaError, LuaStr, Table, TableRef, Value,
+};
 
 /// `tonumber(s)` for strings, as LuaJIT's `lj_strscan` reads them: optional
 /// surrounding whitespace, decimal or `0x` hex. No `inf` or `nan`.
@@ -85,7 +89,7 @@ pub fn to_string(v: &Value) -> LuaStr {
         Value::Nil => "nil".into(),
         Value::Bool(b) => if *b { "true" } else { "false" }.into(),
         Value::Table(_) => "table".into(),
-        Value::Func(_) | Value::Closure(_) => "function".into(),
+        Value::Func(_) | Value::Closure(_) | Value::Function(_) => "function".into(),
     }
 }
 

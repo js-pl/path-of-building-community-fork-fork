@@ -12,3 +12,4 @@ lua.workspace = true
 engine.workspace = true
 importer.workspace = true
 serde_json.workspace = true
+upstream.workspace = true

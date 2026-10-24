@@ -6,7 +6,9 @@ See `docs/design.md` before making architectural decisions.
 
 ## Project overview
 - `crates/` holds the Rust workspace: `engine`, `importer` (reads upstream
-  data and ModParser tables at build time), `lua` (Lua semantics and parser),
+  data and ModParser tables at build time), `lua` (Lua semantics, parser and
+  runtime), `upstream` (upstream's whole program translated to Rust by luagen
+  in its build script; never edit generated code, fix luagen or the runtime),
   `equivalence` (tests against the oracle)
 - `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a release tag; never edit it
 - `docs/` holds design decisions

@@ -75,7 +75,8 @@ web/ (TypeScript)                       crates/
 |   calcs, notes, import/export         +-- engine    data model, mod parser, calcs, power calcs
 +-- engine client (RPC)                 +-- wasm      wasm-bindgen API over engine
 `-- worker pool --- engine.wasm ------> +-- cli       native runner for tests and benchmarks
-                                        +-- lua       Lua values, patterns and parser
+                                        +-- lua       Lua values, patterns, parser and runtime
+                                        +-- upstream  upstream's program translated to Rust (luagen)
                                         `-- equivalence  tests against the oracle
 ```
 
@@ -116,6 +117,26 @@ tables of `ModParser.lua`, and its closures are translated to Rust by
 `portgen` (`cargo run -p importer --bin portgen`) or ported by hand. Every
 ported closure records the hash of the Lua it came from, and the engine
 refuses to start when upstream's source no longer matches.
+
+**Whole-program translation.** `crates/upstream` is upstream's entire
+program (`src/Modules`, `src/Classes`, `Launch.lua`, the libraries in
+`runtime/lua`) translated statement by statement to Rust by `luagen`
+(`crates/importer/src/luagen.rs`) in the crate's build script, so it is always
+in sync with the submodule and never edited by hand. The generated code runs on
+a dynamic runtime with LuaJIT's semantics (`lua::rt`, `lua::env`: values,
+metatables, the standard library with LuaJIT's `table.sort`, `%.14g` number
+formatting, LuaJIT's table constructor order for duplicate keys). A headless
+host (`crates/upstream/src/host.rs`, a port of `HeadlessWrapper.lua`) runs it
+like the oracle does. Data files are not translated: the importer evaluates
+them at run time, and the functions they contain are translated by `luagen`
+like the rest. Generated functions are split into segment functions, since
+rustc's borrow checker is superlinear in function size.
+
+The translation gives exact parity with upstream from the start, and it is
+the reference the typed engine is built against: hot paths (`ModDB`/`ModStore`
+lookups, `initEnv`, `perform`, Full DPS) are replaced by typed Rust one at a
+time, each tested against the translation and the oracle, and the speedups
+above come from those replacements, not from the translation.
 
 **Fail loudly.** The importer errors on embedded Lua functions or mod parser
 rules it does not know, so upstream changes cannot drift in silently.
@@ -241,9 +262,10 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    rules no real line reaches) parse identically, and the engine preloads
    upstream's ModCache as upstream does. Tree data, stat descriptions and
    timeless jewel data are imported with the phases that need them.
-2. **Core calcs.** Port `CalcSetup`, `CalcPerform`, `CalcActiveSkill`,
-   `CalcOffence`, `CalcDefence`, `CalcTriggers`, `CalcMirages`, ... until whole
-   builds and variants match.
+2. **Core calcs.** Whole builds match. Done by translating upstream's whole
+   program (see [Mirroring upstream](#mirroring-upstream)): every corpus build
+   calculates to the oracle's outputs exactly, in `MAIN` and `CALCS` mode
+   (`crates/equivalence/tests/calcs.rs`). Variants follow with the engine API.
 3. **Engine API and WASM.** Build load and save, edits, incremental and parallel
    calcs, power calculations, worker pool.
 4. **Frontend MVP.** Import a build code, stat sidebar, passive tree with node

@@ -1,0 +1,15 @@
+[package]
+name = "upstream"
+description = "Upstream's Lua program translated to Rust by luagen, and the headless host that runs it"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+lua.workspace = true
+importer.workspace = true
+
+[build-dependencies]
+importer.workspace = true
