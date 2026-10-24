@@ -123,27 +123,82 @@ fn bundle(out: &Path, builds: &[String]) {
     eprintln!("files/: {} files", lazy.len());
 }
 
+/// Resident memory (from /proc on Linux) and the cycle collector's work
+fn rss() -> String {
+    let rss = std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("VmRSS:"))
+                .map(|l| l[6..].trim().to_string())
+        })
+        .unwrap_or_default();
+    let (runs, cleared) = lua::gc::totals();
+    format!("{rss}, {runs} collections freed {cleared} objects")
+}
+
 fn bench(path: &str) {
     let t = Instant::now();
     let s = Session::new(Rc::new(Imported::new(src_dir()))).unwrap_or_else(|e| die(e));
-    eprintln!("start:      {:>8.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    eprintln!(
+        "start:      {:>8.0} ms  {}",
+        t.elapsed().as_secs_f64() * 1000.0,
+        rss()
+    );
     let xml = std::fs::read_to_string(path).unwrap_or_else(|e| die(format!("{path}: {e}")));
     let t = Instant::now();
     ok(&s, serde_json::json!({"cmd": "loadXml", "xml": xml}));
-    eprintln!("load:       {:>8.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    eprintln!(
+        "load:       {:>8.0} ms  {}",
+        t.elapsed().as_secs_f64() * 1000.0,
+        rss()
+    );
     let alloc = ok(&s, serde_json::json!({"cmd": "treeState"}))["alloc"].clone();
     if let Some(id) = alloc.as_array().and_then(|a| a.last()).cloned() {
         let t = Instant::now();
         ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
         ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
-        eprintln!("2 edits:    {:>8.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+        eprintln!(
+            "2 edits:    {:>8.0} ms  {}",
+            t.elapsed().as_secs_f64() * 1000.0,
+            rss()
+        );
     }
     let t = Instant::now();
     ok(&s, serde_json::json!({"cmd": "tree"}));
-    eprintln!("tree:       {:>8.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    eprintln!(
+        "tree:       {:>8.0} ms  {}",
+        t.elapsed().as_secs_f64() * 1000.0,
+        rss()
+    );
+    if let Some(id) = alloc.as_array().and_then(|a| a.last()).cloned() {
+        let t = Instant::now();
+        for _ in 0..10 {
+            ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
+            ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
+        }
+        eprintln!(
+            "20 edits:   {:>8.0} ms  {}",
+            t.elapsed().as_secs_f64() * 1000.0,
+            rss()
+        );
+    }
     let t = Instant::now();
     ok(&s, serde_json::json!({"cmd": "nodePower", "index": 1}));
-    eprintln!("node power: {:>8.0} ms", t.elapsed().as_secs_f64() * 1000.0);
+    eprintln!(
+        "node power: {:>8.0} ms  {}",
+        t.elapsed().as_secs_f64() * 1000.0,
+        rss()
+    );
+    if std::env::var_os("BENCH_TWICE").is_some() {
+        let t = Instant::now();
+        ok(&s, serde_json::json!({"cmd": "nodePower", "index": 1}));
+        eprintln!(
+            "node power: {:>8.0} ms  {}",
+            t.elapsed().as_secs_f64() * 1000.0,
+            rss()
+        );
+    }
 }
 
 fn main() {

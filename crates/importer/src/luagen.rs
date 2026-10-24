@@ -1365,10 +1365,20 @@ impl Gen<'_> {
         for (c, src) in captures.iter().zip(&sources) {
             let _ = write!(s, "{c}: {src}.clone(), ");
         }
-        let _ = write!(
-            s,
-            "}}); func({label:?}, move |args: &[Value]| f{id}(&u, args)) }}"
-        );
+        if captures.is_empty() {
+            let _ = write!(
+                s,
+                "}}); func({label:?}, move |args: &[Value]| f{id}(&u, args)) }}"
+            );
+        } else {
+            // The cells go to the cycle collector too, see lua::gc
+            let ups: Vec<String> = captures.iter().map(|c| format!("u.{c}.clone()")).collect();
+            let _ = write!(
+                s,
+                "}}); func_up({label:?}, vec![{}], move |args: &[Value]| f{id}(&u, args)) }}",
+                ups.join(", ")
+            );
+        }
         Ok(s)
     }
 

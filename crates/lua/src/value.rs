@@ -175,6 +175,9 @@ pub struct InvalidKey;
 pub struct Function {
     pub name: Rc<str>,
     pub f: Box<NativeFn>,
+    /// Cells of the locals a translated closure captures, which its native
+    /// closure holds too; the cycle collector ([`crate::gc`]) follows them
+    pub upvalues: Vec<Rc<RefCell<Value>>>,
 }
 
 impl Function {
@@ -712,6 +715,11 @@ impl Table {
     }
 
     /// Array part first, then the hash part in insertion order.
+    /// Entries of the hash part, without cloning
+    pub fn raw_entries(&self) -> impl Iterator<Item = &(Key, Value)> + '_ {
+        self.entries.iter().flatten()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (Key, Value)> + '_ {
         self.array
             .iter()
@@ -722,9 +730,16 @@ impl Table {
     }
 }
 
-/// Shared, mutable table, like a Lua table reference.
-#[derive(Clone, Default)]
+/// Shared, mutable table, like a Lua table reference. Tables are registered
+/// with the cycle collector ([`crate::gc`]).
+#[derive(Clone)]
 pub struct TableRef(pub Rc<RefCell<Table>>);
+
+impl Default for TableRef {
+    fn default() -> Self {
+        Self::from_table(Table::default())
+    }
+}
 
 impl TableRef {
     pub fn new() -> Self {
@@ -732,7 +747,9 @@ impl TableRef {
     }
 
     pub fn from_table(t: Table) -> Self {
-        TableRef(Rc::new(RefCell::new(t)))
+        let r = Rc::new(RefCell::new(t));
+        crate::gc::register_table(&r);
+        TableRef(r)
     }
 
     pub fn borrow(&self) -> std::cell::Ref<'_, Table> {
