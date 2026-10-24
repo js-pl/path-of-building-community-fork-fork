@@ -191,7 +191,9 @@ fn trees_match_upstream() {
                 }
                 let ok = match (&tm.list, list.is_nil()) {
                     (None, true) => true,
-                    (Some(t), false) => lua_mods(&list).map(|l| l == *t).unwrap_or(false),
+                    (Some(t), false) => lua_mods(&list)
+                        .map(|l| mods_json(&l) == mods_json(t))
+                        .unwrap_or(false),
                     _ => false,
                 };
                 check(
@@ -211,7 +213,7 @@ fn trees_match_upstream() {
             }
             // Mods
             match lua_mods(&get(&ln, "modList")) {
-                Ok(l) if l == node.mod_list => {}
+                Ok(l) if mods_json(&l) == mods_json(&node.mod_list) => {}
                 Ok(l) => check(
                     "modList",
                     false,
@@ -231,14 +233,37 @@ fn trees_match_upstream() {
             };
             check(
                 "keystoneMod",
-                lk == node.keystone_mod,
+                lk.as_ref().map(|m| mods_json(std::slice::from_ref(m)))
+                    == node
+                        .keystone_mod
+                        .as_ref()
+                        .map(|m| mods_json(std::slice::from_ref(m))),
                 format!("{:?}", node.keystone_mod),
             );
             // Jewel radii
             let lr = get(&ln, "nodesInRadius");
-            let lr: Option<Vec<Vec<u32>>> =
-                lr.as_table().map(|t| t.array().iter().map(ids).collect());
-            check("nodesInRadius", lr == node.nodes_in_radius, String::new());
+            // Keyed by node id upstream, so in no meaningful order
+            let sorted = |v: Vec<Vec<u32>>| -> Vec<Vec<u32>> {
+                v.into_iter()
+                    .map(|mut r| {
+                        r.sort();
+                        r
+                    })
+                    .collect()
+            };
+            let lr: Option<Vec<Vec<u32>>> = lr
+                .as_table()
+                .map(|t| sorted(t.array().iter().map(ids).collect()));
+            let tr = node.nodes_in_radius.clone().map(sorted);
+            let sizes = |r: &Option<Vec<Vec<u32>>>| {
+                r.as_ref()
+                    .map(|r| r.iter().map(Vec::len).collect::<Vec<_>>())
+            };
+            check(
+                "nodesInRadius",
+                lr == tr,
+                format!("typed {:?} translated {:?}", sizes(&tr), sizes(&lr)),
+            );
         }
         // Lookup tables
         let map = |name: &str| -> BTreeMap<String, u32> {
@@ -320,7 +345,7 @@ fn trees_match_upstream() {
         for effect in typed.mastery_effects.values() {
             let le = rt::index(&lme, &Value::Number(effect.id)).unwrap();
             match lua_mods(&get(&le, "modList")) {
-                Ok(l) if l == effect.mod_list => {}
+                Ok(l) if mods_json(&l) == mods_json(&effect.mod_list) => {}
                 _ => fail(format!("masteryEffects[{}].modList", effect.id)),
             }
         }
