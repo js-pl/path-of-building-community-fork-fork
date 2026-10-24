@@ -5,8 +5,9 @@
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
+use engine::mods::convert::Converter;
 use engine::mods::*;
-use equivalence::bridge::{self, Bridge, Converter};
+use equivalence::bridge::{self, Bridge};
 use equivalence::{corpus, upstream_src};
 use lua::rt::{self, first};
 use lua::{LuaError, Value};
@@ -159,7 +160,7 @@ fn mod_queries() {
         }
         let mut run = Run {
             conv: Converter {
-                originals: &b.originals,
+                originals: Some(&b.originals),
             },
             failures: Vec::new(),
             queries: 0,
@@ -322,7 +323,7 @@ fn mod_queries() {
         failures.extend(run.failures);
     }
     assert!(ran > 0, "no build matches CALCS_FILTER={filter}");
-    bridge::UNKNOWN.with(|u| {
+    engine::mods::convert::UNKNOWN.with(|u| {
         for (k, n) in u.borrow().iter() {
             eprintln!("unknown {k}: {n}");
         }

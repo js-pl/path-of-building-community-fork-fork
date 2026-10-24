@@ -879,10 +879,11 @@ impl<'a> Query<'a> {
                 };
                 *value = ModValue::Number(v * f);
             }
-            TagKind::MeleeProximity(max_bonus) => {
+            TagKind::MeleeProximity(ramp) => {
                 let Some(dist) = cfg.and_then(|c| c.skill_dist) else {
                     return Ok(false);
                 };
+                let max_bonus = *ramp.first().ok_or("attempt to index a nil value (ramp)")?;
                 let v = num(value)?;
                 if dist <= 15.0 {
                     *value = ModValue::Number(v * max_bonus);
@@ -971,6 +972,7 @@ impl<'a> Query<'a> {
                 include_transfigured,
                 summon_skill,
                 neg,
+                ..
             } => {
                 let name = cfg.and_then(|c| {
                     if *summon_skill {

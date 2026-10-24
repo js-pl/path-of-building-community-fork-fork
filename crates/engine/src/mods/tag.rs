@@ -40,7 +40,7 @@ pub enum TagKind {
     /// Value scaled by skill distance, between `(distance, factor)` points
     DistanceRamp(Vec<(f64, f64)>),
     /// `ramp = { max, min }`; only the first is used
-    MeleeProximity(f64),
+    MeleeProximity(Vec<f64>),
     Limit {
         limit: Option<f64>,
         limit_var: Option<Sym>,
@@ -61,6 +61,8 @@ pub enum TagKind {
         include_transfigured: bool,
         summon_skill: bool,
         neg: bool,
+        /// Set on one tag by upstream's data, read by nothing
+        skill_id: Option<Rc<str>>,
     },
     SkillId(Option<Rc<str>>),
     /// `skillPartList`, or `skillPart`, which may be nil

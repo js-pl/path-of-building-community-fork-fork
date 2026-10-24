@@ -5,7 +5,8 @@
 //! does: parseMod modifies some of its tables while parsing, so results can
 //! depend on earlier lines.
 
-use equivalence::{mod_parser, oracle_dir, to_json};
+use engine::mods::convert::Converter;
+use equivalence::{mod_parser, oracle_dir, to_json, typed_json};
 use lua::Value;
 
 #[test]
@@ -15,6 +16,7 @@ fn every_line_matches_upstream() {
         .expect("tests/oracle/modparser.jsonl");
     let mut total = 0;
     let mut failures = Vec::new();
+    let mut typed_failures = Vec::new();
     for oracle_line in text.lines() {
         total += 1;
         let record: serde_json::Value = serde_json::from_str(oracle_line).expect("oracle JSON");
@@ -43,11 +45,35 @@ fn every_line_matches_upstream() {
         let or_false = |v: Value| if v.is_nil() { Value::Bool(false) } else { v };
         let t = lua::TableRef::new();
         t.set_str("line", Value::str(line));
-        t.set_str("mods", or_false(mods));
+        t.set_str("mods", or_false(mods.clone()));
         t.set_str("extra", or_false(extra));
         let got = to_json(&Value::Table(t));
         if got != oracle_line {
             failures.push(format!("expected {oracle_line}\n     got {got}"));
+            continue;
+        }
+        // The typed mods keep everything upstream's do
+        if let Some(Value::Table(list)) = (!mods.is_nil()).then(|| mods.clone()) {
+            let conv = Converter::default();
+            let typed: Result<Vec<_>, _> = list.array().iter().map(|m| conv.mod_(m)).collect();
+            match typed {
+                Err(e) => typed_failures.push(format!("{line:?}: {e}")),
+                Ok(typed) => {
+                    let got =
+                        serde_json::Value::Array(typed.iter().map(typed_json::mod_).collect());
+                    let want = match &record["mods"] {
+                        serde_json::Value::Object(o) if o.is_empty() => {
+                            serde_json::Value::Array(vec![])
+                        }
+                        m => m.clone(),
+                    };
+                    let want = typed_json::normalise(&want, false);
+                    if got != want {
+                        typed_failures
+                            .push(format!("{line:?}:\n  typed    {got}\n  upstream {want}"));
+                    }
+                }
+            }
         }
     }
     // Rule coverage: patterns no known line reaches are listed in the
@@ -73,6 +99,17 @@ fn every_line_matches_upstream() {
         shown
             .iter()
             .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+    assert!(
+        typed_failures.is_empty(),
+        "{} of {total} lines lose something as typed mods:\n{}",
+        typed_failures.len(),
+        typed_failures
+            .iter()
+            .take(20)
+            .cloned()
             .collect::<Vec<_>>()
             .join("\n")
     );

@@ -2,6 +2,7 @@
 //! the queries the calculations make. Plain Rust, replacing the translation
 //! of upstream's `ModStore`, `ModDB`, `ModList` and `modLib.createMod`.
 
+pub mod convert;
 pub mod store;
 pub mod sym;
 pub mod tag;
