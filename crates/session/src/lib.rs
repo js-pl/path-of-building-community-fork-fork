@@ -131,6 +131,7 @@ impl Session {
         let host = Host::new(data);
         install_zlib(&host);
         host.start().map_err(|e| describe(&e))?;
+        engine::install(&host.env).map_err(|e| describe(&e))?;
         let api = first(bridge::chunk(&host.env, &[]).map_err(|e| describe(&e))?);
         let handle = rt::index(&api, &Value::str("handle")).map_err(|e| describe(&e))?;
         let session = Session { host, handle };

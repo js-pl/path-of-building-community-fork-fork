@@ -11,22 +11,30 @@
 //! garbage, and clearing garbage tables and cells breaks the cycles.
 //! References the collector cannot see only ever make it keep objects, so it
 //! is safe at any allocation, also while Lua code runs.
+//!
+//! Collections are generational: most collections look only at objects
+//! registered recently, which is where upstream's garbage is, and count
+//! references from older objects as references from outside. Objects that
+//! survive a few collections are old, and only a full collection, once the
+//! old generation doubled, looks at them again.
 
-use crate::value::{Function, Key, Table, Value};
-use std::cell::RefCell;
-use std::collections::HashMap;
+use crate::value::{Function, Gc, Key, Table, Value};
+use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+type TableBox = Gc<RefCell<Table>>;
+type CellBox = Gc<RefCell<Value>>;
+
 enum Node {
-    Table(Weak<RefCell<Table>>),
+    Table(Weak<TableBox>),
     Function(Weak<Function>),
-    Cell(Weak<RefCell<Value>>),
+    Cell(Weak<CellBox>),
 }
 
 enum Live {
-    Table(Rc<RefCell<Table>>),
+    Table(Rc<TableBox>),
     Function(Rc<Function>),
-    Cell(Rc<RefCell<Value>>),
+    Cell(Rc<CellBox>),
 }
 
 impl Node {
@@ -48,11 +56,20 @@ impl Node {
 }
 
 impl Live {
-    fn ptr(&self) -> *const u8 {
+    fn downgrade(&self) -> Node {
         match self {
-            Live::Table(r) => Rc::as_ptr(r) as *const u8,
-            Live::Function(r) => Rc::as_ptr(r) as *const u8,
-            Live::Cell(r) => Rc::as_ptr(r) as *const u8,
+            Live::Table(r) => Node::Table(Rc::downgrade(r)),
+            Live::Function(r) => Node::Function(Rc::downgrade(r)),
+            Live::Cell(r) => Node::Cell(Rc::downgrade(r)),
+        }
+    }
+
+    /// Where the object's index in the running collection is kept
+    fn slot(&self) -> &Cell<u64> {
+        match self {
+            Live::Table(r) => &r.slot,
+            Live::Function(r) => &r.slot,
+            Live::Cell(r) => &r.slot,
         }
     }
 
@@ -64,9 +81,9 @@ impl Live {
         }
     }
 
-    /// Calls `f` with every object this one references and how many
-    /// references that edge stands for; false when it cannot be read now
-    fn children(&self, f: &mut impl FnMut(*const u8, usize)) -> bool {
+    /// Calls `f` with the slot of every object this one references and how
+    /// many references that edge stands for; false when it cannot be read now
+    fn children(&self, f: &mut impl FnMut(&Cell<u64>, usize)) -> bool {
         match self {
             Live::Table(t) => {
                 let Ok(t) = t.try_borrow() else {
@@ -77,21 +94,21 @@ impl Live {
                 }
                 for (k, v) in t.raw_entries() {
                     match k {
-                        Key::Table(k) => f(Rc::as_ptr(&k.0.0) as *const u8, 1),
-                        Key::Function(k) => f(Rc::as_ptr(&k.0) as *const u8, 1),
+                        Key::Table(k) => f(&k.0.0.slot, 1),
+                        Key::Function(k) => f(&k.0.slot, 1),
                         _ => {}
                     }
                     value(v, f);
                 }
                 if let Some(m) = &t.meta {
-                    f(Rc::as_ptr(&m.0) as *const u8, 1);
+                    f(&m.0.slot, 1);
                 }
                 true
             }
             // Each cell is held by the closure's upvalue struct too
             Live::Function(func) => {
                 for c in &func.upvalues {
-                    f(Rc::as_ptr(c) as *const u8, 2);
+                    f(&c.slot, 2);
                 }
                 true
             }
@@ -126,50 +143,67 @@ enum Garbage {
     Value(#[allow(dead_code)] Value),
 }
 
-fn value(v: &Value, f: &mut impl FnMut(*const u8, usize)) {
+fn value(v: &Value, f: &mut impl FnMut(&Cell<u64>, usize)) {
     match v {
-        Value::Table(t) => f(Rc::as_ptr(&t.0) as *const u8, 1),
-        Value::Function(func) => f(Rc::as_ptr(func) as *const u8, 1),
+        Value::Table(t) => f(&t.0.slot, 1),
+        Value::Function(func) => f(&func.slot, 1),
         _ => {}
     }
 }
 
 struct Registry {
-    nodes: Vec<Node>,
+    /// Objects of the young generation, with the minor collections each
+    /// survived
+    young: Vec<(Node, u8)>,
+    /// Objects that survived [`PROMOTE`] collections
+    old: Vec<Node>,
     /// Objects registered since the last collection
     since: usize,
     /// Registrations that trigger the next collection
     threshold: usize,
+    /// Size of the old generation that makes the next collection a full one
+    old_limit: usize,
     collecting: bool,
 }
 
 const MIN_THRESHOLD: usize = 1 << 21;
 
+/// Minor collections an object survives before it is old
+const PROMOTE: u8 = 2;
+
 thread_local! {
     static REGISTRY: RefCell<Registry> = const {
         RefCell::new(Registry {
-            nodes: Vec::new(),
+            young: Vec::new(),
+            old: Vec::new(),
             since: 0,
             threshold: MIN_THRESHOLD,
+            old_limit: MIN_THRESHOLD,
             collecting: false,
         })
     };
     static TOTAL: RefCell<(usize, usize)> = const { RefCell::new((0, 0)) };
+    /// Number of the running or last collection
+    static EPOCH: Cell<u64> = const { Cell::new(0) };
 }
 
 fn register(node: Node) {
     let due = REGISTRY.with(|r| {
         let mut r = r.borrow_mut();
-        r.nodes.push(node);
+        r.young.push((node, 0));
         r.since += 1;
         r.since >= r.threshold && !r.collecting
     });
     if due {
-        collect();
+        let full = REGISTRY.with(|r| {
+            let r = r.borrow();
+            r.old.len() >= r.old_limit
+        });
+        run(full);
     }
 }
 
-pub(crate) fn register_table(t: &Rc<RefCell<Table>>) {
+pub(crate) fn register_table(t: &Rc<TableBox>) {
     register(Node::Table(Rc::downgrade(t)));
 }
 
@@ -177,7 +211,7 @@ pub(crate) fn register_function(f: &Rc<Function>) {
     register(Node::Function(Rc::downgrade(f)));
 }
 
-pub(crate) fn register_cell(c: &Rc<RefCell<Value>>) {
+pub(crate) fn register_cell(c: &Rc<CellBox>) {
     register(Node::Cell(Rc::downgrade(c)));
 }
 
@@ -193,29 +227,63 @@ pub fn totals() -> (usize, usize) {
     TOTAL.with(|t| *t.borrow())
 }
 
-/// Clears what only garbage references.
+/// Clears what only garbage references, in both generations.
 pub fn collect() -> Stats {
-    let live: Vec<Live> = REGISTRY.with(|r| {
+    run(true)
+}
+
+/// A collection. A minor one looks at the young generation only and takes
+/// every reference from old objects for one from outside, so it keeps
+/// whatever old objects reference; a full one looks at both.
+fn run(full: bool) -> Stats {
+    // The objects looked at: young ones first, with their ages
+    let (live, ages): (Vec<Live>, Vec<u8>) = REGISTRY.with(|r| {
         let mut r = r.borrow_mut();
         r.collecting = true;
-        r.nodes.retain(Node::alive);
-        r.nodes.iter().filter_map(Node::upgrade).collect()
+        let young = std::mem::take(&mut r.young);
+        let old = std::mem::take(&mut r.old);
+        let mut live = Vec::with_capacity(young.len() + if full { old.len() } else { 0 });
+        let mut ages = Vec::with_capacity(live.capacity());
+        for (node, age) in &young {
+            if let Some(l) = node.upgrade() {
+                live.push(l);
+                ages.push(*age);
+            }
+        }
+        let mut kept_old = Vec::new();
+        if full {
+            for node in &old {
+                if let Some(l) = node.upgrade() {
+                    live.push(l);
+                    ages.push(PROMOTE);
+                }
+            }
+        } else {
+            kept_old = old;
+            kept_old.retain(Node::alive);
+        }
+        r.old = kept_old;
+        (live, ages)
     });
     let n = live.len();
-    let mut index: HashMap<
-        *const u8,
-        usize,
-        std::hash::BuildHasherDefault<crate::value::FxHasher>,
-    > = HashMap::with_capacity_and_hasher(n, Default::default());
+    // Each object looked at keeps its index, stamped with this collection
+    let epoch = EPOCH.with(|e| {
+        e.set(e.get() + 1);
+        e.get()
+    });
     for (i, o) in live.iter().enumerate() {
-        index.insert(o.ptr(), i);
+        o.slot().set((epoch << 32) | i as u64);
     }
-    // References from other registered objects
+    let index = |slot: &Cell<u64>| {
+        let v = slot.get();
+        (v >> 32 == epoch).then_some((v & 0xffff_ffff) as usize)
+    };
+    // References from the other objects looked at
     let mut internal = vec![0usize; n];
     let mut readable = vec![false; n];
     for (i, o) in live.iter().enumerate() {
         readable[i] = o.children(&mut |p, count| {
-            if let Some(&j) = index.get(&p) {
+            if let Some(j) = index(p) {
                 internal[j] += count;
             }
         });
@@ -232,7 +300,7 @@ pub fn collect() -> Stats {
     }
     while let Some(i) = stack.pop() {
         live[i].children(&mut |p, _| {
-            if let Some(&j) = index.get(&p)
+            if let Some(j) = index(p)
                 && !marked[j]
             {
                 marked[j] = true;
@@ -253,12 +321,32 @@ pub fn collect() -> Stats {
         live: marked.iter().filter(|&&m| m).count(),
         cleared: garbage.len(),
     };
+    // Survivors age; old enough, they join the old generation
+    let mut young = Vec::new();
+    let mut promoted = Vec::new();
+    for i in 0..n {
+        if marked[i] {
+            let node = live[i].downgrade();
+            if ages[i] + 1 >= PROMOTE {
+                promoted.push(node);
+            } else {
+                young.push((node, ages[i] + 1));
+            }
+        }
+    }
     drop(garbage);
     drop(live);
     REGISTRY.with(|r| {
         let mut r = r.borrow_mut();
+        // Objects registered while collecting stay young
+        young.append(&mut r.young);
+        r.young = young;
+        r.old.append(&mut promoted);
         r.since = 0;
-        r.threshold = stats.live.max(MIN_THRESHOLD);
+        r.threshold = r.young.len().max(MIN_THRESHOLD);
+        if full {
+            r.old_limit = (2 * r.old.len()).max(MIN_THRESHOLD);
+        }
         r.collecting = false;
     });
     TOTAL.with(|t| {
@@ -340,5 +428,52 @@ mod tests {
             panic!("captured table was cleared")
         };
         assert!(matches!(t.get_str("y"), Value::Number(n) if n == 2.0));
+    }
+
+    #[test]
+    fn minor_collections_keep_what_old_objects_reference() {
+        // An old cycle, held from the stack
+        let old = TableRef::new();
+        let other = TableRef::new();
+        old.set_str("other", Value::Table(other.clone()));
+        other.set_str("old", Value::Table(old.clone()));
+        drop(other);
+        for _ in 0..PROMOTE {
+            run(false);
+        }
+        REGISTRY.with(|r| assert!(r.borrow().young.is_empty()));
+        // A young object only the old cycle references, and a young garbage cycle
+        let child = TableRef::new();
+        child.set_str("x", Value::Number(1.0));
+        old.set_str("child", Value::Table(child.clone()));
+        let weak_child = Rc::downgrade(&child.0);
+        drop(child);
+        let weak = {
+            let a = TableRef::new();
+            let b = TableRef::new();
+            a.set_str("b", Value::Table(b.clone()));
+            b.set_str("a", Value::Table(a.clone()));
+            Rc::downgrade(&a.0)
+        };
+        run(false);
+        assert!(
+            weak.upgrade().is_none(),
+            "the young garbage cycle was not freed"
+        );
+        assert!(
+            weak_child.upgrade().is_some(),
+            "a child of an old table was freed"
+        );
+        // Old garbage waits for a full collection
+        let weak_old = Rc::downgrade(&old.0);
+        drop(old);
+        run(false);
+        assert!(weak_old.upgrade().is_some());
+        collect();
+        assert!(
+            weak_old.upgrade().is_none(),
+            "the old garbage cycle was not freed"
+        );
+        assert!(weak_child.upgrade().is_none());
     }
 }

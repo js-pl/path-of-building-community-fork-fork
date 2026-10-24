@@ -1,5 +1,7 @@
-//! Whole builds: upstream's program, translated to Rust, calculates every
-//! corpus build exactly as the oracle did (`tests/oracle/<id>.json`).
+//! Whole builds: upstream's program, translated to Rust with the engine's
+//! native ports in place, calculates every corpus build exactly as the
+//! oracle did (`tests/oracle/<id>.json`). `POB_TRANSLATED=1` runs the
+//! translation alone.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
@@ -136,6 +138,7 @@ fn calcs() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    engine::install(&host.env).unwrap_or_else(|e| panic!("{}", describe(&e)));
     let json_chunk = upstream::up::chunk("oracle/json.lua").expect("oracle/json.lua is translated");
     let to_json = first(json_chunk(&host.env, &[]).unwrap_or_else(|e| panic!("{}", describe(&e))));
     let mut failures = Vec::new();

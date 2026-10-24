@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 lua.workspace = true
+engine.workspace = true
 upstream.workspace = true
 miniz_oxide = "0.9"
 

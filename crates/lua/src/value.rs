@@ -10,30 +10,75 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
-/// Immutable Lua string.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+/// Immutable Lua string. Its hash is computed once and kept in front of the
+/// bytes, so table lookups do not hash the string again.
+#[derive(Clone)]
 pub struct LuaStr(Rc<[u8]>);
+
+/// Bytes of the hash in front of a string's bytes
+const HASH: usize = 8;
 
 impl LuaStr {
     pub fn new(bytes: &[u8]) -> Self {
-        LuaStr(Rc::from(bytes))
+        let mut h = FxHasher::default();
+        h.write(bytes);
+        h.write_usize(bytes.len());
+        let hash = h.finish();
+        let mut rc = Rc::<[u8]>::new_uninit_slice(HASH + bytes.len());
+        let buf = Rc::get_mut(&mut rc).expect("new allocation");
+        for (dst, src) in buf.iter_mut().zip(hash.to_le_bytes().iter().chain(bytes)) {
+            dst.write(*src);
+        }
+        // Safety: every byte was written above
+        LuaStr(unsafe { rc.assume_init() })
     }
 
     pub fn as_bytes(&self) -> &[u8] {
-        &self.0
+        &self.0[HASH..]
+    }
+
+    fn hash_value(&self) -> u64 {
+        u64::from_le_bytes(self.0[..HASH].try_into().expect("hash prefix"))
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.0.len() - HASH
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.len() == 0
     }
 
     /// The string as UTF-8, replacing invalid sequences.
     pub fn to_str_lossy(&self) -> std::borrow::Cow<'_, str> {
-        String::from_utf8_lossy(&self.0)
+        String::from_utf8_lossy(self.as_bytes())
+    }
+}
+
+impl PartialEq for LuaStr {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+            || (self.hash_value() == other.hash_value() && self.as_bytes() == other.as_bytes())
+    }
+}
+
+impl Eq for LuaStr {}
+
+impl Hash for LuaStr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_u64(self.hash_value())
+    }
+}
+
+impl PartialOrd for LuaStr {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LuaStr {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.as_bytes().cmp(other.as_bytes())
     }
 }
 
@@ -51,7 +96,7 @@ impl From<String> for LuaStr {
 
 impl From<Vec<u8>> for LuaStr {
     fn from(v: Vec<u8>) -> Self {
-        LuaStr(Rc::from(v))
+        LuaStr::new(&v)
     }
 }
 
@@ -171,13 +216,41 @@ type NativeFn = dyn Fn(&[Value]) -> LResult<Vec<Value>>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InvalidKey;
 
+/// An object the cycle collector ([`crate::gc`]) tracks, with its place in
+/// the collection running or last run.
+pub struct Gc<T> {
+    pub(crate) slot: std::cell::Cell<u64>,
+    inner: T,
+}
+
+impl<T> Gc<T> {
+    pub fn new(inner: T) -> Self {
+        Gc {
+            slot: std::cell::Cell::new(0),
+            inner,
+        }
+    }
+}
+
+impl<T> std::ops::Deref for Gc<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.inner
+    }
+}
+
+/// A local captured by a closure, shared between them.
+pub type CellRef = Rc<Gc<RefCell<Value>>>;
+
 /// A callable Lua function: generated from upstream code or native.
 pub struct Function {
     pub name: Rc<str>,
     pub f: Box<NativeFn>,
     /// Cells of the locals a translated closure captures, which its native
     /// closure holds too; the cycle collector ([`crate::gc`]) follows them
-    pub upvalues: Vec<Rc<RefCell<Value>>>,
+    pub upvalues: Vec<CellRef>,
+    pub(crate) slot: std::cell::Cell<u64>,
 }
 
 impl Function {
@@ -733,7 +806,7 @@ impl Table {
 /// Shared, mutable table, like a Lua table reference. Tables are registered
 /// with the cycle collector ([`crate::gc`]).
 #[derive(Clone)]
-pub struct TableRef(pub Rc<RefCell<Table>>);
+pub struct TableRef(pub Rc<Gc<RefCell<Table>>>);
 
 impl Default for TableRef {
     fn default() -> Self {
@@ -747,7 +820,7 @@ impl TableRef {
     }
 
     pub fn from_table(t: Table) -> Self {
-        let r = Rc::new(RefCell::new(t));
+        let r = Rc::new(Gc::new(RefCell::new(t)));
         crate::gc::register_table(&r);
         TableRef(r)
     }

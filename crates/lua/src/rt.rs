@@ -30,6 +30,7 @@ pub fn func(name: &str, f: impl Fn(&[Value]) -> LResult<Vec<Value>> + 'static) -
         name: name.into(),
         f: Box::new(f),
         upvalues: Vec::new(),
+        slot: Default::default(),
     }))
 }
 
@@ -43,6 +44,7 @@ pub fn func_up(
         name: name.into(),
         f: Box::new(f),
         upvalues,
+        slot: Default::default(),
     });
     crate::gc::register_function(&r);
     Value::Function(r)
@@ -384,10 +386,10 @@ pub fn tset(t: &mut crate::value::Table, k: Value, v: Value) -> LResult<()> {
 }
 
 /// A local captured by a closure, shared between them.
-pub type Cell = Rc<RefCell<Value>>;
+pub type Cell = crate::value::CellRef;
 
 pub fn cell(v: Value) -> Cell {
-    let c = Rc::new(RefCell::new(v));
+    let c = Rc::new(crate::value::Gc::new(RefCell::new(v)));
     crate::gc::register_cell(&c);
     c
 }
