@@ -134,6 +134,20 @@ fn specs_match_upstream() {
                 continue;
             }
             compared += 1;
+            if std::env::var_os("SPEC_DEBUG").is_some() {
+                eprintln!(
+                    "{id} spec {}: translated tree {:?} class {:?} ascend {:?}, xml {:?} {:?} {:?}, {} specs in xml, {} translated",
+                    si + 1,
+                    get(&lua_spec, "treeVersion"),
+                    get(&lua_spec, "curClassId"),
+                    get(&lua_spec, "curAscendClassId"),
+                    a.get("treeVersion"),
+                    a.get("classId"),
+                    a.get("ascendClassId"),
+                    attrs.len(),
+                    spec_list.as_table().map(|t| t.len()).unwrap_or(0),
+                );
+            }
             let version = a
                 .get("treeVersion")
                 .cloned()
@@ -166,6 +180,8 @@ fn specs_match_upstream() {
                 &effects,
             )
             .unwrap_or_else(|e| panic!("{id} spec {si}: {e}"));
+            spec.post_load()
+                .unwrap_or_else(|e| panic!("{id} spec {si}: {e}"));
             let mut fail = |what: String| {
                 if failures.len() < 60 {
                     failures.push(format!("{id} spec {}: {what}", si + 1));
@@ -266,6 +282,30 @@ fn specs_match_upstream() {
                 let enc = |l: &[engine::mods::Mod]| {
                     serde_json::Value::Array(l.iter().map(typed_json::mod_).collect()).to_string()
                 };
+                // Upstream's modLib.mergeKeystones sets the source of a tree
+                // keystone's own mods to whatever else grants the keystone (an
+                // item, the config), so after a calculation they name that
+                let lmods = lmods.map(|mut l| {
+                    if spec.tree_node(i).kind == engine::tree::NodeType::Keystone {
+                        for m in &mut l {
+                            if m.source
+                                .as_deref()
+                                .is_some_and(|s| !s.to_lowercase().contains("tree"))
+                            {
+                                let tree_source: Rc<str> = format!("Tree:{}", node.id).into();
+                                m.source = Some(tree_source.clone());
+                                // setSource rewrites a carried mod's source too
+                                if let engine::mods::ModValue::Record(r) = &mut m.value
+                                    && let Some(engine::mods::ModValue::Mod(inner)) =
+                                        r.get_mut(engine::mods::Sym::new("mod"))
+                                {
+                                    inner.source = Some(tree_source);
+                                }
+                            }
+                        }
+                    }
+                    l
+                });
                 match lmods {
                     Ok(l) if enc(&l) == enc(spec.mod_list(i)) => {}
                     Ok(l) => check(

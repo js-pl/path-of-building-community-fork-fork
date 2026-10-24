@@ -53,7 +53,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Classes/NotesTab.lua" = { status = "partial", port = "web/src/ui/NotesTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/PartyTab.lua" = { status = "todo" }
 "Classes/PassiveMasteryControl.lua" = { status = "todo" }
-"Classes/PassiveSpec.lua" = { status = "todo" }
+"Classes/PassiveSpec.lua" = { status = "partial", port = "crates/engine/src/spec.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/PassiveSpecListControl.lua" = { status = "todo" }
 "Classes/PassiveTree.lua" = { status = "partial", port = "crates/engine/src/tree.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/PassiveTreeView.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }

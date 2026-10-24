@@ -344,8 +344,17 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    (`crates/engine/src/tree.rs`), typed nodes with their stat parses and
    mods, positions, links, jewel radii and lookup tables, equal to the
    translated tree for every tree version the corpus uses
-   (`tests/tree.rs`). Then the passive spec, items, skills and config, and
-   `initEnv` building typed stores from them.
+   (`tests/tree.rs`). Then the passive spec (`crates/engine/src/spec.rs`):
+   class and ascendancy, allocation, mastery selections, dependencies and
+   paths, equal to the translated spec of every corpus build
+   (`tests/spec.rs`); jewels that change the tree, tattoos and cluster
+   jewel subgraphs follow. Then items, skills and config, and `initEnv`
+   building typed stores from them.
+
+   Upstream mutates shared data in a few places, and the typed engine does
+   not copy that by accident: `modLib.mergeKeystones` sets the source of a
+   tree keystone's mods to whatever else grants the keystone, so the tree
+   itself changes after a calculation.
 
 ## Open questions
 

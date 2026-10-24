@@ -385,6 +385,21 @@ impl<'t> PassiveSpec<'t> {
         self.build_all_depends_and_paths()
     }
 
+    /// `PostLoad()`, which rebuilds the cluster jewel subgraphs (not ported:
+    /// there are none here): allocated ids the spec now has are allocated,
+    /// then dependencies and paths are rebuilt.
+    pub fn post_load(&mut self) -> Result<()> {
+        for id in std::mem::take(&mut self.alloc_subgraph_nodes) {
+            if let Some(&i) = self.index.get(&id) {
+                self.nodes[i].alloc = true;
+                if !self.alloc_nodes.contains(id) {
+                    self.alloc_nodes.insert(id, i);
+                }
+            }
+        }
+        self.build_all_depends_and_paths()
+    }
+
     /// `ProcessStats` on a node with the given lines, keeping its unknown
     /// flag as upstream does
     fn set_stats(&mut self, i: usize, sd: Vec<Rc<str>>, starts: &[usize]) -> Result<()> {
