@@ -72,6 +72,7 @@ fn trees_match_upstream() {
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
     let (data, _) = load_data();
+    let latest = lua::to_string(&host.global("latestTreeVersion")).to_string();
     let mut failures = Vec::new();
     for version in VERSIONS {
         let lua_tree = first(
@@ -86,7 +87,7 @@ fn trees_match_upstream() {
             .load1(&format!("TreeData/{version}/tree"), vec![])
             .unwrap_or_else(|e| panic!("{version}: {e}"));
         let radii = tree::jewel_radii(&data.get("jewelRadii"), version).unwrap();
-        let typed = PassiveTree::new(version, &tree_data, &radii, &parser)
+        let typed = PassiveTree::new(version, &tree_data, &radii, &parser, *version == latest)
             .unwrap_or_else(|e| panic!("{version}: {e}"));
         let mut fail = |what: String| {
             if failures.len() < 60 {

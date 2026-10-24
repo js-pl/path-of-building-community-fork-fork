@@ -335,8 +335,17 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    active skill's, against the translated stores (565k queries, all equal).
    What the queries need from the rest of the engine (actors, outputs,
    items and gems) is the `Actors` trait, which the test answers from the
-   translation until those parts are typed. Next: the mod parser producing
-   typed mods, then `initEnv` building typed stores.
+   translation until those parts are typed. `engine::mods::convert` turns
+   upstream's mods as Lua values (the importer's data, the mod parser's
+   output) into typed ones; every one of the 41601 parsed lines converts
+   and encodes back to upstream's mods (`tests/mod_parser.rs`).
+
+   The build model follows, bottom up: first the passive tree
+   (`crates/engine/src/tree.rs`), typed nodes with their stat parses and
+   mods, positions, links, jewel radii and lookup tables, equal to the
+   translated tree for every tree version the corpus uses
+   (`tests/tree.rs`). Then the passive spec, items, skills and config, and
+   `initEnv` building typed stores from them.
 
 ## Open questions
 

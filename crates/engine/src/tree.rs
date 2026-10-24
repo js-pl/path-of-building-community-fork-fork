@@ -365,12 +365,14 @@ impl PassiveTree {
     }
 
     /// Builds the tree from its data (`tree.lua`), as `PassiveTree`'s
-    /// constructor does; `radii` are the jewel radii for the version.
+    /// constructor does; `radii` are the jewel radii for the version, and
+    /// `latest` says it is upstream's latest tree version.
     pub fn new(
         version: &str,
         data: &Value,
         radii: &[(f64, f64)],
         parser: &ModParser,
+        latest: bool,
     ) -> Result<PassiveTree> {
         let version_num = version_num(version);
         let new_format = version_num >= 3.10;
@@ -829,6 +831,15 @@ impl PassiveTree {
                         &format!("Tree:{nid}"),
                     );
                     tree.nodes[i].mod_list.push(m);
+                }
+            }
+        }
+        // For the latest tree, upstream builds the Forbidden Flame and Flesh
+        // uniques from the class notables, sorting each class's list
+        if latest {
+            for (class, list) in tree.class_notables.iter_mut() {
+                if &**class != "alternate_ascendancies" {
+                    list.sort();
                 }
             }
         }
