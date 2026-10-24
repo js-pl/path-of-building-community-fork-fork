@@ -62,6 +62,7 @@ pub const DATA_LUA_CONSTANTS: &[&str] = &[
     "data.nonDamagingAilmentTypeList",
     "data.nonElementalAilmentTypeList",
     "data.nonDamagingAilment",
+    "data.jewelRadii",
 ];
 
 /// Skill files, in `Data.lua`'s `skillTypes` order.
