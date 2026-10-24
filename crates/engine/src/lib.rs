@@ -8,7 +8,6 @@ pub mod data;
 pub mod mod_parser;
 pub mod mod_store;
 pub mod mod_tools;
-pub mod passive_spec;
 pub mod rt;
 
 /// Replaces translated parts of upstream's running program with the
@@ -18,8 +17,7 @@ pub fn install(env: &std::rc::Rc<lua::env::Env>) -> lua::LResult<()> {
     if std::env::var_os("POB_TRANSLATED").is_some() {
         return Ok(());
     }
-    mod_store::install(env)?;
-    passive_spec::install(env)
+    mod_store::install(env)
 }
 
 /// Upstream's class `name` (`common.classes[name]`), loaded as `getClass`

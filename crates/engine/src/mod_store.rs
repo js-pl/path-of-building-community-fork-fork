@@ -1576,8 +1576,7 @@ fn opt_bool(v: &Value) -> bool {
 /// the classes exist.
 pub fn install(env: &Rc<Env>) -> LResult<()> {
     let classes = rt::index(&env.global("common"), &s("classes"))?;
-    let class =
-        |name: &str| -> LResult<TableRef> { Ok(table(&rt::index(&classes, &s(name))?)?.clone()) };
+    let class = |name: &str| crate::class(env, name);
     let store = class("ModStore")?;
     let mod_db = class("ModDB")?;
     let mod_list = class("ModList")?;
