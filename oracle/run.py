@@ -6,6 +6,8 @@
                                  including modparser.jsonl
   run.py check                   dump twice and compare with tests/oracle
   run.py coverage [--out DIR]    dump with luacov and write a coverage report
+  run.py data-json [--out DIR]   write upstream's data tables as JSON, to debug
+                                 differences in tests/oracle/data.jsonl
 
 Work is split into one LuaJIT process per CPU (--jobs to change).
 """
@@ -117,7 +119,8 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
     if modparser:
         # Runs next to the build dumps; it parses the corpus builds' lines too
         (out / "modparser.jsonl").unlink(missing_ok=True)
-        jobs = max(1, jobs - 1)
+        (out / "data.jsonl").unlink(missing_ok=True)
+        jobs = max(1, jobs - 2)
 
     def run(indexed):
         index, shard = indexed
@@ -126,11 +129,14 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
 
     tasks = list(enumerate(shards(builds, jobs)))
     if modparser:
-        tasks.append((-1, None))
+        tasks.append((-1, "modparser"))
+        tasks.append((-2, "data"))
 
     def run_task(task):
-        if task[1] is None:
+        if task[1] == "modparser":
             luajit(ORACLE / "modparser.lua", [str(out / "modparser.jsonl"), *build_args(builds)])
+        elif task[1] == "data":
+            luajit(ORACLE / "data.lua", [str(out / "data.jsonl")])
         else:
             run(task)
 
@@ -260,6 +266,13 @@ def uncovered(report):
     return "\n".join(lines) + "\n"
 
 
+def cmd_data_json(args):
+    out = Path(args.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    luajit(ORACLE / "data.lua", [str(out / "data.jsonl"), str(out)])
+    print(f"wrote {out}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--jobs", type=int, default=JOBS)
@@ -274,6 +287,9 @@ def main():
     p = sub.add_parser("coverage")
     p.add_argument("--out", default=str(ROOT / "target" / "oracle-coverage"))
     p.set_defaults(func=cmd_coverage)
+    p = sub.add_parser("data-json")
+    p.add_argument("--out", default=str(ROOT / "target" / "oracle-data"))
+    p.set_defaults(func=cmd_data_json)
     args = parser.parse_args()
     args.func(args)
 

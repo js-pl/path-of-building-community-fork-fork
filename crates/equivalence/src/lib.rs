@@ -41,7 +41,18 @@ pub fn mod_parser() -> engine::mod_parser::ModParser {
 /// `{"$func":true}`.
 pub fn to_json(v: &Value) -> String {
     let mut out = String::new();
-    encode(v, &mut out);
+    encode(v, &mut out, &|_| "{\"$func\":true}".to_string());
+    out
+}
+
+/// Like [`to_json`], with Lua functions as `{"$func":"<file>:<line>"}`, as
+/// `oracle/data.lua` writes them.
+pub fn to_json_with_funcs(v: &Value) -> String {
+    let mut out = String::new();
+    encode(v, &mut out, &|v| match v {
+        Value::Func(f) => format!("{{\"$func\":\"{}:{}\"}}", f.file, f.line),
+        _ => "{\"$func\":true}".to_string(),
+    });
     out
 }
 
@@ -62,7 +73,7 @@ fn encode_str(s: &[u8], out: &mut String) {
     out.push('"');
 }
 
-fn encode(v: &Value, out: &mut String) {
+fn encode(v: &Value, out: &mut String, func: &dyn Fn(&Value) -> String) {
     match v {
         Value::Nil => out.push_str("null"),
         Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
@@ -80,7 +91,7 @@ fn encode(v: &Value, out: &mut String) {
             }
         }
         Value::Str(s) => encode_str(s.as_bytes(), out),
-        Value::Func(_) | Value::Closure(_) => out.push_str("{\"$func\":true}"),
+        Value::Func(_) | Value::Closure(_) => out.push_str(&func(v)),
         Value::Table(t) => {
             let entries = t.entries();
             let n = entries.len();
@@ -91,7 +102,7 @@ fn encode(v: &Value, out: &mut String) {
                     if i > 1 {
                         out.push(',');
                     }
-                    encode(&t.get_int(i), out);
+                    encode(&t.get_int(i), out, func);
                 }
                 out.push(']');
             } else {
@@ -107,7 +118,7 @@ fn encode(v: &Value, out: &mut String) {
                     }
                     encode_str(k, out);
                     out.push(':');
-                    encode(v, out);
+                    encode(v, out, func);
                 }
                 out.push('}');
             }

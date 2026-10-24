@@ -30,6 +30,7 @@ if the files differ from what upstream produces.
 | `../corpus/generate.lua` | Generates corpus builds with upstream's build API |
 | `dump.lua` | Writes calc outputs as JSON |
 | `modparser.lua` | Writes mod parser outputs as JSON lines |
+| `data.lua` | Writes hashes of upstream's raw data tables |
 | `json.lua` | The exact JSON encoder both use |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
@@ -80,6 +81,20 @@ version, every item mod, enchantment and crafting table, and the corpus
 builds. Each line is parsed live, with the ModCache emptied first. Jewel functions inside
 `JewelFunc` mods are closures and are written as `{"$func": true}`; what they
 do is tested through whole builds.
+
+## Data outputs
+
+`tests/oracle/data.jsonl` (`data.lua`) holds, for every table `Data.lua`
+loads from `src/Data` (plus the constants it defines itself and the
+`ModFlag`, `KeywordFlag` and `SkillType` globals), the FNV-1a hash and length
+of its canonical JSON, with functions written as `{"$func": "<file>:<line>"}`:
+
+```text
+{"bytes": <length>, "fnv": "<16 hex digits>", "key": "Skills"}
+```
+
+Hashes keep the file small; `run.py data-json` writes the full JSON to
+`target/oracle-data/` for comparing when a table differs.
 
 ## How upstream is run
 
