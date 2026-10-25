@@ -235,6 +235,8 @@ pub struct SkillEffect {
     pub src: Option<(usize, usize)>,
     /// `gemCfg`: the group's cfg with the gem's socket
     pub gem_cfg: Option<Cfg>,
+    /// `gemPropertyInfo`: the gem properties that applied, value and mod
+    pub gem_property_info: Vec<(ModValue, Mod)>,
 }
 
 impl SkillEffect {
@@ -251,6 +253,7 @@ impl SkillEffect {
             gem: None,
             src: None,
             gem_cfg: None,
+            gem_property_info: Vec::new(),
         }
     }
 }
@@ -269,6 +272,8 @@ pub struct ActiveSkill {
     /// The socket group, by index
     pub group: Option<usize>,
     pub slot_name: Option<String>,
+    /// What building the skill's mod list sets (`buildActiveSkillModList`)
+    pub mods: Option<crate::calc_skill_mods::SkillMods>,
 }
 
 /// What creating the active skills needs
@@ -287,6 +292,8 @@ pub struct SkillsInput<'a> {
     pub imbued_support_by_slot: &'a HashMap<String, String>,
     /// `data.misc.MatchingSocketQualityBonus`
     pub matching_socket_quality_bonus: f64,
+    /// The enemy's database (`env.enemyDB`)
+    pub enemy_db: &'a Store,
 }
 
 /// The active skills of the player and what creating them sets
@@ -428,6 +435,7 @@ fn create_active_skill(
         effect_list: vec![],
         group,
         slot_name: None,
+        mods: None,
     };
     let st = |n: &str| ctx.data.skill_type(n);
     if [st("Attack"), st("Damage"), st("Projectile")]
@@ -565,6 +573,7 @@ fn apply_gem_mods(
             "req" => effect.req = Some(effect.req.unwrap_or(0.0) + add),
             k => return Err(format!("gem property {k}")),
         }
+        effect.gem_property_info.push((value.clone(), m.clone()));
     }
     Ok(())
 }
@@ -592,21 +601,67 @@ impl GroupCfg {
 }
 
 /// The player's database during the skills' setup, with its queries
-struct PlayerDb<'a> {
-    stores: Stores,
-    id: StoreId,
-    actors: EnvActors<'a>,
+pub(crate) struct PlayerDb<'a> {
+    pub stores: Stores,
+    pub id: StoreId,
+    pub actors: EnvActors<'a>,
 }
 
-impl PlayerDb<'_> {
-    fn query(&self) -> Query<'_> {
+impl<'a> PlayerDb<'a> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        mod_db: Store,
+        enemy_db: &Store,
+        item_list: &BTreeMap<String, f64>,
+        weapon_data: &[Fields; 2],
+        tab: &'a ItemsTab,
+        item_data: &'a ItemData,
+        skill_data: &'a SkillData,
+    ) -> PlayerDb<'a> {
+        let mut stores = Stores::default();
+        let id = stores.push(mod_db);
+        let enemy = stores.push(enemy_db.clone());
+        PlayerDb {
+            stores,
+            id,
+            actors: EnvActors {
+                actors: vec![
+                    Actor {
+                        store: id,
+                        item_list: item_list.clone(),
+                        weapon_data: [Some(weapon_data[0].clone()), Some(weapon_data[1].clone())],
+                        player: Some(0),
+                        enemy: Some(1),
+                        ..Actor::default()
+                    },
+                    Actor {
+                        store: enemy,
+                        player: Some(0),
+                        enemy: Some(0),
+                        ..Actor::default()
+                    },
+                ],
+                store_actor: [(id, 0), (enemy, 1)].into_iter().collect(),
+                tab,
+                item_data,
+                skill_data,
+            },
+        }
+    }
+
+    /// Takes the player's database back
+    pub fn finish(mut self) -> Store {
+        std::mem::replace(&mut self.stores.stores[self.id], Store::db())
+    }
+
+    pub fn query(&self) -> Query<'_> {
         Query {
             stores: &self.stores,
             actors: &self.actors,
         }
     }
 
-    fn tabulate(&self, cfg: Option<&Cfg>, name: &str) -> Result<Vec<(ModValue, Mod)>, String> {
+    pub fn tabulate(&self, cfg: Option<&Cfg>, name: &str) -> Result<Vec<(ModValue, Mod)>, String> {
         Ok(self
             .query()
             .tabulate(self.id, Some(ModType::List), cfg, &[Sym::new(name)])?
@@ -615,11 +670,11 @@ impl PlayerDb<'_> {
             .collect())
     }
 
-    fn list(&self, cfg: Option<&Cfg>, name: &str) -> Result<Vec<ModValue>, String> {
+    pub fn list(&self, cfg: Option<&Cfg>, name: &str) -> Result<Vec<ModValue>, String> {
         self.query().list(self.id, cfg, &[Sym::new(name)])
     }
 
-    fn add(&mut self, m: Mod) {
+    pub fn add(&mut self, m: Mod) {
         self.stores.stores[self.id].add(m);
     }
 }
@@ -695,34 +750,22 @@ pub fn create_active_skills(
     input: &SkillsInput,
     mod_db: &mut Store,
 ) -> Result<SkillsSetup, String> {
-    let groups = input.groups;
     let data = input.skill_data;
     let weapon_data = weapon_data(input, mod_db);
     let all_one_hand = weapon_data
         .iter()
         .any(|d| d.get("countsAsAll1H").is_some_and(ModValue::truthy));
-    let mut stores = Stores::default();
-    let id = stores.push(std::mem::replace(mod_db, Store::db()));
-    let mut db = PlayerDb {
-        stores,
-        id,
-        actors: EnvActors {
-            actors: vec![Actor {
-                store: id,
-                item_list: input.item_list.clone(),
-                weapon_data: [Some(weapon_data[0].clone()), Some(weapon_data[1].clone())],
-                player: Some(0),
-                ..Actor::default()
-            }],
-            store_actor: [(id, 0)].into_iter().collect(),
-            tab: input.tab,
-            item_data: input.item_data,
-            skill_data: data,
-        },
-    };
+    let mut db = PlayerDb::new(
+        std::mem::replace(mod_db, Store::db()),
+        input.enemy_db,
+        input.item_list,
+        &weapon_data,
+        input.tab,
+        input.item_data,
+        data,
+    );
     let result = active_skills(input, &mut db, weapon_data, all_one_hand);
-    *mod_db = std::mem::replace(&mut db.stores.stores[id], Store::db());
-    let _ = groups;
+    *mod_db = db.finish();
     result
 }
 

@@ -30,6 +30,49 @@ pub struct SetupData {
     pub pantheons: HashMap<String, Vec<(String, Vec<String>)>>,
     pub mod_flags: HashMap<String, u32>,
     pub keyword_flags: HashMap<String, u32>,
+    pub game_constants: HashMap<String, f64>,
+    /// `data.weaponTypeInfo`, by weapon type
+    pub weapon_type_info: HashMap<String, WeaponTypeInfo>,
+    /// `data.minions`, by minion id
+    pub minions: HashMap<String, MinionData>,
+    pub monster_damage_table: Vec<f64>,
+    pub monster_ally_damage_table: Vec<f64>,
+}
+
+/// What a weapon type means for skills (`data.weaponTypeInfo[type]`)
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct WeaponTypeInfo {
+    /// The `ModFlag` of the type
+    pub flag: String,
+    pub one_hand: bool,
+    pub melee: bool,
+}
+
+/// A minion's data (`data.minions[id]`): its numbers and names by field,
+/// its tags, skills and mods
+#[derive(Clone, Debug, Default)]
+pub struct MinionData {
+    pub fields: crate::item::Fields,
+    pub monster_tags: Vec<String>,
+    pub skill_list: Vec<String>,
+    pub mod_list: Vec<Mod>,
+}
+
+impl MinionData {
+    pub fn num(&self, k: &str) -> Option<f64> {
+        self.fields.get(k).and_then(ModValue::as_number)
+    }
+
+    pub fn str(&self, k: &str) -> Option<&str> {
+        match self.fields.get(k) {
+            Some(ModValue::Str(s)) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn flag(&self, k: &str) -> bool {
+        self.fields.get(k).is_some_and(ModValue::truthy)
+    }
 }
 
 fn pairs(v: &Value) -> Vec<(Key, Value)> {
@@ -41,6 +84,39 @@ fn key(k: &Key) -> Result<String> {
         Key::Str(s) => Ok(s.to_str_lossy().into_owned()),
         k => Err(format!("expected a string key, got {k:?}")),
     }
+}
+
+fn minion_from_lua(v: &Value) -> Result<MinionData> {
+    let conv = Converter::default();
+    let mut m = MinionData::default();
+    for (k, x) in pairs(v) {
+        let k = key(&k)?;
+        match k.as_str() {
+            "monsterTags" => {
+                m.monster_tags = array(&x)
+                    .iter()
+                    .map(|t| Ok(text(t)?.to_string()))
+                    .collect::<Result<_>>()?
+            }
+            "skillList" => {
+                m.skill_list = array(&x)
+                    .iter()
+                    .map(|t| Ok(text(t)?.to_string()))
+                    .collect::<Result<_>>()?
+            }
+            "modList" => {
+                m.mod_list = array(&x)
+                    .iter()
+                    .map(|t| conv.mod_(t))
+                    .collect::<Result<_>>()?
+            }
+            _ if matches!(x, Value::Number(_) | Value::Str(_) | Value::Bool(_)) => {
+                m.fields.insert(k, conv.value(&x)?);
+            }
+            _ => {}
+        }
+    }
+    Ok(m)
 }
 
 fn numbers(v: &Value) -> Result<HashMap<String, f64>> {
@@ -83,7 +159,43 @@ impl SetupData {
             pantheons,
             mod_flags: flags(mod_flags)?,
             keyword_flags: flags(keyword_flags)?,
+            game_constants: numbers(&get(data, "gameConstants"))?,
+            weapon_type_info: pairs(&get(data, "weaponTypeInfo"))
+                .iter()
+                .map(|(k, v)| {
+                    Ok((
+                        key(k)?,
+                        WeaponTypeInfo {
+                            flag: text(&get(v, "flag"))?.to_string(),
+                            one_hand: get(v, "oneHand").truthy(),
+                            melee: get(v, "melee").truthy(),
+                        },
+                    ))
+                })
+                .collect::<Result<_>>()?,
+            minions: pairs(&get(data, "minions"))
+                .iter()
+                .map(|(k, v)| {
+                    let id = key(k)?;
+                    minion_from_lua(v)
+                        .map(|m| (id.clone(), m))
+                        .map_err(|e| format!("minion {id}: {e}"))
+                })
+                .collect::<Result<_>>()?,
+            monster_damage_table: array(&get(data, "monsterDamageTable"))
+                .iter()
+                .map(number)
+                .collect::<Result<_>>()?,
+            monster_ally_damage_table: array(&get(data, "monsterAllyDamageTable"))
+                .iter()
+                .map(number)
+                .collect::<Result<_>>()?,
         })
+    }
+
+    /// `data.gameConstants[name]`
+    pub fn game_constant(&self, name: &str) -> f64 {
+        self.game_constants.get(name).copied().unwrap_or(f64::NAN)
     }
 
     /// `data.characterConstants[name]`
@@ -100,12 +212,12 @@ impl SetupData {
     }
 
     /// `ModFlag[name]`
-    fn mod_flag(&self, name: &str) -> u32 {
+    pub fn mod_flag(&self, name: &str) -> u32 {
         self.mod_flags.get(name).copied().unwrap_or(0)
     }
 
     /// `KeywordFlag[name]`
-    fn keyword_flag(&self, name: &str) -> u32 {
+    pub fn keyword_flag(&self, name: &str) -> u32 {
         self.keyword_flags.get(name).copied().unwrap_or(0)
     }
 }

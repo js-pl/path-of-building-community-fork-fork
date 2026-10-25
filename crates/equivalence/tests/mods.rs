@@ -161,6 +161,7 @@ fn mod_queries() {
         let mut run = Run {
             conv: Converter {
                 originals: Some(&b.originals),
+                ..Converter::default()
             },
             failures: Vec::new(),
             queries: 0,

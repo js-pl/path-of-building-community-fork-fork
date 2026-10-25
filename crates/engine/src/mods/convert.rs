@@ -121,9 +121,22 @@ pub struct Originals {
 #[derive(Default)]
 pub struct Converter<'o> {
     pub originals: Option<&'o RefCell<Originals>>,
+    /// Mods as templates, whose value may be nil until it is set (the mods
+    /// of the skills' data); a nil value converts to NaN
+    pub templates: bool,
 }
 
 impl Converter<'_> {
+    /// A mod's flags. A few of upstream's skill mods pass a tag where the
+    /// flags go; upstream fails on the queries of such a mod, and as
+    /// templates they take flags no query has, so queries skip them.
+    fn mod_flags(&self, v: &Value) -> Result<u32, String> {
+        if self.templates && matches!(v, Value::Table(_)) {
+            return Ok(u32::MAX);
+        }
+        flags(v)
+    }
+
     pub fn value(&self, v: &Value) -> Result<ModValue, String> {
         Ok(match v {
             Value::Bool(b) => ModValue::Bool(*b),
@@ -222,7 +235,11 @@ impl Converter<'_> {
         )?;
         let typ = ModType::new(&text(&get(v, "type"))?);
         let raw = get(v, "value");
-        let value = self.value(&raw)?;
+        let value = if self.templates && raw.is_nil() {
+            ModValue::Number(f64::NAN)
+        } else {
+            self.value(&raw)?
+        };
         let mut tags = Vec::new();
         for tag in array(v) {
             tags.push(self.tag(&tag)?);
@@ -239,8 +256,8 @@ impl Converter<'_> {
             name: sym(&get(v, "name"))?,
             typ,
             value,
-            flags: flags(&get(v, "flags"))?,
-            keyword_flags: flags(&get(v, "keywordFlags"))?,
+            flags: self.mod_flags(&get(v, "flags"))?,
+            keyword_flags: self.mod_flags(&get(v, "keywordFlags"))?,
             source: match get(v, "source") {
                 Value::Nil => None,
                 x => Some(text(&x)?),

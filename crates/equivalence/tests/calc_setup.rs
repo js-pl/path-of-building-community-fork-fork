@@ -10,6 +10,7 @@
 use engine::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
+use engine::mods::tag::TagKind;
 use engine::mods::{Mod, ModValue, Mods, Store, Sym};
 use equivalence::{corpus, mod_parser, typed_json, upstream_src};
 use lua::rt;
@@ -81,6 +82,16 @@ fn align(typed: &Mod, lua: &mut Mod) {
         lua.source = typed.source.clone();
     }
     align_value(&typed.value, &mut lua.value);
+    // `CalcPerform` sets the warcry power bonus on the tag the skill data
+    // shares with every copy of the mod
+    for (t, l) in typed.tags.iter().zip(lua.tags.iter_mut()) {
+        if let (TagKind::Other { fields: tf, .. }, TagKind::Other { fields: lf, .. }) =
+            (&t.kind, &mut l.kind)
+            && tf.get("warcryPowerBonus").is_none()
+        {
+            lf.fields.retain(|(k, _)| k.as_str() != "warcryPowerBonus");
+        }
+    }
 }
 
 fn align_value(typed: &ModValue, lua: &mut ModValue) {
@@ -590,7 +601,7 @@ fn items_setup_matches_upstream() {
             config_enemy_mods: &config_enemy_mods,
             mode: BuffMode::new(Some("EFFECTIVE")),
         };
-        let (mut base, _) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
+        let (mut base, enemy_base) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
         calc_setup::allocation_mods(&spec, &mut base);
         let env_setup = match calc_tree::setup(&base, &input, &item_data) {
             Ok(o) => o,
@@ -964,6 +975,7 @@ fn items_setup_matches_upstream() {
                 .and_then(|v| v.parse::<f64>().ok()),
             imbued_support_by_slot: &imbued,
             matching_socket_quality_bonus: setup_data.misc["MatchingSocketQualityBonus"],
+            enemy_db: &enemy_base,
         };
         let mut player_db = env_setup.mod_db.clone();
         let setup = match calc_skills::create_active_skills(&skills_input, &mut player_db) {
@@ -1068,6 +1080,184 @@ fn items_setup_matches_upstream() {
             &get(&env, "modDB"),
             &mut fail,
         );
+        // The skills' mod lists
+        let mut setup = setup;
+        let placeholders = inputs(&get(&env, "configPlaceholder"));
+        let spectres: Vec<String> = entries(&get(&build, "spectreList"))
+            .into_iter()
+            .filter_map(|(_, v)| text(&v))
+            .collect();
+        let weapon_data = setup.weapon_data.clone();
+        let mods_input = engine::calc_skill_mods::ModsInput {
+            setup: &setup_data,
+            skill_data: &skill_data,
+            tab: &tab,
+            item_data: &item_data,
+            item_list: &out.item_list,
+            weapon_data: &weapon_data,
+            mode: BuffMode::new(Some("EFFECTIVE")),
+            config: &config,
+            placeholders: &placeholders,
+            spectre_list: &spectres,
+            character_level: get(&build, "characterLevel").as_number().unwrap(),
+            enemy_level: get(&env, "enemyLevel").as_number().unwrap(),
+            iron_mass: out.iron_mass_mods.is_some(),
+            enemy_db: &enemy_base,
+        };
+        let mut enemy_multipliers = HashMap::new();
+        let mut mgroups = tgroups.clone();
+        if let Err(e) = engine::calc_skill_mods::build_skill_mod_lists(
+            &mut setup.active_skills,
+            &mut mgroups,
+            &mut player_db,
+            &mut enemy_multipliers,
+            &mods_input,
+        ) {
+            fail(format!("skill mod lists: {e}"));
+            continue;
+        }
+        for (i, (t, l)) in setup.active_skills.iter().zip(&lskills).enumerate() {
+            let what = format!("skill {} ({})", i + 1, t.active_effect.granted_effect.id);
+            let Some(m) = &t.mods else {
+                fail(format!("{what}: no mods"));
+                continue;
+            };
+            let la = get(l, "activeEffect");
+            let tl = (t.active_effect.level, t.active_effect.quality);
+            let ll = (
+                get(&la, "level").as_number(),
+                get(&la, "quality").as_number().unwrap_or(f64::NAN),
+            );
+            if tl != ll {
+                fail(format!("{what}: level and quality {tl:?} != {ll:?}"));
+            }
+            let lflags = keys(&get(l, "skillFlags"));
+            if m.skill_flags != lflags {
+                fail(format!("{what}: flags {:?} != {lflags:?}", m.skill_flags));
+            }
+            let lcfg = get(l, "skillCfg");
+            let tc = &m.skill_cfg;
+            let tv = (
+                tc.flags.map(|f| f as f64),
+                tc.keyword_flags.map(|f| f as f64),
+                tc.skill_name.as_deref().map(String::from),
+                tc.slot_name.map(|s| s.as_str().to_string()),
+                tc.socket_num,
+                tc.skill_part,
+                tc.skill_dist,
+            );
+            let lv = (
+                get(&lcfg, "flags").as_number(),
+                get(&lcfg, "keywordFlags").as_number(),
+                text(&get(&lcfg, "skillName")),
+                text(&get(&lcfg, "slotName")),
+                get(&lcfg, "socketNum").as_number(),
+                get(&lcfg, "skillPart").as_number(),
+                get(&lcfg, "skillDist").as_number(),
+            );
+            if tv != lv {
+                fail(format!("{what}: cfg {tv:?} != {lv:?}"));
+            }
+            let lw = (
+                get(l, "weapon1Flags").as_number(),
+                get(l, "weapon2Flags").as_number(),
+            );
+            let tw = (
+                m.weapon_flags[0].map(|f| f as f64),
+                m.weapon_flags[1].map(|f| f as f64),
+            );
+            if tw != lw {
+                fail(format!("{what}: weapon flags {tw:?} != {lw:?}"));
+            }
+            let mut lmods = list_mods(&get(l, "skillModList"));
+            for (a, b) in m.mods.iter().zip(lmods.iter_mut()) {
+                align(a, b);
+            }
+            if m.mods != lmods {
+                let n = m.mods.len().min(lmods.len());
+                let k = (0..n).find(|&k| m.mods[k] != lmods[k]).unwrap_or(n);
+                let show =
+                    |x: Option<&Mod>| x.map_or("none".into(), |x| typed_json::mod_(x).to_string());
+                fail(format!(
+                    "{what}: {} skill mods != {}, at {}:\n    typed {}\n    translated {}",
+                    m.mods.len(),
+                    lmods.len(),
+                    k + 1,
+                    show(m.mods.get(k)),
+                    show(lmods.get(k))
+                ));
+            }
+            let ldata: BTreeMap<String, ModValue> = entries(&get(l, "skillData"))
+                .into_iter()
+                .filter_map(|(k, v)| match k {
+                    Key::Str(k) => Some((k.to_str_lossy().into_owned(), conv.value(&v).ok()?)),
+                    _ => None,
+                })
+                .collect();
+            if m.skill_data != ldata {
+                fail(format!("{what}: skillData {:?} != {ldata:?}", m.skill_data));
+            }
+            let lbuffs: Vec<(String, String, Vec<Mod>)> = entries(&get(l, "buffList"))
+                .into_iter()
+                .map(|(_, b)| {
+                    (
+                        text(&get(&b, "type")).unwrap_or_default(),
+                        text(&get(&b, "name")).unwrap_or_default(),
+                        list_mods(&get(&b, "modList")),
+                    )
+                })
+                .collect();
+            let tbuffs: Vec<(String, String, Vec<Mod>)> = m
+                .buff_list
+                .iter()
+                .map(|b| (b.typ.clone(), b.name.clone(), b.mod_list.clone()))
+                .collect();
+            let mut lbuffs = lbuffs;
+            for (t, l) in tbuffs.iter().zip(lbuffs.iter_mut()) {
+                for (a, b) in t.2.iter().zip(l.2.iter_mut()) {
+                    align(a, b);
+                }
+            }
+            if tbuffs != lbuffs {
+                for (t, l) in tbuffs.iter().zip(&lbuffs) {
+                    for (a, b) in t.2.iter().zip(&l.2) {
+                        if a != b {
+                            eprintln!(
+                                "buff mod {}\n  != {}",
+                                typed_json::mod_(a),
+                                typed_json::mod_(b)
+                            );
+                        }
+                    }
+                }
+                fail(format!(
+                    "{what}: buffs {:?} != {:?}",
+                    tbuffs
+                        .iter()
+                        .map(|b| (&b.0, &b.1, b.2.len()))
+                        .collect::<Vec<_>>(),
+                    lbuffs
+                        .iter()
+                        .map(|b| (&b.0, &b.1, b.2.len()))
+                        .collect::<Vec<_>>()
+                ));
+            }
+            let lminion = get(l, "minion");
+            let lm = (!lminion.is_nil()).then(|| {
+                (
+                    text(&get(&lminion, "type")),
+                    get(&lminion, "level").as_number(),
+                    fields(&get(&lminion, "weaponData1")),
+                )
+            });
+            let tm = m
+                .minion
+                .as_ref()
+                .map(|x| (Some(x.typ.clone()), Some(x.level), x.weapon_data[0].clone()));
+            if tm != lm {
+                fail(format!("{what}: minion {tm:?} != {lm:?}"));
+            }
+        }
     }
     eprintln!("{compared} item setups compared, {skipped} skipped");
     assert!(
