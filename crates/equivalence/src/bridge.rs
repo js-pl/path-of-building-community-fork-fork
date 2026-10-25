@@ -142,6 +142,7 @@ impl Bridge {
         }
         let conv = Converter {
             originals: Some(&self.originals),
+            ..Converter::default()
         };
         let mods = get(store, "mods");
         let mut typed = if let Value::Table(by_name) = &mods {

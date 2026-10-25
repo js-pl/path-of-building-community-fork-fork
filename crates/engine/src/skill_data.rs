@@ -6,7 +6,9 @@
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
-use crate::mods::convert::{array, get, number, text};
+use crate::item::Fields;
+use crate::mods::convert::{Converter, array, get, number, text};
+use crate::mods::{Mod, ModValue};
 use lua::{Key, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -65,6 +67,116 @@ pub struct GrantedEffect {
     pub from_item: bool,
     /// The source of an effect an item or a node grants (`modSource`)
     pub mod_source: Option<String>,
+    /// The stats of the levels' values, in order
+    pub stats: Vec<String>,
+    /// `constantStats`: stat and value, which may be nil
+    pub constant_stats: Vec<(String, Option<f64>)>,
+    /// `qualityStats`: stat and value per quality
+    pub quality_stats: Vec<(String, f64)>,
+    pub base_mods: Vec<Mod>,
+    /// The effect's own stat map (`statMap`); the rest come from the
+    /// shared one ([`SkillData::stat_map`])
+    pub stat_map: HashMap<String, StatMap>,
+    pub not_minion_stat: Vec<String>,
+    /// `parts`: each part's fields (`name`, flags, `stages`, ...)
+    pub parts: Option<Vec<Fields>>,
+    pub skill_totem_id: Option<f64>,
+    /// `minionList`: empty for spectres, which come from the build
+    pub minion_list: Option<Vec<String>>,
+    pub add_minion_list: Option<Vec<String>>,
+    pub minion_has_item_set: bool,
+    /// The keys of `minionUses`
+    pub minion_uses: Option<Vec<String>>,
+    pub base_effectiveness: Option<f64>,
+    pub incremental_effectiveness: Option<f64>,
+}
+
+/// How a stat's value scales the mods it maps to: `value`, or `stat *
+/// mult / div + base`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StatScale {
+    pub value: Option<f64>,
+    pub mult: Option<f64>,
+    pub div: Option<f64>,
+    pub base: Option<f64>,
+}
+
+impl StatScale {
+    pub fn apply(&self, stat: f64) -> f64 {
+        self.value.unwrap_or_else(|| {
+            stat * self.mult.unwrap_or(1.0) / self.div.unwrap_or(1.0) + self.base.unwrap_or(0.0)
+        })
+    }
+}
+
+/// A mod a stat maps to, or a group of mods with its own scale
+#[derive(Clone, Debug, PartialEq)]
+pub enum StatMapEntry {
+    Mod(Mod),
+    Group(Vec<Mod>, StatScale),
+}
+
+/// The mods a skill stat maps to (`statMap[stat]`)
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StatMap {
+    pub entries: Vec<StatMapEntry>,
+    pub scale: StatScale,
+    /// The skill flag a non-zero value sets
+    pub skill_flag: Option<String>,
+    /// Why upstream's map is unusable: a few pass a tag where the mod's
+    /// flags go, which fails when queried
+    pub error: Option<String>,
+}
+
+fn scale_from_lua(v: &Value) -> Result<StatScale> {
+    Ok(StatScale {
+        value: opt_number(&get(v, "value"))?,
+        mult: opt_number(&get(v, "mult"))?,
+        div: opt_number(&get(v, "div"))?,
+        base: opt_number(&get(v, "base"))?,
+    })
+}
+
+fn stat_map_from_lua(v: &Value) -> Result<StatMap> {
+    let conv = Converter {
+        templates: true,
+        ..Converter::default()
+    };
+    let mut entries = Vec::new();
+    let mut error = None;
+    for e in array(v) {
+        let entry = if get(&e, "name").is_nil() {
+            array(&e)
+                .iter()
+                .map(|m| conv.mod_(m))
+                .collect::<Result<_>>()
+                .and_then(|mods| Ok(StatMapEntry::Group(mods, scale_from_lua(&e)?)))
+        } else {
+            conv.mod_(&e).map(StatMapEntry::Mod)
+        };
+        match entry {
+            Ok(x) => entries.push(x),
+            Err(e) => error = Some(e),
+        }
+    }
+    Ok(StatMap {
+        entries,
+        scale: scale_from_lua(v)?,
+        skill_flag: opt_string(&get(v, "skillFlag"))?,
+        error,
+    })
+}
+
+fn strings(v: &Value) -> Result<Vec<String>> {
+    array(v).iter().map(string).collect()
+}
+
+fn opt_strings(v: &Value) -> Result<Option<Vec<String>>> {
+    if v.is_nil() {
+        Ok(None)
+    } else {
+        strings(v).map(Some)
+    }
 }
 
 impl GrantedEffect {
@@ -122,6 +234,14 @@ pub struct SkillData {
     pub skill_type: HashMap<String, i64>,
     /// `data.gemVaalGemIdForBaseGemId`
     gem_vaal_gem_id_for_base_gem_id: HashMap<String, String>,
+    /// `data.skillStatMap`: the stat maps shared by the skills
+    pub skill_stat_map: HashMap<String, StatMap>,
+}
+
+fn rt_index(v: &Value, i: i64) -> Value {
+    v.as_table()
+        .map(|t| t.get(&Value::Number(i as f64)))
+        .unwrap_or_default()
 }
 
 fn pairs(v: &Value) -> Vec<(Key, Value)> {
@@ -261,6 +381,72 @@ impl GrantedEffect {
             ignore_minion_types: get(v, "ignoreMinionTypes").truthy(),
             from_item: get(v, "fromItem").truthy(),
             mod_source: opt_string(&get(v, "modSource"))?,
+            stats: strings(&get(v, "stats"))?,
+            constant_stats: array(&get(v, "constantStats"))
+                .iter()
+                .map(|x| Ok((string(&rt_index(x, 1))?, opt_number(&rt_index(x, 2))?)))
+                .collect::<Result<_>>()?,
+            quality_stats: array(&get(v, "qualityStats"))
+                .iter()
+                .map(|x| Ok((string(&rt_index(x, 1))?, number(&rt_index(x, 2))?)))
+                .collect::<Result<_>>()?,
+            base_mods: {
+                let conv = Converter {
+                    templates: true,
+                    ..Converter::default()
+                };
+                array(&get(v, "baseMods"))
+                    .iter()
+                    .map(|m| conv.mod_(m))
+                    .collect::<Result<_>>()
+                    .map_err(|e| format!("baseMods: {e}"))?
+            },
+            stat_map: pairs(&get(v, "statMap"))
+                .into_iter()
+                .filter_map(|(k, m)| match k {
+                    Key::Str(k) if &*k.to_str_lossy() != "_grantedEffect" => {
+                        Some((k.to_str_lossy().into_owned(), m))
+                    }
+                    _ => None,
+                })
+                .map(|(k, m)| {
+                    Ok((
+                        k.clone(),
+                        stat_map_from_lua(&m).map_err(|e| format!("statMap {k}: {e}"))?,
+                    ))
+                })
+                .collect::<Result<_>>()?,
+            not_minion_stat: match get(v, "notMinionStat") {
+                Value::Nil => vec![],
+                x => strings(&x)?,
+            },
+            parts: match get(v, "parts") {
+                Value::Nil => None,
+                x => {
+                    let conv = Converter::default();
+                    Some(
+                        array(&x)
+                            .iter()
+                            .map(|p| {
+                                pairs(p)
+                                    .iter()
+                                    .map(|(k, f)| Ok((key(k)?, conv.value(f)?)))
+                                    .collect::<Result<Fields>>()
+                            })
+                            .collect::<Result<_>>()?,
+                    )
+                }
+            },
+            skill_totem_id: opt_number(&get(v, "skillTotemId"))?,
+            minion_list: opt_strings(&get(v, "minionList"))?,
+            add_minion_list: opt_strings(&get(v, "addMinionList"))?,
+            minion_has_item_set: get(v, "minionHasItemSet").truthy(),
+            minion_uses: match get(v, "minionUses") {
+                Value::Nil => None,
+                x => Some(truthy_keys(&x)?),
+            },
+            base_effectiveness: opt_number(&get(v, "baseEffectiveness"))?,
+            incremental_effectiveness: opt_number(&get(v, "incrementalEffectiveness"))?,
         })
     }
 }
@@ -272,6 +458,11 @@ impl SkillData {
         let mut d = SkillData::default();
         for (k, v) in pairs(skill_type) {
             d.skill_type.insert(key(&k)?, number(&v)? as i64);
+        }
+        for (k, v) in pairs(&get(data, "skillStatMap")) {
+            let name = key(&k)?;
+            let map = stat_map_from_lua(&v).map_err(|e| format!("skillStatMap {name}: {e}"))?;
+            d.skill_stat_map.insert(name, map);
         }
         for (i, c) in ["STRENGTH", "DEXTERITY", "INTELLIGENCE", "NORMAL"]
             .iter()
@@ -348,6 +539,60 @@ impl SkillData {
             d.gem_for_base_name.insert(key(&k)?, string(&gem_id)?);
         }
         Ok(d)
+    }
+
+    /// `grantedEffect.statMap[stat]`: the effect's own map, else the shared
+    /// one with the effect's source on its mods (`processMod` of
+    /// `Modules/Data.lua`, which reaches only the mods outside groups)
+    pub fn stat_map(
+        &self,
+        effect: &GrantedEffect,
+        stat: &str,
+    ) -> Option<std::borrow::Cow<'_, StatMap>> {
+        if let Some(m) = effect.stat_map.get(stat) {
+            return Some(std::borrow::Cow::Owned(m.clone()));
+        }
+        let shared = self.skill_stat_map.get(stat)?;
+        let source = effect
+            .mod_source
+            .clone()
+            .unwrap_or_else(|| format!("Skill:{}", effect.id));
+        let not_minion = effect.not_minion_stat.iter().any(|s| s == stat)
+            && (effect.support
+                || self
+                    .skill_type("Buff")
+                    .is_some_and(|b| effect.skill_types.contains(&b)));
+        if not_minion
+            && shared
+                .entries
+                .iter()
+                .any(|e| matches!(e, StatMapEntry::Group(..)))
+        {
+            // Upstream adds the tag to the group as if it were a mod
+            return None;
+        }
+        let mut map = shared.clone();
+        for e in &mut map.entries {
+            if let StatMapEntry::Mod(m) = e {
+                m.source = Some(source.as_str().into());
+                if let ModValue::Record(r) = &mut m.value
+                    && let Some(ModValue::Mod(inner)) = r.get_mut(crate::mods::Sym::new("mod"))
+                {
+                    inner.source = Some(format!("Skill:{}", effect.id).into());
+                }
+                if not_minion {
+                    m.tags.push(crate::mods::Tag {
+                        kind: crate::mods::tag::TagKind::ActorCondition {
+                            actor: Some(crate::mods::Sym::new("parent")),
+                            vars: None,
+                            neg: true,
+                        },
+                        global_limit: None,
+                    });
+                }
+            }
+        }
+        Some(std::borrow::Cow::Owned(map))
     }
 
     /// `calcLib.getGameIdFromGemName(name, dropVaal)`

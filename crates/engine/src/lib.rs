@@ -6,6 +6,7 @@
 pub mod actor;
 pub mod calc_items;
 pub mod calc_setup;
+pub mod calc_skill_mods;
 pub mod calc_skills;
 pub mod calc_tree;
 pub mod common;
