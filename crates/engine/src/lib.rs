@@ -4,6 +4,8 @@
 //! see docs/design.md.
 
 pub mod actor;
+pub mod build;
+pub mod calc_env;
 pub mod calc_items;
 pub mod calc_setup;
 pub mod calc_skill_mods;
@@ -11,6 +13,7 @@ pub mod calc_skills;
 pub mod calc_tree;
 pub mod common;
 pub mod config;
+pub mod config_tab;
 pub mod data;
 pub mod item;
 pub mod item_data;

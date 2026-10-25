@@ -37,6 +37,8 @@ pub struct SetupData {
     pub minions: HashMap<String, MinionData>,
     pub monster_damage_table: Vec<f64>,
     pub monster_ally_damage_table: Vec<f64>,
+    /// `data.unarmedWeaponData`, by class id
+    pub unarmed_weapon_data: HashMap<i64, crate::item::Fields>,
 }
 
 /// What a weapon type means for skills (`data.weaponTypeInfo[type]`)
@@ -189,6 +191,21 @@ impl SetupData {
             monster_ally_damage_table: array(&get(data, "monsterAllyDamageTable"))
                 .iter()
                 .map(number)
+                .collect::<Result<_>>()?,
+            unarmed_weapon_data: pairs(&get(data, "unarmedWeaponData"))
+                .iter()
+                .filter_map(|(k, v)| match k {
+                    Key::Int(i) => Some((*i, v)),
+                    _ => None,
+                })
+                .map(|(i, v)| {
+                    let conv = Converter::default();
+                    let fields = pairs(v)
+                        .iter()
+                        .map(|(k, x)| Ok((key(k)?, conv.value(x)?)))
+                        .collect::<Result<_>>()?;
+                    Ok((i, fields))
+                })
                 .collect::<Result<_>>()?,
         })
     }

@@ -137,6 +137,9 @@ pub struct Class {
     /// Ascendancies by index; index 0 is "None"
     pub ascendancies: Vec<(i64, Ascendancy)>,
     pub start_node_id: Option<u32>,
+    /// `base_str`, `base_dex` and `base_int`, from the tree's
+    /// `characterData` when it has the class, else the class's
+    pub base_stats: [Option<f64>; 3],
 }
 
 #[derive(Clone, Debug)]
@@ -468,12 +471,19 @@ impl PassiveTree {
                 ascend_class_of.insert(a.name.clone(), (*ci, name.clone()));
                 ascendancies.push((ai, a));
             }
+            let character = get(data, "characterData")
+                .as_table()
+                .map(|t| t.get(&Value::Number(*ci as f64)))
+                .filter(Value::truthy);
+            let stats_of = character.as_ref().unwrap_or(class);
+            let stat = |k: &str| get(stats_of, k).as_number();
             classes.push((
                 *ci,
                 Class {
                     name,
                     ascendancies,
                     start_node_id: None,
+                    base_stats: [stat("base_str"), stat("base_dex"), stat("base_int")],
                 },
             ));
         }

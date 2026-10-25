@@ -450,6 +450,14 @@ fn items_setup_matches_upstream() {
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
     let ldata = host.global("data");
+    let config_data = engine::config::ConfigData::from_lua(&ldata, &host.global("SkillType"))
+        .unwrap_or_else(|e| panic!("config data: {e}"));
+    let var_list = rt::call(&host.global("LoadModule"), &[s("Modules/ConfigOptions")])
+        .unwrap_or_else(|e| panic!("{}", describe(&e)))
+        .into_iter()
+        .next()
+        .unwrap();
+    let option_defaults = engine::config_tab::option_defaults(&var_list);
     let setup_data =
         SetupData::from_lua(&ldata, &host.global("ModFlag"), &host.global("KeywordFlag"))
             .unwrap_or_else(|e| panic!("setup data: {e}"));
@@ -1257,6 +1265,117 @@ fn items_setup_matches_upstream() {
             if tm != lm {
                 fail(format!("{what}: minion {tm:?} != {lm:?}"));
             }
+        }
+        // The same from the typed build alone: its configuration, then the
+        // whole setup
+        let load_ctx = engine::build::LoadContext {
+            items: ItemContext {
+                data: &item_data,
+                parser: &parser,
+                jewel_radius: &radius,
+                default_affix_quality: 0.5,
+            },
+            skill_data: &skill_data,
+            config_data: &config_data,
+            option_defaults: &option_defaults,
+            parser: &parser,
+            socket_ids: &socket_ids,
+            one_hand: &one_hand,
+            minions: &|m: &str| setup_data.minions.contains_key(m),
+        };
+        let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
+            Ok(b) => b,
+            Err(e) => {
+                fail(format!("build: {e}"));
+                continue;
+            }
+        };
+        let lconfig = get(&build, "configTab");
+        let lset = rt::index(
+            &get(&lconfig, "configSets"),
+            &get(&lconfig, "activeConfigSetId"),
+        )
+        .unwrap();
+        let tset = typed_build.config.active();
+        for (what, t, l) in [
+            ("input", &tset.input, inputs(&get(&lset, "input"))),
+            (
+                "placeholder",
+                &tset.placeholder,
+                inputs(&get(&lset, "placeholder")),
+            ),
+        ] {
+            let t: BTreeMap<_, _> = t
+                .iter()
+                .map(|(k, v)| (k.clone(), format!("{v:?}")))
+                .collect();
+            let l: BTreeMap<_, _> = l
+                .iter()
+                .map(|(k, v)| (k.clone(), format!("{v:?}")))
+                .collect();
+            if t != l {
+                let diff: Vec<_> = t
+                    .keys()
+                    .chain(l.keys())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .filter(|k| t.get(*k) != l.get(*k))
+                    .map(|k| format!("{k}: {:?} != {:?}", t.get(k), l.get(k)))
+                    .collect();
+                fail(format!("config {what}: {}", diff.join(", ")));
+            }
+        }
+        if typed_build.config_mods != config_mods {
+            fail(format!(
+                "config mods: {} != {}",
+                typed_build.config_mods.len(),
+                config_mods.len()
+            ));
+        }
+        if typed_build.config_enemy_mods != config_enemy_mods {
+            fail("config enemy mods differ".into());
+        }
+        let calc_data = engine::calc_env::CalcData {
+            setup: &setup_data,
+            items: &item_data,
+            skills: &skill_data,
+            parser: &parser,
+            jewel_radius: &radius,
+        };
+        match engine::calc_env::init_env(
+            &mut typed_build,
+            &calc_data,
+            BuffMode::new(Some("EFFECTIVE")),
+        ) {
+            Ok(typed_env) => {
+                let same_db = |a: &Store, b: &Store| {
+                    typed_mods(a) == typed_mods(b)
+                        && a.conditions == b.conditions
+                        && a.multipliers == b.multipliers
+                };
+                if !same_db(&typed_env.player_db, &player_db) {
+                    fail("init_env: the player's database differs".into());
+                }
+                if !same_db(&typed_env.enemy_db, &enemy_base) {
+                    fail("init_env: the enemy's database differs".into());
+                }
+                let skill_mods = |s: &[engine::calc_skills::ActiveSkill]| -> Vec<_> {
+                    s.iter()
+                        .map(|a| {
+                            let m = a.mods.as_ref();
+                            (
+                                a.active_effect.granted_effect.id.clone(),
+                                m.map(|m| m.mods.clone()),
+                                m.map(|m| m.skill_flags.clone()),
+                            )
+                        })
+                        .collect()
+                };
+                if skill_mods(&typed_env.skills.active_skills) != skill_mods(&setup.active_skills) {
+                    fail("init_env: the active skills differ".into());
+                }
+            }
+            Err(e) => fail(format!("init_env: {e}")),
         }
     }
     eprintln!("{compared} item setups compared, {skipped} skipped");
