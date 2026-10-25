@@ -419,12 +419,14 @@ fn ids(v: &Value) -> BTreeSet<i64> {
 #[test]
 fn items_setup_matches_upstream() {
     use engine::calc_items::ItemsInput;
+    use engine::calc_skills;
     use engine::calc_tree;
     use engine::item::ItemContext;
     use engine::item_data::ItemData;
     use engine::items_tab::ItemsTab;
     use engine::skill_data::SkillData;
     use engine::skills::Skills;
+    use engine::skills::{ExplodeSource, SocketGroup};
     use engine::spec::PassiveSpec;
     use engine::tree::NodeType;
     use equivalence::typed_build::Trees;
@@ -515,8 +517,10 @@ fn items_setup_matches_upstream() {
             }
         };
         tab.populate_slots(&mut spec, tree, &one_hand);
-        let skills = pob.child("Skills").map(|x| Skills::load(x, &skill_data));
-        let groups = skills.as_ref().map_or(&[][..], |s| s.socket_group_list());
+        let mut skills = pob.child("Skills").map(|x| Skills::load(x, &skill_data));
+        let groups: Vec<SocketGroup> = skills
+            .as_ref()
+            .map_or(vec![], |s| s.socket_group_list().to_vec());
         let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
         let mut node_mods = match calc_setup::build_mod_list_for_node_list(
             &spec,
@@ -554,7 +558,7 @@ fn items_setup_matches_upstream() {
         let input = ItemsInput {
             spec: &spec,
             tab: &tab,
-            socket_groups: groups,
+            socket_groups: &groups,
             node_mods: &node_mods,
             config: &config,
             precision: &item_data,
@@ -757,6 +761,107 @@ fn items_setup_matches_upstream() {
             ));
         }
         compare("modDB", &env_setup.mod_db, &get(&env, "modDB"), &mut fail);
+        // The socket groups with the granted skills and explosions
+        let granted = calc_skills::granted_skills(
+            &env_setup.tree.node_mods,
+            &out.granted_skills,
+            &skill_data,
+        );
+        let mut explode: Vec<ExplodeSource> = env_setup
+            .tree
+            .node_mods
+            .iter()
+            .filter(|(_, n)| n.explode)
+            .map(|(id, _)| ExplodeSource::Node(*id))
+            .collect();
+        explode.extend(
+            out.explode_sources
+                .iter()
+                .map(|&id| ExplodeSource::Item(id)),
+        );
+        let mut tgroups = groups.clone();
+        calc_skills::add_granted_groups(&mut tgroups, &granted, &explode, &skill_data);
+        if let Some(s) = skills.as_mut().and_then(|s| s.socket_group_list_mut()) {
+            *s = tgroups.clone();
+        }
+        let lgroups: Vec<Value> = entries(&get(&get(&build, "skillsTab"), "socketGroupList"))
+            .into_iter()
+            .map(|(_, g)| g)
+            .collect();
+        if lgroups.len() != tgroups.len() {
+            fail(format!(
+                "{} socket groups != {}",
+                tgroups.len(),
+                lgroups.len()
+            ));
+        }
+        let text = |v: &Value| v.as_str().map(|s| s.to_str_lossy().into_owned());
+        for (i, (t, l)) in tgroups.iter().zip(&lgroups).enumerate() {
+            let tg = (
+                t.source.clone(),
+                t.slot.clone(),
+                t.label.clone(),
+                t.enabled,
+                t.no_supports,
+            );
+            let lg = (
+                text(&get(l, "source")),
+                text(&get(l, "slot")),
+                text(&get(l, "label")),
+                get(l, "enabled").truthy(),
+                get(l, "noSupports").truthy(),
+            );
+            if tg != lg {
+                fail(format!("socket group {}: {tg:?} != {lg:?}", i + 1));
+            }
+            let lgems: Vec<Value> = entries(&get(l, "gemList"))
+                .into_iter()
+                .map(|(_, g)| g)
+                .collect();
+            let tgems: Vec<_> = t
+                .gem_list
+                .iter()
+                .map(|g| {
+                    (
+                        g.skill_id.clone(),
+                        g.gem_id.clone(),
+                        g.name_spec.clone(),
+                        g.level,
+                        g.quality,
+                        g.count,
+                        g.enabled,
+                        g.enable_global1,
+                        g.triggered,
+                        g.no_supports,
+                        g.granted_effect.as_ref().map(|e| e.id.clone()),
+                    )
+                })
+                .collect();
+            let lgems: Vec<_> = lgems
+                .iter()
+                .map(|g| {
+                    (
+                        text(&get(g, "skillId")),
+                        text(&get(g, "gemId")),
+                        text(&get(g, "nameSpec")).unwrap_or_default(),
+                        get(g, "level").as_number(),
+                        get(g, "quality").as_number(),
+                        get(g, "count").as_number(),
+                        get(g, "enabled").truthy(),
+                        get(g, "enableGlobal1").truthy(),
+                        get(g, "triggered").truthy(),
+                        get(g, "noSupports").truthy(),
+                        text(&get(&get(g, "grantedEffect"), "id")),
+                    )
+                })
+                .collect();
+            if tgems != lgems {
+                fail(format!(
+                    "socket group {} gems: {tgems:?} != {lgems:?}",
+                    i + 1
+                ));
+            }
+        }
         let lmdb = get(&get(&env, "modDB"), "multipliers");
         for (k, v) in &out.player_multipliers {
             if get(&lmdb, k.as_str()).as_number() != Some(*v) {

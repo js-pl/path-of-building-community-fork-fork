@@ -29,7 +29,8 @@ pub struct GemInstance {
     pub enabled: bool,
     pub enable_global1: bool,
     pub enable_global2: bool,
-    pub count: f64,
+    /// `nil` for the gems of skills the calculations add
+    pub count: Option<f64>,
     pub skill_part: Option<f64>,
     pub skill_part_calcs: Option<f64>,
     pub skill_stage_count: Option<f64>,
@@ -50,6 +51,20 @@ pub struct GemInstance {
     pub req_str: Option<f64>,
     pub req_dex: Option<f64>,
     pub req_int: Option<f64>,
+    /// For the skill of an item or a node: what the calculations set
+    pub from_item: bool,
+    pub no_supports: bool,
+    pub triggered: bool,
+    pub trigger_chance: Option<f64>,
+    /// For the explosion of an item or a node (`explodeSource`)
+    pub explode_source: Option<ExplodeSource>,
+}
+
+/// What makes enemies explode on kill: an item, by id, or a passive node
+#[derive(Clone, Debug, PartialEq)]
+pub enum ExplodeSource {
+    Item(f64),
+    Node(u32),
 }
 
 impl GemInstance {
@@ -74,6 +89,12 @@ pub struct SocketGroup {
     pub main_active_skill_calcs: f64,
     pub imbued_support: Option<String>,
     pub gem_list: Vec<GemInstance>,
+    /// For the skills of an item or a node: their source
+    pub source_item: Option<f64>,
+    pub source_node: Option<u32>,
+    pub no_supports: bool,
+    /// For the explosion group (`source = "Explode"`)
+    pub explode_sources: Vec<ExplodeSource>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -252,6 +273,12 @@ impl Skills {
             .map_or(&[], |s| &s.socket_group_list)
     }
 
+    pub fn socket_group_list_mut(&mut self) -> Option<&mut Vec<SocketGroup>> {
+        self.skill_sets
+            .get_mut(&Skills::key(self.active_skill_set_id))
+            .map(|s| &mut s.socket_group_list)
+    }
+
     /// `SetActiveSkillSet(id)`
     fn set_active_skill_set(&mut self, id: f64, data: &SkillData) {
         if self.skill_set_order_list.is_empty() {
@@ -299,6 +326,7 @@ fn load_skill(node: &Element, ctx: &Ctx) -> Option<SocketGroup> {
         main_active_skill_calcs: num(a("mainActiveSkillCalcs")).unwrap_or(1.0),
         imbued_support: None,
         gem_list: vec![],
+        ..SocketGroup::default()
     };
     if let (Some(support), Some(_)) = (a("imbuedSupport"), a("slot")) {
         group.imbued_support = Some(support.to_string());
@@ -339,7 +367,7 @@ fn load_skill(node: &Element, ctx: &Ctx) -> Option<SocketGroup> {
         gem.enabled = c("enabled").is_none_or(|e| e == "true");
         gem.enable_global1 = c("enableGlobal1").is_none_or(|e| e == "true");
         gem.enable_global2 = c("enableGlobal2") == Some("true");
-        gem.count = num(c("count")).unwrap_or(1.0);
+        gem.count = Some(num(c("count")).unwrap_or(1.0));
         gem.skill_part = num(c("skillPart"));
         gem.skill_part_calcs = num(c("skillPartCalcs"));
         gem.skill_stage_count = num(c("skillStageCount"));
