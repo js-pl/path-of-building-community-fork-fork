@@ -708,10 +708,7 @@ pub static OPTIONS: std::sync::LazyLock<Vec<ConfigOption>> = std::sync::LazyLock
                 cfg(
                     "SkillData",
                     ModType::List,
-                    record([
-                        ("key", "skeletonLife".into()),
-                        ("value", val.value()),
-                    ]),
+                    record([("key", "skeletonLife".into()), ("value", val.value())]),
                 )
                 .tag(Tag::skill_name("Dark Bargain")),
             );
@@ -1129,10 +1126,7 @@ pub static OPTIONS: std::sync::LazyLock<Vec<ConfigOption>> = std::sync::LazyLock
                     cfg(
                         "SkillData",
                         ModType::List,
-                        record([
-                            ("key", "dpsMultiplier".into()),
-                            ("value", val.value()),
-                        ]),
+                        record([("key", "dpsMultiplier".into()), ("value", val.value())]),
                     )
                     .tag(Tag::skill_id("DemonModularBladeVortexSpectre")),
                 );
@@ -1140,10 +1134,7 @@ pub static OPTIONS: std::sync::LazyLock<Vec<ConfigOption>> = std::sync::LazyLock
                     cfg(
                         "SkillData",
                         ModType::List,
-                        record([
-                            ("key", "dpsMultiplier".into()),
-                            ("value", val.value()),
-                        ]),
+                        record([("key", "dpsMultiplier".into()), ("value", val.value())]),
                     )
                     .tag(Tag::skill_id("GhostPirateBladeVortexSpectre")),
                 );
