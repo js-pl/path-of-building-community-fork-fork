@@ -707,14 +707,14 @@ fn items_setup_matches_upstream() {
         if litems != out.item_list {
             fail(format!("itemList {:?} != {litems:?}", out.item_list));
         }
-        if ids(&get(&env, "flasks")) != out.flasks {
+        if ids(&get(&env, "flasks")) != out.flasks.iter().copied().collect::<BTreeSet<_>>() {
             fail(format!(
                 "flasks {:?} != {:?}",
                 out.flasks,
                 ids(&get(&env, "flasks"))
             ));
         }
-        if ids(&get(&env, "tinctures")) != out.tinctures {
+        if ids(&get(&env, "tinctures")) != out.tinctures.iter().copied().collect::<BTreeSet<_>>() {
             fail(format!(
                 "tinctures {:?} != {:?}",
                 out.tinctures,

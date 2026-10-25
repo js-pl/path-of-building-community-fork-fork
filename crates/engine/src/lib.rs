@@ -5,8 +5,12 @@
 
 pub mod actor;
 pub mod build;
+pub mod calc;
+pub mod calc_defence;
+pub mod calc_ehp;
 pub mod calc_env;
 pub mod calc_items;
+pub mod calc_perform;
 pub mod calc_setup;
 pub mod calc_skill_mods;
 pub mod calc_skills;

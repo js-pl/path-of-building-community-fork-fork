@@ -39,6 +39,30 @@ pub struct SetupData {
     pub monster_ally_damage_table: Vec<f64>,
     /// `data.unarmedWeaponData`, by class id
     pub unarmed_weapon_data: HashMap<i64, crate::item::Fields>,
+    /// `data.nonDamagingAilment`, by ailment
+    pub non_damaging_ailment: HashMap<String, Ailment>,
+    /// `data.cursePriority`
+    pub curse_priority: HashMap<String, f64>,
+    /// `data.monsterConstants`
+    pub monster_constants: HashMap<String, f64>,
+    /// `data.ailmentTypeList`, `elementalAilmentTypeList`,
+    /// `nonDamagingAilmentTypeList`, `nonElementalAilmentTypeList`
+    pub ailment_types: Vec<String>,
+    /// `data.monsterPhysConversionMultiTable`, by monster level from 1
+    pub monster_phys_conversion_multi: Vec<f64>,
+    pub elemental_ailment_types: Vec<String>,
+    pub non_damaging_ailment_types: Vec<String>,
+    pub non_elemental_ailment_types: Vec<String>,
+}
+
+/// A non-damaging ailment's numbers (`data.nonDamagingAilment[name]`)
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Ailment {
+    pub default: Option<f64>,
+    pub min: f64,
+    pub max: f64,
+    pub precision: f64,
+    pub duration: Option<f64>,
 }
 
 /// What a weapon type means for skills (`data.weaponTypeInfo[type]`)
@@ -48,6 +72,7 @@ pub struct WeaponTypeInfo {
     pub flag: String,
     pub one_hand: bool,
     pub melee: bool,
+    pub label: Option<String>,
 }
 
 /// A minion's data (`data.minions[id]`): its numbers and names by field,
@@ -129,6 +154,10 @@ fn numbers(v: &Value) -> Result<HashMap<String, f64>> {
         .collect()
 }
 
+fn strings(v: &Value) -> Result<Vec<String>> {
+    array(v).iter().map(|x| Ok(text(x)?.to_string())).collect()
+}
+
 impl SetupData {
     /// Reads the data from upstream's `data` table and its `ModFlag` and
     /// `KeywordFlag`.
@@ -171,6 +200,10 @@ impl SetupData {
                             flag: text(&get(v, "flag"))?.to_string(),
                             one_hand: get(v, "oneHand").truthy(),
                             melee: get(v, "melee").truthy(),
+                            label: match get(v, "label") {
+                                Value::Nil => None,
+                                l => Some(text(&l)?.to_string()),
+                            },
                         },
                     ))
                 })
@@ -207,6 +240,31 @@ impl SetupData {
                     Ok((i, fields))
                 })
                 .collect::<Result<_>>()?,
+            non_damaging_ailment: pairs(&get(data, "nonDamagingAilment"))
+                .iter()
+                .map(|(k, v)| {
+                    Ok((
+                        key(k)?,
+                        Ailment {
+                            default: get(v, "default").as_number(),
+                            min: number(&get(v, "min"))?,
+                            max: number(&get(v, "max"))?,
+                            precision: number(&get(v, "precision"))?,
+                            duration: get(v, "duration").as_number(),
+                        },
+                    ))
+                })
+                .collect::<Result<_>>()?,
+            curse_priority: numbers(&get(data, "cursePriority"))?,
+            monster_constants: numbers(&get(data, "monsterConstants"))?,
+            ailment_types: strings(&get(data, "ailmentTypeList"))?,
+            monster_phys_conversion_multi: array(&get(data, "monsterPhysConversionMultiTable"))
+                .iter()
+                .map(number)
+                .collect::<Result<_>>()?,
+            elemental_ailment_types: strings(&get(data, "elementalAilmentTypeList"))?,
+            non_damaging_ailment_types: strings(&get(data, "nonDamagingAilmentTypeList"))?,
+            non_elemental_ailment_types: strings(&get(data, "nonElementalAilmentTypeList"))?,
         })
     }
 
@@ -224,7 +282,7 @@ impl SetupData {
     }
 
     /// `data.misc[name]`
-    fn misc(&self, name: &str) -> f64 {
+    pub fn misc(&self, name: &str) -> f64 {
         self.misc.get(name).copied().unwrap_or(f64::NAN)
     }
 
@@ -1404,14 +1462,14 @@ pub fn merge_keystones(
         if added.contains(&name) {
             continue;
         }
-        let Some(&id) = tree.keystone_map.get(name.as_str()) else {
+        let Some(keystone_mods) = tree.keystone_mods(&name) else {
             continue;
         };
         added.push(name);
         let from_other = source
             .as_ref()
             .is_some_and(|s| !s.to_ascii_lowercase().contains("tree"));
-        for m in &tree.node(id).ok_or("keystone not in the tree")?.mod_list {
+        for m in keystone_mods {
             let mut m = m.clone();
             if from_other {
                 set_source(&mut m, source.as_deref().unwrap_or(""));

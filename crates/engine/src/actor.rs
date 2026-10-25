@@ -15,6 +15,38 @@ use crate::skill_data::SkillData;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+/// A value of an actor's output: mostly numbers
+#[derive(Clone, Debug, PartialEq)]
+pub enum OutVal {
+    Num(f64),
+    Bool(bool),
+    Str(Rc<str>),
+    /// A table: a weapon's output, a requirement's source, ...
+    Table(Rc<BTreeMap<String, OutVal>>),
+    /// A gem or an item in a table, by name (`oracle/json.lua` writes them
+    /// as `{"$gem": name}` and `{"$item": name}`)
+    Gem(Rc<str>),
+    Item(Rc<str>),
+}
+
+impl OutVal {
+    pub fn num(&self) -> Option<f64> {
+        match self {
+            OutVal::Num(n) => Some(*n),
+            _ => None,
+        }
+    }
+}
+
+/// An active skill as `GetStat` sees it: a skill with a reservation that
+/// is not disabled, with its buffs' names and the base it reserves
+#[derive(Clone, Debug, Default)]
+pub struct ReservingSkill {
+    pub buff_names: Vec<String>,
+    pub mana_reserved_base: Option<f64>,
+    pub life_reserved_base: Option<f64>,
+}
+
 /// An actor: the player, the enemy or a minion
 #[derive(Clone, Debug, Default)]
 pub struct Actor {
@@ -23,11 +55,15 @@ pub struct Actor {
     /// `actor.itemList`: the item in each slot, by id
     pub item_list: BTreeMap<String, f64>,
     /// `actor.output`
-    pub output: HashMap<Sym, f64>,
+    pub output: HashMap<Sym, OutVal>,
     /// `actor.weaponData1` and `weaponData2`
     pub weapon_data: [Option<Fields>; 2],
     /// `actor.minionData.monsterTags`
     pub monster_tags: Option<Vec<Rc<str>>>,
+    /// What `GetStat` reads of the actor's active skills
+    pub reserving_skills: Vec<ReservingSkill>,
+    /// `actor.ManaEfficiency`
+    pub mana_efficiency: Option<f64>,
     /// `actor.player`, `actor.enemy` and `actor.parent`, by index
     pub player: Option<usize>,
     pub enemy: Option<usize>,
@@ -130,11 +166,57 @@ impl Actors for EnvActors<'_> {
     }
 
     fn output(&self, store: StoreId, stat: Sym) -> Option<f64> {
-        self.actor_of(store)?.output.get(&stat).copied()
+        match self.actor_of(store)?.output.get(&stat)? {
+            OutVal::Num(n) => Some(*n),
+            _ => None,
+        }
     }
 
-    fn special_stat(&self, _: StoreId, _: Sym, _: Option<&Cfg>) -> Option<f64> {
-        None
+    fn special_stat(&self, store: StoreId, stat: Sym, cfg: Option<&Cfg>) -> Option<f64> {
+        let actor = self.actor_of(store)?;
+        let out = |k: &str| actor.output.get(&Sym::new(k)).and_then(OutVal::num);
+        match stat.as_str() {
+            s @ ("ManaReservedPercent" | "LifeReservedPercent") => {
+                let mana = s == "ManaReservedPercent";
+                let total = out(if mana { "Mana" } else { "Life" }).unwrap_or(f64::NAN);
+                if total == 0.0 {
+                    return Some(0.0);
+                }
+                let mut reserved = 0.0;
+                if let Some(cfg) = cfg {
+                    for skill in &actor.reserving_skills {
+                        let has = |n: &Option<Rc<str>>| {
+                            n.as_deref()
+                                .is_some_and(|n| skill.buff_names.iter().any(|b| b == n))
+                        };
+                        if has(&cfg.skill_name) || has(&cfg.summon_skill_name) {
+                            let base = if mana {
+                                skill.mana_reserved_base
+                            } else {
+                                skill.life_reserved_base
+                            };
+                            reserved = (base.unwrap_or(0.0) / total * 100.0).floor();
+                            break;
+                        }
+                    }
+                }
+                Some(if 100.0 < reserved { 100.0 } else { reserved })
+            }
+            "ManaUnreserved" => {
+                let v = out("ManaUnreserved")?;
+                if v.is_nan() {
+                    out("Mana")
+                } else if v < 0.0 {
+                    let pct = out("ManaUnreservedPercent").unwrap_or(f64::NAN);
+                    let eff = actor.mana_efficiency.unwrap_or(f64::NAN);
+                    let before = (pct.abs() + 100.0) * ((100.0 + eff) / 100.0);
+                    Some(out("Mana").unwrap_or(f64::NAN) * (before.ceil() / 100.0))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 
     fn one_handed_added(&self, store: StoreId, var: Sym) -> Option<bool> {

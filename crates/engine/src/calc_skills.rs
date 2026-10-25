@@ -240,7 +240,11 @@ pub struct SkillEffect {
 }
 
 impl SkillEffect {
-    fn new(granted_effect: Rc<GrantedEffect>, level: Option<f64>, quality: f64) -> SkillEffect {
+    pub(crate) fn new(
+        granted_effect: Rc<GrantedEffect>,
+        level: Option<f64>,
+        quality: f64,
+    ) -> SkillEffect {
         SkillEffect {
             granted_effect,
             level,
