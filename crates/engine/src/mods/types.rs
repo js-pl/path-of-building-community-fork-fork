@@ -80,9 +80,20 @@ impl ModValue {
 }
 
 /// Named fields, in the order upstream's table constructor gives them.
-#[derive(Clone, Debug, Default, PartialEq)]
+/// Records with the same fields are equal in any order, as tables are.
+#[derive(Clone, Debug, Default)]
 pub struct Record {
     pub fields: Vec<(Sym, ModValue)>,
+}
+
+impl PartialEq for Record {
+    fn eq(&self, other: &Record) -> bool {
+        self.fields.len() == other.fields.len()
+            && self
+                .fields
+                .iter()
+                .all(|(k, v)| other.fields.iter().any(|(ok, ov)| ok == k && ov == v))
+    }
 }
 
 impl Record {
