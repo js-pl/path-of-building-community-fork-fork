@@ -48,6 +48,11 @@ fn query<T>(mods: &[Mod], f: impl FnOnce(&Query, StoreId) -> T) -> T {
     for m in mods {
         store.add(m.clone());
     }
+    on_store(store, f)
+}
+
+/// Runs a query on a store no actor owns
+pub fn on_store<T>(store: Store, f: impl FnOnce(&Query, StoreId) -> T) -> T {
     let mut stores = Stores::default();
     let id = stores.push(store);
     f(

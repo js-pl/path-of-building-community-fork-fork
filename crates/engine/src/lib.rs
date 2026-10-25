@@ -5,6 +5,7 @@
 
 pub mod calc_items;
 pub mod calc_setup;
+pub mod calc_tree;
 pub mod common;
 pub mod config;
 pub mod data;

@@ -303,7 +303,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/CalcOffence.lua" = { status = "todo" }
 "Modules/CalcPerform.lua" = { status = "todo" }
 "Modules/CalcSections.lua" = { status = "todo" }
-"Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_items.rs crates/engine/src/jewel.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_items.rs crates/engine/src/calc_tree.rs crates/engine/src/jewel.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcTriggers.lua" = { status = "todo" }
 "Modules/Calcs.lua" = { status = "todo" }

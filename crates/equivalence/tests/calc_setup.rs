@@ -154,7 +154,7 @@ fn compare(what: &str, t: &Store, l: &Value, fail: &mut dyn FnMut(String)) {
     let names: BTreeSet<&String> = tm.keys().chain(lm.keys()).collect();
     for name in names {
         let tl = tm.get(name).cloned().unwrap_or_default();
-        let ll: Vec<Mod> = lm
+        let mut ll: Vec<Mod> = lm
             .get(name)
             .into_iter()
             .flatten()
@@ -166,6 +166,9 @@ fn compare(what: &str, t: &Store, l: &Value, fail: &mut dyn FnMut(String)) {
             })
             .cloned()
             .collect();
+        for (t, l) in tl.iter().zip(ll.iter_mut()) {
+            align(t, l);
+        }
         if tl != ll {
             let show = |m: &[Mod]| {
                 m.iter()
@@ -410,9 +413,13 @@ fn ids(v: &Value) -> BTreeSet<i64> {
         .collect()
 }
 
+/// The items and the tree with them (`engine::calc_tree::setup`): the item
+/// database, what is equipped, the radius jewels, the allocated nodes and
+/// the player's database with the items' and the tree's mods
 #[test]
 fn items_setup_matches_upstream() {
-    use engine::calc_items::{ItemsInput, setup_items};
+    use engine::calc_items::ItemsInput;
+    use engine::calc_tree;
     use engine::item::ItemContext;
     use engine::item_data::ItemData;
     use engine::items_tab::ItemsTab;
@@ -430,6 +437,9 @@ fn items_setup_matches_upstream() {
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
     let ldata = host.global("data");
+    let setup_data =
+        SetupData::from_lua(&ldata, &host.global("ModFlag"), &host.global("KeywordFlag"))
+            .unwrap_or_else(|e| panic!("setup data: {e}"));
     let item_data = ItemData::from_lua(&ldata, &host.global("colorCodes"))
         .unwrap_or_else(|e| panic!("item data: {e}"));
     let skill_data = SkillData::from_lua(&ldata, &host.global("colorCodes"))
@@ -549,14 +559,39 @@ fn items_setup_matches_upstream() {
             config: &config,
             precision: &item_data,
             energy_blade: false,
+            jewel_radius: &radius,
+            extra_jewel_funcs: &[],
         };
-        let out = match setup_items(&input) {
+        // The player's database before the items
+        let ltree = get(&get(&env, "spec"), "tree");
+        let class_id = get(&env, "classId");
+        let mut class = rt::index(&get(&ltree, "characterData"), &class_id).unwrap_or_default();
+        if class.is_nil() {
+            class = rt::index(&get(&ltree, "classes"), &class_id).unwrap_or_default();
+        }
+        let stat = |k: &str| get(&class, k).as_number().unwrap_or(f64::NAN);
+        let config_tab = get(&build, "configTab");
+        let config_mods = list_mods(&get(&config_tab, "modList"));
+        let config_enemy_mods = list_mods(&get(&config_tab, "enemyModList"));
+        let b = BaseInput {
+            class_stats: [stat("base_str"), stat("base_dex"), stat("base_int")],
+            character_level: get(&build, "characterLevel").as_number().unwrap(),
+            enemy_level: get(&env, "enemyLevel").as_number().unwrap(),
+            config_input: &config,
+            config_mods: &config_mods,
+            config_enemy_mods: &config_enemy_mods,
+            mode: BuffMode::new(Some("EFFECTIVE")),
+        };
+        let (mut base, _) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
+        calc_setup::allocation_mods(&spec, &mut base);
+        let env_setup = match calc_tree::setup(&base, &input, &item_data) {
             Ok(o) => o,
             Err(e) => {
                 failures.push(format!("{id}: typed failed: {e}"));
                 continue;
             }
         };
+        let out = &env_setup.items;
         compared += 1;
         let mut fail = |what: String| {
             if failures.len() < 80 {
@@ -693,13 +728,35 @@ fn items_setup_matches_upstream() {
                 _ => None,
             })
             .collect();
-        // Granted passives later leave the extra list
-        if !lextra.is_subset(&out.extra_radius_nodes) {
+        let textra: BTreeSet<u32> = out.extra_radius_nodes.iter().map(|(k, _)| k).collect();
+        if lextra != textra {
+            fail(format!("extraRadiusNodeList {textra:?} != {lextra:?}"));
+        }
+        // The tree with the items
+        let int_keys = |v: &Value| -> Vec<u32> {
+            entries(v)
+                .into_iter()
+                .filter_map(|(k, _)| match k {
+                    Key::Int(i) => Some(i as u32),
+                    _ => None,
+                })
+                .collect()
+        };
+        let lalloc = int_keys(&get(&env, "allocNodes"));
+        let talloc: Vec<u32> = env_setup.tree.alloc.iter().map(|(k, _)| k).collect();
+        if lalloc != talloc {
+            fail(format!("allocNodes {talloc:?} != {lalloc:?}"));
+        }
+        let lpassives: BTreeSet<u32> = int_keys(&get(&env, "grantedPassives"))
+            .into_iter()
+            .collect();
+        if lpassives != env_setup.tree.granted_passives {
             fail(format!(
-                "extraRadiusNodeList {:?} !>= {lextra:?}",
-                out.extra_radius_nodes
+                "grantedPassives {:?} != {lpassives:?}",
+                env_setup.tree.granted_passives
             ));
         }
+        compare("modDB", &env_setup.mod_db, &get(&env, "modDB"), &mut fail);
         let lmdb = get(&get(&env, "modDB"), "multipliers");
         for (k, v) in &out.player_multipliers {
             if get(&lmdb, k.as_str()).as_number() != Some(*v) {

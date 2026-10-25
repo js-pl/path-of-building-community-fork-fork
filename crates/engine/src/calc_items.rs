@@ -3,8 +3,8 @@
 //! radius jewels and merges the items' mods into `env.itemModDB`, with the
 //! conditions and multipliers it sets.
 //!
-//! Not ported yet: the overrides of the calculations (`override.repItem`,
-//! `override.extraJewelFuncs`), Energy Blade's weapons, the item warnings,
+//! Not ported yet: the overrides of the calculations (`override.repItem`),
+//! Energy Blade's weapons, the item warnings,
 //! and the names of the skills items grant (`nameSpec`).
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
@@ -19,12 +19,13 @@ use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Store, Sym};
 use crate::pat;
 use crate::skills::SocketGroup;
-use crate::spec::PassiveSpec;
+use crate::spec::{OrderedMap, PassiveSpec};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub type Result<T> = std::result::Result<T, String>;
 
 /// What the items' setup needs
+#[derive(Clone, Copy)]
 pub struct ItemsInput<'a, 't> {
     pub spec: &'a PassiveSpec<'t>,
     pub tab: &'a ItemsTab,
@@ -37,6 +38,11 @@ pub struct ItemsInput<'a, 't> {
     pub precision: &'a dyn Precision,
     /// `modDB.conditions.AffectedByEnergyBlade`
     pub energy_blade: bool,
+    /// The labels of the jewel radii (`data.jewelRadius`)
+    pub jewel_radius: &'a [String],
+    /// `override.extraJewelFuncs`: the `ExtraJewelFunc` mods of the first
+    /// pass, which give every socketed jewel more functions
+    pub extra_jewel_funcs: &'a [Mod],
 }
 
 /// A skill an item grants (`env.grantedSkillsItems`)
@@ -75,7 +81,7 @@ pub struct ItemsSetup {
     pub radius_jewels: Vec<RadiusJewel>,
     /// `env.extraRadiusNodeList`: unallocated nodes in the radius of a jewel
     /// that is not `Self`
-    pub extra_radius_nodes: BTreeSet<u32>,
+    pub extra_radius_nodes: OrderedMap<()>,
     /// `env.grantedSkillsItems`
     pub granted_skills: Vec<ItemSkill>,
     /// `env.explodeSources`: items whose base mods can explode enemies
@@ -196,61 +202,100 @@ impl ItemsSetup {
     }
 }
 
+/// A function of a jewel function list (`{ type = ..., func = ... }`)
+fn radius_func(v: &ModValue) -> Result<(RadiusType, RadiusFunc)> {
+    let ModValue::Record(r) = v else {
+        return Err(format!("jewel function {v:?}"));
+    };
+    let typ = match r.get("type") {
+        Some(ModValue::Str(t)) => RadiusType::new(t).ok_or(format!("jewel function type {t}"))?,
+        t => return Err(format!("jewel function type {t:?}")),
+    };
+    let func = RadiusFunc::new(r.get("func").ok_or("jewel function without func")?)?;
+    Ok((typ, func))
+}
+
+/// Whether an extra jewel function applies to a jewel: its tags are
+/// conditions on the jewel's rarity (`{ type = "ItemCondition", itemSlot =
+/// "{SlotName}", rarityCond = ... }`), which find the jewel itself
+fn extra_func_applies(m: &Mod, item: &Item) -> Result<bool> {
+    for t in &m.tags {
+        let TagKind::ItemCondition(c) = &t.kind else {
+            return Err(format!("extra jewel function tag {t:?}"));
+        };
+        let Some(rarity) = &c.rarity_cond else {
+            return Err(format!("extra jewel function condition {c:?}"));
+        };
+        if (item.rarity == **rarity) == c.neg {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 /// The radius jewels of a jewel in a socket, and the unallocated nodes in
 /// their radius
 fn add_radius_jewels(
     out: &mut ItemsSetup,
-    spec: &PassiveSpec,
+    input: &ItemsInput,
     node_id: u32,
     item: &Item,
     item_id: f64,
 ) -> Result<()> {
-    let Some(radius_index) = item.jewel_radius_index else {
+    if item.jewel_radius_index.is_none() && input.extra_jewel_funcs.is_empty() {
         return Ok(());
+    }
+    let spec = input.spec;
+    let tree = spec.tree;
+    let socket = tree.node(node_id).ok_or(format!("no socket {node_id}"))?;
+    let in_radius = |index: Option<f64>| -> Option<&Vec<u32>> {
+        let index = index.filter(|i| i.fract() == 0.0 && *i >= 1.0)?;
+        socket.nodes_in_radius.as_ref()?.get(index as usize - 1)
     };
-    let funcs: Vec<(RadiusType, RadiusFunc)> =
+    let mut funcs: Vec<(RadiusType, RadiusFunc, Option<f64>)> =
         match item.jewel_data.as_ref().and_then(|j| j.get("funcList")) {
             Some(ModValue::List(l)) => l
                 .iter()
-                .map(|f| {
-                    let ModValue::Record(r) = f else {
-                        return Err(format!("jewel function {f:?}"));
-                    };
-                    let typ = match r.get("type") {
-                        Some(ModValue::Str(t)) => {
-                            RadiusType::new(t).ok_or(format!("jewel function type {t}"))?
-                        }
-                        t => return Err(format!("jewel function type {t:?}")),
-                    };
-                    let func =
-                        RadiusFunc::new(r.get("func").ok_or("jewel function without func")?)?;
-                    Ok((typ, func))
-                })
+                .map(|f| radius_func(f).map(|(t, f)| (t, f, item.jewel_radius_index)))
                 .collect::<Result<_>>()?,
             // The default function tallies the attributes in the radius
-            _ => vec![(RadiusType::Self_, RadiusFunc::Tally)],
+            _ => vec![(
+                RadiusType::Self_,
+                RadiusFunc::Tally,
+                item.jewel_radius_index,
+            )],
         };
-    let tree = spec.tree;
-    let socket = tree.node(node_id).ok_or(format!("no socket {node_id}"))?;
-    let in_radius: Option<&Vec<u32>> = socket.nodes_in_radius.as_ref().and_then(|r| {
-        (radius_index.fract() == 0.0 && radius_index >= 1.0)
-            .then(|| r.get(radius_index as usize - 1))
-            .flatten()
-    });
-    for (typ, func) in funcs {
-        let nodes = in_radius
+    for m in input.extra_jewel_funcs {
+        if m.name.as_str() != "ExtraJewelFunc" || !extra_func_applies(m, item)? {
+            continue;
+        }
+        let label = match &m.value {
+            ModValue::Record(r) => r.get("radius").and_then(|v| match v {
+                ModValue::Str(s) => Some(s.clone()),
+                _ => None,
+            }),
+            _ => None,
+        };
+        let index = label
+            .and_then(|l| input.jewel_radius.iter().position(|r| **r == *l))
+            .map(|i| i as f64 + 1.0);
+        let (typ, func) = radius_func(&m.value)?;
+        funcs.push((typ, func, index));
+    }
+    for (typ, func, index) in funcs {
+        let ids = in_radius(index);
+        let nodes = ids
             .map(|ids| {
                 ids.iter()
                     .filter_map(|&id| Some((id, tree.node(id)?.kind)))
                     .collect()
             })
             .unwrap_or_default();
-        if typ != RadiusType::Self_
-            && let Some(ids) = in_radius
-        {
+        if typ != RadiusType::Self_ && socket.nodes_in_radius.is_some() {
+            let ids = ids.ok_or("a jewel function without a radius")?;
             for &id in ids {
                 if !spec.alloc_nodes.contains(id) {
-                    out.extra_radius_nodes.insert(id);
+                    out.extra_radius_nodes.insert(id, ());
                 }
             }
         }
@@ -343,7 +388,7 @@ fn equip<'a>(
                     }
                     *count += 1.0;
                 }
-                add_radius_jewels(out, spec, node_id, item, slot.sel_item_id)?;
+                add_radius_jewels(out, input, node_id, item, slot.sel_item_id)?;
             }
         }
         if let Some(item) = item
@@ -471,7 +516,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         player_multipliers: HashMap::new(),
         player_mods: Vec::new(),
         radius_jewels: Vec::new(),
-        extra_radius_nodes: BTreeSet::new(),
+        extra_radius_nodes: OrderedMap::default(),
         granted_skills: Vec::new(),
         explode_sources: Vec::new(),
         flasks: BTreeSet::new(),
