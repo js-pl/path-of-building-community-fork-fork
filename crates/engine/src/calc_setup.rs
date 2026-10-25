@@ -1114,7 +1114,7 @@ pub struct NodeSkill {
 }
 
 /// `calcLib.mod(modList, nil, name)`
-fn calc_mod(mods: &[Mod], name: &str) -> Result<f64> {
+pub(crate) fn calc_mod(mods: &[Mod], name: &str) -> Result<f64> {
     let inc = list::sum(mods, ModType::Inc, name)?;
     let more = list::more(mods, name)?;
     Ok((1.0 + inc / 100.0) * more)
@@ -1294,7 +1294,7 @@ pub fn merge_keystones(
 }
 
 /// `modLib.setSource(mod, source)`
-fn set_source(m: &mut Mod, source: &str) {
+pub(crate) fn set_source(m: &mut Mod, source: &str) {
     m.source = Some(source.into());
     if let ModValue::Record(r) = &mut m.value
         && let Some(ModValue::Mod(inner)) = r.get_mut(Sym::new("mod"))

@@ -60,7 +60,7 @@ impl Val {
         }
     }
 
-    fn truthy(&self) -> bool {
+    pub fn truthy(&self) -> bool {
         !matches!(self, Val::Bool(false))
     }
 }

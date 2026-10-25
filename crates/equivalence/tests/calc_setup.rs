@@ -396,3 +396,342 @@ fn initial_node_mods_match_upstream() {
         failures.join("\n")
     );
 }
+
+fn ids(v: &Value) -> BTreeSet<i64> {
+    entries(v)
+        .into_iter()
+        .filter_map(|(k, _)| match k {
+            Key::Table(t) => rt::index(&Value::Table(t.0), &s("id"))
+                .ok()?
+                .as_number()
+                .map(|n| n as i64),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn items_setup_matches_upstream() {
+    use engine::calc_items::{ItemsInput, setup_items};
+    use engine::item::ItemContext;
+    use engine::item_data::ItemData;
+    use engine::items_tab::ItemsTab;
+    use engine::skill_data::SkillData;
+    use engine::skills::Skills;
+    use engine::spec::PassiveSpec;
+    use engine::tree::NodeType;
+    use equivalence::typed_build::Trees;
+    let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
+    let host = Host::new(Rc::new(Imported::new(upstream_src())));
+    host.start()
+        .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    let parser = mod_parser();
+    let mut im = importer::Importer::new(&upstream_src());
+    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
+    parser.preload(&cache);
+    let ldata = host.global("data");
+    let item_data = ItemData::from_lua(&ldata, &host.global("colorCodes"))
+        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let skill_data = SkillData::from_lua(&ldata, &host.global("colorCodes"))
+        .unwrap_or_else(|e| panic!("skill data: {e}"));
+    let radius: Vec<String> = entries(&get(&ldata, "jewelRadius"))
+        .into_iter()
+        .map(|(_, r)| {
+            lua::to_string(&get(&r, "label"))
+                .to_str_lossy()
+                .into_owned()
+        })
+        .collect();
+    let ctx = ItemContext {
+        data: &item_data,
+        parser: &parser,
+        jewel_radius: &radius,
+        default_affix_quality: 0.5,
+    };
+    let weapon_types = get(&ldata, "weaponTypeInfo");
+    let one_hand = |t: &str| -> Option<bool> {
+        let info = get(&weapon_types, t);
+        (!info.is_nil()).then(|| get(&info, "oneHand").truthy())
+    };
+    let mut trees = Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
+    let latest = trees.latest().to_string();
+    let socket_ids: Vec<u32> = trees
+        .get(&latest, &parser)
+        .nodes
+        .iter()
+        .filter(|n| n.kind == NodeType::Socket)
+        .map(|n| n.id)
+        .collect();
+    let mut failures = Vec::new();
+    let (mut compared, mut skipped) = (0, 0);
+    for (id, path) in corpus() {
+        if !id.contains(&filter) || path.extension().is_some_and(|e| e == "json") {
+            continue;
+        }
+        let xml = std::fs::read_to_string(&path).unwrap();
+        host.load_build_xml(xml.as_bytes(), &id)
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
+        let build = host.build().unwrap();
+        let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let pob = root.child("PathOfBuilding").unwrap();
+        let (Some(items_xml), Some(tree_xml)) = (pob.child("Items"), pob.child("Tree")) else {
+            continue;
+        };
+        if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
+            eprintln!("{id}: skipped: cluster jewel subgraphs are not ported");
+            skipped += 1;
+            continue;
+        }
+        let specs: Vec<_> = tree_xml.elements().filter(|e| e.elem == "Spec").collect();
+        let active = tree_xml
+            .attr("activeSpec")
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(1)
+            .min(specs.len());
+        let spec_xml = specs[active - 1];
+        let version = spec_xml.attr("treeVersion").unwrap_or("2_6").to_string();
+        let tree = trees.get(&version, &parser);
+        let mut spec = PassiveSpec::new(tree, &parser).unwrap();
+        if let Err(e) = spec.load(spec_xml).and_then(|_| spec.post_load()) {
+            eprintln!("{id}: skipped: {e}");
+            skipped += 1;
+            continue;
+        }
+        let mut tab = match ItemsTab::load(items_xml, &ctx, &socket_ids) {
+            Ok(t) => t,
+            Err(e) => {
+                failures.push(format!("{id}: items tab: {e}"));
+                continue;
+            }
+        };
+        tab.populate_slots(&mut spec, tree, &one_hand);
+        let skills = pob.child("Skills").map(|x| Skills::load(x, &skill_data));
+        let groups = skills.as_ref().map_or(&[][..], |s| s.socket_group_list());
+        let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+        let mut node_mods = match calc_setup::build_mod_list_for_node_list(
+            &spec,
+            &alloc,
+            &spec.alloc_nodes,
+            &mut [],
+            &[],
+            true,
+            &item_data,
+        ) {
+            Ok((m, _)) => m,
+            Err(e) => {
+                failures.push(format!("{id}: node mods: {e}"));
+                continue;
+            }
+        };
+        calc_setup::merge_keystones(&mut node_mods, tree, &mut vec![]).unwrap();
+        let calcs = get(&get(&build, "calcsTab"), "calcs");
+        let env = rt::call(&get(&calcs, "initEnv"), &[build.clone(), s("MAIN")])
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)))
+            .into_iter()
+            .next()
+            .unwrap();
+        if get(
+            &get(&get(&env, "modDB"), "conditions"),
+            "AffectedByEnergyBlade",
+        )
+        .truthy()
+        {
+            eprintln!("{id}: skipped: Energy Blade is not ported");
+            skipped += 1;
+            continue;
+        }
+        let config = inputs(&get(&env, "configInput"));
+        let input = ItemsInput {
+            spec: &spec,
+            tab: &tab,
+            socket_groups: groups,
+            node_mods: &node_mods,
+            config: &config,
+            precision: &item_data,
+            energy_blade: false,
+        };
+        let out = match setup_items(&input) {
+            Ok(o) => o,
+            Err(e) => {
+                failures.push(format!("{id}: typed failed: {e}"));
+                continue;
+            }
+        };
+        compared += 1;
+        let mut fail = |what: String| {
+            if failures.len() < 80 {
+                failures.push(format!("{id}: {what}"));
+            }
+        };
+        // Every mod, condition and multiplier of the item database
+        let ldb = get(&env, "itemModDB");
+        let (tm, lm) = (typed_mods(&out.item_db), db_mods(&ldb));
+        for name in tm.keys().chain(lm.keys()).collect::<BTreeSet<_>>() {
+            let (t, mut l) = (
+                tm.get(name).cloned().unwrap_or_default(),
+                lm.get(name).cloned().unwrap_or_default(),
+            );
+            for (t, l) in t.iter().zip(l.iter_mut()) {
+                align_value(&t.value, &mut l.value);
+            }
+            if t != l {
+                let n = t.len().min(l.len());
+                let i = (0..n).find(|&i| t[i] != l[i]).unwrap_or(n);
+                let show =
+                    |m: Option<&Mod>| m.map_or("none".into(), |m| typed_json::mod_(m).to_string());
+                fail(format!(
+                    "itemModDB {name}: {} mods != {}, at {}:\n    typed {}\n    translated {}",
+                    t.len(),
+                    l.len(),
+                    i + 1,
+                    show(t.get(i)),
+                    show(l.get(i))
+                ));
+            }
+        }
+        let lconds: BTreeMap<String, Value> = entries(&get(&ldb, "conditions"))
+            .into_iter()
+            .filter_map(|(k, v)| match k {
+                Key::Str(k) => Some((k.to_str_lossy().into_owned(), v)),
+                _ => None,
+            })
+            .collect();
+        let tconds: BTreeMap<String, bool> = out
+            .item_db
+            .conditions
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), *v))
+            .collect();
+        let lc: BTreeMap<String, bool> = lconds
+            .iter()
+            .map(|(k, v)| (k.clone(), v.truthy()))
+            .collect();
+        if tconds != lc {
+            fail(format!("conditions {tconds:?} != {lc:?}"));
+        }
+        for (k, class) in &out.class_restrictions {
+            let l = lconds
+                .get(k)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_str_lossy().into_owned());
+            if l.as_deref() != Some(class) {
+                fail(format!("condition {k}: {class} != {l:?}"));
+            }
+        }
+        let lm: BTreeMap<String, Option<f64>> = entries(&get(&ldb, "multipliers"))
+            .into_iter()
+            .filter_map(|(k, v)| match k {
+                Key::Str(k) => Some((k.to_str_lossy().into_owned(), v.as_number())),
+                _ => None,
+            })
+            .collect();
+        let tmult: BTreeMap<String, Option<f64>> = out
+            .item_db
+            .multipliers
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), Some(*v)))
+            .collect();
+        if tmult != lm {
+            fail(format!("multipliers {tmult:?} != {lm:?}"));
+        }
+        // The equipped items, flasks and radius jewels
+        let litems: BTreeMap<String, f64> = entries(&get(&get(&env, "player"), "itemList"))
+            .into_iter()
+            .filter_map(|(k, v)| match k {
+                Key::Str(k) => Some((k.to_str_lossy().into_owned(), get(&v, "id").as_number()?)),
+                _ => None,
+            })
+            .collect();
+        if litems != out.item_list {
+            fail(format!("itemList {:?} != {litems:?}", out.item_list));
+        }
+        if ids(&get(&env, "flasks")) != out.flasks {
+            fail(format!(
+                "flasks {:?} != {:?}",
+                out.flasks,
+                ids(&get(&env, "flasks"))
+            ));
+        }
+        if ids(&get(&env, "tinctures")) != out.tinctures {
+            fail(format!(
+                "tinctures {:?} != {:?}",
+                out.tinctures,
+                ids(&get(&env, "tinctures"))
+            ));
+        }
+        let lrads: Vec<(u32, f64, String, usize)> = entries(&get(&env, "radiusJewelList"))
+            .into_iter()
+            .map(|(_, r)| {
+                (
+                    get(&r, "nodeId").as_number().unwrap_or(0.0) as u32,
+                    get(&get(&r, "item"), "id").as_number().unwrap_or(0.0),
+                    lua::to_string(&get(&r, "type")).to_str_lossy().into_owned(),
+                    entries(&get(&r, "nodes")).len(),
+                )
+            })
+            .collect();
+        let trads: Vec<(u32, f64, String, usize)> = out
+            .radius_jewels
+            .iter()
+            .map(|r| {
+                let typ = match r.typ {
+                    engine::jewel::RadiusType::Other => "Other",
+                    engine::jewel::RadiusType::Self_ => "Self",
+                    engine::jewel::RadiusType::SelfUnalloc => "SelfUnalloc",
+                    engine::jewel::RadiusType::Threshold => "Threshold",
+                };
+                (r.node_id, r.item_id, typ.to_string(), r.nodes.len())
+            })
+            .collect();
+        if trads != lrads {
+            fail(format!("radiusJewelList {trads:?} != {lrads:?}"));
+        }
+        let lextra: BTreeSet<u32> = entries(&get(&env, "extraRadiusNodeList"))
+            .into_iter()
+            .filter_map(|(k, _)| match k {
+                Key::Int(i) => Some(i as u32),
+                _ => None,
+            })
+            .collect();
+        // Granted passives later leave the extra list
+        if !lextra.is_subset(&out.extra_radius_nodes) {
+            fail(format!(
+                "extraRadiusNodeList {:?} !>= {lextra:?}",
+                out.extra_radius_nodes
+            ));
+        }
+        let lmdb = get(&get(&env, "modDB"), "multipliers");
+        for (k, v) in &out.player_multipliers {
+            if get(&lmdb, k.as_str()).as_number() != Some(*v) {
+                fail(format!(
+                    "modDB multiplier {}: {v} != {:?}",
+                    k.as_str(),
+                    get(&lmdb, k.as_str()).as_number()
+                ));
+            }
+        }
+        let lgranted: Vec<String> = entries(&get(&env, "grantedSkillsItems"))
+            .into_iter()
+            .map(|(_, g)| {
+                lua::to_string(&get(&g, "slotName"))
+                    .to_str_lossy()
+                    .into_owned()
+            })
+            .collect();
+        let tgranted: Vec<String> = out
+            .granted_skills
+            .iter()
+            .map(|g| g.slot_name.clone())
+            .collect();
+        if tgranted != lgranted {
+            fail(format!("grantedSkillsItems {tgranted:?} != {lgranted:?}"));
+        }
+    }
+    eprintln!("{compared} item setups compared, {skipped} skipped");
+    assert!(
+        failures.is_empty(),
+        "{} differences:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}

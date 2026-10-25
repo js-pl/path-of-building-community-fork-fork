@@ -101,20 +101,31 @@ pub fn same_params(a: &Mod, b: &Mod) -> bool {
 /// `ModList:MergeMod(mod)`: adds the value to a mod with the same params,
 /// for the summed types, else adds the mod
 pub fn merge_mod(mods: &mut Vec<Mod>, m: Mod) -> Result<()> {
-    if matches!(m.typ, ModType::Base | ModType::Inc | ModType::More)
-        && let Some(existing) = mods.iter_mut().find(|e| same_params(e, &m))
-    {
-        let add = |a: &ModValue, b: &ModValue| -> Result<ModValue> {
-            match (a, b) {
-                (ModValue::Number(x), ModValue::Number(y)) => Ok(ModValue::Number(x + y)),
-                (a, b) => Err(format!("attempt to perform arithmetic on {a:?} and {b:?}")),
-            }
-        };
-        existing.value = add(&existing.value, &m.value)?;
-        return Ok(());
+    if !merge_value(mods, &m)? {
+        mods.push(m);
     }
-    mods.push(m);
     Ok(())
+}
+
+/// `ModList:MergeMod(mod, true)`: adds the value to a mod with the same
+/// params, for the summed types; other mods are dropped
+pub fn merge_additive(mods: &mut [Mod], m: &Mod) -> Result<()> {
+    merge_value(mods, m).map(|_| ())
+}
+
+/// Adds the value of a summed mod to one with the same params, if any
+fn merge_value(mods: &mut [Mod], m: &Mod) -> Result<bool> {
+    if !matches!(m.typ, ModType::Base | ModType::Inc | ModType::More) {
+        return Ok(false);
+    }
+    let Some(existing) = mods.iter_mut().find(|e| same_params(e, m)) else {
+        return Ok(false);
+    };
+    existing.value = match (&existing.value, &m.value) {
+        (ModValue::Number(x), ModValue::Number(y)) => ModValue::Number(x + y),
+        (a, b) => return Err(format!("attempt to perform arithmetic on {a:?} and {b:?}")),
+    };
+    Ok(true)
 }
 
 /// What scaling needs of the data: `data.highPrecisionMods[name][type]`
