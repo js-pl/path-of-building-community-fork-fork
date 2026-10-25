@@ -372,8 +372,12 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    configuration mods; then the tree before the items with its keystones;
    the items in their slots (`calc_items.rs`) with the radius jewels; the
    tree with the items, their granted passives and jewel functions
-   (`calc_tree.rs`); the socket groups of granted skills and explosions
-   (`calc_skills.rs`); then the active skills.
+   (`calc_tree.rs`); the socket groups of granted skills and explosions,
+   the active skills with their supports (`calc_skills.rs`, with the
+   player as the queries' actor in `actor.rs`); and their mod lists
+   (`calc_skill_mods.rs`). `calc_env.rs` chains them from a typed build
+   (`build.rs`, with the Configuration tab's sets in `config_tab.rs`), so
+   the whole setup runs from a build file alone.
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is
