@@ -3,7 +3,9 @@
 //! Free-form ports of upstream, replacing its translation piece by piece,
 //! see docs/design.md.
 
+pub mod calc_items;
 pub mod calc_setup;
+pub mod calc_tree;
 pub mod common;
 pub mod config;
 pub mod data;
