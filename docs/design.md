@@ -369,8 +369,11 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    each compared with the translated `calcs.initEnv`'s databases on the
    mods of the sources ported so far (`tests/calc_setup.rs`): first the
    base mods of the player and the enemy, the bandit, pantheon and
-   configuration mods; then the tree with its jewel functions, the items
-   and the active skills.
+   configuration mods; then the tree before the items with its keystones;
+   the items in their slots (`calc_items.rs`) with the radius jewels; the
+   tree with the items, their granted passives and jewel functions
+   (`calc_tree.rs`); the socket groups of granted skills and explosions
+   (`calc_skills.rs`); then the active skills.
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is

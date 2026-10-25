@@ -60,7 +60,7 @@ fn compare_gem(t: &GemInstance, l: &Value, fail: &mut dyn FnMut(String)) {
     for (field, tv) in [
         ("level", t.level),
         ("quality", t.quality),
-        ("count", Some(t.count)),
+        ("count", t.count),
         ("skillPart", t.skill_part),
         ("skillPartCalcs", t.skill_part_calcs),
         ("skillStageCount", t.skill_stage_count),
