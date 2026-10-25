@@ -360,7 +360,17 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    presets with the placeholders they set, and the custom modifier lines,
    equal to the translated Configuration tab for every corpus build and for
    every option set alone to each of its values (`tests/config.rs`). Then
-   skills, and `initEnv` building typed stores from them.
+   the Skills tab (`crates/engine/src/skills.rs`, with typed gem and skill
+   data in `skill_data.rs`): skill sets and socket groups loaded from a
+   build, each gem found and its level and requirements settled, equal to
+   the translated tab for every corpus build (`tests/skills.rs`). Builds are
+   read with `engine::xml`, upstream's XML reader. Then `initEnv`
+   (`crates/engine/src/calc_setup.rs`) building typed stores, in slices
+   each compared with the translated `calcs.initEnv`'s databases on the
+   mods of the sources ported so far (`tests/calc_setup.rs`): first the
+   base mods of the player and the enemy, the bandit, pantheon and
+   configuration mods; then the tree with its jewel functions, the items
+   and the active skills.
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is

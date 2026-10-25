@@ -71,7 +71,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Classes/SharedItemSetListControl.lua" = { status = "todo" }
 "Classes/SkillListControl.lua" = { status = "todo" }
 "Classes/SkillSetListControl.lua" = { status = "todo" }
-"Classes/SkillsTab.lua" = { status = "partial", port = "web/src/ui/SkillsTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Classes/SkillsTab.lua" = { status = "partial", port = "web/src/ui/SkillsTab.tsx crates/engine/src/skills.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/SliderControl.lua" = { status = "todo" }
 "Classes/TextListControl.lua" = { status = "todo" }
 "Classes/TimelessJewelListControl.lua" = { status = "todo" }
@@ -303,8 +303,8 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/CalcOffence.lua" = { status = "todo" }
 "Modules/CalcPerform.lua" = { status = "todo" }
 "Modules/CalcSections.lua" = { status = "todo" }
-"Modules/CalcSetup.lua" = { status = "todo" }
-"Modules/CalcTools.lua" = { status = "todo" }
+"Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcTriggers.lua" = { status = "todo" }
 "Modules/Calcs.lua" = { status = "todo" }
 "Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
@@ -319,7 +319,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/Main.lua" = { status = "todo" }
 "Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/ModTools.lua" = { status = "partial", port = "crates/lua/src/modlib.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Modules/PantheonTools.lua" = { status = "todo" }
+"Modules/PantheonTools.lua" = { status = "ported", port = "crates/engine/src/calc_setup.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/StatDescriber.lua" = { status = "todo" }
 "Modules/ToastNotification.lua" = { status = "todo" }
 "Modules/Utils.lua" = { status = "todo" }

@@ -45,6 +45,14 @@ pub fn captures(s: &str, p: &str) -> Option<Vec<String>> {
         .map(|caps| caps.iter().map(text).collect())
 }
 
+/// `s:match(p, init)` from the 1-based position `init`; position
+/// captures (`()`) give their position as text
+pub fn captures_at(s: &str, p: &str, init: usize) -> Option<Vec<String>> {
+    pattern::lua_match(s.as_bytes(), p.as_bytes(), init as i64)
+        .unwrap_or_else(|e| panic!("{}", bad(p)(e)))
+        .map(|caps| caps.iter().map(text).collect())
+}
+
 /// The first capture of `s:match(p)` (or the whole match)
 pub fn capture(s: &str, p: &str) -> Option<String> {
     captures(s, p).and_then(|c| c.into_iter().next())

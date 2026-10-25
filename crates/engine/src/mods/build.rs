@@ -61,6 +61,13 @@ impl Mod {
         }
     }
 
+    /// With mod flags and keyword flags
+    pub fn flags(mut self, flags: u32, keyword_flags: u32) -> Mod {
+        self.flags = flags;
+        self.keyword_flags = keyword_flags;
+        self
+    }
+
     /// Adds a tag after the ones it has
     pub fn tag(mut self, tag: Tag) -> Mod {
         self.tags.push(tag);
@@ -136,6 +143,14 @@ impl Tag {
         }))
     }
 
+    /// `{ type = "PerStat", stat = stat }`
+    pub fn per_stat(stat: &str) -> Tag {
+        Tag::kind(TagKind::PerStat(PerStat {
+            stats: Some(Names::One(Sym::new(stat))),
+            ..PerStat::default()
+        }))
+    }
+
     /// `{ type = "MultiplierThreshold", var = var, threshold = threshold }`
     pub fn multiplier_threshold(var: &str, threshold: f64) -> Tag {
         Tag::kind(TagKind::MultiplierThreshold(MultiplierThreshold {
@@ -183,6 +198,38 @@ impl Tag {
                 *actor = Some(Sym::new(a))
             }
             k => panic!("{k:?} has no actor"),
+        }
+        self
+    }
+
+    /// `base = base`
+    pub fn base(mut self, base: f64) -> Tag {
+        match &mut self.kind {
+            TagKind::Multiplier(m) => m.base = Some(base),
+            TagKind::PerStat(m) => m.base = Some(base),
+            TagKind::PercentStat(m) => m.base = Some(base),
+            k => panic!("{k:?} has no base"),
+        }
+        self
+    }
+
+    /// `div = div`
+    pub fn divisor(mut self, div: f64) -> Tag {
+        match &mut self.kind {
+            TagKind::Multiplier(m) => m.div = Some(div),
+            TagKind::PerStat(m) => m.div = Some(div),
+            k => panic!("{k:?} has no div"),
+        }
+        self
+    }
+
+    /// `limit = limit`
+    pub fn limit(mut self, limit: f64) -> Tag {
+        match &mut self.kind {
+            TagKind::Multiplier(m) => m.limit = Some(limit),
+            TagKind::PerStat(m) => m.limit = Some(limit),
+            TagKind::PercentStat(m) => m.limit = Some(limit),
+            k => panic!("{k:?} has no limit"),
         }
         self
     }

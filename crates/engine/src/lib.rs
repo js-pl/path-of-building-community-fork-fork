@@ -3,6 +3,7 @@
 //! Free-form ports of upstream, replacing its translation piece by piece,
 //! see docs/design.md.
 
+pub mod calc_setup;
 pub mod common;
 pub mod config;
 pub mod data;
@@ -14,8 +15,11 @@ pub mod mod_store;
 pub mod mods;
 pub mod pat;
 pub mod rt;
+pub mod skill_data;
+pub mod skills;
 pub mod spec;
 pub mod tree;
+pub mod xml;
 
 /// Replaces translated parts of upstream's running program with the
 /// engine's native ports. With `POB_TRANSLATED` set, the program stays
