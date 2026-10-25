@@ -5,10 +5,13 @@
 
 pub mod common;
 pub mod data;
+pub mod item;
+pub mod item_data;
+pub mod item_tools;
 pub mod mod_parser;
 pub mod mod_store;
-pub mod mod_tools;
 pub mod mods;
+pub mod pat;
 pub mod rt;
 pub mod spec;
 pub mod tree;

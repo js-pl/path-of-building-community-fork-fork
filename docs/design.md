@@ -348,8 +348,21 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    class and ascendancy, allocation, mastery selections, dependencies and
    paths, equal to the translated spec of every corpus build
    (`tests/spec.rs`); jewels that change the tree, tattoos and cluster
-   jewel subgraphs follow. Then items, skills and config, and `initEnv`
-   building typed stores from them.
+   jewel subgraphs follow. Then items (`crates/engine/src/item.rs`, with
+   `item_data.rs` and `item_tools.rs`): an item's text parsed into its
+   base, properties, sockets, variants, affixes and mod lines, rolled and
+   scaled as upstream does, and the mods it grants in each slot with local
+   mods applied and its weapon, armour, flask, tincture and jewel data,
+   equal to the translated item for every corpus build item and every
+   unique and rare template (`tests/item.rs`); crafting and text building
+   follow with the UI. Then skills and config, and `initEnv` building typed
+   stores from them.
+
+   Item text and data lines are matched with upstream's own patterns
+   (`engine::pat`, Lua patterns on Rust strings), so the parse is
+   upstream's. The item data is read from upstream's processed `data`
+   table for now; porting `Data.lua`'s item processing makes it typed data
+   of the importer.
 
    Upstream mutates shared data in a few places, and the typed engine does
    not copy that by accident: `modLib.mergeKeystones` sets the source of a

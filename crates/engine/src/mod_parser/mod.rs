@@ -11,8 +11,8 @@ mod generated;
 mod ported;
 
 use crate::data::Data;
-use crate::mod_tools::create_mod_args;
 use crate::rt::*;
+use lua::modlib::create_mod_args;
 use lua::{Closure, LuaStr, TableRef, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -61,7 +61,7 @@ pub fn import(im: &mut Importer, raw: &Raw) -> Result<TableRef> {
     };
     native(
         "mod",
-        Box::new(|args| Ok(vec![Value::Table(engine::mod_tools::create_mod_args(args))])),
+        Box::new(|args| Ok(vec![Value::Table(lua::modlib::create_mod_args(args))])),
     );
     native(
         "flag",
@@ -72,7 +72,7 @@ pub fn import(im: &mut Importer, raw: &Raw) -> Result<TableRef> {
                 true.into(),
             ];
             a.extend(args.iter().skip(1).cloned());
-            Ok(vec![Value::Table(engine::mod_tools::create_mod_args(&a))])
+            Ok(vec![Value::Table(lua::modlib::create_mod_args(&a))])
         }),
     );
     native("getSimpleConv", Box::new(factory("getSimpleConv")));
