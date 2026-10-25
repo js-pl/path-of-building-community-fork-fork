@@ -98,6 +98,8 @@ pub struct Cfg {
     pub strength_gems: Option<f64>,
     pub dexterity_gems: Option<f64>,
     pub intelligence_gems: Option<f64>,
+    /// `skillGem`: the gem a socket query is for
+    pub skill_gem: Option<Rc<crate::skill_data::Gem>>,
 }
 
 /// What queries need from outside the stores: actors, their outputs and

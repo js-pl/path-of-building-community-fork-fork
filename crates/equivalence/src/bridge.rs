@@ -94,6 +94,8 @@ pub fn cfg(v: &Value) -> Result<Option<Cfg>, String> {
         strength_gems: opt_number(&g("strengthGems"))?,
         dexterity_gems: opt_number(&g("dexterityGems"))?,
         intelligence_gems: opt_number(&g("intelligenceGems"))?,
+        // Gem checks go to the translation, with the Lua cfg
+        skill_gem: None,
     }))
 }
 

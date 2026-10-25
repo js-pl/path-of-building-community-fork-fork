@@ -709,6 +709,47 @@ impl Item {
         }
     }
 
+    /// `FindModifierSubstring(substring, itemSlotName)`: whether a mod line
+    /// of the item has a pattern, and is not one of the lines the data
+    /// excludes for the slot, or is one it counts. `explicit ` in the
+    /// pattern keeps to the explicit lines.
+    pub fn find_modifier_substring(&self, substring: &str, slot: &str, data: &ItemData) -> bool {
+        let (substring, explicit) = crate::pat::gsub_n(substring, "explicit ", "", None);
+        let mut lines: Vec<&ModLine> = self.explicit_mod_lines.iter().collect();
+        if explicit < 1 {
+            lines.extend(&self.enchant_mod_lines);
+            lines.extend(&self.scourge_mod_lines);
+            lines.extend(&self.implicit_mod_lines);
+            lines.extend(&self.crucible_mod_lines);
+        }
+        let key = (substring.clone(), slot.to_string());
+        for line in lines {
+            if line.flags.disabled || !self.check_mod_line_variant(line) {
+                continue;
+            }
+            let text = crate::pat::lower(&line.line);
+            if crate::pat::find(&text, &substring).is_some()
+                && crate::pat::find(&text, &format!("{substring} modifier")).is_none()
+            {
+                let excluded = data.item_tag_special_exclusion.get(&key).is_some_and(|ps| {
+                    ps.iter()
+                        .any(|p| crate::pat::find(&text, &crate::pat::lower(p)).is_some())
+                });
+                if !excluded {
+                    return true;
+                }
+            }
+            if let Some(ps) = data.item_tag_special.get(&key)
+                && ps
+                    .iter()
+                    .any(|p| crate::pat::find(&text, &crate::pat::lower(p)).is_some())
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     /// `CheckModLineVariant`
     pub fn check_mod_line_variant(&self, line: &ModLine) -> bool {
         self.check_variant(

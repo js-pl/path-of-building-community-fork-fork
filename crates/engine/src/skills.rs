@@ -8,6 +8,7 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::item::sanitise_text;
+use crate::items_tab::ItemsTab;
 use crate::pat::{self, gsub, gsub_fn};
 use crate::skill_data::{Gem, GrantedEffect, SkillData};
 use crate::xml::Element;
@@ -58,6 +59,8 @@ pub struct GemInstance {
     pub trigger_chance: Option<f64>,
     /// For the explosion of an item or a node (`explodeSource`)
     pub explode_source: Option<ExplodeSource>,
+    /// Whether the gem's colour matches its socket's (`matchesSocket`)
+    pub matches_socket: bool,
 }
 
 /// What makes enemies explode on kill: an item, by id, or a passive node
@@ -506,6 +509,50 @@ pub fn process_socket_group(group: &mut SocketGroup, data: &SkillData) {
                 gem.req_int = Some(gem_stat_requirement(r, effect.support, g.req_int));
             }
         }
+    }
+}
+
+/// `SkillsTabClass:UpdateSocketGroups()`: whether each gem's colour matches
+/// its socket's, counting the sockets of an item on from the groups before
+/// in its slot
+pub fn update_socket_groups(groups: &mut [SocketGroup], tab: &ItemsTab) {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for group in groups.iter_mut() {
+        for gem in &mut group.gem_list {
+            gem.matches_socket = false;
+        }
+        let Some(slot_name) = group.slot.clone() else {
+            continue;
+        };
+        let offset = counts.get(&slot_name).copied().unwrap_or(0);
+        let item = tab
+            .ordered_slots
+            .iter()
+            .find(|s| s.slot_name == slot_name)
+            .and_then(|s| tab.item(s.sel_item_id));
+        for (i, gem) in group.gem_list.iter_mut().enumerate() {
+            let Some(effect) = gem.effect().cloned() else {
+                continue;
+            };
+            let Some(item) = item else {
+                continue;
+            };
+            if item.colour_always_matches {
+                gem.matches_socket = true;
+            } else {
+                let colour = match effect.color {
+                    Some(1.0) => Some('R'),
+                    Some(2.0) => Some('G'),
+                    Some(3.0) => Some('B'),
+                    _ => None,
+                };
+                gem.matches_socket = item
+                    .sockets
+                    .get(offset + i)
+                    .is_some_and(|s| Some(s.color) == colour);
+            }
+        }
+        counts.insert(slot_name, offset + group.gem_list.len());
     }
 }
 

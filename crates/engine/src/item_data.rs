@@ -160,6 +160,11 @@ pub struct ItemData {
     pub cluster_jewels: HashMap<String, ClusterJewel>,
     pub mod_scalability: HashMap<String, Vec<Scalability>>,
     pub high_precision_mods: HashMap<(String, String), f64>,
+    /// `data.itemTagSpecial` and `data.itemTagSpecialExclusionPattern`:
+    /// by tag and lower case slot, the patterns of lines that do and do not
+    /// count as having the tag
+    pub item_tag_special: HashMap<(String, String), Vec<String>>,
+    pub item_tag_special_exclusion: HashMap<(String, String), Vec<String>>,
     pub default_high_precision: f64,
     /// The keys of `colorCodes`, which name valid rarities
     pub color_codes: HashSet<String>,
@@ -414,6 +419,22 @@ impl ItemData {
             }
         }
         d.default_high_precision = number(&get(data, "defaultHighPrecision"))?;
+        for (field, out) in [
+            ("itemTagSpecial", &mut d.item_tag_special),
+            (
+                "itemTagSpecialExclusionPattern",
+                &mut d.item_tag_special_exclusion,
+            ),
+        ] {
+            for (tag, slots) in pairs(&get(data, field)) {
+                for (slot, patterns) in pairs(&slots) {
+                    out.insert(
+                        (key_string(&tag)?, key_string(&slot)?),
+                        array(&patterns).iter().map(string).collect::<Result<_>>()?,
+                    );
+                }
+            }
+        }
         d.caster_tag_crucible_uniques = truthy_set(&get(data, "casterTagCrucibleUniques"))?;
         d.minion_tag_crucible_uniques = truthy_set(&get(data, "minionTagCrucibleUniques"))?;
         if let Some(exclusive) = d.item_mods.get("ItemExclusive").cloned() {

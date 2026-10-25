@@ -444,8 +444,12 @@ fn items_setup_matches_upstream() {
             .unwrap_or_else(|e| panic!("setup data: {e}"));
     let item_data = ItemData::from_lua(&ldata, &host.global("colorCodes"))
         .unwrap_or_else(|e| panic!("item data: {e}"));
-    let skill_data = SkillData::from_lua(&ldata, &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("skill data: {e}"));
+    let skill_data = SkillData::from_lua(
+        &ldata,
+        &host.global("colorCodes"),
+        &host.global("SkillType"),
+    )
+    .unwrap_or_else(|e| panic!("skill data: {e}"));
     let radius: Vec<String> = entries(&get(&ldata, "jewelRadius"))
         .into_iter()
         .map(|(_, r)| {
@@ -761,6 +765,45 @@ fn items_setup_matches_upstream() {
             ));
         }
         compare("modDB", &env_setup.mod_db, &get(&env, "modDB"), &mut fail);
+        // The typed player's item conditions, on every tag of the
+        // translated player's database
+        {
+            use engine::actor::{Actor, EnvActors};
+            use engine::mods::Actors;
+            use engine::mods::tag::TagKind;
+            let mut bridge = equivalence::bridge::Bridge::new(host.env.clone());
+            let pid = bridge.add(&get(&env, "modDB")).unwrap();
+            let actors = EnvActors {
+                actors: vec![Actor {
+                    store: pid,
+                    item_list: out.item_list.clone(),
+                    player: Some(0),
+                    ..Actor::default()
+                }],
+                store_actor: [(pid, 0)].into_iter().collect(),
+                tab: &tab,
+                item_data: &item_data,
+                skill_data: &skill_data,
+            };
+            if let Mods::Db(by_name) = &bridge.stores.stores[pid].mods {
+                for m in by_name.values().flatten() {
+                    for t in &m.tags {
+                        if let TagKind::ItemCondition(c) = &t.kind {
+                            let (tv, lv) = (
+                                actors.item_condition(pid, c, None),
+                                bridge.item_condition(pid, c, None),
+                            );
+                            if tv != lv {
+                                fail(format!(
+                                    "{} item condition {c:?}: {tv} != {lv}",
+                                    m.name.as_str()
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // The socket groups with the granted skills and explosions
         let granted = calc_skills::granted_skills(
             &env_setup.tree.node_mods,
@@ -781,6 +824,7 @@ fn items_setup_matches_upstream() {
         );
         let mut tgroups = groups.clone();
         calc_skills::add_granted_groups(&mut tgroups, &granted, &explode, &skill_data);
+        engine::skills::update_socket_groups(&mut tgroups, &tab);
         if let Some(s) = skills.as_mut().and_then(|s| s.socket_group_list_mut()) {
             *s = tgroups.clone();
         }
@@ -888,6 +932,142 @@ fn items_setup_matches_upstream() {
         if tgranted != lgranted {
             fail(format!("grantedSkillsItems {tgranted:?} != {lgranted:?}"));
         }
+        // The active skills
+        let conv = Converter::default();
+        let fields = |v: &Value| -> engine::item::Fields {
+            entries(v)
+                .into_iter()
+                .filter_map(|(k, x)| match k {
+                    Key::Str(k) => Some((k.to_str_lossy().into_owned(), conv.value(&x).ok()?)),
+                    _ => None,
+                })
+                .collect()
+        };
+        let unarmed = fields(
+            &rt::index(&get(&ldata, "unarmedWeaponData"), &get(&env, "classId"))
+                .unwrap_or_default(),
+        );
+        let imbued = skills
+            .as_ref()
+            .map(|s| s.imbued_support_by_slot.clone())
+            .unwrap_or_default();
+        let skills_input = calc_skills::SkillsInput {
+            groups: &tgroups,
+            tab: &tab,
+            item_data: &item_data,
+            skill_data: &skill_data,
+            item_list: &out.item_list,
+            unarmed: &unarmed,
+            main_socket_group: pob
+                .child("Build")
+                .and_then(|b| b.attr("mainSocketGroup"))
+                .and_then(|v| v.parse::<f64>().ok()),
+            imbued_support_by_slot: &imbued,
+            matching_socket_quality_bonus: setup_data.misc["MatchingSocketQualityBonus"],
+        };
+        let mut player_db = env_setup.mod_db.clone();
+        let setup = match calc_skills::create_active_skills(&skills_input, &mut player_db) {
+            Ok(s) => s,
+            Err(e) => {
+                fail(format!("active skills: {e}"));
+                continue;
+            }
+        };
+        let lplayer = get(&env, "player");
+        let lskills: Vec<Value> = entries(&get(&lplayer, "activeSkillList"))
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect();
+        let keys = |v: &Value| -> BTreeSet<String> {
+            entries(v)
+                .into_iter()
+                .filter(|(_, x)| x.truthy())
+                .filter_map(|(k, _)| match k {
+                    Key::Str(k) => Some(k.to_str_lossy().into_owned()),
+                    Key::Int(i) => Some(i.to_string()),
+                    _ => None,
+                })
+                .collect()
+        };
+        let group_index = |src: &Value| -> Option<(usize, usize)> {
+            if src.is_nil() {
+                return None;
+            }
+            for (gi, g) in lgroups.iter().enumerate() {
+                for (i, (_, gem)) in entries(&get(g, "gemList")).into_iter().enumerate() {
+                    if gem.raw_eq(src) {
+                        return Some((gi, i));
+                    }
+                }
+            }
+            None
+        };
+        let effect = |e: &Value| {
+            (
+                text(&get(&get(e, "grantedEffect"), "id")),
+                get(e, "level").as_number(),
+                get(e, "quality").as_number(),
+            )
+        };
+        let teffect = |e: &calc_skills::SkillEffect| {
+            (Some(e.granted_effect.id.clone()), e.level, Some(e.quality))
+        };
+        if lskills.len() != setup.active_skills.len() {
+            fail(format!(
+                "{} active skills != {}",
+                setup.active_skills.len(),
+                lskills.len()
+            ));
+        }
+        for (i, (t, l)) in setup.active_skills.iter().zip(&lskills).enumerate() {
+            let la = get(l, "activeEffect");
+            // The active effect's level and quality, and the skill's flags,
+            // change as its mod list is built
+            let tv = (
+                teffect(&t.active_effect).0,
+                t.active_effect.src,
+                t.slot_name.clone(),
+                t.effect_list[1..].iter().map(teffect).collect::<Vec<_>>(),
+                t.skill_types
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<BTreeSet<_>>(),
+            );
+            let leffects: Vec<_> = entries(&get(l, "effectList"))
+                .iter()
+                .map(|(_, e)| effect(e))
+                .collect();
+            let lv = (
+                effect(&la).0,
+                group_index(&get(&la, "srcInstance")),
+                text(&get(l, "slotName")),
+                leffects.get(1..).unwrap_or_default().to_vec(),
+                keys(&get(l, "skillTypes")),
+            );
+            if tv != lv {
+                fail(format!("active skill {}: {tv:?}\n    != {lv:?}", i + 1));
+            }
+        }
+        let lmain = get(&lplayer, "mainSkill");
+        let lmain_index = lskills.iter().position(|s| s.raw_eq(&lmain));
+        if lmain_index != Some(setup.main_skill) {
+            fail(format!(
+                "main skill {} != {lmain_index:?}",
+                setup.main_skill
+            ));
+        }
+        for (n, w) in ["weaponData1", "weaponData2"].iter().enumerate() {
+            let lw = fields(&get(&lplayer, w));
+            if lw != setup.weapon_data[n] {
+                fail(format!("{w}: {:?} != {lw:?}", setup.weapon_data[n]));
+            }
+        }
+        compare(
+            "modDB with skills",
+            &player_db,
+            &get(&env, "modDB"),
+            &mut fail,
+        );
     }
     eprintln!("{compared} item setups compared, {skipped} skipped");
     assert!(

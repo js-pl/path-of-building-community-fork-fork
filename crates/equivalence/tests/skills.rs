@@ -155,8 +155,12 @@ fn skills_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let data = SkillData::from_lua(&host.global("data"), &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("skill data: {e}"));
+    let data = SkillData::from_lua(
+        &host.global("data"),
+        &host.global("colorCodes"),
+        &host.global("SkillType"),
+    )
+    .unwrap_or_else(|e| panic!("skill data: {e}"));
     let mut failures = Vec::new();
     let mut compared = 0;
     for (id, path) in corpus() {

@@ -45,6 +45,26 @@ pub struct GrantedEffect {
     pub unsupported: bool,
     /// By level, from 1
     pub levels: BTreeMap<i64, SkillLevel>,
+    /// `skillTypes`: the types the skill has
+    pub skill_types: HashSet<i64>,
+    pub minion_skill_types: Option<HashSet<i64>>,
+    /// The truthy `baseFlags`
+    pub base_flags: Vec<String>,
+    /// For supports: the types they add, and the type expressions of the
+    /// skills they support and do not
+    pub add_skill_types: Vec<i64>,
+    pub require_skill_types: Vec<i64>,
+    pub exclude_skill_types: Vec<i64>,
+    pub weapon_types: Option<Vec<String>>,
+    pub add_flags: Option<Vec<String>>,
+    pub is_trigger: bool,
+    pub cannot_be_supported: bool,
+    pub support_gems_only: bool,
+    pub has_global_effect: bool,
+    pub ignore_minion_types: bool,
+    pub from_item: bool,
+    /// The source of an effect an item or a node grants (`modSource`)
+    pub mod_source: Option<String>,
 }
 
 impl GrantedEffect {
@@ -98,6 +118,10 @@ pub struct SkillData {
     gem_for_base_name: HashMap<String, String>,
     /// `colorCodes.STRENGTH`, `.DEXTERITY`, `.INTELLIGENCE` and `.NORMAL`
     pub color_codes: [String; 4],
+    /// `SkillType`: the skill types by name
+    pub skill_type: HashMap<String, i64>,
+    /// `data.gemVaalGemIdForBaseGemId`
+    gem_vaal_gem_id_for_base_gem_id: HashMap<String, String>,
 }
 
 fn pairs(v: &Value) -> Vec<(Key, Value)> {
@@ -129,6 +153,33 @@ fn key(k: &Key) -> Result<String> {
         Key::Str(s) => Ok(s.to_str_lossy().into_owned()),
         k => Err(format!("expected a string key, got {k:?}")),
     }
+}
+
+/// The keys of a set of skill types (`{ [SkillType.Attack] = true }`)
+fn int_set(v: &Value) -> Result<HashSet<i64>> {
+    pairs(v)
+        .into_iter()
+        .filter(|(_, x)| x.truthy())
+        .map(|(k, _)| match k {
+            Key::Int(i) => Ok(i),
+            k => Err(format!("skill type {k:?}")),
+        })
+        .collect()
+}
+
+fn int_array(v: &Value) -> Result<Vec<i64>> {
+    array(v).iter().map(|x| Ok(number(x)? as i64)).collect()
+}
+
+/// The keys of the truthy entries of a set
+fn truthy_keys(v: &Value) -> Result<Vec<String>> {
+    let mut keys: Vec<String> = pairs(v)
+        .iter()
+        .filter(|(_, x)| x.truthy())
+        .map(|(k, _)| key(k))
+        .collect::<Result<_>>()?;
+    keys.sort();
+    Ok(keys)
 }
 
 fn level_from_lua(v: &Value) -> Result<SkillLevel> {
@@ -183,15 +234,45 @@ impl GrantedEffect {
             plus_version_of: opt_string(&get(v, "plusVersionOf"))?,
             unsupported: get(v, "unsupported").truthy(),
             levels,
+            skill_types: int_set(&get(v, "skillTypes"))?,
+            minion_skill_types: match get(v, "minionSkillTypes") {
+                Value::Nil => None,
+                t => Some(int_set(&t)?),
+            },
+            base_flags: truthy_keys(&get(v, "baseFlags"))?,
+            add_skill_types: pairs(&get(v, "addSkillTypes"))
+                .iter()
+                .map(|(_, x)| Ok(number(x)? as i64))
+                .collect::<Result<_>>()?,
+            require_skill_types: int_array(&get(v, "requireSkillTypes"))?,
+            exclude_skill_types: int_array(&get(v, "excludeSkillTypes"))?,
+            weapon_types: match get(v, "weaponTypes") {
+                Value::Nil => None,
+                t => Some(truthy_keys(&t)?),
+            },
+            add_flags: match get(v, "addFlags") {
+                Value::Nil => None,
+                t => Some(truthy_keys(&t)?),
+            },
+            is_trigger: get(v, "isTrigger").truthy(),
+            cannot_be_supported: get(v, "cannotBeSupported").truthy(),
+            support_gems_only: get(v, "supportGemsOnly").truthy(),
+            has_global_effect: get(v, "hasGlobalEffect").truthy(),
+            ignore_minion_types: get(v, "ignoreMinionTypes").truthy(),
+            from_item: get(v, "fromItem").truthy(),
+            mod_source: opt_string(&get(v, "modSource"))?,
         })
     }
 }
 
 impl SkillData {
-    /// Reads the skills and gems from upstream's processed `data` table and
-    /// its `colorCodes`.
-    pub fn from_lua(data: &Value, color_codes: &Value) -> Result<SkillData> {
+    /// Reads the skills and gems from upstream's processed `data` table, its
+    /// `colorCodes` and `SkillType`.
+    pub fn from_lua(data: &Value, color_codes: &Value, skill_type: &Value) -> Result<SkillData> {
         let mut d = SkillData::default();
+        for (k, v) in pairs(skill_type) {
+            d.skill_type.insert(key(&k)?, number(&v)? as i64);
+        }
         for (i, c) in ["STRENGTH", "DEXTERITY", "INTELLIGENCE", "NORMAL"]
             .iter()
             .enumerate()
@@ -259,10 +340,58 @@ impl SkillData {
             }
             d.gems_by_game_id.insert(key(&k)?, by_variant);
         }
+        for (k, gem_id) in pairs(&get(data, "gemVaalGemIdForBaseGemId")) {
+            d.gem_vaal_gem_id_for_base_gem_id
+                .insert(key(&k)?, string(&gem_id)?);
+        }
         for (k, gem_id) in pairs(&get(data, "gemForBaseName")) {
             d.gem_for_base_name.insert(key(&k)?, string(&gem_id)?);
         }
         Ok(d)
+    }
+
+    /// `calcLib.getGameIdFromGemName(name, dropVaal)`
+    pub fn game_id_from_gem_name(&self, name: &str, drop_vaal: bool) -> Option<&str> {
+        let gem = self.gem_for_base_name(&crate::pat::lower(name))?;
+        if drop_vaal && gem.vaal_gem {
+            let base = self.gem_vaal_gem_id_for_base_gem_id.get(&gem.id)?;
+            return self.gem(base).map(|g| g.game_id.as_str());
+        }
+        Some(&gem.game_id)
+    }
+
+    /// `calcLib.isGemIdSame(gemName, typeName, dropVaal)`
+    pub fn is_gem_id_same(&self, gem_name: &str, type_name: &str, drop_vaal: bool) -> bool {
+        match (
+            self.game_id_from_gem_name(gem_name, drop_vaal),
+            self.game_id_from_gem_name(type_name, drop_vaal),
+        ) {
+            (Some(a), Some(b)) => a == b,
+            _ => false,
+        }
+    }
+
+    /// `calcLib.gemIsType(gem, type, includeTransfigured)`
+    pub fn gem_is_type(&self, gem: &Gem, typ: &str, include_transfigured: bool) -> bool {
+        let tag = |t: &str| gem.tags.contains(t);
+        let name = crate::pat::lower(&gem.name);
+        let active = matches!(typ, "active skill" | "grants_active_skill" | "skill");
+        typ == "all"
+            || (typ == "elemental" && (tag("fire") || tag("cold") || tag("lightning")))
+            || (typ == "aoe" && tag("area"))
+            || (typ == "trap or mine" && (tag("trap") || tag("mine")))
+            || (active && tag("grants_active_skill") && !tag("support"))
+            || (typ == "non-vaal" && !tag("vaal"))
+            || (typ == "non-exceptional" && !tag("exceptional"))
+            || typ == name
+            || typ == crate::pat::gsub(&name, "^vaal ", "")
+            || (include_transfigured && self.is_gem_id_same(&gem.name, typ, true))
+            || (!active && tag(typ))
+    }
+
+    /// The number of a skill type (`SkillType[name]`)
+    pub fn skill_type(&self, name: &str) -> Option<i64> {
+        self.skill_type.get(name).copied()
     }
 
     pub fn gem(&self, id: &str) -> Option<&Rc<Gem>> {
