@@ -11,8 +11,7 @@ use crate::item_data::{Affix, AffixSet, Base, ItemData, normalise_mod_line};
 use crate::item_tools::{Range, apply_range, is_zero_value_line, round};
 use crate::mod_parser::ModParser;
 use crate::mods::convert::Converter;
-use crate::mods::store::{Actors, Cfg, Query, Store, Stores};
-use crate::mods::tag::{ItemCondition, Names, Tag, TagKind};
+use crate::mods::tag::{Names, Tag, TagKind};
 use crate::mods::{Mod, ModType, ModValue, Record, Sym};
 use crate::pat::{self, capture, captures, gmatch, gmatch1, gsub, gsub_fn, is_match, num};
 use lua::Value;
@@ -332,6 +331,8 @@ pub struct Item {
     pub limit: Option<f64>,
     pub cluster_jewel_skill: Option<String>,
     pub cluster_jewel_node_count: Option<f64>,
+    /// `clusterJewel.sizeIndex` of a cluster jewel's base
+    pub cluster_jewel_size_index: Option<f64>,
 
     pub variant: Option<f64>,
     /// `variantAlt` to `variantAlt5`
@@ -469,52 +470,9 @@ fn catalyst_scalar(catalyst: Option<usize>, line: &ModLine, quality: Option<f64>
     }
 }
 
-/// No actors: the queries of an item's own mod lists
-struct NoActors;
-
-impl Actors for NoActors {
-    fn actor_store(&self, _: usize, _: Sym) -> Option<usize> {
-        None
-    }
-    fn output(&self, _: usize, _: Sym) -> Option<f64> {
-        None
-    }
-    fn special_stat(&self, _: usize, _: Sym, _: Option<&Cfg>) -> Option<f64> {
-        None
-    }
-    fn one_handed_added(&self, _: usize, _: Sym) -> Option<bool> {
-        None
-    }
-    fn monster_tags(&self, _: usize) -> Option<Vec<Rc<str>>> {
-        None
-    }
-    fn item_condition(&self, _: usize, _: &ItemCondition, _: Option<&Cfg>) -> bool {
-        false
-    }
-    fn gem_is_type(&self, _: &Cfg, _: &str) -> bool {
-        false
-    }
-    fn game_id(&self, _: &str) -> Option<Rc<str>> {
-        None
-    }
-    fn high_precision(&self, _: Sym, _: ModType) -> Option<f64> {
-        None
-    }
-}
-
 /// `modList:List(nil, name)` over a plain mod list
 fn list_values(mods: &[Mod], name: &str) -> Result<Vec<ModValue>> {
-    let mut store = Store::list();
-    for m in mods {
-        store.add(m.clone());
-    }
-    let mut stores = Stores::default();
-    let id = stores.push(store);
-    let q = Query {
-        stores: &stores,
-        actors: &NoActors,
-    };
-    q.list(id, None, &[Sym::new(name)])
+    crate::mods::list::list(mods, name)
 }
 
 /// `calcLocal`: sums the local mods of a name, type and flags (no tags but
@@ -2124,6 +2082,7 @@ impl Item {
                 self.rare_like_unique = None;
             }
         }
+        self.cluster_jewel_size_index = data.cluster_jewels.get(&base_name).map(|c| c.size_index);
         self.corruptible = base.typ != "Flask";
         self.can_be_influenced = base.influence_tags.is_some();
         self.requirements.str = base.req.str.unwrap_or(0.0);

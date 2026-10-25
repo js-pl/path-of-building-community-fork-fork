@@ -10,7 +10,7 @@
 use engine::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
-use engine::mods::{Mod, Mods, Store, Sym};
+use engine::mods::{Mod, ModValue, Mods, Store, Sym};
 use equivalence::{corpus, mod_parser, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
@@ -62,6 +62,52 @@ fn list_mods(v: &Value) -> Vec<Mod> {
         .iter()
         .map(|m| conv.mod_(m).unwrap())
         .collect()
+}
+
+/// Takes over from a typed mod what the translation cannot show the same:
+/// - the source of a tree mod: upstream's `modLib.setSource` rewrites the
+///   tree's shared keystone mods in place when an item or the configuration
+///   grants the keystone, so their source depends on the calculations run
+///   before; the typed port keeps the tree's mods as they are
+/// - functions the translation gives no name and no upvalues, the inline
+///   functions of `ModParser.lua`
+fn align(typed: &Mod, lua: &mut Mod) {
+    if typed
+        .source
+        .as_deref()
+        .is_some_and(|s| s.starts_with("Tree:"))
+        && !lua.source.as_deref().is_some_and(|s| s.starts_with("Tree"))
+    {
+        lua.source = typed.source.clone();
+    }
+    align_value(&typed.value, &mut lua.value);
+}
+
+fn align_value(typed: &ModValue, lua: &mut ModValue) {
+    match (typed, lua) {
+        (ModValue::Func(_), l @ ModValue::Func(_)) => {
+            if let ModValue::Func(f) = &*l
+                && f.name.contains("<anonymous>")
+                && f.args.is_empty()
+            {
+                *l = typed.clone();
+            }
+        }
+        (ModValue::Mod(t), ModValue::Mod(l)) => align(t, l),
+        (ModValue::Record(t), ModValue::Record(l)) => {
+            for (k, v) in &t.fields {
+                if let Some(lv) = l.get_mut(*k) {
+                    align_value(v, lv);
+                }
+            }
+        }
+        (ModValue::List(t), ModValue::List(l)) => {
+            for (t, l) in t.iter().zip(l.iter_mut()) {
+                align_value(t, l);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// The mods of a ModDB by name
@@ -236,6 +282,113 @@ fn base_dbs_match_upstream() {
         }
     }
     eprintln!("{compared} setups compared");
+    assert!(
+        failures.is_empty(),
+        "{} differences:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// The passive nodes' mods before the items (`env.initialNodeModDB`): the
+/// allocated nodes' mods in allocation order, then the keystones they grant
+#[test]
+fn initial_node_mods_match_upstream() {
+    use engine::item_data::ItemData;
+    use engine::spec::PassiveSpec;
+    use equivalence::typed_build::Trees;
+    let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
+    let host = Host::new(Rc::new(Imported::new(upstream_src())));
+    host.start()
+        .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    let parser = mod_parser();
+    let mut im = importer::Importer::new(&upstream_src());
+    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
+    parser.preload(&cache);
+    let item_data = ItemData::from_lua(&host.global("data"), &host.global("colorCodes"))
+        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let mut trees = Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
+    let mut failures = Vec::new();
+    let (mut compared, mut skipped) = (0, 0);
+    for (id, path) in corpus() {
+        if !id.contains(&filter) || path.extension().is_some_and(|e| e == "json") {
+            continue;
+        }
+        let xml = std::fs::read_to_string(&path).unwrap();
+        host.load_build_xml(xml.as_bytes(), &id)
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
+        let build = host.build().unwrap();
+        let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
+        let Some(tree_xml) = root.child("PathOfBuilding").and_then(|p| p.child("Tree")) else {
+            continue;
+        };
+        let specs: Vec<_> = tree_xml.elements().filter(|e| e.elem == "Spec").collect();
+        let active = tree_xml
+            .attr("activeSpec")
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(1)
+            .min(specs.len());
+        let spec_xml = specs[active - 1];
+        let version = spec_xml.attr("treeVersion").unwrap_or("2_6").to_string();
+        let tree = trees.get(&version, &parser);
+        let mut spec = PassiveSpec::new(tree, &parser).unwrap();
+        if let Err(e) = spec.load(spec_xml).and_then(|_| spec.post_load()) {
+            eprintln!("{id}: skipped: {e}");
+            skipped += 1;
+            continue;
+        }
+        let calcs = get(&get(&build, "calcsTab"), "calcs");
+        let env = rt::call(&get(&calcs, "initEnv"), &[build.clone(), s("MAIN")])
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)))
+            .into_iter()
+            .next()
+            .unwrap();
+        if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
+            eprintln!("{id}: skipped: cluster jewel subgraphs are not ported");
+            skipped += 1;
+            continue;
+        }
+        let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+        compared += 1;
+        let result = calc_setup::build_mod_list_for_node_list(
+            &spec,
+            &alloc,
+            &spec.alloc_nodes,
+            &mut [],
+            &[],
+            true,
+            &item_data,
+        )
+        .and_then(|(mut mods, _)| {
+            calc_setup::merge_keystones(&mut mods, tree, &mut vec![])?;
+            Ok(mods)
+        });
+        match result {
+            Ok(mods) => {
+                let mut lmods = list_mods(&get(&env, "initialNodeModDB"));
+                for (m, l) in mods.iter().zip(lmods.iter_mut()) {
+                    align(m, l);
+                }
+                if mods != lmods {
+                    let n = mods.len().min(lmods.len());
+                    let i = (0..n).find(|&i| mods[i] != lmods[i]).unwrap_or(n);
+                    let show = |m: Option<&Mod>| {
+                        m.map_or("none".into(), |m| typed_json::mod_(m).to_string())
+                    };
+                    failures.push(format!(
+                        "{id}: {} mods != {}, first difference at {}:\n    typed {}\n    translated {}",
+                        mods.len(),
+                        lmods.len(),
+                        i + 1,
+                        show(mods.get(i)),
+                        show(lmods.get(i))
+                    ));
+                }
+            }
+            Err(e) => failures.push(format!("{id}: typed failed: {e}")),
+        }
+    }
+    eprintln!("{compared} node lists compared, {skipped} skipped");
     assert!(
         failures.is_empty(),
         "{} differences:\n{}",

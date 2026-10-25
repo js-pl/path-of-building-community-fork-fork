@@ -135,6 +135,7 @@ pub struct RareLikeUnique {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClusterJewel {
     pub size: String,
+    pub size_index: f64,
     pub min_nodes: f64,
     pub max_nodes: f64,
     pub skills: HashSet<String>,
@@ -381,6 +382,7 @@ impl ItemData {
                 key_string(&k)?,
                 ClusterJewel {
                     size: string(&get(&v, "size"))?,
+                    size_index: number(&get(&v, "sizeIndex"))?,
                     min_nodes: number(&get(&v, "minNodes"))?,
                     max_nodes: number(&get(&v, "maxNodes"))?,
                     skills: pairs(&get(&v, "skills"))
@@ -435,5 +437,17 @@ impl ItemData {
             }
         }
         Ok(d)
+    }
+}
+
+impl crate::mods::list::Precision for ItemData {
+    fn high_precision(&self, name: crate::mods::Sym, typ: crate::mods::ModType) -> Option<f64> {
+        self.high_precision_mods
+            .get(&(name.as_str().to_string(), typ.name().to_string()))
+            .copied()
+    }
+
+    fn default_high_precision(&self) -> f64 {
+        self.default_high_precision
     }
 }

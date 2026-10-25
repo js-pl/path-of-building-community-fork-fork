@@ -10,6 +10,8 @@ pub mod data;
 pub mod item;
 pub mod item_data;
 pub mod item_tools;
+pub mod items_tab;
+pub mod jewel;
 pub mod mod_parser;
 pub mod mod_store;
 pub mod mods;

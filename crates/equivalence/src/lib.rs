@@ -7,6 +7,7 @@ use lua::Value;
 use std::path::PathBuf;
 
 pub mod bridge;
+pub mod typed_build;
 pub mod typed_json;
 
 /// The repository root.

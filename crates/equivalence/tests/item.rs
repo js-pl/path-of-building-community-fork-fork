@@ -88,7 +88,12 @@ fn lua_mods(v: &Value) -> Result<Vec<Mod>, String> {
 /// their place. Record fields compare in any order.
 fn no_funcs(v: &mut ModValue) {
     match v {
-        ModValue::Func(f) => *f = "".into(),
+        ModValue::Func(f) => {
+            *f = std::rc::Rc::new(engine::mods::Func {
+                name: "".into(),
+                args: vec![],
+            })
+        }
         ModValue::Mod(m) => no_funcs(&mut m.value),
         ModValue::Record(r) => {
             r.fields.iter_mut().for_each(|(_, x)| no_funcs(x));
