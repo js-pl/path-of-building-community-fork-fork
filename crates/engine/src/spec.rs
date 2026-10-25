@@ -18,7 +18,7 @@
 use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Sym};
 use crate::tree::{self, NodeType, PassiveTree, StatLine};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -147,6 +147,9 @@ pub struct PassiveSpec<'t> {
     /// Allocated masteries by mastery name, in the order first counted
     pub allocated_mastery_types: Vec<(Rc<str>, u32)>,
     pub allocated_mastery_type_count: u32,
+    /// Jewel socket node id to the id of the item in it
+    pub jewels: BTreeMap<u32, f64>,
+    pub title: Option<String>,
 }
 
 impl<'t> PassiveSpec<'t> {
@@ -169,6 +172,8 @@ impl<'t> PassiveSpec<'t> {
             allocated_keystone_count: 0,
             allocated_mastery_types: Vec::new(),
             allocated_mastery_type_count: 0,
+            jewels: BTreeMap::new(),
+            title: None,
         };
         // A copy of the tree without proxies, groupless nodes and nested
         // cluster sockets
@@ -347,6 +352,74 @@ impl<'t> PassiveSpec<'t> {
             }
         }
         self.mastery_selections.clear();
+    }
+
+    /// `PassiveSpecClass:Load(xml)`: the spec of a `<Spec>` element, its
+    /// jewel sockets and allocations. Tattoos (`<Overrides>`) and specs in
+    /// the old URL format only are not ported.
+    pub fn load(&mut self, xml: &crate::xml::Element) -> Result<()> {
+        self.title = xml.attr("title").map(String::from);
+        let mut url = false;
+        for node in xml.elements() {
+            if node.elem == "URL" {
+                url = true;
+            }
+            if node.elem == "Sockets" {
+                for child in node.elements().filter(|c| c.elem == "Socket") {
+                    let num = |k: &str| -> Result<f64> {
+                        child
+                            .attr(k)
+                            .and_then(crate::pat::to_number)
+                            .ok_or_else(|| format!("'Socket' element missing '{k}' attribute"))
+                    };
+                    // Badly saved files have empty sockets with item 0
+                    let item = num("itemId")?;
+                    if item > 0.0 {
+                        self.jewels.insert(num("nodeId")? as u32, item);
+                    }
+                }
+            }
+        }
+        let Some(nodes) = xml.attr("nodes") else {
+            if url {
+                return Err("specs in the URL format are not ported".into());
+            }
+            return Ok(());
+        };
+        if xml
+            .elements()
+            .any(|n| n.elem == "Overrides" && n.elements().next().is_some())
+        {
+            return Err("tattoos are not ported".into());
+        }
+        let num = |k: &str| xml.attr(k).and_then(crate::pat::to_number);
+        let class_id = num("classId").ok_or("'Spec' element missing 'classId' attribute")?;
+        let ascend_class_id =
+            num("ascendClassId").ok_or("'Spec' element missing 'ascendClassId' attribute")?;
+        let hash_list: Vec<u32> = crate::pat::gmatch1(nodes, "%d+")
+            .iter()
+            .filter_map(|h| crate::pat::to_number(h))
+            .map(|h| h as u32)
+            .collect();
+        // A table by mastery: a mastery listed again keeps its place
+        let mut effects: Vec<(u32, f64)> = Vec::new();
+        for c in crate::pat::gmatch(xml.attr("masteryEffects").unwrap_or(""), "{(%d+),(%d+)}") {
+            let (m, e) = (
+                c[0].parse::<f64>().unwrap_or(0.0) as u32,
+                c[1].parse().unwrap_or(0.0),
+            );
+            match effects.iter_mut().find(|(k, _)| *k == m) {
+                Some(slot) => slot.1 = e,
+                None => effects.push((m, e)),
+            }
+        }
+        self.import_from_node_list(
+            class_id as i64,
+            ascend_class_id as i64,
+            num("secondaryAscendClassId").unwrap_or(0.0) as i64,
+            &hash_list,
+            &effects,
+        )
     }
 
     /// `ImportFromNodeList(nil, classId, ascendClassId,

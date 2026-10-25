@@ -1,14 +1,19 @@
 //! Setting up a calculation: upstream's `calcs.initEnv` and the helpers of
 //! `Modules/CalcSetup.lua`, building the player's and the enemy's mod
 //! databases from the build. Ported so far: the base mods of both, the
-//! bandit and pantheon mods and the configuration's mods.
+//! bandit and pantheon mods, the configuration's mods, and the passive
+//! nodes' mods with the radius jewels.
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
 use crate::config::{Inputs, Val};
+use crate::jewel::{RadiusData, RadiusFunc, RadiusNode, RadiusType};
 use crate::mod_parser::ModParser;
 use crate::mods::convert::{Converter, array, get, number, text};
+use crate::mods::list::{self, Precision};
 use crate::mods::{Mod, ModType, ModValue, Store, Sym, Tag};
+use crate::spec::{OrderedMap, PassiveSpec};
+use crate::tree::{NodeType, PassiveTree};
 use lua::{Key, Value};
 use std::collections::HashMap;
 
@@ -1075,4 +1080,259 @@ fn apply_soul_mods(
         }
     }
     Ok(())
+}
+
+/// A radius jewel in the setup (`env.radiusJewelList`)
+#[derive(Clone, Debug)]
+pub struct RadiusJewel {
+    /// The socket's node
+    pub node_id: u32,
+    pub item_id: f64,
+    /// The nodes in the radius, by id, with their type
+    pub nodes: HashMap<u32, NodeType>,
+    pub func: RadiusFunc,
+    pub typ: RadiusType,
+    pub data: RadiusData,
+}
+
+/// A node's mods as the setup builds them (`calcs.buildModListForNode`)
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct NodeMods {
+    pub mods: Vec<Mod>,
+    /// `CanExplode`: the node is an explode source
+    pub explode: bool,
+    /// The skills the node grants (`node.grantedSkills`)
+    pub granted_skills: Vec<NodeSkill>,
+}
+
+/// A skill a passive node grants
+#[derive(Clone, Debug, PartialEq)]
+pub struct NodeSkill {
+    pub skill_id: Option<ModValue>,
+    pub level: Option<ModValue>,
+    pub source: String,
+}
+
+/// `calcLib.mod(modList, nil, name)`
+fn calc_mod(mods: &[Mod], name: &str) -> Result<f64> {
+    let inc = list::sum(mods, ModType::Inc, name)?;
+    let more = list::more(mods, name)?;
+    Ok((1.0 + inc / 100.0) * more)
+}
+
+/// `calcs.buildModListForNode(env, node)`: the node's mods with the radius
+/// jewels applied and its passive effect scaling
+pub fn build_mod_list_for_node(
+    spec: &PassiveSpec,
+    i: usize,
+    alloc: &OrderedMap<usize>,
+    rads: &mut [RadiusJewel],
+    precision: &dyn Precision,
+) -> Result<NodeMods> {
+    let node = spec.tree_node(i);
+    let id = spec.nodes[i].id;
+    let mut mods: Vec<Mod> = if node.kind == NodeType::Keystone {
+        node.keystone_mod.iter().cloned().collect()
+    } else {
+        spec.mod_list(i).to_vec()
+    };
+    let own = spec.mod_list(i).to_vec();
+    let view = RadiusNode {
+        id,
+        typ: node.kind,
+        mod_list: &own,
+        is_tattoo: false,
+        conquered: false,
+    };
+    // First pass: the jewels that change nodes
+    for rad in rads.iter_mut() {
+        if rad.typ == RadiusType::Other
+            && rad.nodes.get(&id).is_some_and(|t| *t != NodeType::Mastery)
+        {
+            rad.func.run(Some(&view), &mut mods, &mut rad.data)?;
+        }
+    }
+    if list::flag(&mods, "PassiveSkillHasNoEffect")?
+        || (alloc.contains(id) && list::flag(&mods, "AllocatedPassiveSkillHasNoEffect")?)
+    {
+        mods.clear();
+    }
+    // The passive effect scaling
+    let scale = calc_mod(&mods, "PassiveSkillEffect")?;
+    if scale != 1.0 {
+        mods = mods
+            .iter()
+            .map(|m| list::scale_mod(m, scale, precision))
+            .collect();
+    }
+    // Second pass: the jewels that read nodes
+    let allocated = alloc.contains(id);
+    for rad in rads.iter_mut() {
+        let applies = match rad.typ {
+            RadiusType::Threshold => true,
+            RadiusType::Self_ => allocated,
+            RadiusType::SelfUnalloc => !allocated,
+            RadiusType::Other => false,
+        };
+        if applies && rad.nodes.get(&id).is_some_and(|t| *t != NodeType::Mastery) {
+            rad.func.run(Some(&view), &mut mods, &mut rad.data)?;
+        }
+    }
+    if list::flag(&mods, "PassiveSkillHasOtherEffect")? {
+        let others = list::list(&mods, "NodeModifier")?;
+        for (n, v) in others.into_iter().enumerate() {
+            if n == 0 {
+                mods.clear();
+            }
+            match v {
+                ModValue::Record(r) => match r.get("mod") {
+                    Some(ModValue::Mod(m)) => mods.push((**m).clone()),
+                    m => return Err(format!("NodeModifier {m:?}")),
+                },
+                v => return Err(format!("NodeModifier {v:?}")),
+            }
+        }
+    }
+    let mut granted_skills = Vec::new();
+    for v in list::list(&mods, "ExtraSkill")? {
+        let ModValue::Record(r) = v else {
+            return Err(format!("ExtraSkill {v:?}"));
+        };
+        if matches!(r.get("name"), Some(ModValue::Str(n)) if &**n == "Unknown") {
+            continue;
+        }
+        granted_skills.push(NodeSkill {
+            skill_id: r.get("skillId").cloned(),
+            level: r.get("level").cloned(),
+            source: format!("Tree:{id}"),
+        });
+    }
+    let explode = list::flag(&mods, "CanExplode")?;
+    Ok(NodeMods {
+        mods,
+        explode,
+        granted_skills,
+    })
+}
+
+/// The mods of a node list, and each node's own by node id
+pub type NodeListMods = (Vec<Mod>, Vec<(u32, NodeMods)>);
+
+/// `calcs.buildModListForNodeList(env, nodeList, finishJewels)`: the mods
+/// of the nodes, in order, and each node's own; with `finish`, the extra
+/// nodes in the radius of jewels run too, and the jewels finish.
+pub fn build_mod_list_for_node_list(
+    spec: &PassiveSpec,
+    nodes: &[usize],
+    alloc: &OrderedMap<usize>,
+    rads: &mut [RadiusJewel],
+    extra: &[usize],
+    finish: bool,
+    precision: &dyn Precision,
+) -> Result<NodeListMods> {
+    for rad in rads.iter_mut() {
+        rad.data = RadiusData {
+            mod_source: format!("Tree:{}", rad.node_id),
+            ..RadiusData::default()
+        };
+    }
+    let mut out = Vec::new();
+    let mut per_node = Vec::new();
+    for &i in nodes {
+        let node = build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+        out.extend(node.mods.iter().cloned());
+        per_node.push((spec.nodes[i].id, node));
+    }
+    if finish {
+        for &i in extra {
+            build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+        }
+        for rad in rads.iter_mut() {
+            rad.func.run(None, &mut out, &mut rad.data)?;
+        }
+    }
+    Ok((out, per_node))
+}
+
+/// `modLib.mergeKeystones(env, modList)`: adds the mods of the keystones
+/// the mods grant (`Keystone`), once each, sourced from what grants them
+/// unless that is the tree. Upstream sets that source on the tree's own
+/// keystone mods; here the added copies have it.
+pub fn merge_keystones(
+    mods: &mut Vec<Mod>,
+    tree: &PassiveTree,
+    added: &mut Vec<String>,
+) -> Result<()> {
+    let grants: Vec<(String, Option<std::rc::Rc<str>>)> =
+        list::tabulate(mods, Some(ModType::List), "Keystone")?
+            .into_iter()
+            .filter_map(|(v, m)| match v {
+                ModValue::Str(v) => Some((v.to_string(), m.source.clone())),
+                _ => None,
+            })
+            .collect();
+    for (name, source) in grants {
+        if added.contains(&name) {
+            continue;
+        }
+        let Some(&id) = tree.keystone_map.get(name.as_str()) else {
+            continue;
+        };
+        added.push(name);
+        let from_other = source
+            .as_ref()
+            .is_some_and(|s| !s.to_ascii_lowercase().contains("tree"));
+        for m in &tree.node(id).ok_or("keystone not in the tree")?.mod_list {
+            let mut m = m.clone();
+            if from_other {
+                set_source(&mut m, source.as_deref().unwrap_or(""));
+            }
+            mods.push(m);
+        }
+    }
+    Ok(())
+}
+
+/// `modLib.setSource(mod, source)`
+fn set_source(m: &mut Mod, source: &str) {
+    m.source = Some(source.into());
+    if let ModValue::Record(r) = &mut m.value
+        && let Some(ModValue::Mod(inner)) = r.get_mut(Sym::new("mod"))
+    {
+        inner.source = Some(source.into());
+    }
+}
+
+/// The allocation counts' multipliers of `initEnv`
+pub fn allocation_mods(spec: &PassiveSpec, db: &mut Store) {
+    let counts = [
+        ("Multiplier:AllocatedNotable", spec.allocated_notable_count),
+        (
+            "Multiplier:AllocatedKeystone",
+            spec.allocated_keystone_count,
+        ),
+        ("Multiplier:AllocatedMastery", spec.allocated_mastery_count),
+        (
+            "Multiplier:AllocatedMasteryType",
+            spec.allocated_mastery_type_count,
+        ),
+    ];
+    for (name, n) in counts {
+        if n > 0 {
+            db.add(Mod::new(name, ModType::Base, n as f64, None));
+        }
+    }
+    if let Some((_, n)) = spec
+        .allocated_mastery_types
+        .iter()
+        .find(|(name, _)| &**name == "Life Mastery")
+        && *n > 0
+    {
+        db.add(Mod::new(
+            "Multiplier:AllocatedLifeMastery",
+            ModType::Base,
+            *n as f64,
+            None,
+        ));
+    }
 }

@@ -129,9 +129,48 @@ impl Converter<'_> {
             Value::Bool(b) => ModValue::Bool(*b),
             Value::Number(n) => ModValue::Number(*n),
             Value::Str(x) => ModValue::Str(x.to_str_lossy().into()),
-            Value::Func(f) => ModValue::Func(f.key.clone()),
-            Value::Function(f) => ModValue::Func(f.name.clone()),
-            Value::Closure(c) => ModValue::Func(c.name.clone()),
+            Value::Func(f) => ModValue::Func(Rc::new(Func {
+                name: f.key.clone(),
+                args: vec![],
+            })),
+            Value::Function(f) => ModValue::Func(Rc::new(Func {
+                name: f.name.clone(),
+                args: vec![],
+            })),
+            // `getThreshold` closes over the mod it builds,
+            // `mod(name, type, value, "", ...)`
+            Value::Closure(c) if &*c.name == "getThreshold" => {
+                let attrib = c.upvalues.first().cloned().unwrap_or_default();
+                let mut mod_args = c
+                    .upvalues
+                    .get(1..4)
+                    .map(<[Value]>::to_vec)
+                    .unwrap_or_default();
+                mod_args.push(Value::str(""));
+                mod_args.extend(c.upvalues.iter().skip(4).cloned());
+                let base = lua::modlib::create_mod_args(&mod_args);
+                ModValue::Func(Rc::new(Func {
+                    name: c.name.clone(),
+                    args: vec![
+                        Some(self.value(&attrib)?),
+                        Some(ModValue::Mod(Box::new(self.mod_(&Value::Table(base))?))),
+                    ],
+                }))
+            }
+            Value::Closure(c) => ModValue::Func(Rc::new(Func {
+                name: c.name.clone(),
+                args: c
+                    .upvalues
+                    .iter()
+                    .map(|u| {
+                        if u.is_nil() {
+                            Ok(None)
+                        } else {
+                            self.value(u).map(Some)
+                        }
+                    })
+                    .collect::<Result<_, String>>()?,
+            })),
             Value::Nil => return Err("nil value".into()),
             Value::Table(t) => {
                 if !get(v, "name").is_nil() && !get(v, "type").is_nil() && !get(v, "flags").is_nil()

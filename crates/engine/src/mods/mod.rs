@@ -4,6 +4,7 @@
 
 pub mod build;
 pub mod convert;
+pub mod list;
 pub mod store;
 pub mod sym;
 pub mod tag;
@@ -13,4 +14,4 @@ pub use build::record;
 pub use store::{Actors, Cfg, Mods, Query, Row, Store, StoreId, Stores};
 pub use sym::Sym;
 pub use tag::{Names, Tag, TagKind};
-pub use types::{Mod, ModType, ModValue, Record};
+pub use types::{Func, Mod, ModType, ModValue, Record};

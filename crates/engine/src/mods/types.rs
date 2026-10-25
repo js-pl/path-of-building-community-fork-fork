@@ -61,8 +61,8 @@ pub enum ModValue {
     /// A structured value, e.g. `ExtraSkill`'s `{ skillId = ..., level = ... }`
     Record(Record),
     List(Vec<ModValue>),
-    /// A function of upstream's data, by name, e.g. a radius jewel's
-    Func(Rc<str>),
+    /// A function of upstream's data, e.g. a radius jewel's
+    Func(Rc<Func>),
 }
 
 impl ModValue {
@@ -77,6 +77,15 @@ impl ModValue {
             _ => None,
         }
     }
+}
+
+/// A function of upstream's data: its name (a factory like `getPerStat`,
+/// or the table entry that defines it) and the values it closes over
+#[derive(Clone, Debug, PartialEq)]
+pub struct Func {
+    pub name: Rc<str>,
+    /// `None` for a `nil`
+    pub args: Vec<Option<ModValue>>,
 }
 
 /// Named fields, in the order upstream's table constructor gives them.
