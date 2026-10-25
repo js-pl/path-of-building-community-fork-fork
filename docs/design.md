@@ -355,8 +355,12 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    mods applied and its weapon, armour, flask, tincture and jewel data,
    equal to the translated item for every corpus build item and every
    unique and rare template (`tests/item.rs`); crafting and text building
-   follow with the UI. Then skills and config, and `initEnv` building typed
-   stores from them.
+   follow with the UI. Then the configuration (`crates/engine/src/config.rs`):
+   every option's apply function and the map mods' as plain Rust, the boss
+   presets with the placeholders they set, and the custom modifier lines,
+   equal to the translated Configuration tab for every corpus build and for
+   every option set alone to each of its values (`tests/config.rs`). Then
+   skills, and `initEnv` building typed stores from them.
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is

@@ -24,7 +24,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Classes/ComparePowerReportListControl.lua" = { status = "todo" }
 "Classes/CompareTab.lua" = { status = "todo" }
 "Classes/ConfigSetListControl.lua" = { status = "todo" }
-"Classes/ConfigTab.lua" = { status = "partial", port = "web/src/ui/ConfigTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Classes/ConfigTab.lua" = { status = "partial", port = "web/src/ui/ConfigTab.tsx crates/engine/src/config.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/Control.lua" = { status = "todo" }
 "Classes/ControlHost.lua" = { status = "todo" }
 "Classes/DraggerControl.lua" = { status = "todo" }
@@ -142,7 +142,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Data/ModJewelAbyss.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/ModJewelCharm.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/ModJewelCluster.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Data/ModMap.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/ModMap.lua" = { status = "data", port = "crates/importer crates/engine/src/config.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/ModMaster.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/ModNecropolis.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/ModScalability.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
@@ -308,7 +308,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/CalcTriggers.lua" = { status = "todo" }
 "Modules/Calcs.lua" = { status = "todo" }
 "Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Modules/ConfigOptions.lua" = { status = "todo" }
+"Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/ConfigVisibility.lua" = { status = "todo" }
 "Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/DataAbyssJewelLookUpTableHelper.lua" = { status = "todo" }

@@ -4,6 +4,7 @@
 //! see docs/design.md.
 
 pub mod common;
+pub mod config;
 pub mod data;
 pub mod item;
 pub mod item_data;
