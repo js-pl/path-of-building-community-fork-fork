@@ -86,9 +86,10 @@ pub struct ItemsSetup {
     pub granted_skills: Vec<ItemSkill>,
     /// `env.explodeSources`: items whose base mods can explode enemies
     pub explode_sources: Vec<f64>,
-    /// `env.flasks` and `env.tinctures`: the active ones, by item id
-    pub flasks: BTreeSet<i64>,
-    pub tinctures: BTreeSet<i64>,
+    /// `env.flasks` and `env.tinctures`: the active ones, by item id, in
+    /// the order they were added
+    pub flasks: Vec<i64>,
+    pub tinctures: Vec<i64>,
     /// `env.flaskSlotMap`: each flask's slot number, by item id
     pub flask_slots: BTreeMap<i64, f64>,
     pub requirements: Vec<ItemRequirement>,
@@ -519,8 +520,8 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         extra_radius_nodes: OrderedMap::default(),
         granted_skills: Vec::new(),
         explode_sources: Vec::new(),
-        flasks: BTreeSet::new(),
-        tinctures: BTreeSet::new(),
+        flasks: Vec::new(),
+        tinctures: Vec::new(),
         flask_slots: BTreeMap::new(),
         requirements: Vec::new(),
         aegis_mods: None,
@@ -548,8 +549,8 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
                 base_name(item).replace(char::is_whitespace, "")
             ));
             let id = item.id.unwrap_or(0.0) as i64;
-            if slot.active {
-                out.flasks.insert(id);
+            if slot.active && !out.flasks.contains(&id) {
+                out.flasks.push(id);
             }
             if let Some(n) = pat::capture(slot_name, "Flask (%d+)").and_then(|n| pat::to_number(&n))
             {
@@ -565,8 +566,9 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             continue;
         }
         if typ(item) == "Tincture" {
-            if slot.active {
-                out.tinctures.insert(item.id.unwrap_or(0.0) as i64);
+            let id = item.id.unwrap_or(0.0) as i64;
+            if slot.active && !out.tinctures.contains(&id) {
+                out.tinctures.push(id);
             }
             continue;
         }

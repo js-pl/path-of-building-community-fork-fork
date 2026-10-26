@@ -5,9 +5,18 @@
 
 pub mod actor;
 pub mod build;
+pub mod calc;
+pub mod calc_defence;
+pub mod calc_ehp;
 pub mod calc_env;
 pub mod calc_items;
+pub mod calc_offence;
+pub mod calc_offence_ailments;
+pub mod calc_offence_dot;
+pub mod calc_offence_hit;
+pub mod calc_perform;
 pub mod calc_setup;
+pub mod calc_skill_funcs;
 pub mod calc_skill_mods;
 pub mod calc_skills;
 pub mod calc_tree;

@@ -28,6 +28,23 @@ covers everything from the items on; 57 builds compared, 4 skipped).
 | `buildActiveSkillModList`, `mergeSkillInstanceMods`, `buildSkillInstanceStats` | `calc_skill_mods.rs` |
 | `SkillsTab:UpdateSocketGroups` (`matchesSocket`) | `skills.rs` |
 
+`calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
+then `defence`, `defence_estimations` and `player_offence`), compared with
+the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
+`calcs.triggers` and after `calcs.perform` (outputs, the player's and
+enemy's databases, every skill's mod list) in
+`crates/equivalence/tests/perform.rs`: 40 builds compared, 36 of them
+through the offence; minion builds and the gaps below are skipped.
+
+| Upstream | Typed |
+|---|---|
+| `calcs.perform` | `calc.rs` (stores and queries), `calc_perform.rs` |
+| `calcs.defence` | `calc_defence.rs` |
+| `calcs.buildDefenceEstimations` | `calc_ehp.rs` |
+| `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
+| skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
+| `calcs.triggers`, `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
+
 Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
 `Data.lua` to the importer comes later.
@@ -43,18 +60,27 @@ Game data is still read from upstream's processed Lua `data` table
   skills, the character level's auto mode, timeless jewel data
 - Passives granted only by the latest tree
 
+## Not ported yet in `perform`
+
+Each returns an error starting with `not ported`, which the tests count as
+a skip:
+
+- Minions (`createMinionSkills`, `initMinionModDB`, the minion branches of
+  perform, defence and offence), allies' life pools (`calcTotemLife` of
+  other skills), the party tab
+- Triggers (`CalcTriggers.lua`'s handlers) and mirages (`CalcMirages.lua`)
+- Skill functions other than the ten in `calc_skill_funcs.rs`
+- Skills whose stages come from a cached calculation (Blight, Penance
+  Brand's, Earthquake of Amplification), overcapped lightning resistance's
+  mana, self hit damage, PvP scaling, added damage redirection
+  (Cryogenesis), Energy Blade
+- Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`)
+
 ## Next
 
-`calcs.perform` and what it calls, about 19k lines of upstream:
-`CalcPerform.lua` (3.9k), `CalcOffence.lua` (6.1k), `CalcDefence.lua`
-(3.8k), `CalcTriggers.lua` (1.6k), `CalcMirages.lua`, then
-`calcs.createMinionSkills` (CalcActiveSkill.lua:868) and `Calcs.lua`'s
-calculators. Suggested order: perform's setup (keystones, minion skills,
-the per-skill multipliers at CalcPerform.lua:1252-1450), then
-`doActorAttribsConditions`, `doActorLifeMana`, the buffs and auras, then
-defence and offence. Compare as the setup slices do: the typed output for
-the fields ported so far against the translated `env.player.output` after
-`calcs.perform`, and the oracle at the end.
+Minions, then triggers and mirages, then `Calcs.lua`'s calculators
+(`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
+Port further skill functions as builds need them.
 
 ## Upstream quirks met so far
 
@@ -71,6 +97,11 @@ the tests align these:
   query matches (upstream fails if one is queried)
 - inline `ModParser.lua` functions have no name or upvalues in the
   translation, so tests accept the typed function there
+- `skillModList:More("MORE", cfg, "Accuracy")` in `calcs.offence` passes
+  the string as the cfg: the typed offence queries with an empty cfg
+- `Flag(...) and x` outputs are nil, not false, without the flag
+  (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
+  association to stay bit-exact
 
 ## Working notes
 

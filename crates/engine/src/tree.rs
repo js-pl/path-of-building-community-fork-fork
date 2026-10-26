@@ -155,6 +155,10 @@ pub struct PassiveTree {
     pub node_index: HashMap<u32, usize>,
     /// `keystoneMap`: by name and lower case name
     pub keystone_map: HashMap<Rc<str>, u32>,
+    /// The mods of the timeless jewels' keystones (`self.legion.nodes`), by
+    /// name, which `keystoneMap` holds where the tree has no keystone of
+    /// that name
+    pub legion_keystones: HashMap<Rc<str>, Vec<Mod>>,
     /// `notableMap`: by lower case name
     pub notable_map: HashMap<Rc<str>, u32>,
     /// `ascendancyMap`: by lower case name
@@ -394,6 +398,37 @@ pub(crate) fn process_stats_from(
 }
 
 impl PassiveTree {
+    /// Adds the keystones of the timeless jewels' passives
+    /// (`Data/TimelessJewelData/LegionPassives`) the tree has no keystone
+    /// of the same name for
+    pub fn add_legion_keystones(&mut self, legion: &Value, parser: &ModParser) -> Result<()> {
+        let nodes = get(legion, "nodes");
+        for (_, node) in nodes.as_table().map(|t| t.entries()).unwrap_or_default() {
+            if !truthy(&node, "ks") {
+                continue;
+            }
+            let dn: Rc<str> = lua::to_string(&get(&node, "dn")).to_str_lossy().into();
+            if self.keystone_map.contains_key(&dn) || self.legion_keystones.contains_key(&dn) {
+                continue;
+            }
+            let id = lua::to_string(&get(&node, "id"))
+                .to_str_lossy()
+                .into_owned();
+            let mut sd = texts(&get(&node, "sd"))?;
+            let (_, mod_list, _, _) = process_stats(parser, &mut sd, Some(&format!("Tree:{id}")))?;
+            self.legion_keystones.insert(dn, mod_list);
+        }
+        Ok(())
+    }
+
+    /// The mods of a keystone by name (`keystoneMap[name].modList`)
+    pub fn keystone_mods(&self, name: &str) -> Option<&[Mod]> {
+        match self.keystone_map.get(name) {
+            Some(&id) => self.node(id).map(|n| &n.mod_list[..]),
+            None => self.legion_keystones.get(name).map(|m| &m[..]),
+        }
+    }
+
     pub fn node(&self, id: u32) -> Option<&Node> {
         self.node_index.get(&id).map(|&i| &self.nodes[i])
     }
@@ -539,6 +574,7 @@ impl PassiveTree {
             nodes: Vec::new(),
             node_index: HashMap::new(),
             keystone_map: HashMap::new(),
+            legion_keystones: HashMap::new(),
             notable_map: HashMap::new(),
             ascendancy_map: HashMap::new(),
             cluster_node_map: HashMap::new(),

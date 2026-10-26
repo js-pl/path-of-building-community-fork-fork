@@ -210,16 +210,16 @@ fn merge_level_mod(list: &mut Vec<Mod>, m: &Mod, value: f64) {
 
 /// `calcs.mergeSkillInstanceMods(env, modList, skillEffect, extraStats)`:
 /// the effect's stat mods and base mods
-fn merge_skill_instance_mods(
+pub(crate) fn merge_skill_instance_mods(
     list: &mut Vec<Mod>,
     effect: &mut SkillEffect,
     extra: &[(String, f64)],
-    input: &ModsInput,
+    setup: &SetupData,
+    skill_data: &SkillData,
 ) -> Result<()> {
     validate_effect(effect);
     let ge = effect.granted_effect.clone();
-    let mut stats =
-        build_skill_instance_stats(effect.level, effect.quality, None, &ge, input.setup);
+    let mut stats = build_skill_instance_stats(effect.level, effect.quality, None, &ge, setup);
     for (k, v) in extra {
         match stats.iter_mut().find(|(s, _)| s == k) {
             Some((_, x)) => *x += v,
@@ -227,7 +227,7 @@ fn merge_skill_instance_mods(
         }
     }
     for (stat, value) in &stats {
-        let Some(map) = input.skill_data.stat_map(&ge, stat) else {
+        let Some(map) = skill_data.stat_map(&ge, stat) else {
             continue;
         };
         if let Some(e) = &map.error {
@@ -694,7 +694,7 @@ fn build_skill_mod_list(
             continue;
         }
         let mut effect = skill.effect_list[i].clone();
-        merge_skill_instance_mods(&mut mods, &mut effect, &[], input)?;
+        merge_skill_instance_mods(&mut mods, &mut effect, &[], input.setup, input.skill_data)?;
         let sge = effect.granted_effect.clone();
         let level = effect
             .level
@@ -871,7 +871,13 @@ fn build_skill_mod_list(
         })
         .collect();
     let mut active = skill.active_effect.clone();
-    merge_skill_instance_mods(&mut mods, &mut active, &extra, input)?;
+    merge_skill_instance_mods(
+        &mut mods,
+        &mut active,
+        &extra,
+        input.setup,
+        input.skill_data,
+    )?;
     skill.active_effect = active;
     let level = skill
         .active_effect
