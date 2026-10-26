@@ -226,6 +226,8 @@ pub struct Perform<'a> {
     pub(crate) has_guaranteed_bonechill: bool,
     /// `env.weaponData1`, `env.player.weaponData1` after Dancing Dervish
     pub weapons_disabled: bool,
+    /// `actor.weaponRange1`, `weaponRange2` set by the offence
+    pub weapon_range: [Option<f64>; 2],
 }
 
 impl<'a> Perform<'a> {
@@ -460,6 +462,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         curse_slots: Vec::new(),
         has_guaranteed_bonechill: false,
         weapons_disabled: false,
+        weapon_range: [None, None],
     };
     p.run()?;
     Ok(p)

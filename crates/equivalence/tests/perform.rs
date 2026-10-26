@@ -315,7 +315,12 @@ fn snapshot(env: &Value) -> Snapshot {
 }
 
 /// Compares the typed calculation with the translated state
-fn compare_stage(p: &engine::calc_perform::Perform, want: &mut Snapshot, fail: &mut Vec<String>) {
+fn compare_stage(
+    p: &engine::calc_perform::Perform,
+    want: &mut Snapshot,
+    fail: &mut Vec<String>,
+    partial: bool,
+) {
     let got: BTreeMap<String, J> = p.c.actors.actors[0]
         .output
         .iter()
@@ -326,7 +331,7 @@ fn compare_stage(p: &engine::calc_perform::Perform, want: &mut Snapshot, fail: &
         .chain(want.output.keys())
         .collect::<std::collections::BTreeSet<_>>()
     {
-        if got.get(k) != want.output.get(k) {
+        if got.get(k) != want.output.get(k) && !(partial && !got.contains_key(k)) {
             fail.push(format!(
                 "output {k}: {} != {}",
                 got.get(k).map_or("missing".into(), |v| v.to_string()),
@@ -418,7 +423,11 @@ fn perform_matches_upstream() {
         jewel_radius: &radius,
     };
     let mut failures = Vec::new();
-    let (mut compared, mut skipped) = (0, 0);
+    let (mut compared, mut skipped, mut offence_skipped) = (0, 0, 0);
+    // `OFFENCE_PARTIAL=1`: after the offence, only the outputs the typed
+    // offence sets
+    let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
+    let stage_name = |k: usize| ["defence", "buildDefenceEstimations", "triggers", "offence"][k];
     let mut skip_reasons: BTreeMap<String, usize> = BTreeMap::new();
     for (id, path) in corpus() {
         if !id.contains(&filter) || path.extension().is_some_and(|e| e == "json") {
@@ -482,7 +491,9 @@ fn perform_matches_upstream() {
             continue;
         }
         let mut snaps = std::mem::take(&mut *snaps.borrow_mut());
-        if snaps.len() != stages.len() {
+        // The state after the offence: what `calcs.perform` leaves
+        snaps.push((stages.len(), snapshot(&env)));
+        if snaps.len() != stages.len() + 1 {
             failures.push(format!(
                 "{id}: the translated perform reached {} of the stages",
                 snaps.len()
@@ -548,16 +559,22 @@ fn perform_matches_upstream() {
             let result = match *stage {
                 0 => Ok(()),
                 1 => p.defence(0),
-                _ => p.defence_estimations(0),
+                2 => p.defence_estimations(0),
+                _ => p.player_offence(),
             };
             if let Err(e) = result {
-                fail.push(format!("typed {} failed: {e}", stages[*stage]));
+                if e.starts_with("not ported") {
+                    *skip_reasons.entry(e).or_default() += 1;
+                    offence_skipped += 1;
+                } else {
+                    fail.push(format!("typed {} failed: {e}", stage_name(*stage)));
+                }
                 break;
             }
             let before = fail.len();
-            compare_stage(&p, want, &mut fail);
+            compare_stage(&p, want, &mut fail, partial && *stage == stages.len());
             if fail.len() > before {
-                fail.insert(before, format!("at {}:", stages[*stage]));
+                fail.insert(before, format!("at {}:", stage_name(*stage)));
                 break;
             }
         }
@@ -566,7 +583,9 @@ fn perform_matches_upstream() {
             failures.push(format!("{id}:\n    {}", fail.join("\n    ")));
         }
     }
-    eprintln!("{compared} performs compared, {skipped} skipped: {skip_reasons:?}");
+    eprintln!(
+        "{compared} performs compared ({offence_skipped} up to the offence), {skipped} skipped: {skip_reasons:?}"
+    );
     assert!(
         failures.is_empty(),
         "{} builds differ:\n{}",

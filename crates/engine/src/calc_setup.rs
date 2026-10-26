@@ -53,6 +53,12 @@ pub struct SetupData {
     pub elemental_ailment_types: Vec<String>,
     pub non_damaging_ailment_types: Vec<String>,
     pub non_elemental_ailment_types: Vec<String>,
+    /// Numeric tables by level or id (`monsterLifeTable`,
+    /// `monsterAllyLifeTable`, `totemLifeMult`, `monsterVarietyLifeMult`,
+    /// `mapLevelLifeMult`), keyed as strings
+    pub tables: HashMap<String, HashMap<String, f64>>,
+    /// `data.costs[resource].Divisor`
+    pub cost_divisors: HashMap<String, f64>,
 }
 
 /// A non-damaging ailment's numbers (`data.nonDamagingAilment[name]`)
@@ -63,6 +69,8 @@ pub struct Ailment {
     pub max: f64,
     pub precision: f64,
     pub duration: Option<f64>,
+    pub associated_type: String,
+    pub alt: bool,
 }
 
 /// What a weapon type means for skills (`data.weaponTypeInfo[type]`)
@@ -251,6 +259,8 @@ impl SetupData {
                             max: number(&get(v, "max"))?,
                             precision: number(&get(v, "precision"))?,
                             duration: get(v, "duration").as_number(),
+                            associated_type: text(&get(v, "associatedType"))?.to_string(),
+                            alt: get(v, "alt").truthy(),
                         },
                     ))
                 })
@@ -265,6 +275,40 @@ impl SetupData {
             elemental_ailment_types: strings(&get(data, "elementalAilmentTypeList"))?,
             non_damaging_ailment_types: strings(&get(data, "nonDamagingAilmentTypeList"))?,
             non_elemental_ailment_types: strings(&get(data, "nonElementalAilmentTypeList"))?,
+            tables: [
+                "monsterLifeTable",
+                "monsterAllyLifeTable",
+                "totemLifeMult",
+                "monsterVarietyLifeMult",
+                "mapLevelLifeMult",
+                "monsterAilmentThresholdTable",
+                "mapLevelBossLifeMult",
+                "mapLevelBossAilmentMult",
+            ]
+            .into_iter()
+            .map(|n| {
+                let t = pairs(&get(data, n))
+                    .iter()
+                    .map(|(k, x)| {
+                        let k = match k {
+                            Key::Int(i) => i.to_string(),
+                            k => key(k)?,
+                        };
+                        Ok((k, number(x)?))
+                    })
+                    .collect::<Result<_>>()?;
+                Ok((n.to_string(), t))
+            })
+            .collect::<Result<_>>()?,
+            cost_divisors: pairs(&get(data, "costs"))
+                .iter()
+                .map(|(_, c)| {
+                    Ok((
+                        text(&get(c, "Resource"))?.to_string(),
+                        number(&get(c, "Divisor"))?,
+                    ))
+                })
+                .collect::<Result<_>>()?,
         })
     }
 
@@ -279,6 +323,11 @@ impl SetupData {
             .get(name)
             .copied()
             .unwrap_or(f64::NAN)
+    }
+
+    /// `data[table][k]`, for the numeric [`SetupData::tables`]
+    pub fn table(&self, table: &str, k: &str) -> Option<f64> {
+        self.tables.get(table)?.get(k).copied()
     }
 
     /// `data.misc[name]`

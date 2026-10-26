@@ -89,6 +89,10 @@ pub struct GrantedEffect {
     pub minion_uses: Option<Vec<String>>,
     pub base_effectiveness: Option<f64>,
     pub incremental_effectiveness: Option<f64>,
+    /// The offence functions the effect has (`initialFunc`,
+    /// `preDamageFunc`, ...), ported by hand per effect
+    pub funcs: Vec<String>,
+    pub cast_time: Option<f64>,
 }
 
 /// How a stat's value scales the mods it maps to: `value`, or `stat *
@@ -447,6 +451,19 @@ impl GrantedEffect {
             },
             base_effectiveness: opt_number(&get(v, "baseEffectiveness"))?,
             incremental_effectiveness: opt_number(&get(v, "incrementalEffectiveness"))?,
+            cast_time: opt_number(&get(v, "castTime"))?,
+            funcs: [
+                "initialFunc",
+                "preSkillTypeFunc",
+                "preDamageFunc",
+                "postCritFunc",
+                "preDotFunc",
+                "explosiveArrowFunc",
+            ]
+            .into_iter()
+            .filter(|f| get(v, f).type_name() == "function")
+            .map(String::from)
+            .collect(),
         })
     }
 }

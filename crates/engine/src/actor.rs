@@ -36,6 +36,11 @@ impl OutVal {
             _ => None,
         }
     }
+
+    /// Lua truthiness: everything but `false`
+    pub fn truthy(&self) -> bool {
+        !matches!(self, OutVal::Bool(false))
+    }
 }
 
 /// An active skill as `GetStat` sees it: a skill with a reservation that
