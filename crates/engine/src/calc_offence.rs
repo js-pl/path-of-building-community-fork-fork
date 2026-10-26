@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-use ModType::{Base, Flag as FlagT, Inc, More, Override};
+use ModType::{Base, Flag as FlagT, Inc, More};
 
 /// One damage type's conversions to the later types, by type index
 #[derive(Clone, Debug, Default)]
@@ -36,7 +36,10 @@ pub(crate) struct Conversion {
 pub(crate) type ConversionTable = [Conversion; 5];
 
 pub(crate) fn dmg_index(t: &str) -> usize {
-    DMG_TYPES.iter().position(|x| *x == t).expect("a damage type")
+    DMG_TYPES
+        .iter()
+        .position(|x| *x == t)
+        .expect("a damage type")
 }
 
 /// `calcRadius(baseRadius, areaMod)`
@@ -49,11 +52,6 @@ fn molten_strike_tertiary_radius(base: f64, deadzone: f64, area_mod: f64, speed_
     let max_ignoring_speed =
         (base * base * area_mod - deadzone * deadzone * (area_mod - 1.0)).sqrt();
     ((max_ignoring_speed - deadzone) * speed_mod + deadzone).floor()
-}
-
-/// Lua's `math.ceil`
-pub(crate) fn ceil(x: f64) -> f64 {
-    x.ceil()
 }
 
 /// An output map: the actor's output or a pass's (`output.MainHand`)
@@ -197,7 +195,8 @@ impl<'a> Perform<'a> {
                     .into_iter()
                     .map(|(k, v)| (k.as_str().to_string(), v))
                     .collect();
-                self.c.set_out_val(actor, k, OutVal::Table(std::rc::Rc::new(t)));
+                self.c
+                    .set_out_val(actor, k, OutVal::Table(std::rc::Rc::new(t)));
             }
         }
         result
@@ -236,7 +235,9 @@ impl<'a> Perform<'a> {
                     .c
                     .flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])?
                 {
-                    self.c.out(crate::calc::PLAYER, &resist_name).unwrap_or(f64::NAN)
+                    self.c
+                        .out(crate::calc::PLAYER, &resist_name)
+                        .unwrap_or(f64::NAN)
                 } else {
                     let mut names = vec![resist_name.as_str()];
                     if is_elemental(t) {
@@ -246,7 +247,10 @@ impl<'a> Perform<'a> {
                 }
             }
         };
-        Ok(m_max(m_min(resist, max_resist), self.misc_data("ResistFloor")))
+        Ok(m_max(
+            m_min(resist, max_resist),
+            self.misc_data("ResistFloor"),
+        ))
     }
 
     /// Adds `mod` with another name, type or value and the same flags and
@@ -305,7 +309,15 @@ impl<'a> Perform<'a> {
             let flags = attack | self.mf("Projectile");
             self.c.add(
                 list,
-                new_mod("PhysicalDamage", Inc, str_bonus, Some("Strength"), flags, 0, vec![]),
+                new_mod(
+                    "PhysicalDamage",
+                    Inc,
+                    str_bonus,
+                    Some("Strength"),
+                    flags,
+                    0,
+                    vec![],
+                ),
             );
         }
         if self.c.flag(list, None, &["IronWill"])? {
@@ -315,22 +327,49 @@ impl<'a> Perform<'a> {
             );
         }
         for (flag, stat, source, flags) in [
-            ("TransfigurationOfBody", "Life", "Transfiguration of Body", attack),
-            ("TransfigurationOfMind", "Mana", "Transfiguration of Mind", 0),
-            ("TransfigurationOfSoul", "EnergyShield", "Transfiguration of Soul", spell),
+            (
+                "TransfigurationOfBody",
+                "Life",
+                "Transfiguration of Body",
+                attack,
+            ),
+            (
+                "TransfigurationOfMind",
+                "Mana",
+                "Transfiguration of Mind",
+                0,
+            ),
+            (
+                "TransfigurationOfSoul",
+                "EnergyShield",
+                "Transfiguration of Soul",
+                spell,
+            ),
         ] {
             if self.c.flag(list, None, &[flag])? {
-                let v = (self.c.inc(list, None, &[stat])? * self.misc_data("Transfiguration")).floor();
-                self.c
-                    .add(list, new_mod("Damage", Inc, v, Some(source), flags, 0, vec![]));
+                let v =
+                    (self.c.inc(list, None, &[stat])? * self.misc_data("Transfiguration")).floor();
+                self.c.add(
+                    list,
+                    new_mod("Damage", Inc, v, Some(source), flags, 0, vec![]),
+                );
             }
         }
-        if self.c.flag(db, None, &["Elusive"])? && self.c.flag(list, None, &["SupportedByNightblade"])? {
+        if self.c.flag(db, None, &["Elusive"])?
+            && self.c.flag(list, None, &["SupportedByNightblade"])?
+        {
             let effect = self.c.out(actor, "ElusiveEffectMod").unwrap_or(f64::NAN) / 100.0;
-            let multi = self.c.base(list, None, &["NightbladeElusiveCritMultiplier"])?;
+            let multi = self
+                .c
+                .base(list, None, &["NightbladeElusiveCritMultiplier"])?;
             self.c.add(
                 list,
-                Mod::new("CritMultiplier", Base, (multi * effect).floor(), Some("Nightblade")),
+                Mod::new(
+                    "CritMultiplier",
+                    Base,
+                    (multi * effect).floor(),
+                    Some("Nightblade"),
+                ),
             );
         }
         // set other limits
@@ -340,7 +379,14 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "ActiveMineLimit", v);
         // set flask scaling
         for k in ["LifeFlaskRecovery", "LifeFlaskCharges"] {
-            let v = self.env.setup.items.item_db.multipliers.get(&Sym::new(k)).copied();
+            let v = self
+                .env
+                .setup
+                .items
+                .item_db
+                .multipliers
+                .get(&Sym::new(k))
+                .copied();
             match v {
                 Some(v) => self.c.set_out(actor, k, v),
                 None => self.c.clear_out(actor, k),
@@ -358,12 +404,22 @@ impl<'a> Perform<'a> {
                 / 100.0;
             for t in DMG_TYPES {
                 for mm in ["Min", "Max"] {
-                    let v = (self.weapon_num(actor, 0, &format!("{t}{mm}")).unwrap_or(0.0)
+                    let v = (self
+                        .weapon_num(actor, 0, &format!("{t}{mm}"))
+                        .unwrap_or(0.0)
                         * multiplier)
                         .floor();
                     self.c.add(
                         list,
-                        new_mod(&format!("{t}{mm}"), Base, v, Some("Battlemage"), spell, 0, vec![]),
+                        new_mod(
+                            &format!("{t}{mm}"),
+                            Base,
+                            v,
+                            Some("Battlemage"),
+                            spell,
+                            0,
+                            vec![],
+                        ),
                     );
                 }
             }
@@ -394,7 +450,9 @@ impl<'a> Perform<'a> {
             for (n, source) in weapons {
                 for t in DMG_TYPES {
                     for mm in ["Min", "Max"] {
-                        let v = (self.weapon_num(actor, n, &format!("{t}{mm}")).unwrap_or(0.0)
+                        let v = (self
+                            .weapon_num(actor, n, &format!("{t}{mm}"))
+                            .unwrap_or(0.0)
                             * multiplier)
                             .floor();
                         self.c.add(
@@ -406,7 +464,9 @@ impl<'a> Perform<'a> {
             }
         }
         if self.c.flag(list, None, &["MinionDamageAppliesToPlayer"])?
-            || self.c.flag(list, Some(&cfg), &["MinionDamageAppliesToPlayer"])?
+            || self
+                .c
+                .flag(list, Some(&cfg), &["MinionDamageAppliesToPlayer"])?
         {
             let multiplier = self
                 .c
@@ -423,7 +483,15 @@ impl<'a> Perform<'a> {
                     let value = number(&m.value)? * multiplier;
                     self.c.add(
                         list,
-                        new_mod("Damage", Inc, value, m.source.as_deref(), m.flags, m.keyword_flags, tags),
+                        new_mod(
+                            "Damage",
+                            Inc,
+                            value,
+                            m.source.as_deref(),
+                            m.flags,
+                            m.keyword_flags,
+                            tags,
+                        ),
                     );
                 }
             }
@@ -441,11 +509,8 @@ impl<'a> Perform<'a> {
             ),
         ] {
             if self.c.flag(list, None, &[flag])? {
-                let multiplier = self
-                    .c
-                    .max(list, Some(&cfg), &[improved])?
-                    .unwrap_or(100.0)
-                    / 100.0;
+                let multiplier =
+                    self.c.max(list, Some(&cfg), &[improved])?.unwrap_or(100.0) / 100.0;
                 for v in self.c.list(list, Some(&cfg), &["MinionModifier"])? {
                     let ModValue::Record(r) = &v else { continue };
                     let Some(ModValue::Mod(m)) = r.get("mod") else {
@@ -459,20 +524,34 @@ impl<'a> Perform<'a> {
                         let value = number(&m.value)? * multiplier;
                         self.c.add(
                             list,
-                            new_mod("Speed", Inc, value, m.source.as_deref(), flag_bit, m.keyword_flags, tags),
+                            new_mod(
+                                "Speed",
+                                Inc,
+                                value,
+                                m.source.as_deref(),
+                                flag_bit,
+                                m.keyword_flags,
+                                tags,
+                            ),
                         );
                     }
                 }
             }
         }
         if self.c.flag(list, None, &["EvasionAppliesToSpellDamage"])? {
-            for (_, m) in self.c.tabulate(list, Some(Inc), Some(&Cfg::default()), &["Evasion"])? {
+            for (_, m) in self
+                .c
+                .tabulate(list, Some(Inc), Some(&Cfg::default()), &["Evasion"])?
+            {
                 let v = number(&m.value)?;
-                self.c.add(list, Self::copy_mod("Damage", m.typ, v, &m, spell));
+                self.c
+                    .add(list, Self::copy_mod("Damage", m.typ, v, &m, spell));
             }
         }
         if self.c.flag(list, None, &["SpellDamageAppliesToAttacks"])?
-            || self.c.flag(list, Some(&cfg), &["SpellDamageAppliesToAttacks"])?
+            || self
+                .c
+                .flag(list, Some(&cfg), &["SpellDamageAppliesToAttacks"])?
         {
             let multiplier = self
                 .c
@@ -483,7 +562,10 @@ impl<'a> Perform<'a> {
                 flags: Some(spell),
                 ..Cfg::default()
             };
-            for (_, m) in self.c.tabulate(list, Some(Inc), Some(&spell_cfg), &["Damage"])? {
+            for (_, m) in self
+                .c
+                .tabulate(list, Some(Inc), Some(&spell_cfg), &["Damage"])?
+            {
                 if m.flags & spell != 0 {
                     let tags = converted_tags(&m, multiplier, false);
                     let value = number(&m.value)? * multiplier;
@@ -502,7 +584,15 @@ impl<'a> Perform<'a> {
                     if m.source.as_deref() == Some("Strength") {
                         self.c.replace_mod(
                             list,
-                            new_mod("PhysicalDamage", Inc, 0.0, Some("Strength"), self.mf("Melee"), 0, vec![]),
+                            new_mod(
+                                "PhysicalDamage",
+                                Inc,
+                                0.0,
+                                Some("Strength"),
+                                self.mf("Melee"),
+                                0,
+                                vec![],
+                            ),
                         );
                     }
                 }
@@ -519,7 +609,10 @@ impl<'a> Perform<'a> {
                 flags: Some(cast),
                 ..Cfg::default()
             };
-            for (_, m) in self.c.tabulate(list, Some(Inc), Some(&cast_cfg), &["Speed"])? {
+            for (_, m) in self
+                .c
+                .tabulate(list, Some(Inc), Some(&cast_cfg), &["Speed"])?
+            {
                 if m.flags & cast != 0 {
                     let tags = converted_tags(&m, multiplier, false);
                     let value = number(&m.value)? * multiplier;
@@ -545,13 +638,17 @@ impl<'a> Perform<'a> {
             self.mf("Unarmed"),
             self.mf("Melee"),
         );
-        if self.c.flag(list, None, &["ProjectileSpeedAppliesToBowDamage"])? {
-            for (_, m) in self
-                .c
-                .tabulate(list, Some(Inc), Some(&Cfg::default()), &["ProjectileSpeed"])?
+        if self
+            .c
+            .flag(list, None, &["ProjectileSpeedAppliesToBowDamage"])?
+        {
+            for (_, m) in
+                self.c
+                    .tabulate(list, Some(Inc), Some(&Cfg::default()), &["ProjectileSpeed"])?
             {
                 let v = number(&m.value)?;
-                self.c.add(list, Self::copy_mod("Damage", m.typ, v, &m, bow | hit));
+                self.c
+                    .add(list, Self::copy_mod("Damage", m.typ, v, &m, bow | hit));
             }
         }
         if self.c.flag(list, None, &["ClawDamageAppliesToUnarmed"])? {
@@ -564,11 +661,15 @@ impl<'a> Perform<'a> {
                 if m.flags & claw != 0 {
                     let v = number(&m.value)?;
                     let flags = (m.flags & !claw) | unarmed | melee;
-                    self.c.add(list, Self::copy_mod("Damage", m.typ, v, &m, flags));
+                    self.c
+                        .add(list, Self::copy_mod("Damage", m.typ, v, &m, flags));
                 }
             }
         }
-        if self.c.flag(list, None, &["ClawAttackSpeedAppliesToUnarmed"])? {
+        if self
+            .c
+            .flag(list, None, &["ClawAttackSpeedAppliesToUnarmed"])?
+        {
             let c = Cfg {
                 flags: Some(claw | attack | hit),
                 ..Cfg::default()
@@ -577,7 +678,8 @@ impl<'a> Perform<'a> {
                 if m.flags & claw != 0 && m.flags & attack != 0 {
                     let v = number(&m.value)?;
                     let flags = (m.flags & !claw) | unarmed;
-                    self.c.add(list, Self::copy_mod("Speed", m.typ, v, &m, flags));
+                    self.c
+                        .add(list, Self::copy_mod("Speed", m.typ, v, &m, flags));
                 }
             }
         }
@@ -585,32 +687,69 @@ impl<'a> Perform<'a> {
             flags: Some(claw | hit),
             ..Cfg::default()
         };
-        if self.c.flag(list, None, &["ClawCritChanceAppliesToUnarmed"])? {
-            for (_, m) in self.c.tabulate(list, Some(Inc), Some(&claw_hit), &["CritChance"])? {
+        if self
+            .c
+            .flag(list, None, &["ClawCritChanceAppliesToUnarmed"])?
+        {
+            for (_, m) in self
+                .c
+                .tabulate(list, Some(Inc), Some(&claw_hit), &["CritChance"])?
+            {
                 if m.flags & claw != 0 {
                     let v = number(&m.value)?;
                     let flags = (m.flags & !claw) | unarmed;
-                    self.c.add(list, Self::copy_mod("CritChance", m.typ, v, &m, flags));
+                    self.c
+                        .add(list, Self::copy_mod("CritChance", m.typ, v, &m, flags));
                 }
             }
         }
-        if self.c.flag(list, None, &["ClawCritChanceAppliesToMinions"])?
-            || self.c.flag(list, None, &["ClawCritMultiplierAppliesToMinions"])?
+        if self
+            .c
+            .flag(list, None, &["ClawCritChanceAppliesToMinions"])?
+            || self
+                .c
+                .flag(list, None, &["ClawCritMultiplierAppliesToMinions"])?
         {
             return Err("not ported: minions".into());
         }
         for (flag, stat, name) in [
-            ("CritChanceIncreasedByUncappedLightningRes", "LightningResistTotal", "CritChance"),
-            ("CritChanceIncreasedByLightningRes", "LightningResist", "CritChance"),
-            ("CritChanceIncreasedByOvercappedLightningRes", "LightningResistOverCap", "CritChance"),
-            ("CritChanceIncreasedBySpellSuppressChance", "SpellSuppressionChance", "CritChance"),
-            ("FirePenIncreasedByUncappedFireRes", "FireResistOverCap", "FirePenetration"),
+            (
+                "CritChanceIncreasedByUncappedLightningRes",
+                "LightningResistTotal",
+                "CritChance",
+            ),
+            (
+                "CritChanceIncreasedByLightningRes",
+                "LightningResist",
+                "CritChance",
+            ),
+            (
+                "CritChanceIncreasedByOvercappedLightningRes",
+                "LightningResistOverCap",
+                "CritChance",
+            ),
+            (
+                "CritChanceIncreasedBySpellSuppressChance",
+                "SpellSuppressionChance",
+                "CritChance",
+            ),
+            (
+                "FirePenIncreasedByUncappedFireRes",
+                "FireResistOverCap",
+                "FirePenetration",
+            ),
         ] {
             if self.c.flag(list, None, &[flag])? {
                 let typ = if name == "CritChance" { Inc } else { Base };
-                if let Some((_, m)) = self.c.tabulate(db, Some(FlagT), None, &[flag])?.into_iter().next() {
+                if let Some((_, m)) = self
+                    .c
+                    .tabulate(db, Some(FlagT), None, &[flag])?
+                    .into_iter()
+                    .next()
+                {
                     let v = self.c.out(actor, stat).unwrap_or(f64::NAN);
-                    self.c.add(list, Mod::new(name, typ, v, m.source.as_deref()));
+                    self.c
+                        .add(list, Mod::new(name, typ, v, m.source.as_deref()));
                 }
             }
         }
@@ -620,9 +759,9 @@ impl<'a> Perform<'a> {
             ("LightRadiusAppliesToDamage", "Damage", false),
         ] {
             if self.c.flag(list, None, &[flag])? {
-                for (_, m) in self
-                    .c
-                    .tabulate(list, Some(Inc), Some(&Cfg::default()), &["LightRadius"])?
+                for (_, m) in
+                    self.c
+                        .tabulate(list, Some(Inc), Some(&Cfg::default()), &["LightRadius"])?
                 {
                     let mut v = number(&m.value)?;
                     if half {
@@ -632,7 +771,10 @@ impl<'a> Perform<'a> {
                 }
             }
         }
-        if self.c.flag(list, None, &["CastSpeedAppliesToTrapThrowingSpeed"])? {
+        if self
+            .c
+            .flag(list, None, &["CastSpeedAppliesToTrapThrowingSpeed"])?
+        {
             let c = Cfg {
                 flags: Some(cast),
                 ..Cfg::default()
@@ -652,7 +794,10 @@ impl<'a> Perform<'a> {
                 flags: Some(bow),
                 ..Cfg::default()
             };
-            for (_, m) in self.c.tabulate(list, Some(Inc), Some(&c), &["ProjectileSpeed"])? {
+            for (_, m) in self
+                .c
+                .tabulate(list, Some(Inc), Some(&c), &["ProjectileSpeed"])?
+            {
                 let v = number(&m.value)?;
                 self.c
                     .add(list, Self::copy_mod("AreaOfEffect", Inc, v, &m, m.flags));
@@ -680,7 +825,15 @@ impl<'a> Perform<'a> {
                     let v = (self.weapon_num(actor, 0, &name).unwrap_or(0.0) * mult).floor();
                     self.c.add(
                         list,
-                        new_mod(&name, Base, v, Some("Runegraft of the Spellbound"), spell, 0, vec![]),
+                        new_mod(
+                            &name,
+                            Base,
+                            v,
+                            Some("Runegraft of the Spellbound"),
+                            spell,
+                            0,
+                            vec![],
+                        ),
                     );
                 }
             }
@@ -794,9 +947,15 @@ impl<'a> Perform<'a> {
     fn repeats(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
         let cfg = self.cfg(i);
-        let mut check = !["Instant", "Channel", "Triggered", "Retaliation", "NonRepeatable"]
-            .iter()
-            .any(|t| self.has_type(i, t));
+        let mut check = ![
+            "Instant",
+            "Channel",
+            "Triggered",
+            "Retaliation",
+            "NonRepeatable",
+        ]
+        .iter()
+        .any(|t| self.has_type(i, t));
         if check {
             check = !self.c.flag(list, None, &["CannotRepeat"])?
                 && (self.has_type(i, "Attack") || self.has_type(i, "Spell"));
@@ -820,40 +979,64 @@ impl<'a> Perform<'a> {
             return Ok(());
         }
         let average = mode.as_deref() == Some("AVERAGE");
-        for (_, m) in self.c.tabulate(list, Some(Inc), Some(&cfg), &["RepeatFinalAreaOfEffect"])? {
-            let mut v = number(&m.value)?;
-            if average {
-                v /= repeats;
-            }
-            self.c.add(list, Self::copy_mod("AreaOfEffect", Inc, v, &m, m.flags));
-        }
-        for (_, m) in self.c.tabulate(list, Some(Inc), Some(&cfg), &["RepeatPerRepeatAreaOfEffect"])? {
-            let mut v = number(&m.value)? * (repeats - 1.0);
-            if average {
-                v /= 2.0;
-            }
-            self.c.add(list, Self::copy_mod("AreaOfEffect", Inc, v, &m, m.flags));
-        }
-        for (_, m) in self.c.tabulate(list, Some(Base), Some(&cfg), &["RepeatFinalDoubleDamageChance"])? {
+        for (_, m) in self
+            .c
+            .tabulate(list, Some(Inc), Some(&cfg), &["RepeatFinalAreaOfEffect"])?
+        {
             let mut v = number(&m.value)?;
             if average {
                 v /= repeats;
             }
             self.c
-                .add(list, Self::copy_mod("DoubleDamageChance", Base, v, &m, m.flags));
+                .add(list, Self::copy_mod("AreaOfEffect", Inc, v, &m, m.flags));
+        }
+        for (_, m) in self.c.tabulate(
+            list,
+            Some(Inc),
+            Some(&cfg),
+            &["RepeatPerRepeatAreaOfEffect"],
+        )? {
+            let mut v = number(&m.value)? * (repeats - 1.0);
+            if average {
+                v /= 2.0;
+            }
+            self.c
+                .add(list, Self::copy_mod("AreaOfEffect", Inc, v, &m, m.flags));
+        }
+        for (_, m) in self.c.tabulate(
+            list,
+            Some(Base),
+            Some(&cfg),
+            &["RepeatFinalDoubleDamageChance"],
+        )? {
+            let mut v = number(&m.value)?;
+            if average {
+                v /= repeats;
+            }
+            self.c.add(
+                list,
+                Self::copy_mod("DoubleDamageChance", Base, v, &m, m.flags),
+            );
         }
         let mut final_more_total = 1.0;
         let mut more_total = 0.0;
-        for (_, m) in self.c.tabulate(list, Some(More), Some(&cfg), &["RepeatFinalDamage"])? {
+        for (_, m) in self
+            .c
+            .tabulate(list, Some(More), Some(&cfg), &["RepeatFinalDamage"])?
+        {
             let mut v = number(&m.value)?;
             final_more_total *= 1.0 + v / 100.0;
             more_total += v;
             if average && !self.c.flag(list, None, &["OnlyFinalRepeat"])? {
                 v /= repeats;
             }
-            self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+            self.c
+                .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
         }
-        for (_, m) in self.c.tabulate(list, Some(More), Some(&cfg), &["RepeatPerRepeatDamage"])? {
+        for (_, m) in self
+            .c
+            .tabulate(list, Some(More), Some(&cfg), &["RepeatPerRepeatDamage"])?
+        {
             let mv = number(&m.value)?;
             let mut v = mv * (repeats - 1.0);
             if average {
@@ -866,7 +1049,8 @@ impl<'a> Perform<'a> {
                     v /= 2.0;
                 }
             }
-            self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+            self.c
+                .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
         }
         let mut last_mod: Option<Mod> = None;
         let final_total = more_total;
@@ -883,18 +1067,24 @@ impl<'a> Perform<'a> {
             } else if n == repeats {
                 for (_, m) in self.c.tabulate(list, Some(More), Some(&cfg), &[&name])? {
                     let v = number(&m.value)?;
-                    self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+                    self.c
+                        .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
                 }
             }
         }
         if average && let Some(m) = last_mod {
             let v = (more_total / repeats + 100.0) / (1.0 + final_total / repeats / 100.0) - 100.0;
-            self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+            self.c
+                .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
         }
         if self.c.flag(list, None, &["FinalRepeatSumsDamage"])? {
-            for (_, m) in self.c.tabulate(list, Some(FlagT), Some(&cfg), &["FinalRepeatSumsDamage"])? {
+            for (_, m) in
+                self.c
+                    .tabulate(list, Some(FlagT), Some(&cfg), &["FinalRepeatSumsDamage"])?
+            {
                 let v = (100.0 * repeats + final_total) / (1.0 + final_total / 100.0) - 100.0;
-                self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+                self.c
+                    .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
             }
         }
         if self.has_flag(i, "trap") || self.has_flag(i, "mine") {
@@ -932,24 +1122,30 @@ impl<'a> Perform<'a> {
         let speed = 1.0 / cast_time * 1.1 * self.c.calc_mod(list, Some(&cfg), &["Speed"])? * action;
         let penalty = self.c.calc_mod(list, Some(&cfg), &["SealRepeatPenalty"])?;
         if self.c.flag(list, None, &["UseMaxUnleash"])? {
-            for (_, m) in self
-                .c
-                .tabulate(list, Some(Inc), Some(&Cfg::default()), &["MaxSealCrit"])?
+            for (_, m) in
+                self.c
+                    .tabulate(list, Some(Inc), Some(&Cfg::default()), &["MaxSealCrit"])?
             {
                 let v = number(&m.value)?;
-                self.c.add(list, Self::copy_mod("CritChance", Inc, v, &m, m.flags));
+                self.c
+                    .add(list, Self::copy_mod("CritChance", Inc, v, &m, m.flags));
             }
-            for (_, m) in self
-                .c
-                .tabulate(list, Some(More), Some(&Cfg::default()), &["MaxSealDamage"])?
+            for (_, m) in
+                self.c
+                    .tabulate(list, Some(More), Some(&Cfg::default()), &["MaxSealDamage"])?
             {
                 let v = number(&m.value)? * max;
-                self.c.add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
+                self.c
+                    .add(list, Self::copy_mod("Damage", More, v, &m, m.flags));
             }
             self.sd_set(main, "dpsMultiplier", 1.0 + max * penalty);
             self.sd_set(main, "hitTimeOverride", m_max(cooldown * max, speed));
         } else {
-            self.sd_set(main, "dpsMultiplier", 1.0 + 1.0 / cooldown / speed * penalty);
+            self.sd_set(
+                main,
+                "dpsMultiplier",
+                1.0 + 1.0 / cooldown / speed * penalty,
+            );
         }
         Ok(())
     }
@@ -985,8 +1181,16 @@ impl<'a> Perform<'a> {
             let before = processed.clone();
             for (stat, prefix, three) in [
                 ("PhysicalDamageGainAsRandom", "PhysicalDamageGainAs", true),
-                ("PhysicalDamageConvertToRandom", "PhysicalDamageConvertTo", true),
-                ("PhysicalDamageGainAsColdOrLightning", "PhysicalDamageGainAs", false),
+                (
+                    "PhysicalDamageConvertToRandom",
+                    "PhysicalDamageConvertTo",
+                    true,
+                ),
+                (
+                    "PhysicalDamageGainAsColdOrLightning",
+                    "PhysicalDamageGainAs",
+                    false,
+                ),
             ] {
                 for (_, m) in self.c.tabulate(list, Some(Base), Some(&cfg), &[stat])? {
                     if before.contains(&m) {
@@ -1017,8 +1221,10 @@ impl<'a> Perform<'a> {
                         }
                     };
                     for (t, v) in targets {
-                        self.c
-                            .add(list, Self::copy_mod(&format!("{prefix}{t}"), Base, v, &m, m.flags));
+                        self.c.add(
+                            list,
+                            Self::copy_mod(&format!("{prefix}{t}"), Base, v, &m, m.flags),
+                        );
                     }
                 }
             }
@@ -1063,7 +1269,8 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "AreaOfEffectModSecondary", m);
             let r = calc_radius(secondary + extra, m);
             self.c.set_out(actor, "AreaOfEffectRadiusSecondary", r);
-            self.c.set_out(actor, "AreaOfEffectRadiusSecondaryMetres", r / 10.0);
+            self.c
+                .set_out(actor, "AreaOfEffectRadiusSecondaryMetres", r / 10.0);
         }
         if let Some(tertiary) = self.sd_num(i, "radiusTertiary") {
             let names = ["AreaOfEffect", "AreaOfEffectTertiary"];
@@ -1117,7 +1324,8 @@ impl<'a> Perform<'a> {
                 calc_radius(base, m)
             };
             self.c.set_out(actor, "AreaOfEffectRadiusTertiary", r);
-            self.c.set_out(actor, "AreaOfEffectRadiusTertiaryMetres", r / 10.0);
+            self.c
+                .set_out(actor, "AreaOfEffectRadiusTertiaryMetres", r / 10.0);
         }
         Ok(())
     }
@@ -1126,7 +1334,12 @@ impl<'a> Perform<'a> {
 impl<'a> Perform<'a> {
     /// `calcSkillCooldown(skillModList, skillCfg, skillData)`: the
     /// cooldown, whether it is rounded to server ticks and the added base
-    pub(crate) fn skill_cooldown(&self, list: StoreId, cfg: &Cfg, i: usize) -> Result<(f64, bool, f64)> {
+    pub(crate) fn skill_cooldown(
+        &self,
+        list: StoreId,
+        cfg: &Cfg,
+        i: usize,
+    ) -> Result<(f64, bool, f64)> {
         let c = Some(cfg);
         let over = self.c.override_num(list, c, &["CooldownRecovery"])?;
         let added = self.c.base(list, c, &["CooldownRecovery"])?;
@@ -1176,7 +1389,9 @@ impl<'a> Perform<'a> {
             return Err("not ported: minions".into());
         }
         if self.has_flag(i, "chaining") {
-            if self.c.flag(list, c, &["CannotChain"])? || self.c.flag(list, c, &["NoAdditionalChains"])? {
+            if self.c.flag(list, c, &["CannotChain"])?
+                || self.c.flag(list, c, &["NoAdditionalChains"])?
+            {
                 self.c
                     .set_out_val(actor, "ChainMaxString", OutVal::Str("Cannot chain".into()));
             } else {
@@ -1185,7 +1400,10 @@ impl<'a> Perform<'a> {
                     names.push("BeamChainCountMax");
                 }
                 let mut max = self.c.base(list, c, &names)?;
-                if self.c.flag(list, c, &["AdditionalProjectilesAddChainsInstead"])? {
+                if self
+                    .c
+                    .flag(list, c, &["AdditionalProjectilesAddChainsInstead"])?
+                {
                     let proj = if self.c.flag(list, c, &["SingleProjectile"])? {
                         0.0
                     } else {
@@ -1247,7 +1465,9 @@ impl<'a> Perform<'a> {
                     ),
                 );
             }
-            if self.c.flag(list, c, &["NoAdditionalProjectiles"])? || self.c.flag(list, c, &["SingleProjectile"])? {
+            if self.c.flag(list, c, &["NoAdditionalProjectiles"])?
+                || self.c.flag(list, c, &["SingleProjectile"])?
+            {
                 set(self, "ProjectileCount", 1.0);
             } else {
                 let min = self.c.base(list, c, &["ProjectileCountMinimum"])?;
@@ -1260,26 +1480,39 @@ impl<'a> Perform<'a> {
                 .floor();
                 set(self, "ProjectileCount", m_max(m_min(proj, max), min));
             }
-            if self.c.flag(list, c, &["AdditionalProjectilesAddBouncesInstead"])? {
+            if self
+                .c
+                .flag(list, c, &["AdditionalProjectilesAddBouncesInstead"])?
+            {
                 let base = if self.c.flag(list, c, &["SingleProjectile"])? {
                     0.0
                 } else {
-                    self.c.base(list, c, &["ProjectileCount"])? + self.c.base(list, c, &["BounceCount"])? - 1.0
+                    self.c.base(list, c, &["ProjectileCount"])?
+                        + self.c.base(list, c, &["BounceCount"])?
+                        - 1.0
                 };
                 let more = self.c.more(list, c, &["ProjectileCount"])?;
                 set(self, "BounceCount", (base * more).floor());
             }
             if self.c.flag(list, c, &["CannotSplit"])? || self.has_type(i, "ProjectileNumber") {
                 if self.input.breakdown {
-                    let n = self.c.base(list, c, &["SplitCount"])? + self.c.base(edb, c, &["SelfSplitCount"])?;
+                    let n = self.c.base(list, c, &["SplitCount"])?
+                        + self.c.base(edb, c, &["SelfSplitCount"])?;
                     if n > 0.0 {
-                        self.c
-                            .set_out_val(actor, "SplitCountString", OutVal::Str("Cannot split".into()));
+                        self.c.set_out_val(
+                            actor,
+                            "SplitCountString",
+                            OutVal::Str("Cannot split".into()),
+                        );
                     }
                 }
             } else {
-                let mut n = self.c.base(list, c, &["SplitCount"])? + self.c.base(edb, c, &["SelfSplitCount"])?;
-                if self.c.flag(list, c, &["AdditionalProjectilesAddSplitsInstead"])? {
+                let mut n = self.c.base(list, c, &["SplitCount"])?
+                    + self.c.base(edb, c, &["SelfSplitCount"])?;
+                if self
+                    .c
+                    .flag(list, c, &["AdditionalProjectilesAddSplitsInstead"])?
+                {
                     n += if self.c.flag(list, c, &["SingleProjectile"])? {
                         0.0
                     } else {
@@ -1288,7 +1521,10 @@ impl<'a> Perform<'a> {
                         .floor()
                     };
                 }
-                if self.c.flag(list, c, &["AdditionalChainsAddSplitsInstead"])? {
+                if self
+                    .c
+                    .flag(list, c, &["AdditionalChainsAddSplitsInstead"])?
+                {
                     n += self.c.base(list, c, &["ChainCountMax"])?;
                 }
                 set(self, "SplitCount", n);
@@ -1299,7 +1535,11 @@ impl<'a> Perform<'a> {
                     .set_out_val(actor, "ForkCountString", OutVal::Str("Cannot fork".into()));
             } else if self.c.flag(list, c, &["ForkOnce"])? {
                 self.set_flag(i, "forking", true);
-                let cap = if self.c.flag(list, c, &["ForkTwice"])? { 2.0 } else { 1.0 };
+                let cap = if self.c.flag(list, c, &["ForkTwice"])? {
+                    2.0
+                } else {
+                    1.0
+                };
                 let max = m_min(self.c.base(list, c, &["ForkCountMax"])?, cap);
                 set(self, "ForkCountMax", max);
                 let forked = m_min(max, self.c.base(list, c, &["ForkedCount"])?);
@@ -1312,14 +1552,20 @@ impl<'a> Perform<'a> {
             }
             if self.c.flag(list, c, &["CannotPierce"])? {
                 set(self, "PierceCount", 0.0);
-                self.c
-                    .set_out_val(actor, "PierceCountString", OutVal::Str("Cannot pierce".into()));
+                self.c.set_out_val(
+                    actor,
+                    "PierceCountString",
+                    OutVal::Str("Cannot pierce".into()),
+                );
             } else {
                 let n = if self.c.flag(list, c, &["PierceAllTargets"])?
                     || self.c.flag(edb, None, &["AlwaysPierceSelf"])?
                 {
-                    self.c
-                        .set_out_val(actor, "PierceCountString", OutVal::Str("All targets".into()));
+                    self.c.set_out_val(
+                        actor,
+                        "PierceCountString",
+                        OutVal::Str("All targets".into()),
+                    );
                     100.0
                 } else {
                     let n = self.c.base(list, c, &["PierceCount"])?;
@@ -1338,7 +1584,14 @@ impl<'a> Perform<'a> {
         }
         if self.has_flag(i, "melee") {
             for n in 0..2 {
-                if !self.has_flag(i, if n == 0 { "weapon1Attack" } else { "weapon2Attack" }) {
+                if !self.has_flag(
+                    i,
+                    if n == 0 {
+                        "weapon1Attack"
+                    } else {
+                        "weapon2Attack"
+                    },
+                ) {
                     continue;
                 }
                 let range = match self.weapon_num(actor, n, "range") {
@@ -1357,7 +1610,14 @@ impl<'a> Perform<'a> {
             if self.has_type(i, "MeleeSingleTarget") {
                 let mut range: f64 = 100.0;
                 for n in 0..2 {
-                    if self.has_flag(i, if n == 0 { "weapon1Attack" } else { "weapon2Attack" }) {
+                    if self.has_flag(
+                        i,
+                        if n == 0 {
+                            "weapon1Attack"
+                        } else {
+                            "weapon2Attack"
+                        },
+                    ) {
                         range = m_min(range, self.weapon_range[n].unwrap_or(f64::NAN));
                     }
                 }
@@ -1375,7 +1635,9 @@ impl<'a> Perform<'a> {
         }
         if self.has_type(i, "Aura") {
             let mut names = vec!["AuraEffect"];
-            if !(self.sd_truthy(i, "auraCannotAffectSelf") || self.has_type(i, "AuraAffectsEnemies")) {
+            if !(self.sd_truthy(i, "auraCannotAffectSelf")
+                || self.has_type(i, "AuraAffectsEnemies"))
+            {
                 names.push("SkillAuraEffectOnSelf");
             }
             let v = self.c.calc_mod(list, c, &names)?;
@@ -1386,12 +1648,17 @@ impl<'a> Perform<'a> {
                 let k = format!("{pool}ReservedMod");
                 set(self, &k, 0.0);
                 let support = self.c.calc_mod(list, c, &["SupportManaMultiplier"])?;
-                let reserved = self.c.calc_mod(list, c, &[&format!("{pool}Reserved"), "Reserved"])?;
+                let reserved =
+                    self.c
+                        .calc_mod(list, c, &[&format!("{pool}Reserved"), "Reserved"])?;
                 if support > 0.0 && reserved > 0.0 {
                     let eff = self.c.calc_mod(
                         list,
                         c,
-                        &[&format!("{pool}ReservationEfficiency"), "ReservationEfficiency"],
+                        &[
+                            &format!("{pool}ReservationEfficiency"),
+                            "ReservationEfficiency",
+                        ],
                     )?;
                     set(self, &k, reserved * floor(support, 4.0) / m_max(0.0, eff));
                 }
@@ -1425,7 +1692,9 @@ impl<'a> Perform<'a> {
             set(self, "LinkEffectMod", v);
         }
         if self.has_type(i, "Buff") && self.has_type(i, "Herald") {
-            let v = self.c.calc_mod(list, c, &["BuffEffect", "BuffEffectOnSelf"])?;
+            let v = self
+                .c
+                .calc_mod(list, c, &["BuffEffect", "BuffEffectOnSelf"])?;
             set(self, "HeraldBuffEffectMod", v);
         }
         let has_cooldown = self.sd(i, "trapCooldown").is_some_and(ModValue::truthy)
@@ -1483,7 +1752,9 @@ impl<'a> Perform<'a> {
             set(self, "Cooldown", cd);
         }
         if let Some(base) = self.sd_num(i, "storedUses") {
-            let add = self.c.base(list, c, &["AdditionalCooldownUses", "AdditionalUses"])?;
+            let add = self
+                .c
+                .base(list, c, &["AdditionalCooldownUses", "AdditionalUses"])?;
             set(self, "StoredUses", base + add);
         }
         if self.has_flag(i, "mine") {
@@ -1539,7 +1810,9 @@ impl<'a> Perform<'a> {
             let speed = base_speed * self.c.calc_mod(list, c, &["TotemPlacementSpeed"])? * action;
             set(self, "TotemPlacementSpeed", speed);
             set(self, "TotemPlacementTime", 1.0 / speed);
-            let limit = self.c.base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
+            let limit = self
+                .c
+                .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
             set(self, "ActiveTotemLimit", limit);
             let summoned = self
                 .c
@@ -1568,10 +1841,14 @@ impl<'a> Perform<'a> {
         }
         if self.has_flag(i, "warcry") {
             let base_speed = 1.0 / self.c.base(list, c, &["WarcryCastTime"])?;
-            let mut t = base_speed * self.c.calc_mod(list, c, &["WarcrySpeed"])? * self.action_speed_mod(actor)?;
+            let mut t = base_speed
+                * self.c.calc_mod(list, c, &["WarcrySpeed"])?
+                * self.action_speed_mod(actor)?;
             t = m_min(t, tick);
             t = 1.0 / t;
-            if self.c.flag(list, c, &["InstantWarcry"])? || self.sd_truthy(i, "triggeredByAutoexertion") {
+            if self.c.flag(list, c, &["InstantWarcry"])?
+                || self.sd_truthy(i, "triggeredByAutoexertion")
+            {
                 t = 0.0;
             }
             set(self, "WarcryCastTime", t);
@@ -1587,9 +1864,10 @@ impl<'a> Perform<'a> {
                 Some(ModValue::Str(v)) => self.data().table("monsterVarietyLifeMult", v),
                 _ => None,
             };
-            let map = self
-                .data()
-                .table("mapLevelLifeMult", &format!("{}", self.env.enemy_level as i64));
+            let map = self.data().table(
+                "mapLevelLifeMult",
+                &format!("{}", self.env.enemy_level as i64),
+            );
             let base = life * variety.unwrap_or(1.0) * map.unwrap_or(1.0);
             set(self, "BaseCorpseLife", base);
             let inc = 1.0 + self.c.inc(list, c, &["CorpseLife"])? / 100.0;
@@ -1622,7 +1900,8 @@ impl<'a> Perform<'a> {
             v
         };
         let dmod = m_max(
-            self.c.calc_mod(list, c, &with_mine(vec!["Duration", "PrimaryDuration"]))?,
+            self.c
+                .calc_mod(list, c, &with_mine(vec!["Duration", "PrimaryDuration"]))?,
             0.0,
         );
         self.c.set_out(actor, "DurationMod", dmod);
@@ -1636,12 +1915,27 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "Duration", (d * tick).ceil() / tick);
         }
         for (key, name, out, debuff) in [
-            ("durationSecondary", "SecondaryDuration", "DurationSecondary", "debuffSecondary"),
-            ("durationTertiary", "TertiaryDuration", "DurationTertiary", "debuffTertiary"),
+            (
+                "durationSecondary",
+                "SecondaryDuration",
+                "DurationSecondary",
+                "debuffSecondary",
+            ),
+            (
+                "durationTertiary",
+                "TertiaryDuration",
+                "DurationTertiary",
+                "debuffTertiary",
+            ),
         ] {
-            let base = self.sd_num(i, key).unwrap_or(0.0) + self.c.base(list, c, &["Duration", name])?;
+            let base =
+                self.sd_num(i, key).unwrap_or(0.0) + self.c.base(list, c, &["Duration", name])?;
             if base > 0.0 {
-                let m = m_max(self.c.calc_mod(list, c, &with_mine(vec!["Duration", name]))?, 0.0);
+                let m = m_max(
+                    self.c
+                        .calc_mod(list, c, &with_mine(vec!["Duration", name]))?,
+                    0.0,
+                );
                 let mut d = base * m;
                 if self.sd_truthy(i, debuff) {
                     d *= debuff_mult;
@@ -1649,7 +1943,10 @@ impl<'a> Perform<'a> {
                 self.c.set_out(actor, out, (d * tick).ceil() / tick);
             }
         }
-        for (key, out) in [("auraDuration", "AuraDuration"), ("reserveDuration", "ReserveDuration")] {
+        for (key, out) in [
+            ("auraDuration", "AuraDuration"),
+            ("reserveDuration", "ReserveDuration"),
+        ] {
             let base = self.sd_num(i, key).unwrap_or(0.0);
             if base > 0.0 {
                 let m = m_max(self.c.calc_mod(list, c, &["Duration"])?, 0.0);
@@ -1672,7 +1969,8 @@ impl<'a> Perform<'a> {
         let m = m_max(self.c.calc_mod(list, c, &["TotemDuration"])?, 0.0);
         self.c.set_out(actor, "TotemDurationMod", m);
         let base = self.c.base(list, c, &["TotemDuration"])?;
-        self.c.set_out(actor, "TotemDuration", (base * m * tick).ceil() / tick);
+        self.c
+            .set_out(actor, "TotemDuration", (base * m * tick).ceil() / tick);
         let m = m_max(self.c.calc_mod(list, c, &["ImpaleDuration"])?, 0.0);
         self.c.set_out(actor, "ImpaleDurationMod", m);
         let base = self.data().character_constants["impaled_debuff_base_duration_ms"] / 1000.0;
@@ -1684,7 +1982,13 @@ impl<'a> Perform<'a> {
         // Skill uptime
         if !self.has_type(i, "Vaal") {
             let cooldown = self.c.out(actor, "Cooldown").unwrap_or(0.0);
-            for t in ["Duration", "DurationSecondary", "DurationTertiary", "AuraDuration", "reserveDuration"] {
+            for t in [
+                "Duration",
+                "DurationSecondary",
+                "DurationTertiary",
+                "AuraDuration",
+                "reserveDuration",
+            ] {
                 let d = self.c.out(actor, t).unwrap_or(0.0);
                 if d != 0.0 && cooldown != 0.0 {
                     let uptime = if self.c.flag(list, c, &["NoCooldownRecoveryInDuration"])? {
@@ -1767,13 +2071,17 @@ impl<'a> Perform<'a> {
                 .unwrap_or_default();
             for k in 0..costs.len() {
                 let resource = costs[k].resource;
-                let skill_cost = match self
-                    .c
-                    .override_num(list, c, &[&format!("Base{resource}CostOverride")])?
-                {
-                    Some(v) => Some(v),
-                    None => level_cost.iter().find(|(r, _)| r == resource).map(|(_, v)| *v),
-                };
+                let skill_cost =
+                    match self
+                        .c
+                        .override_num(list, c, &[&format!("Base{resource}CostOverride")])?
+                    {
+                        Some(v) => Some(v),
+                        None => level_cost
+                            .iter()
+                            .find(|(r, _)| r == resource)
+                            .map(|(_, v)| *v),
+                    };
                 let mut base_cost = round(
                     match skill_cost {
                         Some(v) => {
@@ -1792,7 +2100,9 @@ impl<'a> Perform<'a> {
                 let mut correction = 0.0;
                 if costs[k].upfront {
                     base_cost += self.c.base(list, c, &[&format!("{resource}CostBase")])?;
-                    costs[k].total_cost = self.c.base(list, c, &[&format!("{resource}Cost"), "Cost"])?;
+                    costs[k].total_cost =
+                        self.c
+                            .base(list, c, &[&format!("{resource}Cost"), "Cost"])?;
                     if resource == "Mana"
                         && self.has_type(i, "ReservationBecomesCost")
                         && !costs[k].percent
@@ -1802,10 +2112,16 @@ impl<'a> Perform<'a> {
                         let text = costs[k].text;
                         let level = |key: &str| self.effect_level(i).and_then(|l| l.field(key));
                         let flat_key = format!("{text}ReservationFlat");
-                        let flat = self.sd_num(i, &flat_key).or_else(|| level(&flat_key)).unwrap_or(0.0);
+                        let flat = self
+                            .sd_num(i, &flat_key)
+                            .or_else(|| level(&flat_key))
+                            .unwrap_or(0.0);
                         base_cost += flat;
                         let pct_key = format!("{text}ReservationPercent");
-                        let pct = self.sd_num(i, &pct_key).or_else(|| level(&pct_key)).unwrap_or(0.0);
+                        let pct = self
+                            .sd_num(i, &pct_key)
+                            .or_else(|| level(&pct_key))
+                            .unwrap_or(0.0);
                         let pool = self.c.out(actor, resource).unwrap_or(0.0);
                         base_cost += (pool * pct / 100.0).floor();
                         correction = round(pool * pct / 100.0 * mult, 0.0)
@@ -1815,7 +2131,8 @@ impl<'a> Perform<'a> {
                 let v = &mut costs[k];
                 v.base_cost += base_cost;
                 v.base_cost_no_mult += base_no_mult;
-                v.final_base_cost = ((v.base_cost * mult).floor() + v.base_cost_no_mult) + correction;
+                v.final_base_cost =
+                    ((v.base_cost * mult).floor() + v.base_cost_no_mult) + correction;
                 v.base_cost_raw = v
                     .base_cost_raw
                     .map(|_| v.base_cost * mult + v.base_cost_no_mult + correction);
@@ -1866,20 +2183,18 @@ impl<'a> Perform<'a> {
                             v.final_base_cost += round(mana.final_base_cost * additional_es, 0.0);
                         }
                     }
-                    "Rage" => {
-                        if self.c.flag(list, c, &["CostRageInsteadOfSouls"])? {
-                            let s = idx(&costs, "Soul");
-                            let soul = costs[s].clone();
-                            let v = &mut costs[k];
-                            v.base_cost = soul.base_cost;
-                            v.base_cost_no_mult += soul.base_cost_no_mult;
-                            v.final_base_cost = soul.base_cost;
-                            mult = 1.0;
-                            let soul = &mut costs[s];
-                            soul.base_cost = 0.0;
-                            soul.base_cost_no_mult = 0.0;
-                            soul.final_base_cost = 0.0;
-                        }
+                    "Rage" if self.c.flag(list, c, &["CostRageInsteadOfSouls"])? => {
+                        let s = idx(&costs, "Soul");
+                        let soul = costs[s].clone();
+                        let v = &mut costs[k];
+                        v.base_cost = soul.base_cost;
+                        v.base_cost_no_mult += soul.base_cost_no_mult;
+                        v.final_base_cost = soul.base_cost;
+                        mult = 1.0;
+                        let soul = &mut costs[s];
+                        soul.base_cost = 0.0;
+                        soul.base_cost_no_mult = 0.0;
+                        soul.final_base_cost = 0.0;
                     }
                     _ => {}
                 }
@@ -1912,12 +2227,20 @@ impl<'a> Perform<'a> {
                     let mut r = v.base_cost_raw.map(|r| {
                         m_max(
                             0.0,
-                            m_max(0.0, (1.0 + inc / 100.0) * r * more_type * more_cost / eff) + v.total_cost,
+                            m_max(0.0, (1.0 + inc / 100.0) * r * more_type * more_cost / eff)
+                                + v.total_cost,
                         )
                     });
                     let mut x = v.final_base_cost;
                     let scale = |x: f64, by: f64, up: bool| {
-                        m_max(0.0, if up { (by * x).ceil() } else { (by * x).floor() })
+                        m_max(
+                            0.0,
+                            if up {
+                                (by * x).ceil()
+                            } else {
+                                (by * x).floor()
+                            },
+                        )
                     };
                     x = scale(x, 1.0 + inc / 100.0, inc < 0.0);
                     x = scale(x, more_type, more_type < 1.0);
@@ -1942,8 +2265,10 @@ impl<'a> Perform<'a> {
                     raw = v.base_cost_raw.map(|r| {
                         m_max(
                             0.0,
-                            m_max(0.0, (1.0 + inc / 100.0) * (r + v.base_cost_no_mult) * more_type / eff)
-                                + v.total_cost,
+                            m_max(
+                                0.0,
+                                (1.0 + inc / 100.0) * (r + v.base_cost_no_mult) * more_type / eff,
+                            ) + v.total_cost,
                         )
                     });
                 }
@@ -1956,20 +2281,29 @@ impl<'a> Perform<'a> {
         }
         // account for Sacrificial Zeal
         if self.c.flag(list, None, &["Condition:SacrificialZeal"])?
-            && matches!(self.c.out_val(actor, "ManaHasCost"), Some(OutVal::Bool(true)))
+            && matches!(
+                self.c.out_val(actor, "ManaHasCost"),
+                Some(OutVal::Bool(true))
+            )
         {
             let v = (self.c.out(actor, "ManaCost").unwrap_or(f64::NAN) * 0.25).floor();
             let spell = self.mf("Spell");
             for n in ["PhysicalMin", "PhysicalMax"] {
-                self.c
-                    .add(list, new_mod(n, Base, v, Some("Sacrificial Zeal"), spell, 0, vec![]));
+                self.c.add(
+                    list,
+                    new_mod(n, Base, v, Some("Sacrificial Zeal"), spell, 0, vec![]),
+                );
             }
         }
         Ok(())
     }
 
     /// `buildConversionTable(cfg)`
-    pub(crate) fn conversion_table(&self, list: StoreId, cfg: Option<&Cfg>) -> Result<ConversionTable> {
+    pub(crate) fn conversion_table(
+        &self,
+        list: StoreId,
+        cfg: Option<&Cfg>,
+    ) -> Result<ConversionTable> {
         let mut table: ConversionTable = Default::default();
         for (ti, t) in DMG_TYPES.iter().enumerate().take(4) {
             let mut global = [0.0; 5];
@@ -2038,7 +2372,10 @@ impl<'a> Perform<'a> {
             Some(l) => l,
             None => self
                 .data()
-                .table("monsterLifeTable", &format!("{}", self.env.enemy_level as i64))
+                .table(
+                    "monsterLifeTable",
+                    &format!("{}", self.env.enemy_level as i64),
+                )
                 .unwrap_or(100.0),
         };
         if self.sd_truthy(i, "explodeCorpse") {
@@ -2064,9 +2401,10 @@ impl<'a> Perform<'a> {
         }
         let cfg = self.cfg(i);
         for (k, t) in DMG_TYPES.iter().enumerate() {
-            o.can_deal[k] = !self
-                .c
-                .flag(list, Some(&cfg), &[&format!("DealNo{t}"), "DealNoDamage"])?;
+            o.can_deal[k] =
+                !self
+                    .c
+                    .flag(list, Some(&cfg), &[&format!("DealNo{t}"), "DealNoDamage"])?;
         }
         o.conv[0] = Some(self.conversion_table(list, Some(&cfg))?);
         for n in 0..2 {
@@ -2081,24 +2419,87 @@ impl<'a> Perform<'a> {
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
 const TRIGGER_CONFIGS: [&str; 81] = [
-    "law of the wilds", "the rippling thoughts", "the surging thoughts", "the hidden blade",
-    "replica eternity shroud", "shroud of the lightless", "limbsplit", "the cauteriser", "duskblight",
-    "lioneye's paws", "replica lioneye's paws", "moonbender's wing", "ngamahu's flame",
-    "cameria's avarice", "starcaller", "uul-netol's embrace", "rigwald's crest",
-    "jorrhast's blacksteel", "ashcaller", "arakaali's fang", "sporeguard", "mark of the elder",
-    "mark of the shaper", "poet's pen", "maloney's mechanism", "asenath's chant",
-    "vixen's entrapment", "flames of judgement", "storm of judgement", "trigger craft",
-    "kitava's thirst", "foulborn kitava's thirst", "mjolner", "wing of the wyvern", "cospri's malice",
-    "seven teachings", "squirming terror", "kinetic flux", "cast on critical strike",
-    "cast on melee kill", "nova", "cast when damage taken", "cast when stunned", "cast on ward break",
-    "spellslinger", "call to arms", "automation", "autoexertion", "seize the flesh", "fissure",
-    "mark on hit", "hextouch", "oskarm", "tempest shield", "shattershard", "battlemage's cry",
-    "arcanist brand", "cast on death", "combust", "prismatic burst", "voidstorm", "shockwave",
-    "void shockwave", "falling crystal", "call the pyre", "manaforged arrows", "doom blast",
-    "cast while channelling", "focus", "snipe", "avenging flame", "intuitive link",
-    "svalinn cast on block", "festering resentment cast on block", "hex on trap",
-    "supporttriggerfirespellonhit", "ghostly artillery", "replica gifts from above", "bursting toad",
-    "TriggeredMoltenStrike", "FieryImpactHeistMaceImplicit",
+    "law of the wilds",
+    "the rippling thoughts",
+    "the surging thoughts",
+    "the hidden blade",
+    "replica eternity shroud",
+    "shroud of the lightless",
+    "limbsplit",
+    "the cauteriser",
+    "duskblight",
+    "lioneye's paws",
+    "replica lioneye's paws",
+    "moonbender's wing",
+    "ngamahu's flame",
+    "cameria's avarice",
+    "starcaller",
+    "uul-netol's embrace",
+    "rigwald's crest",
+    "jorrhast's blacksteel",
+    "ashcaller",
+    "arakaali's fang",
+    "sporeguard",
+    "mark of the elder",
+    "mark of the shaper",
+    "poet's pen",
+    "maloney's mechanism",
+    "asenath's chant",
+    "vixen's entrapment",
+    "flames of judgement",
+    "storm of judgement",
+    "trigger craft",
+    "kitava's thirst",
+    "foulborn kitava's thirst",
+    "mjolner",
+    "wing of the wyvern",
+    "cospri's malice",
+    "seven teachings",
+    "squirming terror",
+    "kinetic flux",
+    "cast on critical strike",
+    "cast on melee kill",
+    "nova",
+    "cast when damage taken",
+    "cast when stunned",
+    "cast on ward break",
+    "spellslinger",
+    "call to arms",
+    "automation",
+    "autoexertion",
+    "seize the flesh",
+    "fissure",
+    "mark on hit",
+    "hextouch",
+    "oskarm",
+    "tempest shield",
+    "shattershard",
+    "battlemage's cry",
+    "arcanist brand",
+    "cast on death",
+    "combust",
+    "prismatic burst",
+    "voidstorm",
+    "shockwave",
+    "void shockwave",
+    "falling crystal",
+    "call the pyre",
+    "manaforged arrows",
+    "doom blast",
+    "cast while channelling",
+    "focus",
+    "snipe",
+    "avenging flame",
+    "intuitive link",
+    "svalinn cast on block",
+    "festering resentment cast on block",
+    "hex on trap",
+    "supporttriggerfirespellonhit",
+    "ghostly artillery",
+    "replica gifts from above",
+    "bursting toad",
+    "TriggeredMoltenStrike",
+    "FieryImpactHeistMaceImplicit",
 ];
 
 impl<'a> Perform<'a> {
@@ -2153,7 +2554,29 @@ impl<'a> Perform<'a> {
                 return Err("not ported: mirages".into());
             }
         }
-        self.offence(crate::calc::PLAYER, main)
+        self.offence(crate::calc::PLAYER, main)?;
+        // The main skill's gem level and quality
+        let e = &self.skill(main).active_effect;
+        if e.src.is_some() {
+            let (level, list, cfg) = (e.level, self.lists[main].list, self.cfg(main));
+            let c = Some(&cfg);
+            let actor = crate::calc::PLAYER;
+            if level.is_some() {
+                let v = self.c.base(list, c, &["GemLevel"])?
+                    + self.c.base(list, c, &["GemSupportLevel"])?
+                    + self.c.base(list, c, &["GemItemLevel"])?;
+                self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
+                self.c.set_out(actor, "GemLevel", v);
+            }
+            let v = self.c.base(list, c, &["GemQuality"])?
+                + self.c.base(list, c, &["GemSupportQuality"])?
+                + self.c.base(list, c, &["GemItemQuality"])?
+                + self.c.base(list, c, &["GemSocketQuality"])?;
+            self.c
+                .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
+            self.c.set_out(actor, "GemQuality", v);
+        }
+        Ok(())
     }
 }
 

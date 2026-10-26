@@ -154,9 +154,9 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Data/QueryMods.lua" = { status = "todo" }
 "Data/Rares.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/SkillStatMap.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Data/Skills/act_dex.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Data/Skills/act_int.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Data/Skills/act_str.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_dex.lua" = { status = "data", port = "crates/importer crates/engine/src/calc_skill_funcs.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_int.lua" = { status = "data", port = "crates/importer crates/engine/src/calc_skill_funcs.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Data/Skills/act_str.lua" = { status = "data", port = "crates/importer crates/engine/src/calc_skill_funcs.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/Skills/glove.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/Skills/minion.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Data/Skills/other.lua" = { status = "data", port = "crates/importer", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
@@ -299,13 +299,13 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/CalcBreakdown.lua" = { status = "todo" }
 "Modules/CalcDefence.lua" = { status = "partial", port = "crates/engine/src/calc_defence.rs crates/engine/src/calc_ehp.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcFormat.lua" = { status = "todo" }
-"Modules/CalcMirages.lua" = { status = "todo" }
-"Modules/CalcOffence.lua" = { status = "todo" }
+"Modules/CalcMirages.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/CalcOffence.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs crates/engine/src/calc_offence_hit.rs crates/engine/src/calc_offence_ailments.rs crates/engine/src/calc_offence_dot.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcPerform.lua" = { status = "partial", port = "crates/engine/src/calc.rs crates/engine/src/calc_perform.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcSections.lua" = { status = "todo" }
 "Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_env.rs crates/engine/src/calc_items.rs crates/engine/src/calc_tree.rs crates/engine/src/calc_skills.rs crates/engine/src/jewel.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs crates/engine/src/skill_data.rs crates/engine/src/calc_skills.rs crates/engine/src/calc_skill_mods.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Modules/CalcTriggers.lua" = { status = "todo" }
+"Modules/CalcTriggers.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/Calcs.lua" = { status = "todo" }
 "Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }

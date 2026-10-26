@@ -98,7 +98,12 @@ impl<'a> Perform<'a> {
             let mut eff = 1.0;
             if effective {
                 let resist = self.resist_for_type(o, "Chaos", Some(&dot))?;
-                let names = ["DamageTaken", "DamageTakenOverTime", "ChaosDamageTaken", "ChaosDamageTakenOverTime"];
+                let names = [
+                    "DamageTaken",
+                    "DamageTakenOverTime",
+                    "ChaosDamageTaken",
+                    "ChaosDamageTakenOverTime",
+                ];
                 let inc = self.c.inc(edb, None, &names)?;
                 let more = self.c.more(edb, None, &names)?;
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
@@ -118,7 +123,8 @@ impl<'a> Perform<'a> {
                 "DecayDPS",
                 decay * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * eff,
             );
-            self.c.set_out(actor, "DecayDuration", 8.0 * o.debuff_duration_mult);
+            self.c
+                .set_out(actor, "DecayDuration", 8.0 * o.debuff_duration_mult);
         }
         let db = o.db;
         let ground = self.c.base(db, None, &["DropsBurningGround"])?;
@@ -226,9 +232,17 @@ impl<'a> Perform<'a> {
                 let (a, b) = (format!("{t}DamageTaken"), format!("{t}DamageTakenOverTime"));
                 let names = ["DamageTaken", "DamageTakenOverTime", a.as_str(), b.as_str()];
                 let inc = self.c.inc(edb, Some(&taken), &names)?
-                    + if is_elemental(t) { self.c.inc(edb, Some(&taken), &["ElementalDamageTaken"])? } else { 0.0 };
+                    + if is_elemental(t) {
+                        self.c.inc(edb, Some(&taken), &["ElementalDamageTaken"])?
+                    } else {
+                        0.0
+                    };
                 let more = self.c.more(edb, Some(&taken), &names)?
-                    * if is_elemental(t) { self.c.more(edb, Some(&taken), &["ElementalDamageTaken"])? } else { 1.0 };
+                    * if is_elemental(t) {
+                        self.c.more(edb, Some(&taken), &["ElementalDamageTaken"])?
+                    } else {
+                        1.0
+                    };
                 let resist = if t == "Physical" {
                     m_max(
                         0.0,
@@ -257,10 +271,15 @@ impl<'a> Perform<'a> {
                 Some(v) => v,
                 None => {
                     self.c.base(list, Some(&typ), &["DotMultiplier"])?
-                        + self.c.base(list, Some(&typ), &[&format!("{t}DotMultiplier")])?
+                        + self
+                            .c
+                            .base(list, Some(&typ), &[&format!("{t}DotMultiplier")])?
                 }
             };
-            let aura = if self.has_type(i, "Aura") && !self.has_type(i, "RemoteMined") && !self.has_type(i, "Banner") {
+            let aura = if self.has_type(i, "Aura")
+                && !self.has_type(i, "RemoteMined")
+                && !self.has_type(i, "Banner")
+            {
                 self.c.calc_mod(list, Some(&typ), &["AuraEffect"])?
             } else {
                 1.0
@@ -269,11 +288,13 @@ impl<'a> Perform<'a> {
             let instance = g(self, "TotalDotInstance").unwrap_or(f64::NAN);
             match g(self, &key) {
                 Some(v) if v != 0.0 => {
-                    self.c.set_out(actor, "TotalDotInstance", m_min(instance + total + v, cap));
+                    self.c
+                        .set_out(actor, "TotalDotInstance", m_min(instance + total + v, cap));
                 }
                 _ => {
                     self.c.set_out(actor, &key, total);
-                    self.c.set_out(actor, "TotalDotInstance", m_min(instance + total, cap));
+                    self.c
+                        .set_out(actor, "TotalDotInstance", m_min(instance + total, cap));
                 }
             }
         }
@@ -300,8 +321,16 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "TotalDot", total);
             self.c.set_out(actor, "TotalDotCalcSection", total);
         } else if let Some((flag, out, from)) = [
-            ("dotIsBurningGround", "BurningGroundDPS", Some("BurningGroundFromIgnite")),
-            ("dotIsCausticGround", "CausticGroundDPS", Some("CausticGroundFromPoison")),
+            (
+                "dotIsBurningGround",
+                "BurningGroundDPS",
+                Some("BurningGroundFromIgnite"),
+            ),
+            (
+                "dotIsCausticGround",
+                "CausticGroundDPS",
+                Some("CausticGroundFromPoison"),
+            ),
             ("dotIsCorruptingBlood", "CorruptingBloodDPS", None),
         ]
         .into_iter()
@@ -316,7 +345,8 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "TotalDotCalcSection", instance);
             let cur = g(self, out);
             if cur.is_none_or(|v| v < instance) {
-                self.c.set_out(actor, out, m_max(cur.unwrap_or(0.0), instance));
+                self.c
+                    .set_out(actor, out, m_max(cur.unwrap_or(0.0), instance));
                 if let Some(f) = from {
                     self.c.set_out_val(actor, f, OutVal::Bool(false));
                 }
@@ -325,7 +355,9 @@ impl<'a> Perform<'a> {
             if self.c.flag(list, None, &["DotCanStackAsTotems"])? && self.has_flag(i, "totem") {
                 self.set_flag(i, "DotCanStack", true);
             }
-            let brands = if self.has_type(i, "Brand") && !self.sd_truthy(i, "countsAttachedBrandsInDamage") {
+            let brands = if self.has_type(i, "Brand")
+                && !self.sd_truthy(i, "countsAttachedBrandsInDamage")
+            {
                 g(self, "AttachedBrandCount")
             } else {
                 Some(1.0)
@@ -343,10 +375,20 @@ impl<'a> Perform<'a> {
     /// Costs per second of skills that have none (link skills)
     fn cost_per_second(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
-        let eb = self.c.flag(self.pdb(), None, &["EnergyShieldProtectsMana"])?;
+        let eb = self
+            .c
+            .flag(self.pdb(), None, &["EnergyShieldProtectsMana"])?;
         let g = |p: &Self, k: &str| p.c.out(actor, k);
         let has = |p: &Self, k: &str| p.c.out_val(actor, k).is_some_and(|v| v.truthy());
-        for resource in ["Mana", "Life", "ES", "Soul", "Rage", "ManaPercent", "LifePercent"] {
+        for resource in [
+            "Mana",
+            "Life",
+            "ES",
+            "Soul",
+            "Rage",
+            "ManaPercent",
+            "LifePercent",
+        ] {
             let speed = g(self, "Speed").unwrap_or(f64::NAN);
             let cooldown = g(self, "Cooldown");
             if !(has(self, &format!("{resource}HasCost"))
@@ -356,7 +398,11 @@ impl<'a> Perform<'a> {
             {
                 continue;
             }
-            let used = if eb && resource == "Mana" { "ES" } else { resource };
+            let used = if eb && resource == "Mana" {
+                "ES"
+            } else {
+                resource
+            };
             let repeats = g(self, "Repeats").unwrap_or(1.0);
             let use_speed = if self.has_flag(i, "trap") || self.has_flag(i, "mine") {
                 let pre = g(self, "TrapThrowingSpeed").or_else(|| g(self, "MineLayingSpeed"));
@@ -393,8 +439,11 @@ impl<'a> Perform<'a> {
                     _ => speed,
                 }) / repeats
             };
-            self.c
-                .set_out_val(actor, &format!("{used}PerSecondHasCost"), OutVal::Bool(true));
+            self.c.set_out_val(
+                actor,
+                &format!("{used}PerSecondHasCost"),
+                OutVal::Bool(true),
+            );
             let v = g(self, &format!("{used}PerSecondCost")).unwrap_or(0.0)
                 + g(self, &format!("{resource}Cost")).unwrap_or(f64::NAN) * use_speed;
             self.c.set_out(actor, &format!("{used}PerSecondCost"), v);
@@ -406,8 +455,12 @@ impl<'a> Perform<'a> {
     fn self_hit(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
         let name = self.skill_name(i).to_string();
-        let any = |p: &Self, n: &str| -> Result<bool> { Ok(!p.c.list(list, None, &[n])?.is_empty()) };
-        let has_cost = matches!(self.c.out_val(actor, "ManaHasCost"), Some(OutVal::Bool(true)));
+        let any =
+            |p: &Self, n: &str| -> Result<bool> { Ok(!p.c.list(list, None, &[n])?.is_empty()) };
+        let has_cost = matches!(
+            self.c.out_val(actor, "ManaHasCost"),
+            Some(OutVal::Bool(true))
+        );
         if (name == "Summon Skeletons" && any(self, "HeartboundLoopSelfDamage")?)
             || (name == "Herald of Thunder" && any(self, "StormSecretSelfDamage")?)
             || (self.has_flag(i, "ignite") && any(self, "EyeOfInnocenceSelfDamage")?)
@@ -427,19 +480,32 @@ impl<'a> Perform<'a> {
         let g = |p: &Self, k: &str| p.c.out(actor, k);
         let n = |p: &Self, k: &str| g(p, k).unwrap_or(f64::NAN);
         let show_average = self.sd_truthy(i, "showAverage");
-        let base = n(self, if show_average { "AverageDamage" } else { "TotalDPS" });
+        let base = n(
+            self,
+            if show_average {
+                "AverageDamage"
+            } else {
+                "TotalDPS"
+            },
+        );
         let mut combined = base;
         let mut avg = base;
         if self.has_flag(i, "dot") {
-            self.c
-                .set_out(actor, "WithDotDPS", base + g(self, "TotalDot").unwrap_or(0.0));
+            self.c.set_out(
+                actor,
+                "WithDotDPS",
+                base + g(self, "TotalDot").unwrap_or(0.0),
+            );
         }
         let cap = self.misc_data("DotDpsCap");
         if o.quantity_multiplier > 1.0
             && let Some(p) = g(self, "TotalPoisonDPS")
         {
-            self.c
-                .set_out(actor, "TotalPoisonDPS", m_min(p * o.quantity_multiplier, cap));
+            self.c.set_out(
+                actor,
+                "TotalPoisonDPS",
+                m_min(p * o.quantity_multiplier, cap),
+            );
         }
         if show_average {
             avg += g(self, "TotalPoisonAverageDamage").unwrap_or(0.0);
@@ -449,8 +515,11 @@ impl<'a> Perform<'a> {
                 base + g(self, "TotalPoisonAverageDamage").unwrap_or(0.0),
             );
         } else {
-            self.c
-                .set_out(actor, "WithPoisonDPS", base + g(self, "TotalPoisonDPS").unwrap_or(0.0));
+            self.c.set_out(
+                actor,
+                "WithPoisonDPS",
+                base + g(self, "TotalPoisonDPS").unwrap_or(0.0),
+            );
         }
         if self.has_flag(i, "ignite") {
             if self.has_flag(i, "igniteCanStack") {
@@ -461,31 +530,38 @@ impl<'a> Perform<'a> {
                         .set_out(actor, "WithIgniteDPS", base + n(self, "TotalIgniteDPS"));
                 }
             } else if show_average {
-                self.c.set_out(actor, "WithIgniteDPS", base + n(self, "IgniteDamage"));
+                self.c
+                    .set_out(actor, "WithIgniteDPS", base + n(self, "IgniteDamage"));
                 avg += n(self, "IgniteDamage");
             } else {
-                self.c.set_out(actor, "WithIgniteDPS", base + n(self, "IgniteDPS"));
+                self.c
+                    .set_out(actor, "WithIgniteDPS", base + n(self, "IgniteDPS"));
             }
         } else {
             self.c.set_out(actor, "WithIgniteDPS", base);
         }
         if self.has_flag(i, "monsterExplode") {
-            self.c
-                .set_out(actor, "CombinedAvgToMonsterLife", avg / o.monster_life * 100.0);
+            self.c.set_out(
+                actor,
+                "CombinedAvgToMonsterLife",
+                avg / o.monster_life * 100.0,
+            );
         }
         if self.has_flag(i, "bleed") {
             if show_average {
-                self.c.set_out(actor, "WithBleedDPS", base + n(self, "BleedDamage"));
+                self.c
+                    .set_out(actor, "WithBleedDPS", base + n(self, "BleedDamage"));
                 avg += n(self, "BleedDamage");
             } else {
-                self.c.set_out(actor, "WithBleedDPS", base + n(self, "BleedDPS"));
+                self.c
+                    .set_out(actor, "WithBleedDPS", base + n(self, "BleedDPS"));
             }
         } else {
             self.c.set_out(actor, "WithBleedDPS", base);
         }
         let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
         if self.has_flag(i, "impale") {
-            let hand = |p: &Self, h: usize, k: &str| crate::calc_offence::get_num(&o.hands[h], k);
+            let hand = |_: &Self, h: usize, k: &str| crate::calc_offence::get_num(&o.hands[h], k);
             let mut impale = if self.has_flag(i, "attack")
                 && self.sd_truthy(i, "doubleHitsWhenDualWielding")
                 && self.has_flag(i, "bothWeaponAttack")
@@ -500,7 +576,9 @@ impl<'a> Perform<'a> {
                     })
                     .sum()
             } else {
-                n(self, "impaleStoredHitAvg") * (g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0) * n(self, "HitChance")
+                n(self, "impaleStoredHitAvg")
+                    * (g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0)
+                    * n(self, "HitChance")
                     / 100.0
                     * dps_mult
             };
@@ -513,8 +591,11 @@ impl<'a> Perform<'a> {
                 avg += impale;
             } else {
                 self.set_flag(i, "notAverage", true);
-                impale *= g(self, "HitSpeed").or_else(|| g(self, "Speed")).unwrap_or(f64::NAN);
-                self.c.set_out(actor, "WithImpaleDPS", n(self, "TotalDPS") + impale);
+                impale *= g(self, "HitSpeed")
+                    .or_else(|| g(self, "Speed"))
+                    .unwrap_or(f64::NAN);
+                self.c
+                    .set_out(actor, "WithImpaleDPS", n(self, "TotalDPS") + impale);
             }
             if o.quantity_multiplier > 1.0 {
                 impale *= o.quantity_multiplier;
@@ -524,22 +605,32 @@ impl<'a> Perform<'a> {
         }
         let total_dot = g(self, "TotalDot").unwrap_or(0.0)
             + g(self, "TotalPoisonDPS").unwrap_or(0.0)
-            + m_max(g(self, "CausticGroundDPS").unwrap_or(0.0), g(self, "MirageCausticGroundDPS").unwrap_or(0.0))
-            + g(self, "TotalIgniteDPS").or_else(|| g(self, "IgniteDPS")).unwrap_or(0.0)
-            + m_max(g(self, "BurningGroundDPS").unwrap_or(0.0), g(self, "MirageBurningGroundDPS").unwrap_or(0.0))
+            + m_max(
+                g(self, "CausticGroundDPS").unwrap_or(0.0),
+                g(self, "MirageCausticGroundDPS").unwrap_or(0.0),
+            )
+            + g(self, "TotalIgniteDPS")
+                .or_else(|| g(self, "IgniteDPS"))
+                .unwrap_or(0.0)
+            + m_max(
+                g(self, "BurningGroundDPS").unwrap_or(0.0),
+                g(self, "MirageBurningGroundDPS").unwrap_or(0.0),
+            )
             + g(self, "BleedDPS").unwrap_or(0.0)
             + g(self, "CorruptingBloodDPS").unwrap_or(0.0)
             + g(self, "DecayDPS").unwrap_or(0.0);
         let capped = m_min(total_dot, cap);
         self.c.set_out(actor, "TotalDotDPS", capped);
         if capped != total_dot {
-            self.c.set_out_val(actor, "showTotalDotDPS", OutVal::Bool(true));
+            self.c
+                .set_out_val(actor, "showTotalDotDPS", OutVal::Bool(true));
         }
         if !show_average {
             combined += capped;
         }
         let best_cull = m_max(1.0, n(self, "CullMultiplier"));
-        self.c.set_out(actor, "CullingDPS", combined * (best_cull - 1.0));
+        self.c
+            .set_out(actor, "CullingDPS", combined * (best_cull - 1.0));
         let reservation = n(self, "ReservationDpsMultiplier");
         self.c
             .set_out(actor, "ReservationDPS", combined * (reservation - 1.0));

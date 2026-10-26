@@ -379,6 +379,19 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    (`build.rs`, with the Configuration tab's sets in `config_tab.rs`), so
    the whole setup runs from a build file alone.
 
+   `calcs.perform` follows on the typed setup: one `Calc` holds the stores
+   and actors and answers upstream's queries by name (`calc.rs`);
+   `calc_perform.rs` runs perform's stages, `calc_defence.rs` and
+   `calc_ehp.rs` the defence and its estimations, and `calc_offence*.rs`
+   the offence, with a weapon pass's output kept apart from the actor's
+   and seen by its cfg as `skillStats`. Skills' Lua functions
+   (`preDamageFunc`, ...) are ported by hand per granted effect id
+   (`calc_skill_funcs.rs`); the skill data records which ones an effect
+   has, so a missing one fails loudly. `tests/perform.rs` compares the
+   outputs and databases with the translation at each stage and after
+   `calcs.perform`. What is not ported yet is listed in
+   `docs/progress.md`.
+
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is
    upstream's. The item data is read from upstream's processed `data`

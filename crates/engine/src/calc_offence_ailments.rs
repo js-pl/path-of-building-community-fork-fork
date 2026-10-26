@@ -30,7 +30,14 @@ impl<'a> Perform<'a> {
 
     /// `calcAilmentDamage(type, sourceCritChance, sourceHitDmg,
     /// sourceCritDmg)`: sets `<type>Chance`
-    fn ailment_damage(&mut self, o: &mut Off, t: &str, crit_chance: f64, hit: f64, crit: f64) -> f64 {
+    fn ailment_damage(
+        &mut self,
+        o: &mut Off,
+        t: &str,
+        crit_chance: f64,
+        hit: f64,
+        crit: f64,
+    ) -> f64 {
         let on_hit = self.po(o, &format!("{t}ChanceOnHit")).unwrap_or(f64::NAN);
         let on_crit = self.po(o, &format!("{t}ChanceOnCrit")).unwrap_or(f64::NAN);
         let from_hit = on_hit * (1.0 - crit_chance / 100.0);
@@ -42,16 +49,21 @@ impl<'a> Perform<'a> {
     /// `calcAverageSourceDamage(ailment)`: hit and crit damage of the types
     /// that can inflict it
     fn average_source_damage(&self, o: &Off, cfg: &Cfg, ailment: &str) -> Result<(f64, f64)> {
-        let assoc = self.data().non_damaging_ailment[ailment].associated_type.clone();
+        let assoc = self.data().non_damaging_ailment[ailment]
+            .associated_type
+            .clone();
         let (mut hit, mut crit) = (0.0, 0.0);
         for (ti, t) in DMG_TYPES.iter().enumerate() {
             if !o.can_deal[ti] {
                 continue;
             }
             let ok = if **t == *assoc {
-                !self.c.flag(o.list, Some(cfg), &[&format!("{t}Cannot{ailment}")])?
+                !self
+                    .c
+                    .flag(o.list, Some(cfg), &[&format!("{t}Cannot{ailment}")])?
             } else {
-                self.c.flag(o.list, Some(cfg), &[&format!("{t}Can{ailment}")])?
+                self.c
+                    .flag(o.list, Some(cfg), &[&format!("{t}Can{ailment}")])?
             };
             if ok {
                 hit += self.po(o, &format!("{t}HitAverage")).unwrap_or(f64::NAN);
@@ -74,7 +86,8 @@ impl<'a> Perform<'a> {
         for n in kw {
             k |= self.kf(n);
         }
-        let mut conds: std::collections::HashSet<Sym> = skill_cfg.skill_cond.clone().unwrap_or_default();
+        let mut conds: std::collections::HashSet<Sym> =
+            skill_cfg.skill_cond.clone().unwrap_or_default();
         conds.extend(cfg.skill_cond.iter().flatten().copied());
         conds.insert(Sym::new("CriticalStrike"));
         Cfg {
@@ -164,7 +177,10 @@ impl<'a> Perform<'a> {
                 _ => None,
             };
             if self.c.base(list, None, &["CritMultiplierAppliesToDegen"])? > 0.0 {
-                for (_, m) in self.c.tabulate(list, Some(Base), Some(&cfg), &["CritMultiplier"])? {
+                for (_, m) in self
+                    .c
+                    .tabulate(list, Some(Base), Some(&cfg), &["CritMultiplier"])?
+                {
                     if m.source.as_deref() != Some("Base") {
                         let mut tags = vec![Tag::condition("CriticalStrike")];
                         tags.extend(hand.clone());
@@ -184,8 +200,14 @@ impl<'a> Perform<'a> {
                     }
                 }
             }
-            if self.c.flag(list, None, &["DotMultiplierIsCritMultiplier"])? {
-                let over = self.c.override_num(list, Some(&cfg), &["CritMultiplier"])?.map(|v| v - 100.0);
+            if self
+                .c
+                .flag(list, None, &["DotMultiplierIsCritMultiplier"])?
+            {
+                let over = self
+                    .c
+                    .override_num(list, Some(&cfg), &["CritMultiplier"])?
+                    .map(|v| v - 100.0);
                 let v = match over {
                     Some(v) => v,
                     None => self.c.base(list, Some(&cfg), &["CritMultiplier"])?,
@@ -194,7 +216,15 @@ impl<'a> Perform<'a> {
                 tags.extend(hand);
                 self.c.add(
                     list,
-                    new_mod("DotMultiplier", Override, v, Some("Perfect Agony"), ailment_flag, 0, tags),
+                    new_mod(
+                        "DotMultiplier",
+                        Override,
+                        v,
+                        Some("Perfect Agony"),
+                        ailment_flag,
+                        0,
+                        tags,
+                    ),
                 );
             }
         }
@@ -207,13 +237,21 @@ impl<'a> Perform<'a> {
         let v = if !attack || self.c.flag(list, c, &["CannotBleed"])? {
             0.0
         } else {
-            m_min(100.0, self.c.base(list, c, &["BleedChance"])? + self.c.base(edb, None, &["SelfBleedChance"])?)
+            m_min(
+                100.0,
+                self.c.base(list, c, &["BleedChance"])?
+                    + self.c.base(edb, None, &["SelfBleedChance"])?,
+            )
         };
         self.set_po(o, "BleedChanceOnCrit", v);
         let v = if !hit || self.c.flag(list, c, &["CannotPoison"])? {
             0.0
         } else {
-            m_min(100.0, self.c.base(list, c, &["PoisonChance"])? + self.c.base(edb, None, &["SelfPoisonChance"])?)
+            m_min(
+                100.0,
+                self.c.base(list, c, &["PoisonChance"])?
+                    + self.c.base(edb, None, &["SelfPoisonChance"])?,
+            )
         };
         self.set_po(o, "PoisonChanceOnCrit", v);
         let v = if !hit {
@@ -237,14 +275,22 @@ impl<'a> Perform<'a> {
         let v = if !attack || self.c.flag(list, c, &["CannotBleed"])? {
             0.0
         } else {
-            m_min(100.0, self.c.base(list, c, &["BleedChance"])? + self.c.base(edb, None, &["SelfBleedChance"])?)
+            m_min(
+                100.0,
+                self.c.base(list, c, &["BleedChance"])?
+                    + self.c.base(edb, None, &["SelfBleedChance"])?,
+            )
         };
         self.set_po(o, "BleedChanceOnHit", v);
         if !hit || self.c.flag(list, c, &["CannotPoison"])? {
             self.set_po(o, "PoisonChanceOnHit", 0.0);
             self.set_po(o, "ChaosPoisonChance", 0.0);
         } else {
-            let v = m_min(100.0, self.c.base(list, c, &["PoisonChance"])? + self.c.base(edb, None, &["SelfPoisonChance"])?);
+            let v = m_min(
+                100.0,
+                self.c.base(list, c, &["PoisonChance"])?
+                    + self.c.base(edb, None, &["SelfPoisonChance"])?,
+            );
             self.set_po(o, "PoisonChanceOnHit", v);
             let v = m_min(100.0, self.c.base(list, c, &["ChaosPoisonChance"])?);
             self.set_po(o, "ChaosPoisonChance", v);
@@ -254,7 +300,11 @@ impl<'a> Perform<'a> {
         for a in self.data().elemental_ailment_types.clone() {
             let mut chance = self.c.base(list, c, &[&format!("Enemy{a}Chance")])?
                 + self.c.base(edb, None, &[&format!("Self{a}Chance")])?;
-            let immune = self.c.flag(edb, None, &[&format!("{a}Immune"), "ElementalAilmentImmune"])?;
+            let immune = self.c.flag(
+                edb,
+                None,
+                &[&format!("{a}Immune"), "ElementalAilmentImmune"],
+            )?;
             let avoid = 1.0
                 - m_min(
                     if immune {
@@ -263,7 +313,11 @@ impl<'a> Perform<'a> {
                         self.c.base(
                             edb,
                             None,
-                            &[&format!("Avoid{a}"), "AvoidAilments", "AvoidElementalAilments"],
+                            &[
+                                &format!("Avoid{a}"),
+                                "AvoidAilments",
+                                "AvoidElementalAilments",
+                            ],
                         )?
                     },
                     100.0,
@@ -274,13 +328,19 @@ impl<'a> Perform<'a> {
             chance *= avoid;
             if a == "Ignite" && can_scorch {
                 self.set_po(o, "ScorchChance", m_min(100.0, chance));
-                self.c
-                    .add(list, Mod::new("EnemyScorchChance", Base, chance, Some("Ignite Chance")));
+                self.c.add(
+                    list,
+                    Mod::new("EnemyScorchChance", Base, chance, Some("Ignite Chance")),
+                );
             }
             if hit && !(self.c.flag(list, c, &[&format!("Cannot{a}")])? || avoid == 0.0) {
                 let on_hit = m_min(100.0, chance);
                 self.set_po(o, &format!("{a}ChanceOnHit"), on_hit);
-                let alt = self.data().non_damaging_ailment.get(&a).is_some_and(|d| d.alt);
+                let alt = self
+                    .data()
+                    .non_damaging_ailment
+                    .get(&a)
+                    .is_some_and(|d| d.alt);
                 if self.c.flag(list, c, &[&format!("CritsDontAlways{a}")])?
                     || (alt && !self.c.flag(list, c, &["CritAlwaysAltAilments"])?)
                 {
@@ -311,7 +371,11 @@ impl<'a> Perform<'a> {
             self.c.base(list, c, &["EnemyKnockbackChance"])?
         };
         self.set_po(o, "KnockbackChanceOnHit", v);
-        let v = if effective { m_min(100.0, self.c.base(list, c, &["ImpaleChance"])?) } else { 0.0 };
+        let v = if effective {
+            m_min(100.0, self.c.base(list, c, &["ImpaleChance"])?)
+        } else {
+            0.0
+        };
         self.set_po(o, "ImpaleChance", v);
         for t in ["Fire", "Cold", "Lightning"] {
             if self.c.base(list, c, &[&format!("{t}ExposureChance")])? > 0.0 {
@@ -349,7 +413,11 @@ impl<'a> Perform<'a> {
         let never_crit = self.c.flag(db, None, &["AilmentsAreNeverFromCrit"])?;
         if never_crit {
             for a in &ailments {
-                let v = if only_crit { 0.0 } else { self.po(o, &format!("{a}ChanceOnHit")).unwrap_or(f64::NAN) };
+                let v = if only_crit {
+                    0.0
+                } else {
+                    self.po(o, &format!("{a}ChanceOnHit")).unwrap_or(f64::NAN)
+                };
                 self.set_po(o, &format!("{a}ChanceOnCrit"), v);
             }
         }
@@ -384,27 +452,39 @@ impl<'a> Perform<'a> {
             .override_num(list, None, &["BleedStackPotentialOverride"])?
             .map(|v| v / max_stacks);
         self.set_go(o, "BleedStacksMax", max_stacks);
-        let duration_base = match self.c.override_num(list, Some(&dot), &["BleedDurationBase"])? {
+        let duration_base = match self
+            .c
+            .override_num(list, Some(&dot), &["BleedDurationBase"])?
+        {
             Some(v) => v,
             None => {
-                if self.sd_truthy(i, "bleedDurationIsSkillDuration") && let Some(d) = self.sd_num(i, "duration") {
+                if self.sd_truthy(i, "bleedDurationIsSkillDuration")
+                    && let Some(d) = self.sd_num(i, "duration")
+                {
                     d
                 } else {
                     self.misc_data("BleedDurationBase")
                 }
             }
         };
-        let mut names = vec!["EnemyBleedDuration", "EnemyAilmentDuration", "DamagingAilmentDuration"];
+        let mut names = vec![
+            "EnemyBleedDuration",
+            "EnemyAilmentDuration",
+            "DamagingAilmentDuration",
+        ];
         if self.sd_truthy(i, "bleedIsSkillEffect") {
             names.push("Duration");
         }
         let duration_mod = m_max(
             self.c.calc_mod(list, Some(&dot), &names)?
-                * self.c.calc_mod(edb, None, &["SelfBleedDuration", "SelfAilmentDuration"])?
+                * self
+                    .c
+                    .calc_mod(edb, None, &["SelfBleedDuration", "SelfAilmentDuration"])?
                 / self.c.calc_mod(edb, Some(&dot), &["BleedExpireRate"])?,
             0.0,
         );
-        let rate_mod = self.c.calc_mod(list, c, &["BleedFaster"])? + self.c.inc(edb, None, &["SelfBleedFaster"])? / 100.0;
+        let rate_mod = self.c.calc_mod(list, c, &["BleedFaster"])?
+            + self.c.inc(edb, None, &["SelfBleedFaster"])? / 100.0;
         let duration = duration_base * duration_mod / rate_mod * o.debuff_duration_mult;
         self.set_go(o, "BleedDuration", duration);
         let crit = pv(self, o, "CritChance");
@@ -412,14 +492,21 @@ impl<'a> Perform<'a> {
             + pv(self, o, "BleedChanceOnCrit") / 100.0 * crit / 100.0;
         let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
         let mut stacks = pv(self, o, "HitChance") / 100.0 * chance * dps_mult;
-        let speed = self.go(o, "HitSpeed").or_else(|| self.go(o, "Speed")).unwrap_or(f64::NAN);
+        let speed = self
+            .go(o, "HitSpeed")
+            .or_else(|| self.go(o, "Speed"))
+            .unwrap_or(f64::NAN);
         if speed > 0.0 {
-            stacks *= duration * speed;
+            stacks = stacks * duration * speed;
         }
         let skill_cfg = self.cfg(i);
         let totems = match self.c.override_num(self.pdb(), None, &["TotemsSummoned"])? {
             Some(v) => v,
-            None => self.c.base(list, Some(&skill_cfg), &["ActiveTotemLimit", "ActiveBallistaLimit"])?,
+            None => self.c.base(
+                list,
+                Some(&skill_cfg),
+                &["ActiveTotemLimit", "ActiveBallistaLimit"],
+            )?,
         };
         if self.has_flag(i, "totem") {
             stacks *= totems;
@@ -428,8 +515,10 @@ impl<'a> Perform<'a> {
             stacks = config_stacks;
         }
         if stacks < 1.0 && override_potential.unwrap_or(0.0) <= 1.0 {
-            self.c
-                .add(list, Mod::new("Condition:SingleBleed", FlagT, true, Some("bleed")));
+            self.c.add(
+                list,
+                Mod::new("Condition:SingleBleed", FlagT, true, Some("bleed")),
+            );
         }
         let potential = override_potential.unwrap_or(stacks / max_stacks);
         self.set_go(o, "BleedStackPotential", potential);
@@ -439,7 +528,8 @@ impl<'a> Perform<'a> {
             50.0
         };
         self.set_go(o, "BleedRollAverage", roll);
-        let (mut avg_crit, mut max_crit, mut avg_hit, mut min_hit, mut max_hit) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        let (mut avg_crit, mut max_crit, mut avg_hit, mut min_hit, mut max_hit) =
+            (0.0, 0.0, 0.0, 0.0, 0.0);
         for sub in 1..=2 {
             set_cond(&mut dot, "CriticalStrike", sub != 1);
             let (min, max) = self.ailment_source_damage(o, &dot, "Physical", 0)?;
@@ -479,7 +569,12 @@ impl<'a> Perform<'a> {
                     m_max(0.0, self.c.base(edb, None, &["PhysicalDamageReduction"])?),
                     self.misc_data("EnemyPhysicalDamageReductionCap"),
                 );
-                let names = ["DamageTaken", "DamageTakenOverTime", "PhysicalDamageTaken", "PhysicalDamageTakenOverTime"];
+                let names = [
+                    "DamageTaken",
+                    "DamageTakenOverTime",
+                    "PhysicalDamageTaken",
+                    "PhysicalDamageTakenOverTime",
+                ];
                 let inc = self.c.inc(edb, Some(&dot), &names)?;
                 let more = self.c.more(edb, Some(&dot), &names)?;
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
@@ -500,29 +595,45 @@ impl<'a> Perform<'a> {
     fn poison(&mut self, o: &mut Off, cfg: &Cfg) -> Result<()> {
         let (i, list, edb) = (o.skill, o.list, o.edb);
         let pv = |p: &Self, o: &Off, k: &str| p.po(o, k).unwrap_or(f64::NAN);
-        if pv(self, o, "PoisonChanceOnHit") + pv(self, o, "PoisonChanceOnCrit") + pv(self, o, "ChaosPoisonChance") <= 0.0 {
+        if pv(self, o, "PoisonChanceOnHit")
+            + pv(self, o, "PoisonChanceOnCrit")
+            + pv(self, o, "ChaosPoisonChance")
+            <= 0.0
+        {
             return Ok(());
         }
         let c = Some(cfg);
         let mut dot = self.ailment_cfg(o, cfg, &["Poison", "Ailment", "ChaosDot"]);
-        let rate_mod = self.c.calc_mod(list, c, &["PoisonFaster"])? + self.c.inc(edb, None, &["SelfPoisonFaster"])? / 100.0;
-        let duration_base = match self.c.override_num(list, Some(&dot), &["PoisonDurationBase"])? {
+        let rate_mod = self.c.calc_mod(list, c, &["PoisonFaster"])?
+            + self.c.inc(edb, None, &["SelfPoisonFaster"])? / 100.0;
+        let duration_base = match self
+            .c
+            .override_num(list, Some(&dot), &["PoisonDurationBase"])?
+        {
             Some(v) => v,
             None => {
-                if self.sd_truthy(i, "poisonDurationIsSkillDuration") && let Some(d) = self.sd_num(i, "duration") {
+                if self.sd_truthy(i, "poisonDurationIsSkillDuration")
+                    && let Some(d) = self.sd_num(i, "duration")
+                {
                     d
                 } else {
                     self.misc_data("PoisonDurationBase")
                 }
             }
         };
-        let mut names = vec!["EnemyPoisonDuration", "EnemyAilmentDuration", "DamagingAilmentDuration"];
+        let mut names = vec![
+            "EnemyPoisonDuration",
+            "EnemyAilmentDuration",
+            "DamagingAilmentDuration",
+        ];
         if self.sd_truthy(i, "poisonIsSkillEffect") {
             names.push("Duration");
         }
         let duration_mod = m_max(
             self.c.calc_mod(list, Some(&dot), &names)?
-                * self.c.calc_mod(edb, None, &["SelfPoisonDuration", "SelfAilmentDuration"])?,
+                * self
+                    .c
+                    .calc_mod(edb, None, &["SelfPoisonDuration", "SelfAilmentDuration"])?,
             0.0,
         );
         let duration = duration_base * duration_mod / rate_mod * o.debuff_duration_mult;
@@ -538,9 +649,11 @@ impl<'a> Perform<'a> {
         let chance = on_hit / 100.0 * (1.0 - crit / 100.0) + on_crit / 100.0 * crit / 100.0;
         let mut additional = 1.0;
         if !self.c.flag(list, None, &["CannotMultiplePoison"])? {
-            additional = 1.0
-                + m_min(self.c.base(list, c, &["AdditionalPoisonChance"])? / 100.0, 1.0)
-                + self.c.base(list, c, &["AdditionalPoisonStacks"])?;
+            additional =
+                1.0 + m_min(
+                    self.c.base(list, c, &["AdditionalPoisonChance"])? / 100.0,
+                    1.0,
+                ) + self.c.base(list, c, &["AdditionalPoisonStacks"])?;
         }
         let limit = self.c.min(list, c, &["PoisonStackLimit"])?;
         let mut stacks = pv(self, o, "HitChance") / 100.0
@@ -549,9 +662,12 @@ impl<'a> Perform<'a> {
             * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN)
             * self.sd_num(i, "stackMultiplier").unwrap_or(1.0)
             * o.quantity_multiplier;
-        let speed = self.go(o, "HitSpeed").or_else(|| self.go(o, "Speed")).unwrap_or(f64::NAN);
+        let speed = self
+            .go(o, "HitSpeed")
+            .or_else(|| self.go(o, "Speed"))
+            .unwrap_or(f64::NAN);
         if speed > 0.0 {
-            stacks *= duration * speed;
+            stacks = stacks * duration * speed;
             if let Some(l) = limit
                 && l > 0.0
                 && stacks > l
@@ -561,10 +677,18 @@ impl<'a> Perform<'a> {
             }
         }
         if stacks < additional && self.config_num("multiplierPoisonOnEnemy").unwrap_or(0.0) == 0.0 {
-            self.c
-                .add(list, Mod::new("Condition:NonPoisonedOnly", FlagT, true, Some("Calculation")));
+            self.c.add(
+                list,
+                Mod::new(
+                    "Condition:NonPoisonedOnly",
+                    FlagT,
+                    true,
+                    Some("Calculation"),
+                ),
+            );
         }
-        let (mut hit_dmg, mut crit_dmg, mut max_crit, mut min_hit, mut max_hit) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        let (mut hit_dmg, mut crit_dmg, mut max_crit, mut min_hit, mut max_hit) =
+            (0.0, 0.0, 0.0, 0.0, 0.0);
         let chaos_flag = 0x10;
         for sub in 1..=2 {
             set_cond(&mut dot, "CriticalStrike", sub != 1);
@@ -576,7 +700,11 @@ impl<'a> Perform<'a> {
             total_max += max;
             let mut non_chaos = 1.0;
             if pv(self, o, "ChaosPoisonChance") > 0.0 && pv(self, o, "PoisonChaosMax") > 0.0 {
-                let k = if sub == 2 { "PoisonChanceOnCrit" } else { "PoisonChanceOnHit" };
+                let k = if sub == 2 {
+                    "PoisonChanceOnCrit"
+                } else {
+                    "PoisonChanceOnHit"
+                };
                 let cc = m_min(100.0, pv(self, o, k) + pv(self, o, "ChaosPoisonChance"));
                 non_chaos = pv(self, o, k) / cc;
                 self.set_po(o, k, cc);
@@ -636,11 +764,19 @@ impl<'a> Perform<'a> {
             self.set_po(o, "PoisonDPS", single);
             self.set_po(o, "PoisonDamage", single * duration);
             let ground = m_max(
-                self.c.max(list, None, &["PoisonDpsAsCausticGround"])?.unwrap_or(0.0),
-                self.c.max(edb, None, &["PoisonDpsAsCausticGround"])?.unwrap_or(0.0),
+                self.c
+                    .max(list, None, &["PoisonDpsAsCausticGround"])?
+                    .unwrap_or(0.0),
+                self.c
+                    .max(edb, None, &["PoisonDpsAsCausticGround"])?
+                    .unwrap_or(0.0),
             );
             if ground > 0.0 {
-                self.set_po(o, "CausticGroundDPS", m_min(base * effect * rate_mod * eff * ground / 100.0, cap));
+                self.set_po(
+                    o,
+                    "CausticGroundDPS",
+                    m_min(base * effect * rate_mod * eff * ground / 100.0, cap),
+                );
                 self.c
                     .set_out_val(o.actor, "CausticGroundFromPoison", OutVal::Bool(true));
             }
@@ -663,7 +799,8 @@ impl<'a> Perform<'a> {
         let c = Some(cfg);
         let mut dot = self.ailment_cfg(o, cfg, &["Ignite", "Ailment", "FireDot"]);
         let crit = pv(self, o, "CritChance");
-        let per_hit = pv(self, o, "IgniteChanceOnHit") * (1.0 - crit / 100.0) + pv(self, o, "IgniteChanceOnCrit") * crit / 100.0;
+        let per_hit = pv(self, o, "IgniteChanceOnHit") * (1.0 - crit / 100.0)
+            + pv(self, o, "IgniteChanceOnCrit") * crit / 100.0;
         self.set_go(o, "IgniteChancePerHit", per_hit);
         let can_stack = self.has_flag(i, "igniteCanStack");
         let mut max_stacks = 1.0;
@@ -689,11 +826,20 @@ impl<'a> Perform<'a> {
             self.c.calc_mod(
                 list,
                 Some(&dot),
-                &["EnemyIgniteDuration", "EnemyAilmentDuration", "EnemyElementalAilmentDuration", "DamagingAilmentDuration"],
+                &[
+                    "EnemyIgniteDuration",
+                    "EnemyAilmentDuration",
+                    "EnemyElementalAilmentDuration",
+                    "DamagingAilmentDuration",
+                ],
             )? * self.c.calc_mod(
                 edb,
                 None,
-                &["SelfIgniteDuration", "SelfAilmentDuration", "SelfElementalAilmentDuration"],
+                &[
+                    "SelfIgniteDuration",
+                    "SelfAilmentDuration",
+                    "SelfElementalAilmentDuration",
+                ],
             )?,
             0.0,
         );
@@ -701,14 +847,22 @@ impl<'a> Perform<'a> {
         self.set_go(o, "IgniteDuration", duration);
         let chance = pv(self, o, "IgniteChanceOnHit") / 100.0 * (1.0 - crit / 100.0)
             + pv(self, o, "IgniteChanceOnCrit") / 100.0 * crit / 100.0;
-        let mut stacks = pv(self, o, "HitChance") / 100.0 * chance * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+        let mut stacks = pv(self, o, "HitChance") / 100.0
+            * chance
+            * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
         if !self.sd_truthy(i, "triggeredOnDeath") {
-            let speed = self.go(o, "HitSpeed").or_else(|| self.go(o, "Speed")).unwrap_or(f64::NAN);
+            let speed = self
+                .go(o, "HitSpeed")
+                .or_else(|| self.go(o, "Speed"))
+                .unwrap_or(f64::NAN);
             if let Some(cd) = self.po(o, "Cooldown") {
-                let t = self.po(o, "HitTime").or_else(|| self.po(o, "Time")).unwrap_or(f64::NAN);
+                let t = self
+                    .po(o, "HitTime")
+                    .or_else(|| self.po(o, "Time"))
+                    .unwrap_or(f64::NAN);
                 stacks = stacks * duration / m_max(cd, t);
             } else if speed > 0.0 {
-                stacks *= duration * speed;
+                stacks = stacks * duration * speed;
             }
         }
         let potential = override_potential.unwrap_or(stacks / max_stacks);
@@ -719,7 +873,8 @@ impl<'a> Perform<'a> {
             50.0
         };
         self.set_go(o, "IgniteRollAverage", roll);
-        let (mut hit_dmg, mut crit_dmg, mut max_crit, mut min_hit, mut max_hit) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        let (mut hit_dmg, mut crit_dmg, mut max_crit, mut min_hit, mut max_hit) =
+            (0.0, 0.0, 0.0, 0.0, 0.0);
         let fire_flag = 0x08;
         for sub in 1..=2 {
             set_cond(&mut dot, "CriticalStrike", sub != 1);
@@ -762,7 +917,8 @@ impl<'a> Perform<'a> {
             * self.go(o, "AilmentWarcryEffect").unwrap_or(f64::NAN);
         self.ailment_damage(o, "Ignite", ailment_crit, min_hit, 0.0);
         self.ailment_damage(o, "Ignite", 100.0, max_hit, max_crit);
-        let base = self.ailment_damage(o, "Ignite", ailment_crit, hit_dmg, crit_dmg) * percent * effects;
+        let base =
+            self.ailment_damage(o, "Ignite", ailment_crit, hit_dmg, crit_dmg) * percent * effects;
         if base > 0.0 {
             self.set_flag(i, "ignite", true);
             let mut eff = 1.0;
@@ -780,12 +936,20 @@ impl<'a> Perform<'a> {
             let dps = m_min(base * effect * rate_mod * active * eff, cap);
             self.set_po(o, "IgniteDPS", dps);
             let ground = m_max(
-                self.c.max(list, None, &["IgniteDpsAsBurningGround"])?.unwrap_or(0.0),
-                self.c.max(edb, None, &["IgniteDpsAsBurningGround"])?.unwrap_or(0.0),
+                self.c
+                    .max(list, None, &["IgniteDpsAsBurningGround"])?
+                    .unwrap_or(0.0),
+                self.c
+                    .max(edb, None, &["IgniteDpsAsBurningGround"])?
+                    .unwrap_or(0.0),
             );
             if ground > 0.0 {
                 let fire = self.dot_eff_mult(o, &dot, "Fire", true)?;
-                self.set_go(o, "BurningGroundDPS", m_min(base * effect * rate_mod * fire * ground / 100.0, cap));
+                self.set_go(
+                    o,
+                    "BurningGroundDPS",
+                    m_min(base * effect * rate_mod * fire * ground / 100.0, cap),
+                );
                 self.c
                     .set_out_val(o.actor, "BurningGroundFromIgnite", OutVal::Bool(true));
             }
@@ -809,53 +973,102 @@ impl<'a> Perform<'a> {
             self.set_flag(i, "chill", true);
             let inc = self.c.inc(list, c, &["EnemyChillEffect"])?;
             let more = self.c.more(list, c, &["EnemyChillEffect"])?;
-            let effect = (1.0 + inc / 100.0) * more * self.c.calc_mod(edb, None, &["SelfChillEffect"])?;
+            let effect =
+                (1.0 + inc / 100.0) * more * self.c.calc_mod(edb, None, &["SelfChillEffect"])?;
             self.set_po(o, "ChillEffectMod", effect);
-            let dur_names = ["EnemyChillDuration", "EnemyAilmentDuration", "EnemyElementalAilmentDuration"];
-            let self_names = ["SelfChillDuration", "SelfAilmentDuration", "SelfElementalAilmentDuration"];
+            let dur_names = [
+                "EnemyChillDuration",
+                "EnemyAilmentDuration",
+                "EnemyElementalAilmentDuration",
+            ];
+            let self_names = [
+                "SelfChillDuration",
+                "SelfAilmentDuration",
+                "SelfElementalAilmentDuration",
+            ];
             let inc_d = self.c.inc(list, c, &dur_names)? + self.c.inc(edb, None, &self_names)?;
             let more_d = self.c.more(list, c, &dur_names)? * self.c.more(edb, None, &self_names)?;
             self.set_po(o, "ChillDurationMod", (1.0 + inc_d / 100.0) * more_d);
             let chill = &self.data().non_damaging_ailment["Chill"];
             let (max, default) = (chill.max, chill.default.unwrap_or(f64::NAN));
-            let max = self.c.override_num(list, None, &["ChillMax"])?.unwrap_or(max);
-            self.set_po(o, "ChillSourceEffect", m_min(max, (default * effect).floor()));
+            let max = self
+                .c
+                .override_num(list, None, &["ChillMax"])?
+                .unwrap_or(max);
+            self.set_po(
+                o,
+                "ChillSourceEffect",
+                m_min(max, (default * effect).floor()),
+            );
         }
         let crit = pv(self, o, "CritChance");
         if pv(self, o, "FreezeChanceOnHit") + pv(self, o, "FreezeChanceOnCrit") > 0.0 {
             let (h, cr) = self.average_source_damage(o, &cfg, "Freeze")?;
-            let base = self.ailment_damage(o, "Freeze", crit, h, cr) * self.c.more(list, c, &["FreezeAsThoughDealing"])?;
+            let base = self.ailment_damage(o, "Freeze", crit, h, cr)
+                * self.c.more(list, c, &["FreezeAsThoughDealing"])?;
             if base > 0.0 {
                 self.set_flag(i, "freeze", true);
                 let v = 1.0
-                    + self.c.inc(list, c, &["EnemyFreezeDuration", "EnemyAilmentDuration", "EnemyElementalAilmentDuration"])? / 100.0
+                    + self.c.inc(
+                        list,
+                        c,
+                        &[
+                            "EnemyFreezeDuration",
+                            "EnemyAilmentDuration",
+                            "EnemyElementalAilmentDuration",
+                        ],
+                    )? / 100.0
                     + self.c.inc(
                         edb,
                         None,
-                        &["SelfFreezeDuration", "SelfElementalAilmentDuration", "SelfAilmentDuration", "HoarfrostFreezeDuration"],
+                        &[
+                            "SelfFreezeDuration",
+                            "SelfElementalAilmentDuration",
+                            "SelfAilmentDuration",
+                            "HoarfrostFreezeDuration",
+                        ],
                     )? / 100.0;
                 self.set_po(o, "FreezeDurationMod", v);
             }
         }
         let never_crit = self.c.flag(db, None, &["AilmentsAreNeverFromCrit"])?;
         for a in ["Chill", "Shock", "Scorch", "Brittle", "Sap"] {
-            if pv(self, o, &format!("{a}ChanceOnHit")) + pv(self, o, &format!("{a}ChanceOnCrit")) <= 0.0 {
+            if pv(self, o, &format!("{a}ChanceOnHit")) + pv(self, o, &format!("{a}ChanceOnCrit"))
+                <= 0.0
+            {
                 continue;
             }
             self.set_pass_cond(o, "CriticalStrike", ailment_mode == "CRIT" && !never_crit);
             let cfg = self.pcfg(o);
             let c = Some(&cfg);
             let (h, cr) = self.average_source_damage(o, &cfg, a)?;
-            let damage = self.ailment_damage(o, a, crit, h, cr) * self.c.more(list, c, &[&format!("{a}AsThoughDealing")])?;
+            let damage = self.ailment_damage(o, a, crit, h, cr)
+                * self.c.more(list, c, &[&format!("{a}AsThoughDealing")])?;
             if damage > 0.0 {
                 self.set_flag(i, &a.to_lowercase(), true);
                 let ed = format!("Enemy{a}Duration");
                 let sd = format!("Self{a}Duration");
-                let inc = self.c.inc(list, c, &[&ed, "EnemyElementalAilmentDuration", "EnemyAilmentDuration"])?
-                    + self.c.inc(edb, None, &[&sd, "SelfElementalAilmentDuration", "SelfAilmentDuration"])?;
-                let more = self.c.more(list, c, &[&ed, "EnemyElementalAilmentDuration", "EnemyAilmentDuration"])?
-                    * self.c.more(edb, None, &[&sd, "SelfElementalAilmentDuration", "SelfAilmentDuration"])?;
-                let base = self.data().non_damaging_ailment[a].duration.unwrap_or(f64::NAN);
+                let inc = self.c.inc(
+                    list,
+                    c,
+                    &[&ed, "EnemyElementalAilmentDuration", "EnemyAilmentDuration"],
+                )? + self.c.inc(
+                    edb,
+                    None,
+                    &[&sd, "SelfElementalAilmentDuration", "SelfAilmentDuration"],
+                )?;
+                let more = self.c.more(
+                    list,
+                    c,
+                    &[&ed, "EnemyElementalAilmentDuration", "EnemyAilmentDuration"],
+                )? * self.c.more(
+                    edb,
+                    None,
+                    &[&sd, "SelfElementalAilmentDuration", "SelfAilmentDuration"],
+                )?;
+                let base = self.data().non_damaging_ailment[a]
+                    .duration
+                    .unwrap_or(f64::NAN);
                 self.set_po(
                     o,
                     &format!("{a}Duration"),
@@ -883,7 +1096,10 @@ impl<'a> Perform<'a> {
         );
         self.set_po(o, "KnockbackChance", kb);
         if kb > 0.0 {
-            let v = round(4.0 * self.c.calc_mod(list, c, &["EnemyKnockbackDistance"])?, 0.0);
+            let v = round(
+                4.0 * self.c.calc_mod(list, c, &["EnemyKnockbackDistance"])?,
+                0.0,
+            );
             self.set_po(o, "KnockbackDistance", v);
         }
         let red = -self.c.inc(list, c, &["EnemyStunThreshold"])?;
@@ -940,12 +1156,17 @@ impl<'a> Perform<'a> {
                 m_max(
                     0.0,
                     self.c.base(edb, None, &["PhysicalDamageReduction"])?
-                        + self.c.base(list, c, &["EnemyImpalePhysicalDamageReduction"])?
+                        + self
+                            .c
+                            .base(list, c, &["EnemyImpalePhysicalDamageReduction"])?
                         + reduction,
                 ),
                 self.misc_data("EnemyPhysicalDamageReductionCap"),
             );
-            if self.c.flag(list, c, &["IgnoreEnemyImpalePhysicalDamageReduction"])? {
+            if self
+                .c
+                .flag(list, c, &["IgnoreEnemyImpalePhysicalDamageReduction"])?
+            {
                 resist = 0.0;
             }
             let taken_cfg = Cfg {
