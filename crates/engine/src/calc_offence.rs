@@ -2538,10 +2538,9 @@ const TRIGGER_CONFIGS: [&str; 81] = [
 ];
 
 impl<'a> Perform<'a> {
-    /// `calcs.triggers(env, env.player)`, `calcs.mirages(env)`, then
-    /// `calcs.offence(env, env.player, env.player.mainSkill)`
-    pub fn player_offence(&mut self) -> Result<()> {
-        let main = self.main();
+    /// `calcs.triggers(env, actor)` of the actor's main skill: only
+    /// detects the skills a trigger handler calculates
+    pub(crate) fn triggers(&mut self, main: usize) -> Result<()> {
         if !self.has_flag(main, "disable") {
             let s = self.skill(main);
             let ge = &s.active_effect.granted_effect;
@@ -2572,6 +2571,28 @@ impl<'a> Perform<'a> {
             }
             self.sd_clear(main, "triggered");
         }
+        Ok(())
+    }
+
+    /// The minion's calculations after the player's: `calcs.defence`,
+    /// `calcs.buildDefenceEstimations`, `calcs.triggers` and
+    /// `calcs.offence` of `env.minion`
+    pub fn minion_calcs(&mut self) -> Result<()> {
+        let Some(m) = self.minion else {
+            return Ok(());
+        };
+        let (actor, main) = (self.minions[m].actor, self.minions[m].main_skill);
+        self.defence(actor)?;
+        self.defence_estimations(actor)?;
+        self.triggers(main)?;
+        self.offence(actor, main)
+    }
+
+    /// `calcs.triggers(env, env.player)`, `calcs.mirages(env)`, then
+    /// `calcs.offence(env, env.player, env.player.mainSkill)`
+    pub fn player_offence(&mut self) -> Result<()> {
+        let main = self.main();
+        self.triggers(main)?;
         // Mirages
         let used_by_mirage = self
             .cfg(main)

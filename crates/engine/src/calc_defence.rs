@@ -343,6 +343,23 @@ impl<'a> Perform<'a> {
         let asm = self.action_speed_mod(actor)?;
         self.c.set_out(actor, "ActionSpeedMod", asm);
         self.resistances(actor)?;
+        let to_minions = self.c.base(db, None, &["ResistanceAddedToMinions"])?;
+        if let Some(a) = self.minion_actor()
+            && to_minions > 0.0
+        {
+            let mdb = self.c.db(a);
+            for e in ["Fire", "Cold", "Lightning", "Chaos"] {
+                let k = format!("{e}Resist");
+                let v = (o(self, &k) * to_minions / 100.0).floor();
+                self.c
+                    .add(mdb, crate::calc_perform::src(&k, Base, v, "Player"));
+            }
+        }
+        // Formless Inferno
+        if self.minion_actor() == Some(actor) {
+            self.life_mana(actor)?;
+            self.life_mana_reservation(actor, false)?;
+        }
 
         // Block
         let block_max = m_min(

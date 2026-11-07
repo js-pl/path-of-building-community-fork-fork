@@ -387,17 +387,17 @@ fn compare_stage(
                 false,
             );
             compare_db("minion", &typed_db(p.c.store(p.c.db(m.actor))), db, fail);
-            if skills.len() != m.lists.len() {
+            if skills.len() != m.skills.len() {
                 fail.push(format!(
                     "{} minion skills != {}",
-                    m.lists.len(),
+                    m.skills.len(),
                     skills.len()
                 ));
             } else {
-                for (i, (&l, w)) in m.lists.iter().zip(skills.iter_mut()).enumerate() {
+                for (i, (&k, w)) in m.skills.iter().zip(skills.iter_mut()).enumerate() {
                     compare_db(
                         &format!("minion skill {i}"),
-                        &typed_db(p.c.store(l)),
+                        &typed_db(p.c.store(p.lists[k].list)),
                         w,
                         fail,
                     );
@@ -418,10 +418,14 @@ fn compare_stage(
         &mut want.enemy,
         fail,
     );
-    if want.skills.len() != p.lists.len() {
-        fail.push(format!("{} skills != {}", p.lists.len(), want.skills.len()));
+    if want.skills.len() != p.n_player {
+        fail.push(format!("{} skills != {}", p.n_player, want.skills.len()));
     } else {
-        for (i, (l, w)) in p.lists.iter().zip(want.skills.iter_mut()).enumerate() {
+        for (i, (l, w)) in p.lists[..p.n_player]
+            .iter()
+            .zip(want.skills.iter_mut())
+            .enumerate()
+        {
             compare_db(&format!("skill {i}"), &typed_db(p.c.store(l.list)), w, fail);
         }
     }
@@ -489,6 +493,7 @@ fn perform_matches_upstream() {
     };
     let mut failures = Vec::new();
     let (mut compared, mut skipped, mut offence_skipped) = (0, 0, 0);
+    let (mut minions_compared, mut minion_skipped) = (0, 0);
     // `OFFENCE_PARTIAL=1`: after the offence, only the outputs the typed
     // offence sets
     let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
@@ -637,13 +642,28 @@ fn perform_matches_upstream() {
                 break;
             }
             let before = fail.len();
-            // The minion's own defence and offence (not ported yet) follow
-            // the player's offence
+            // The minion's own calculations follow the player's offence
             let last = *stage == stages.len();
             compare_stage(&p, want, &mut fail, partial && last, !last);
             if fail.len() > before {
                 fail.insert(before, format!("at {}:", stage_name(*stage)));
                 break;
+            }
+            if last && p.minion.is_some() {
+                match p.minion_calcs() {
+                    Err(e) if e.starts_with("not ported") => {
+                        *skip_reasons.entry(format!("minion: {e}")).or_default() += 1;
+                        minion_skipped += 1;
+                    }
+                    Err(e) => fail.push(format!("typed minion calculations failed: {e}")),
+                    Ok(()) => {
+                        minions_compared += 1;
+                        compare_stage(&p, want, &mut fail, partial, true);
+                        if fail.len() > before {
+                            fail.insert(before, "after the minion's calculations:".into());
+                        }
+                    }
+                }
             }
         }
         if !fail.is_empty() {
@@ -652,7 +672,7 @@ fn perform_matches_upstream() {
         }
     }
     eprintln!(
-        "{compared} performs compared ({offence_skipped} up to the offence), {skipped} skipped: {skip_reasons:?}"
+        "{compared} performs compared ({offence_skipped} up to the offence), {skipped} skipped, {minions_compared} minions compared ({minion_skipped} skipped): {skip_reasons:?}"
     );
     assert!(
         failures.is_empty(),

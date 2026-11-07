@@ -32,10 +32,11 @@ covers everything from the items on; 57 builds compared, 4 skipped).
 then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
-enemy's databases, every skill's mod list, and up to the triggers
-`env.minion`'s output, database and skills' mod lists) in
-`crates/equivalence/tests/perform.rs`: 57 builds compared, 49 of them
-through the player's offence; the gaps below are skipped.
+enemy's databases, every skill's mod list, and `env.minion`'s output,
+database and skills' mod lists) in `crates/equivalence/tests/perform.rs`:
+57 builds compared, 49 of them through the player's offence and 5 minions
+through their own; the gaps below are skipped. The minions' skills follow
+the player's in the calculation's skills (`Perform::n_player`).
 
 | Upstream | Typed |
 |---|---|
@@ -67,12 +68,9 @@ Game data is still read from upstream's processed Lua `data` table
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The minion's own calculations after the player's (`calcs.defence`,
-  `buildDefenceEstimations`, `triggers` and `offence` of `env.minion`),
-  with the offence's `...EqualToParent` crit, and the player's output
-  `Minion`; the Calcs tab's choice of a minion's skill
-  (`skillMinionSkillCalcs`); shared minion life pools
-  (`MinionLifeShares...`)
+- The player's output `Minion`, the Calcs tab's choice of a minion's
+  skill (`skillMinionSkillCalcs`), shared minion life pools
+  (`MinionLifeShares...`) and the offence's `...EqualToParent` crit
 - The party tab
 - Triggers (`CalcTriggers.lua`'s handlers) and mirages (`CalcMirages.lua`)
 - Skill functions other than the ten in `calc_skill_funcs.rs`
@@ -84,9 +82,7 @@ a skip:
 
 ## Next
 
-The minion's defence and offence (the offence is written for the player's
-skills; it needs to run on a minion's skill), then triggers and mirages,
-then `Calcs.lua`'s calculators
+Triggers and mirages, then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 

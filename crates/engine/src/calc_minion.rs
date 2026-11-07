@@ -16,7 +16,7 @@ use crate::calc_perform::{
     tag_str,
 };
 use crate::calc_skill_mods::{MinionSkill, ModsInput, SkillDb, build_skill_mod_list};
-use crate::calc_skills::{ActiveSkill, SkillEffect, SupportContext, create_active_skill};
+use crate::calc_skills::{SkillEffect, SupportContext, create_active_skill};
 use crate::mods::{Cfg, Mod, ModType, ModValue, Store, StoreId, Tag};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -29,12 +29,11 @@ pub struct MinionActor {
     pub skill: usize,
     /// The minion's actor
     pub actor: usize,
-    /// `minion.activeSkillList`
-    pub skills: Vec<ActiveSkill>,
-    /// Each skill's mod list, whose parent is the minion's database
-    /// (`skillModList`, also `baseSkillModList`)
-    pub lists: Vec<StoreId>,
-    /// `minion.mainSkill`, by index in its skills
+    /// `minion.activeSkillList`, by index in the calculation's skills
+    /// (after the player's). Their mod lists' parent is the minion's
+    /// database, and `skillModList` is also `baseSkillModList`.
+    pub skills: Vec<usize>,
+    /// `minion.mainSkill`, by index in the calculation's skills
     pub main_skill: usize,
 }
 
@@ -84,13 +83,8 @@ impl<'a> Perform<'a> {
 
     /// `actor.mainSkill`: the player's main skill, a minion's chosen skill
     pub fn actor_main_skill(&self, actor: usize) -> Option<MainSkill> {
-        let (list, skill) = if actor == PLAYER {
-            let main = self.main();
-            (self.lists[main].list, &self.env.skills.active_skills[main])
-        } else {
-            let m = self.minions.iter().find(|m| m.actor == actor)?;
-            (m.lists[m.main_skill], &m.skills[m.main_skill])
-        };
+        let main = self.actor_main_index(actor)?;
+        let (list, skill) = (self.lists[main].list, &self.env.skills.active_skills[main]);
         let mods = skill.mods.as_ref()?;
         Some(MainSkill {
             list,
@@ -99,6 +93,33 @@ impl<'a> Perform<'a> {
             types: skill.skill_types.clone(),
             data: mods.skill_data.clone(),
         })
+    }
+
+    /// The index of `actor.mainSkill`
+    pub fn actor_main_index(&self, actor: usize) -> Option<usize> {
+        if actor == PLAYER {
+            Some(self.main())
+        } else {
+            Some(self.minions.iter().find(|m| m.actor == actor)?.main_skill)
+        }
+    }
+
+    /// `actor.activeSkillList`, by index
+    pub fn actor_skills(&self, actor: usize) -> Vec<usize> {
+        if actor == PLAYER {
+            (0..self.n_player).collect()
+        } else {
+            self.minions
+                .iter()
+                .find(|m| m.actor == actor)
+                .map(|m| m.skills.clone())
+                .unwrap_or_default()
+        }
+    }
+
+    /// The minion whose skill this is, by index in `minions`
+    pub fn minion_of_skill(&self, skill: usize) -> Option<usize> {
+        self.minions.iter().position(|m| m.skills.contains(&skill))
     }
 
     /// Whether `env.minion` is hostile
@@ -126,7 +147,7 @@ impl<'a> Perform<'a> {
     /// The minions' actors and skills: for each skill with a minion, a
     /// new database and `calcs.createMinionSkills(env, activeSkill)`
     pub(crate) fn create_minions(&mut self) -> Result<()> {
-        for i in 0..self.env.skills.active_skills.len() {
+        for i in 0..self.n_player {
             let Some(minion) = self.mods(i).minion.clone() else {
                 continue;
             };
@@ -159,12 +180,11 @@ impl<'a> Perform<'a> {
                 skill: i,
                 actor,
                 skills: Vec::new(),
-                lists: Vec::new(),
                 main_skill: 0,
             });
             self.create_minion_skills(self.minions.len() - 1)?;
             let m = &self.minions[self.minions.len() - 1];
-            let name = m.skills[m.main_skill]
+            let name = self.env.skills.active_skills[m.main_skill]
                 .active_effect
                 .granted_effect
                 .name
@@ -235,7 +255,6 @@ impl<'a> Perform<'a> {
             .as_ref()
             .is_some_and(|s| s.skill_flags.contains("spectre"));
         let mut skills = Vec::new();
-        let mut lists = Vec::new();
         for id in ids {
             let ge = data
                 .skills
@@ -324,8 +343,12 @@ impl<'a> Perform<'a> {
             for m in &mods.mods {
                 store.add(m.clone());
             }
-            lists.push(self.c.push_store(store, Some(actor)));
-            skills.push(ms);
+            let list = self.c.push_store(store, Some(actor));
+            self.lists
+                .push(crate::calc_perform::SkillLists { base: list, list });
+            self.marks.push(Default::default());
+            self.env.skills.active_skills.push(ms);
+            skills.push(self.env.skills.active_skills.len() - 1);
         }
         // The chosen skill, which the gem keeps in the main mode
         let n = skills.len() as f64;
@@ -341,9 +364,8 @@ impl<'a> Perform<'a> {
             g.skill_minion_skill = Some(index);
         }
         let mm = &mut self.minions[m];
+        mm.main_skill = skills[index as usize - 1];
         mm.skills = skills;
-        mm.lists = lists;
-        mm.main_skill = index as usize - 1;
         Ok(())
     }
 
@@ -682,9 +704,9 @@ impl<'a> Perform<'a> {
             }
         };
         let st = |n: &str| self.input.data.skills.skill_type(n).unwrap_or(-1);
-        for j in 0..self.minions[m].skills.len() {
-            let list = self.minions[m].lists[j];
-            let ms = &self.minions[m].skills[j];
+        for j in self.minions[m].skills.clone() {
+            let list = self.lists[j].list;
+            let ms = &self.env.skills.active_skills[j];
             let mods = ms
                 .mods
                 .as_ref()

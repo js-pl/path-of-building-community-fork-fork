@@ -236,6 +236,8 @@ pub struct Perform<'a> {
     pub minions: Vec<crate::calc_minion::MinionActor>,
     /// `env.minion`, by index in `minions`
     pub minion: Option<usize>,
+    /// The number of the player's skills, which come first in the skills
+    pub n_player: usize,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies`,
     /// `nonUniqueFlasksApplyToMinion`
     pub(crate) flasks_to_minion: [bool; 3],
@@ -474,6 +476,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         weapon_range: [None, None],
         minions: Vec::new(),
         minion: None,
+        n_player: n,
         flasks_to_minion: [false; 3],
         buff_lists: Vec::new(),
         minion_buff_lists: Vec::new(),
@@ -491,7 +494,7 @@ impl<'a> Perform<'a> {
         self.merge_keystones(pdb)?;
 
         // The skills' mod lists
-        for i in 0..self.env.skills.active_skills.len() {
+        for i in 0..self.n_player {
             let mut base = Store::list();
             base.parent = Some(pdb);
             for m in &self.mods(i).mods {
@@ -851,7 +854,7 @@ impl<'a> Perform<'a> {
         if mode.buffs {
             let mut heralds: Vec<String> = Vec::new();
             let mut auras: Vec<String> = Vec::new();
-            for i in 0..self.lists.len() {
+            for i in 0..self.n_player {
                 let name = self
                     .mods(i)
                     .skill_cfg
@@ -971,7 +974,7 @@ impl<'a> Perform<'a> {
     /// What `GetStat` reads of the player's skills
     fn update_reserving_skills(&mut self) {
         let mut out = Vec::new();
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             let m = self.mods(i);
             if self.has_type(i, "HasReservation")
                 && !m.skill_flags.contains("disable")
@@ -997,7 +1000,7 @@ impl<'a> Perform<'a> {
         let main_cfg = self.cfg(main);
         // Minion counts by key: (total, nonVaal, permanent)
         let mut minion_counts: Vec<(String, f64, Option<f64>, Option<f64>)> = Vec::new();
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             let list = self.lists[i].list;
             let cfg = self.cfg(i);
             let name = self.skill_name(i).to_string();
@@ -2300,7 +2303,7 @@ impl<'a> Perform<'a> {
         // (base, percent) of Life and Mana
         self.reserved = [(0.0, extra_life), (0.0, 0.0)];
         self.uncancellable = [extra_life, extra_mana];
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             if !((self.has_type(i, "HasReservation")
                 || self.sd_truthy(i, "triggeredByAutoexertion"))
                 && !self.has_type(i, "ReservationBecomesCost"))
@@ -3932,7 +3935,7 @@ impl<'a> Perform<'a> {
         // Active spectres
         let mut has_spectre = false;
         let mut active_spectres: Vec<String> = Vec::new();
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             if !self.has_flag(i, "disable")
                 && self
                     .skill(i)
@@ -4017,7 +4020,7 @@ impl<'a> Perform<'a> {
         }
 
         // Skills whose stages come from their own calculation
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             if self.has_flag(i, "disable") {
                 continue;
             }
@@ -4052,7 +4055,7 @@ impl<'a> Perform<'a> {
 
         let mut applied_combustion = false;
         let mut warcry_list: Vec<String> = Vec::new();
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             let list = self.lists[i].list;
             let cfg = self.cfg(i);
             let buff_list = self.mods(i).buff_list.clone();
@@ -4811,7 +4814,7 @@ impl<'a> Perform<'a> {
             }
             let mut slot: Option<usize> = None;
             let mut skip = false;
-            for i in 0..self.lists.len() {
+            for i in 0..self.n_player {
                 let bl = &self.mods(i).buff_list;
                 if bl.first().is_some_and(|b| b.name == curse.name) && self.has_type(i, "Aura") {
                     if self.c.flag(pdb, None, &["SelfAurasOnlyAffectYou"])?
@@ -5176,7 +5179,7 @@ impl<'a> Perform<'a> {
                 .override_num(pdb, None, &[&format!("{ailment}Max")])?;
             let mut max = max_over.unwrap_or(0.0);
             if max_over.is_none() {
-                for i in 0..self.lists.len() {
+                for i in 0..self.n_player {
                     let base = self.lists[i].base;
                     let skill_max =
                         ad.max + self.c.base(base, None, &[&format!("{ailment}Max")])?;
@@ -5416,7 +5419,7 @@ impl<'a> Perform<'a> {
             self.c.out(PLAYER, "ActiveSpectreLimit").unwrap_or(0.0),
             summoned_override.unwrap_or(f64::INFINITY),
         );
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             let Some(m) = self.minions.iter().position(|x| x.skill == i) else {
                 continue;
             };
@@ -5532,7 +5535,7 @@ impl<'a> Perform<'a> {
         // The totem with the most life
         let mut normal: Option<f64> = None;
         let mut vaal: Option<f64> = None;
-        for i in 0..self.lists.len() {
+        for i in 0..self.n_player {
             if self.has_flag(i, "totem")
                 && !self.has_flag(i, "disable")
                 && self.sd(i, "totemLevel").is_some()

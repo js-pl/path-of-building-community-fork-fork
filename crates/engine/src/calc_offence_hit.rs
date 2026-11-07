@@ -742,7 +742,7 @@ impl<'a> Perform<'a> {
             return Ok(());
         }
         let max_hit = self.c.flag(list, None, &["Condition:WarcryMaxHit"])?;
-        for j in 0..self.lists.len() {
+        for j in self.actor_skills(actor) {
             let name = self.skill_name(j).to_string();
             let Some(&(_, key, short, ratio, count_stat, needs)) =
                 EXERTING_CRIES.iter().find(|c| c.0 == name)
@@ -988,7 +988,7 @@ impl<'a> Perform<'a> {
         if !self.has_type(i, "Spell") || self.has_type(i, "Brand") {
             return Ok(());
         }
-        for j in 0..self.lists.len() {
+        for j in self.actor_skills(actor) {
             let pact_name = self.skill_name(j).to_string();
             let Some(key) = pact_name.strip_prefix("Pact of ") else {
                 continue;
