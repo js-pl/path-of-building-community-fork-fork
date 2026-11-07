@@ -202,6 +202,81 @@ struct DamageIn {
     cycles_ran: bool,
 }
 
+/// Adds a degen row to the breakdowns of the total and of the final type
+/// (`TotalBuildDegen`/`<type>BuildDegen` or `TotalDegen`/`<type>EnemyDegen`)
+#[allow(clippy::too_many_arguments)]
+fn degen_rows(
+    bd: &mut Bd,
+    total_key: &str,
+    type_key: &str,
+    source: Option<&str>,
+    typ: &str,
+    to: &str,
+    base: f64,
+    pct: f64,
+    mult: f64,
+    total: f64,
+) {
+    let cols = |with_type2: bool| {
+        let mut c = vec![];
+        if source.is_some() {
+            c.push(("Source", "source"));
+        }
+        c.push(("Base Type", "type"));
+        if with_type2 {
+            c.push(("Final Type", "type2"));
+        }
+        c.extend([
+            ("Base", "base"),
+            ("Taken As Percent", "conv"),
+            ("Multiplier", "mult"),
+            ("Total", "total"),
+        ]);
+        let mut t = row_table("", &c);
+        t.fields.remove("label");
+        t
+    };
+    let cells = |with_type2: bool| {
+        let mut r = Bd::new();
+        if let Some(s) = source {
+            r.set("source", s);
+        }
+        r.set("type", typ);
+        if with_type2 {
+            r.set("type2", to);
+        }
+        r.set("base", sf!("%.1f", base));
+        r.set("conv", sf!("x %.2f%%", pct));
+        r.set("mult", sf!("x %.2f", mult));
+        r.set("total", sf!("%.1f", total));
+        r
+    };
+    if bd.get(total_key).is_none() {
+        bd.set(total_key, cols(true));
+    }
+    bd.table(total_key).add_row(cells(true));
+    if bd.get(type_key).is_none() {
+        bd.set(type_key, cols(false));
+    }
+    bd.table(type_key).add_row(cells(false));
+}
+
+/// The net regen breakdowns: degen by type, then the sums
+#[allow(clippy::too_many_arguments)]
+fn net_regen_tables(prefix: &str) -> [(String, Bd); 3] {
+    ["Life", "Mana", "EnergyShield"].map(|r| {
+        let label = match r {
+            "EnergyShield" => "Total Energy Shield Degen",
+            "Life" => "Total Life Degen",
+            _ => "Total Mana Degen",
+        };
+        (
+            format!("{prefix}Net{r}Regen"),
+            row_table(label, &[("Type", "type"), ("Degen", "degen")]),
+        )
+    })
+}
+
 /// A guard's breakdown: the life its absorption protects
 fn guard_bd(limit: f64, rate: f64) -> Bd {
     let protected = limit / (rate / 100.0) * (1.0 - rate / 100.0);
@@ -3516,11 +3591,26 @@ impl<'a> Perform<'a> {
             if base > 0.0 {
                 for &(c, pct) in ds {
                     if pct > 0.0 {
-                        let total = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                        let mult = o(self, &format!("{c}TakenDotMult"));
+                        let total = base * (pct / 100.0) * mult;
                         let k = format!("{c}BuildDegen");
                         let v = self.o_or(actor, &k, 0.0) + total;
                         self.c.set_out(actor, &k, v);
                         total_build += total;
+                        if let Some(bd) = self.bd(actor) {
+                            degen_rows(
+                                bd,
+                                "TotalBuildDegen",
+                                &k,
+                                None,
+                                t,
+                                c,
+                                base,
+                                pct,
+                                mult,
+                                total,
+                            );
+                        }
                     }
                 }
             }
@@ -3555,21 +3645,56 @@ impl<'a> Perform<'a> {
         } else {
             self.c.set_out(actor, "TotalBuildDegen", total_build);
             let (mut tl, mut tm, mut te) = (0.0, 0.0, 0.0);
+            let mut tables = net_regen_tables("");
             for t in DMG_TYPES {
                 if let Some(d) = self.c.out(actor, &format!("{t}BuildDegen")) {
                     let (l, m, e) = split(self, t, d);
                     tl += l;
                     tm += m;
                     te += e;
+                    for (k, v) in [l, m, e].iter().enumerate() {
+                        tables[k]
+                            .1
+                            .add_row(row([("type", sf!("%s", t)), ("degen", sf!("%.2f", *v))]));
+                    }
                 }
             }
-            let nl = o(self, "LifeRegenRecovery") - tl;
-            let nm = o(self, "ManaRegenRecovery") - tm;
-            let ne = o(self, "EnergyShieldRegenRecovery") - te;
+            let (rl, rm, re) = (
+                o(self, "LifeRegenRecovery"),
+                o(self, "ManaRegenRecovery"),
+                o(self, "EnergyShieldRegenRecovery"),
+            );
+            let nl = rl - tl;
+            let nm = rm - tm;
+            let ne = re - te;
             self.c.set_out(actor, "NetLifeRegen", nl);
             self.c.set_out(actor, "NetManaRegen", nm);
             self.c.set_out(actor, "NetEnergyShieldRegen", ne);
             self.c.set_out(actor, "TotalNetRegen", nl + nm + ne);
+            if let Some(bd) = self.bd(actor) {
+                let [(kl, mut bl), (km, mut bm), (ke, mut be)] = tables;
+                bl.push(sf!("%.1f ^8(total life regen)", rl));
+                bl.push(sf!("- %.1f ^8(total life degen)", tl));
+                bl.push(sf!("= %.1f", nl));
+                bm.push(sf!("%.1f ^8(total mana regen)", rm));
+                bm.push(sf!("- %.1f ^8(total mana degen)", tm));
+                bm.push(sf!("= %.1f", nm));
+                be.push(sf!("%.1f ^8(total energy shield regen)", re));
+                be.push(sf!("- %.1f ^8(total energy shield degen)", te));
+                be.push(sf!("= %.1f", ne));
+                bd.set(&kl, bl);
+                bd.set(&km, bm);
+                bd.set(&ke, be);
+                bd.set(
+                    "TotalNetRegen",
+                    Bd::of([
+                        sf!("Net Life Regen: %.1f", nl),
+                        sf!("+ Net Mana Regen: %.1f", nm),
+                        sf!("+ Net Energy Shield Regen: %.1f", ne),
+                        sf!("= Total Net Regen: %.1f", nl + nm + ne),
+                    ]),
+                );
+            }
         }
         let crit_ailment = 1.0
             + self.o_or(actor, "EnemyCritChance", 0.0) / 100.0
@@ -3623,8 +3748,9 @@ impl<'a> Perform<'a> {
             };
             if category == "DamageOverTime" {
                 for t in DMG_TYPES {
-                    let base = self
-                        .input_num(&format!("enemy{t}Damage"))
+                    let input = self.input_num(&format!("enemy{t}Damage"));
+                    let source = if input.is_some() { "Config" } else { "Default" };
+                    let base = input
                         .or_else(|| {
                             Some(
                                 self.placeholder_num(&format!("enemy{t}Damage"))
@@ -3635,11 +3761,26 @@ impl<'a> Perform<'a> {
                     if base > 0.0 {
                         for (c, pct) in dot_of(t) {
                             if pct > 0.0 {
-                                let x = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                                let mult = o(self, &format!("{c}TakenDotMult"));
+                                let x = base * (pct / 100.0) * mult;
                                 let k = format!("{c}EnemyDegen");
                                 let v = self.o_or(actor, &k, 0.0) + x;
                                 self.c.set_out(actor, &k, v);
                                 total += x;
+                                if let Some(bd) = self.bd(actor) {
+                                    degen_rows(
+                                        bd,
+                                        "TotalDegen",
+                                        &k,
+                                        Some(source),
+                                        t,
+                                        c,
+                                        base,
+                                        pct,
+                                        mult,
+                                        x,
+                                    );
+                                }
                             }
                         }
                     }
@@ -3671,11 +3812,26 @@ impl<'a> Perform<'a> {
                     if base > 0.0 {
                         for (c, pct) in dot_of(dt) {
                             if pct > 0.0 {
-                                let x = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                                let mult = o(self, &format!("{c}TakenDotMult"));
+                                let x = base * (pct / 100.0) * mult;
                                 let k = format!("{c}EnemyDegen");
                                 let v = self.o_or(actor, &k, 0.0) + x;
                                 self.c.set_out(actor, &k, v);
                                 total += x;
+                                if let Some(bd) = self.bd(actor) {
+                                    degen_rows(
+                                        bd,
+                                        "TotalDegen",
+                                        &k,
+                                        Some(source),
+                                        dt,
+                                        c,
+                                        base,
+                                        pct,
+                                        mult,
+                                        x,
+                                    );
+                                }
                             }
                         }
                     }
@@ -3686,6 +3842,7 @@ impl<'a> Perform<'a> {
             } else {
                 self.c.set_out(actor, "TotalDegen", total);
                 let (mut tl, mut tm, mut te) = (0.0, 0.0, 0.0);
+                let mut tables = net_regen_tables("Comprehensive");
                 for t in DMG_TYPES {
                     let d = self.o_or(actor, &format!("{t}BuildDegen"), 0.0)
                         + self.o_or(actor, &format!("{t}EnemyDegen"), 0.0);
@@ -3694,6 +3851,11 @@ impl<'a> Perform<'a> {
                         tl += l;
                         tm += m;
                         te += e;
+                        for (k, v) in [l, m, e].iter().enumerate() {
+                            tables[k]
+                                .1
+                                .add_row(row([("type", sf!("%s", t)), ("degen", sf!("%.2f", *v))]));
+                        }
                     }
                 }
                 let nl = o(self, "LifeRegenRecovery")
@@ -3712,6 +3874,53 @@ impl<'a> Perform<'a> {
                     .set_out(actor, "ComprehensiveNetEnergyShieldRegen", ne);
                 self.c
                     .set_out(actor, "ComprehensiveTotalNetRegen", nl + nm + ne);
+                let (lr, mr, er, lla) = (
+                    self.o_or(actor, "LifeRecoupRecoveryAvg", 0.0),
+                    self.o_or(actor, "ManaRecoupRecoveryAvg", 0.0),
+                    self.o_or(actor, "EnergyShieldRecoupRecoveryAvg", 0.0),
+                    self.o_or(actor, "LifeLossLostAvg", 0.0),
+                );
+                let (rl, rm, re) = (
+                    o(self, "LifeRegenRecovery"),
+                    o(self, "ManaRegenRecovery"),
+                    o(self, "EnergyShieldRegenRecovery"),
+                );
+                if let Some(bd) = self.bd(actor) {
+                    let [(kl, mut bl), (km, mut bm), (ke, mut be)] = tables;
+                    bl.push(sf!("%.1f ^8(total life regen)", rl));
+                    if lr != 0.0 {
+                        bl.push(sf!("+ %.1f ^8(average life recoup)", lr));
+                    }
+                    bl.push(sf!("- %.1f ^8(total life degen)", tl));
+                    if lla != 0.0 {
+                        bl.push(sf!("- %.1f ^8(average life lost over time)", lla));
+                    }
+                    bl.push(sf!("= %.1f", nl));
+                    bm.push(sf!("%.1f ^8(total mana regen)", rm));
+                    if mr != 0.0 {
+                        bm.push(sf!("+ %.1f ^8(average mana recoup)", mr));
+                    }
+                    bm.push(sf!("- %.1f ^8(total mana degen)", tm));
+                    bm.push(sf!("= %.1f", nm));
+                    be.push(sf!("%.1f ^8(total energy shield regen)", re));
+                    if er != 0.0 {
+                        be.push(sf!("+ %.1f ^8(average energy shield recoup)", er));
+                    }
+                    be.push(sf!("- %.1f ^8(total energy shield degen)", te));
+                    be.push(sf!("= %.1f", ne));
+                    bd.set(&kl, bl);
+                    bd.set(&km, bm);
+                    bd.set(&ke, be);
+                    bd.set(
+                        "ComprehensiveTotalNetRegen",
+                        Bd::of([
+                            sf!("Net Life Regen: %.1f", nl),
+                            sf!("+ Net Mana Regen: %.1f", nm),
+                            sf!("+ Net Energy Shield Regen: %.1f", ne),
+                            sf!("= Total Net Regen: %.1f", nl + nm + ne),
+                        ]),
+                    );
+                }
             }
         }
         Ok(())
