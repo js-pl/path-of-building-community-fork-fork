@@ -64,6 +64,12 @@ fn lua_json(v: &Value, key: &str, depth: usize) -> Option<J> {
         Value::Table(_) if key == "item" => {
             Some(json!({"$item": lua::to_string(&get(v, "name")).to_str_lossy()}))
         }
+        Value::Table(_) if key == "mod" => Some(
+            engine::mods::convert::Converter::default()
+                .mod_(v)
+                .map(|m| without_warcry_bonus(equivalence::typed_json::mod_(&m)))
+                .unwrap_or_else(|e| J::String(format!("<mod: {e}>"))),
+        ),
         Value::Table(_) if depth > 6 => Some(J::String("<deep>".into())),
         Value::Table(_) => {
             let mut m = Map::new();
@@ -83,6 +89,20 @@ fn lua_json(v: &Value, key: &str, depth: usize) -> Option<J> {
     }
 }
 
+/// `CalcPerform` writes `warcryPowerBonus` onto the tag a skill's data
+/// shares with every copy of the mod (an upstream quirk the typed perform
+/// keeps local), so the translated mods carry it
+fn without_warcry_bonus(mut j: J) -> J {
+    if let J::Object(o) = &mut j {
+        for (_, t) in o.iter_mut() {
+            if let J::Object(tag) = t {
+                tag.remove("warcryPowerBonus");
+            }
+        }
+    }
+    j
+}
+
 fn bd_val_json(v: &BdVal) -> J {
     match v {
         BdVal::Str(s) => J::String(s.to_string()),
@@ -90,6 +110,8 @@ fn bd_val_json(v: &BdVal) -> J {
         BdVal::Bool(b) => J::Bool(*b),
         BdVal::Table(t) => bd_json(t),
         BdVal::Item(n) => json!({"$item": &**n}),
+        BdVal::Mod(m) => equivalence::typed_json::mod_(m),
+        BdVal::Value(v) => equivalence::typed_json::value(v),
     }
 }
 

@@ -10,6 +10,7 @@
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
 use crate::actor::OutVal;
+use crate::breakdown::{Bd, BdVal};
 use crate::build::Build;
 use crate::calc::PLAYER;
 use crate::calc_env::{CalcData, Env, init_env};
@@ -948,10 +949,22 @@ fn multipliers_used(p: &Perform) -> std::collections::HashSet<String> {
 
 /// The Calcs tab's lists of the buffs, combat buffs and curses
 /// (`buildOutput`, `CALCS`)
+/// The lists of the buffs `sorted` names, in that order
+fn buff_list<'x>(
+    names: &[String],
+    lists: &'x [Vec<crate::mods::Mod>],
+    sorted: &[String],
+) -> Vec<&'x Vec<crate::mods::Mod>> {
+    sorted
+        .iter()
+        .filter_map(|n| names.iter().position(|x| x == n).map(|i| &lists[i]))
+        .collect()
+}
+
 fn calcs_lists(
     p: &Perform,
     main_multipliers: &std::collections::HashSet<String>,
-) -> Result<Vec<(String, OutVal)>> {
+) -> Result<CalcsLists> {
     let pdb = p.c.db(PLAYER);
     let out = |a: usize, k: &str| p.c.out(a, k).unwrap_or(f64::NAN);
     let mut combat: Vec<String> = Vec::new();
@@ -1041,8 +1054,44 @@ fn calcs_lists(
         combat.push("Elusive".into());
     }
     buffs.sort();
+    let edb = p.c.db(crate::calc::ENEMY);
+    // `breakdown.SkillBuffs` and `SkillDebuffs`: the buffs' and debuffs'
+    // mods that apply
+    let mod_rows = |db, lists: Vec<&Vec<crate::mods::Mod>>| -> Result<Bd> {
+        let mut rows = Bd::new();
+        for l in lists {
+            for m in l {
+                let v = p.c.query().eval_mod(db, m, None, None)?;
+                let v = match v {
+                    Some(ModValue::Number(n)) if n != 0.0 => BdVal::Num(n),
+                    Some(ModValue::Number(_)) | None => continue,
+                    Some(ModValue::Bool(b)) => BdVal::Bool(b),
+                    Some(ModValue::Str(s)) => BdVal::Str(s),
+                    Some(v) => BdVal::Value(v),
+                };
+                let mut r = Bd::new();
+                r.set("mod", BdVal::Mod(Rc::new(m.clone())));
+                r.set("value", v);
+                rows.push(r);
+            }
+        }
+        let mut t = Bd::new();
+        t.set("modList", rows);
+        Ok(t)
+    };
+    let skill_buffs = mod_rows(pdb, buff_list(&p.buff_names, &p.buff_lists, &buffs))?;
     let mut curses: Vec<String> = p.debuffs.iter().map(|d| d.0.clone()).collect();
     curses.sort();
+    let mut debuff_lists: Vec<&Vec<crate::mods::Mod>> = Vec::new();
+    for c in &curses {
+        if let Some(d) = p.debuffs.iter().find(|d| d.0 == *c) {
+            debuff_lists.push(&d.1);
+        }
+    }
+    for l in p.curse_slot_mods.iter().flatten() {
+        debuff_lists.push(l);
+    }
+    let skill_debuffs = mod_rows(edb, debuff_lists)?;
     for c in curses.iter_mut() {
         let mods = &p.debuffs.iter().find(|d| d.0 == *c).ok_or("no debuff")?.1;
         let stacks = crate::mods::list::sum(
@@ -1057,6 +1106,10 @@ fn calcs_lists(
     }
     curses.extend(p.curse_slots.iter().cloned());
     let curse_list = curses.join(", ");
+    let mut bds: Vec<(String, Bd)> = vec![
+        ("SkillBuffs".into(), skill_buffs),
+        ("SkillDebuffs".into(), skill_debuffs.clone()),
+    ];
     let mut out_lists = vec![
         ("BuffList".to_string(), OutVal::Str(buffs.join(", ").into())),
         (
@@ -1095,6 +1148,12 @@ fn calcs_lists(
         }
         let mut buffs = p.minion_buff_names.clone();
         buffs.sort();
+        let rows = mod_rows(
+            mdb,
+            buff_list(&p.minion_buff_names, &p.minion_buff_lists, &buffs),
+        )?;
+        bds.push(("Minion.SkillBuffs".into(), rows));
+        bds.push(("Minion.SkillDebuffs".into(), skill_debuffs.clone()));
         out_lists.push((
             "Minion.BuffList".into(),
             OutVal::Str(buffs.join(", ").into()),
@@ -1105,8 +1164,12 @@ fn calcs_lists(
         ));
         out_lists.push(("Minion.CurseList".into(), OutVal::Str(curse_list.into())));
     }
-    Ok(out_lists)
+    Ok((out_lists, bds))
 }
+
+/// The Calcs tab's lists (`BuffList`, ...) and the breakdowns of the buffs
+/// and debuffs, `Minion.` prefixed for the minion's
+type CalcsLists = (Vec<(String, OutVal)>, Vec<(String, Bd)>);
 
 impl<'d> Calcs<'d> {
     /// `calcsTab:BuildOutput()`: `calcs.buildOutput(build, "MAIN")`, then
@@ -1142,7 +1205,19 @@ impl<'d> Calcs<'d> {
                 lists,
             ))
         })?;
-        let (mut outputs, lists) = out?;
+        let (mut outputs, (lists, bds)) = out?;
+        for (k, b) in bds {
+            let bd = match k.strip_prefix("Minion.") {
+                Some(k) => outputs
+                    .minion_breakdown
+                    .as_mut()
+                    .map(|bd| (bd, k.to_string())),
+                None => outputs.player_breakdown.as_mut().map(|bd| (bd, k.clone())),
+            };
+            if let Some((bd, k)) = bd {
+                bd.set(&k, b);
+            }
+        }
         let full = self.calc_full_dps(build, Mode::Calculator)?;
         full.write(&mut outputs.player);
         for (k, v) in lists {

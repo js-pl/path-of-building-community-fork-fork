@@ -12,10 +12,12 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::Bd;
 use crate::calc::{floor, m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_perform::{Perform, converted_tags, new_mod};
 use crate::mods::{Cfg, Mod, ModType, ModValue, StoreId, Sym, Tag};
+use crate::sf;
 use std::collections::BTreeMap;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -2536,18 +2538,45 @@ impl<'a> Perform<'a> {
             let c = Some(&cfg);
             let actor = crate::calc::PLAYER;
             if level.is_some() {
-                let v = self.c.base(list, c, &["GemLevel"])?
-                    + self.c.base(list, c, &["GemSupportLevel"])?
-                    + self.c.base(list, c, &["GemItemLevel"])?;
+                let base = self.c.base(list, c, &["GemLevel"])?;
+                let support = self.c.base(list, c, &["GemSupportLevel"])?;
+                let item = self.c.base(list, c, &["GemItemLevel"])?;
+                let v = base + support + item;
                 self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
                 self.c.set_out(actor, "GemLevel", v);
+                if let Some(bd) = self.bd(actor) {
+                    let mut b = Bd::of([sf!("%d ^8(level from gem)", base)]);
+                    if support > 0.0 {
+                        b.push(sf!("+ %d ^8(level from support)", support));
+                    }
+                    if item > 0.0 {
+                        b.push(sf!("+ %d ^8(level from items)", item));
+                    }
+                    b.push(sf!("= %d", v));
+                    bd.set("GemLevel", b);
+                }
             }
-            let v = self.c.base(list, c, &["GemQuality"])?
-                + self.c.base(list, c, &["GemSupportQuality"])?
-                + self.c.base(list, c, &["GemItemQuality"])?
-                + self.c.base(list, c, &["GemSocketQuality"])?;
+            let base = self.c.base(list, c, &["GemQuality"])?;
+            let support = self.c.base(list, c, &["GemSupportQuality"])?;
+            let item = self.c.base(list, c, &["GemItemQuality"])?;
+            let socket = self.c.base(list, c, &["GemSocketQuality"])?;
+            let v = base + support + item + socket;
             self.c
                 .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
+            if let Some(bd) = self.bd(actor) {
+                let mut b = Bd::of([sf!("%d ^8(quality from gem)", base)]);
+                if support > 0.0 {
+                    b.push(sf!("+ %d ^8(quality from support)", support));
+                }
+                if item > 0.0 {
+                    b.push(sf!("+ %d ^8(quality from items)", item));
+                }
+                if socket > 0.0 {
+                    b.push(sf!("+ %d ^8(quality from socket)", socket));
+                }
+                b.push(sf!("= %d", v));
+                bd.set("GemQuality", b);
+            }
             self.c.set_out(actor, "GemQuality", v);
         }
         Ok(())

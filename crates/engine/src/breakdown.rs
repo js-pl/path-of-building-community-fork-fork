@@ -21,6 +21,10 @@ pub enum BdVal {
     Table(Bd),
     /// An item, by name (`item = actor.itemList[slot]`)
     Item(Rc<str>),
+    /// A mod (`modList` rows)
+    Mod(Rc<crate::mods::Mod>),
+    /// A mod's value that is not a number (`modList` rows)
+    Value(crate::mods::ModValue),
 }
 
 impl From<&str> for BdVal {

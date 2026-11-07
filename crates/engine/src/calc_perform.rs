@@ -244,6 +244,8 @@ pub struct Perform<'a> {
     pub(crate) applied_enemy_modifiers: Vec<Vec<Mod>>,
     /// The curses in their slots (`env.curseSlots`), by name
     pub curse_slots: Vec<String>,
+    /// The curse slots' mod lists on the enemy
+    pub curse_slot_mods: Vec<Option<Vec<Mod>>>,
     /// `output.HasBonechill` and whether some skill guarantees it
     pub(crate) has_guaranteed_bonechill: bool,
     /// `env.weaponData1`, `env.player.weaponData1` after Dancing Dervish
@@ -308,6 +310,32 @@ impl<'a> Perform<'a> {
 
     pub fn skill(&self, i: usize) -> &crate::calc_skills::ActiveSkill {
         &self.env.skills.active_skills[i]
+    }
+
+    /// `breakdown[key] = breakdown.simple(nil, nil, total, names...)`
+    pub(crate) fn bd_simple(
+        &mut self,
+        actor: usize,
+        key: &str,
+        total: f64,
+        names: &[&str],
+    ) -> Result<()> {
+        if self.bd(actor).is_none() {
+            return Ok(());
+        }
+        let db = self.c.db(actor);
+        let base = self.c.base(db, None, &names[..1])?;
+        let inc = self.c.inc(db, None, names)?;
+        let more = self.c.more(db, None, names)?;
+        let b = crate::breakdown::simple(0.0, base, inc, more, total);
+        let bd = self.bd(actor).unwrap();
+        match b {
+            Some(b) => bd.set(key, b),
+            None => {
+                bd.fields.remove(key);
+            }
+        }
+        Ok(())
     }
 
     /// `actor.breakdown`, when the calculation builds them
@@ -504,6 +532,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         uncancellable: [0.0; 2],
         applied_enemy_modifiers: vec![Vec::new(), Vec::new()],
         curse_slots: Vec::new(),
+        curse_slot_mods: Vec::new(),
         has_guaranteed_bonechill: false,
         weapons_disabled: false,
         weapon_range: [None, None],
@@ -1848,7 +1877,7 @@ impl<'a> Perform<'a> {
             let more = self.c.more(db, None, &["Life"])?;
             let over = self.c.override_num(db, None, &["Life"])?;
             let conv = self.c.base(db, None, &["LifeConvertToEnergyShield"])?;
-            match over {
+            let life = match over {
                 Some(o) => o,
                 None => m_max(
                     round(
@@ -1857,12 +1886,57 @@ impl<'a> Perform<'a> {
                     ),
                     1.0,
                 ),
+            };
+            if let Some(bd) = self.bd(actor)
+                && (inc != 0.0 || more != 1.0 || conv != 0.0 || over.is_some())
+            {
+                let mut b = crate::breakdown::Bd::of([crate::sf!("%g ^8(base)", base)]);
+                if inc != 0.0 {
+                    b.push(crate::sf!(
+                        "x %.2f ^8(increased/reduced)",
+                        1.0 + inc / 100.0
+                    ));
+                }
+                if more != 1.0 {
+                    b.push(crate::sf!("x %.2f ^8(more/less)", more));
+                }
+                if let Some(o) = over {
+                    b.push(crate::sf!("= %g ^8(life override)", o));
+                }
+                b.push(crate::sf!("= %g", life));
+                bd.set("Life", b);
             }
+            life
         };
         self.c.set_out(actor, "Life", life);
         let conv = self.c.base(db, None, &["ManaConvertToArmour"])?;
         let mana = round(self.c.val(db, "Mana", None)? * (1.0 - conv / 100.0), 0.0);
         self.c.set_out(actor, "Mana", mana);
+        if self.bd(actor).is_some() {
+            let base = self.c.base(db, None, &["Mana"])?;
+            let inc = self.c.inc(db, None, &["Mana"])?;
+            let more = self.c.more(db, None, &["Mana"])?;
+            if inc != 0.0 || more != 1.0 || conv != 0.0 {
+                let mut b = crate::breakdown::Bd::of([crate::sf!("%g ^8(base)", base)]);
+                if inc != 0.0 {
+                    b.push(crate::sf!(
+                        "x %.2f ^8(increased/reduced)",
+                        1.0 + inc / 100.0
+                    ));
+                }
+                if more != 1.0 {
+                    b.push(crate::sf!("x %.2f ^8(more/less)", more));
+                }
+                if conv != 0.0 {
+                    b.push(crate::sf!(
+                        "x %.2f ^8(converted to Armour)",
+                        1.0 - conv / 100.0
+                    ));
+                }
+                b.push(crate::sf!("= %g", mana));
+                self.bd(actor).unwrap().set("Mana", b);
+            }
+        }
         self.c.set_out(
             actor,
             "LowestOfMaximumLifeAndMaximumMana",
@@ -2062,6 +2136,7 @@ impl<'a> Perform<'a> {
                 for stat in ["Str", "Dex", "Int"] {
                     let v = m_max(round(self.c.val(db, stat, None)?, 0.0), 0.0);
                     self.c.set_out(actor, stat, v);
+                    self.bd_simple(actor, stat, v, &[stat])?;
                 }
                 self.attribute_conditions(actor);
             }
@@ -2342,6 +2417,7 @@ impl<'a> Perform<'a> {
                 for (k, stat) in ["Str", "Dex", "Int"].into_iter().enumerate() {
                     let v = m_min(round(self.c.val(db, stat, None)?, 0.0), base[k]);
                     self.c.set_out(actor, stat, v);
+                    self.bd_simple(actor, stat, v, &[stat])?;
                     let b = self.c.base(db, None, &[stat])? - base[k];
                     self.c.add(
                         db,
@@ -2371,6 +2447,7 @@ impl<'a> Perform<'a> {
             }
             let omni = m_max(round(self.c.val(db, "Omni", None)?, 0.0), 0.0);
             self.c.set_out(actor, "Omni", omni);
+            self.bd_simple(actor, "Omni", omni, &["Omni"])?;
             self.attribute_conditions(actor);
         }
         Ok(())
@@ -2386,6 +2463,13 @@ impl<'a> Perform<'a> {
         // (base, percent) of Life and Mana
         self.reserved = [(0.0, extra_life), (0.0, 0.0)];
         self.uncancellable = [extra_life, extra_mana];
+        if let Some(bd) = self.bd(PLAYER) {
+            for k in ["LifeReserved", "ManaReserved"] {
+                let mut t = crate::breakdown::Bd::new();
+                t.set("reservations", crate::breakdown::Bd::new());
+                bd.set(k, t);
+            }
+        }
         for i in 0..self.n_player {
             if !((self.has_type(i, "HasReservation")
                 || self.sd_truthy(i, "triggeredByAutoexertion"))
@@ -2521,11 +2605,57 @@ impl<'a> Perform<'a> {
                     flat *= n + 1.0;
                     pct *= n + 1.0;
                 }
+                let skill_name = self.skill_name(i).to_string();
+                let row = |base: crate::breakdown::BdVal, total: crate::breakdown::BdVal| {
+                    use crate::breakdown::BdVal;
+                    let n = crate::pat::num;
+                    let opt = |c: bool, s: String| {
+                        if c {
+                            BdVal::from(s)
+                        } else {
+                            BdVal::Bool(false)
+                        }
+                    };
+                    let mut r = crate::breakdown::Bd::new();
+                    r.set("skillName", skill_name.as_str());
+                    r.set("base", base);
+                    r.set("mult", opt(mult != 1.0, format!("x {}", n(mult))));
+                    r.set("more", opt(more != 1.0, format!("x {}", n(more))));
+                    r.set(
+                        "inc",
+                        opt(inc != 0.0, format!("x {}", n(1.0 + inc / 100.0))),
+                    );
+                    r.set(
+                        "efficiency",
+                        opt(
+                            eff != 0.0,
+                            format!("x {}", n(round(100.0 / (100.0 + eff), 4.0))),
+                        ),
+                    );
+                    r.set(
+                        "efficiencyMore",
+                        opt(eff_more != 1.0, format!("x {}", n(eff_more))),
+                    );
+                    r.set("total", total);
+                    r
+                };
+                let flat_row = (flat != 0.0).then(|| row(base_flat.into(), flat.into()));
+                let pct_row = (pct != 0.0).then(|| {
+                    row(
+                        format!("{}%", crate::pat::num(base_pct)).into(),
+                        format!("{}%", crate::pat::num(pct)).into(),
+                    )
+                });
                 if flat != 0.0 {
                     self.mods_mut(i)
                         .skill_data
                         .insert(format!("{name}ReservedBase"), ModValue::Number(flat));
                     self.reserved[pool].0 += flat;
+                    if let Some(bd) = self.bd(PLAYER) {
+                        bd.table(&format!("{name}Reserved"))
+                            .table("reservations")
+                            .push(flat_row.unwrap());
+                    }
                 }
                 if pct != 0.0 {
                     let max = self.c.out(PLAYER, name).unwrap_or(f64::NAN);
@@ -2536,6 +2666,11 @@ impl<'a> Perform<'a> {
                         ModValue::Number(flat + (max * pct / 100.0).ceil()),
                     );
                     self.reserved[pool].1 += pct;
+                    if let Some(bd) = self.bd(PLAYER) {
+                        bd.table(&format!("{name}Reserved"))
+                            .table("reservations")
+                            .push(pct_row.unwrap());
+                    }
                 }
                 if self
                     .c
@@ -2623,6 +2758,54 @@ impl<'a> Perform<'a> {
     }
 
     /// The attribute requirements (`env.requirementsTable`)
+    /// The breakdown name of each requirement source (`sourceName`)
+    fn requirement_names(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for r in &self.env.setup.items.requirements {
+            let (rarity, name) = self
+                .input
+                .tab
+                .item(r.item_id)
+                .map(|i| (i.rarity.clone(), i.name.clone()))
+                .unwrap_or_default();
+            let color = match rarity.as_str() {
+                "NORMAL" => "^xC8C8C8",
+                "MAGIC" => "^x8888FF",
+                "RARE" => "^xFFFF77",
+                "UNIQUE" => "^xAF6025",
+                "RELIC" => "^x60C060",
+                _ => "",
+            };
+            out.push(format!("{color}{name}"));
+        }
+        let main = self.env.skills.main_socket_group;
+        for (gi, g) in self.env.groups.iter().enumerate() {
+            let enabled = self
+                .env
+                .skills
+                .slot_enabled
+                .get(gi)
+                .copied()
+                .unwrap_or(true);
+            if !(gi + 1 == main || (g.enabled && enabled)) {
+                continue;
+            }
+            for gem in &g.gem_list {
+                if gem.gem.is_none() || !gem.enabled {
+                    continue;
+                }
+                out.push(crate::sf!(
+                    "%s%s ^7%d/%d",
+                    gem.color.as_str(),
+                    gem.name_spec.as_str(),
+                    gem.level,
+                    gem.quality
+                ));
+            }
+        }
+        out
+    }
+
     fn requirements_table(&self) -> Vec<(BTreeMap<&'static str, f64>, OutVal, Option<String>)> {
         let mut out = Vec::new();
         for r in &self.env.setup.items.requirements {
@@ -2653,7 +2836,7 @@ impl<'a> Perform<'a> {
                 continue;
             }
             for (k, gem) in g.gem_list.iter().enumerate() {
-                if gem.gem.is_none() {
+                if gem.gem.is_none() || !gem.enabled {
                     continue;
                 }
                 let over = self
@@ -2699,11 +2882,29 @@ impl<'a> Perform<'a> {
             &["Str", "Dex", "Int"]
         };
         let table = self.requirements_table();
+        let names = if self.input.breakdown {
+            self.requirement_names()
+        } else {
+            Vec::new()
+        };
         for &attr in attrs {
             let battr = if omni.is_some() { "Omni" } else { attr };
+            if let Some(bd) = self.bd(PLAYER) {
+                let mut t = crate::breakdown::row_table(
+                    "",
+                    &[
+                        (attr, "req"),
+                        ("Source", "source"),
+                        ("Source Name", "sourceName"),
+                    ],
+                );
+                t.fields.remove("label");
+                t.set("source", "");
+                bd.set(&format!("Req{attr}"), t);
+            }
             let mut best = 0.0;
             let mut source: Option<usize> = None;
-            for (k, (vals, _, _)) in table.iter().enumerate() {
+            for (k, (vals, src, _)) in table.iter().enumerate() {
                 let Some(&v) = vals.get(attr) else { continue };
                 if v > 0.0 {
                     let mut req = (v * req_mult).floor();
@@ -2713,6 +2914,32 @@ impl<'a> Perform<'a> {
                     if req > best {
                         best = req;
                         source = Some(k);
+                    }
+                    let have = self.c.out(PLAYER, battr).unwrap_or(f64::NAN);
+                    if let Some(bd) = self.bd(PLAYER) {
+                        use crate::breakdown::BdVal;
+                        let mut r = crate::breakdown::Bd::new();
+                        r.set(
+                            "req",
+                            if req > have {
+                                BdVal::from(format!("^xDD0022{}", crate::pat::num(req)))
+                            } else {
+                                BdVal::Num(req)
+                            },
+                        );
+                        r.set("reqNum", req);
+                        r.set(
+                            "source",
+                            if matches!(src, OutVal::Gem(_)) {
+                                "Gem"
+                            } else {
+                                "Item"
+                            },
+                        );
+                        if let Some(n) = names.get(k) {
+                            r.set("sourceName", n.as_str());
+                        }
+                        bd.table(&format!("Req{battr}")).add_row(r);
                     }
                 }
             }
@@ -5054,6 +5281,7 @@ impl<'a> Perform<'a> {
             }
         }
         self.curse_slots = slots.iter().map(|s| s.name.clone()).collect();
+        self.curse_slot_mods = slots.iter().map(|s| s.mod_list.clone()).collect();
 
         // Impale stacks on the enemy
         let max_impale = self.c.base(pdb, None, &["ImpaleStacksMax"])?
