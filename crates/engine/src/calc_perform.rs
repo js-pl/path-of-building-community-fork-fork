@@ -48,6 +48,8 @@ pub struct PerformInput<'a> {
     pub tree_version: &'a str,
     /// A calculation of the Calcs tab, which builds breakdowns
     pub breakdown: bool,
+    /// `skipEHP`: no defence estimations and allies' life pools
+    pub skip_ehp: bool,
 }
 
 /// An active skill's mod lists during the calculation
@@ -963,7 +965,7 @@ pub(crate) fn actor_cfg(actor: &str) -> Cfg {
 }
 
 /// `{ source = name }`
-pub(crate) fn source_cfg(source: &str) -> Cfg {
+pub fn source_cfg(source: &str) -> Cfg {
     Cfg {
         source: Some(source.into()),
         ..Cfg::default()
@@ -1251,6 +1253,10 @@ impl<'a> Perform<'a> {
                 self.mods_mut(i)
                     .skill_data
                     .insert("triggerTime".into(), ModValue::Number(60.0 * 1000.0));
+            }
+            // The Saviour
+            if self.skill_name(i) == "Reflection" || self.sd_truthy(i, "triggeredBySaviour") {
+                self.mods_mut(i).info_trigger = Some("Saviour".into());
             }
         }
 
@@ -5405,7 +5411,7 @@ impl<'a> Perform<'a> {
             "takenFromTotemsBeforeYou",
             "takenFromVaalRejuvenationTotemsBeforeYou",
         ];
-        if self.c.base(pdb, None, &redirects)? == 0.0 {
+        if self.input.skip_ehp || self.c.base(pdb, None, &redirects)? == 0.0 {
             return Ok(());
         }
         let base = |p: &Self, k: &str| p.c.base(pdb, None, &[k]);
@@ -5611,6 +5617,7 @@ impl<'a> PerformInput<'a> {
             class_stats: [stat(0), stat(1), stat(2)],
             tree_version: &tree.version,
             breakdown,
+            skip_ehp: false,
         })
     }
 }

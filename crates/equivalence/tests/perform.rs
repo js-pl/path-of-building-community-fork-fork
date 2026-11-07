@@ -93,6 +93,7 @@ fn typed_json(v: &OutVal) -> J {
         OutVal::Table(t) => J::Object(t.iter().map(|(k, v)| (k.clone(), typed_json(v))).collect()),
         OutVal::Gem(n) => json!({"$gem": &**n}),
         OutVal::Item(n) => json!({"$item": &**n}),
+        OutVal::List(l) => J::Array(l.iter().map(typed_json).collect()),
     }
 }
 

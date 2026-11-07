@@ -83,6 +83,8 @@ pub struct SkillMods {
     pub minion_list: Vec<String>,
     pub minion: Option<Minion>,
     pub buff_list: Vec<Buff>,
+    /// `infoTrigger`: what triggers the skill, for Full DPS
+    pub info_trigger: Option<String>,
 }
 
 /// What building the mod lists needs

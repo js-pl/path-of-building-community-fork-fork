@@ -11,5 +11,5 @@ publish.workspace = true
 lua.workspace = true
 engine.workspace = true
 importer.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 upstream.workspace = true

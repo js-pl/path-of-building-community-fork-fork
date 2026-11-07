@@ -48,6 +48,13 @@ the player's in the calculation's skills (`Perform::n_player`).
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
 | `calcs.triggers`, `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
 
+`calcs.buildOutput` (`MAIN`), `calcs.calcFullDPS`, `calcs.buildActiveSkill`
+and the skill cache (`GlobalCache.cachedData`) run typed in
+`engine::calcs`; with the sidebar's sort of `SkillDPS`, whole builds are
+compared with the oracle's `MAIN` output in
+`crates/equivalence/tests/typed_calcs.rs`: 24 builds equal, the others
+skipped at a part not ported yet.
+
 Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
 `Data.lua` to the importer comes later.
@@ -82,7 +89,9 @@ a skip:
 
 ## Next
 
-Triggers and mirages, then `Calcs.lua`'s calculators
+Triggers (14 corpus builds stop there in `typed_calcs`), the skill
+functions (13), mirages, self hit damage and cluster jewels, then the Calcs
+tab's output (`CALCS`), then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 

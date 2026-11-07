@@ -2574,6 +2574,17 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
+    /// `calcs.perform` after the setup: the player's defence, estimations
+    /// (unless `skipEHP`), triggers and offence, then the minion's
+    pub fn finish(&mut self) -> Result<()> {
+        self.defence(crate::calc::PLAYER)?;
+        if !self.input.skip_ehp {
+            self.defence_estimations(crate::calc::PLAYER)?;
+        }
+        self.player_offence()?;
+        self.minion_calcs()
+    }
+
     /// The minion's calculations after the player's: `calcs.defence`,
     /// `calcs.buildDefenceEstimations`, `calcs.triggers` and
     /// `calcs.offence` of `env.minion`
@@ -2583,7 +2594,9 @@ impl<'a> Perform<'a> {
         };
         let (actor, main) = (self.minions[m].actor, self.minions[m].main_skill);
         self.defence(actor)?;
-        self.defence_estimations(actor)?;
+        if !self.input.skip_ehp {
+            self.defence_estimations(actor)?;
+        }
         self.triggers(main)?;
         self.offence(actor, main)
     }

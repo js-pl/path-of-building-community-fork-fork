@@ -21,6 +21,7 @@ pub mod calc_skill_funcs;
 pub mod calc_skill_mods;
 pub mod calc_skills;
 pub mod calc_tree;
+pub mod calcs;
 pub mod common;
 pub mod config;
 pub mod config_tab;
