@@ -78,6 +78,9 @@ pub struct ItemsTab {
     /// All slots in the tab's order: base slots with their swap and
     /// abyssal slots, then jewel sockets by node id
     pub ordered_slots: Vec<Slot>,
+    /// The Energy Blade that replaces each weapon while the skill is on
+    /// (`initEnv`), by the weapon's id negated
+    pub energy_blades: BTreeMap<i64, Item>,
 }
 
 /// `tonumber(slotName:match("%d+$") or slotName:match("%d+"))`
@@ -293,9 +296,59 @@ impl ItemsTab {
     }
 
     pub fn item(&self, id: f64) -> Option<&Item> {
-        (id.fract() == 0.0)
-            .then(|| self.items.get(&(id as i64)))
-            .flatten()
+        if id.fract() != 0.0 {
+            return None;
+        }
+        if id < 0.0 {
+            return self.energy_blades.get(&(id as i64));
+        }
+        self.items.get(&(id as i64))
+    }
+
+    /// The Energy Blades of the tab's weapons but bows: a normal item of
+    /// the one or two handed Energy Blade base, with the weapon's sockets
+    pub fn make_energy_blades(
+        &mut self,
+        ctx: &crate::item::ItemContext,
+        one_hand: &dyn Fn(&str) -> Option<bool>,
+    ) -> Result<()> {
+        let mut out = BTreeMap::new();
+        for (&id, item) in &self.items {
+            let Some(typ) = item
+                .weapon_data
+                .as_ref()
+                .and_then(|w| w.get(&1))
+                .and_then(|w| match w.get("type") {
+                    Some(crate::mods::ModValue::Str(t)) => Some(t.to_string()),
+                    _ => None,
+                })
+            else {
+                continue;
+            };
+            let Some(oh) = one_hand(&typ) else { continue };
+            if typ == "Bow" {
+                continue;
+            }
+            let name = if oh {
+                "Energy Blade One Handed"
+            } else {
+                "Energy Blade Two Handed"
+            };
+            let mut blade = Item::new(
+                ctx,
+                &format!("Rarity: NORMAL\n{name}\nQuality: 0"),
+                None,
+                false,
+            )
+            .map_err(|e| format!("{name}: {e}"))?;
+            blade.build_mod_list(ctx)?;
+            blade.sockets = item.sockets.clone();
+            blade.abyssal_socket_count = item.abyssal_socket_count;
+            blade.id = Some(-(id as f64));
+            out.insert(-id, blade);
+        }
+        self.energy_blades = out;
+        Ok(())
     }
 
     /// `IsItemValidForSlot(item, slotName)`

@@ -176,6 +176,17 @@ impl<'t> Build<'t> {
             None => ItemsTab::load(&Element::default(), &ctx.items, ctx.socket_ids)?,
         };
         let skills = pob.child("Skills").map(|x| Skills::load(x, ctx.skill_data));
+        // Energy Blade replaces the weapons with its own
+        let energy_blade = skills.as_ref().is_some_and(|s| {
+            s.socket_group_list().iter().any(|g| {
+                g.gem_list
+                    .iter()
+                    .any(|gem| gem.effect().is_some_and(|e| e.name == "Energy Blade"))
+            })
+        });
+        if energy_blade {
+            items.make_energy_blades(&ctx.items, ctx.one_hand)?;
+        }
         let mut spec = PassiveSpec::new(tree, parser)?;
         if let Some(s) = active_spec(root) {
             spec.load(s)?;

@@ -51,6 +51,21 @@ pub struct Env {
 /// `calcs.initEnv(build, mode)`; [`write_back`] gives the build's Skills
 /// tab the socket groups with the granted skills and the gems' selections.
 pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> Result<Env> {
+    match init_env_with(build, data, mode, calcs, false) {
+        Err(e) if e == calc_skills::ENERGY_BLADE => init_env_with(build, data, mode, calcs, true),
+        r => r,
+    }
+}
+
+/// `calcs.initEnv(build, mode, override)` with `override.conditions`
+/// holding `AffectedByEnergyBlade` or not
+fn init_env_with(
+    build: &Build,
+    data: &CalcData,
+    mode: BuffMode,
+    calcs: bool,
+    energy_blade: bool,
+) -> Result<Env> {
     // The Calcs tab's buff mode
     let mode = if calcs {
         match build.calcs_input.get("misc_buffMode") {
@@ -95,6 +110,11 @@ pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> 
         mode,
     };
     let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
+    if energy_blade {
+        player_db
+            .conditions
+            .insert(crate::mods::Sym::new("AffectedByEnergyBlade"), true);
+    }
     calc_setup::allocation_mods(spec, &mut player_db);
     // The tree before the items
     let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
@@ -120,7 +140,7 @@ pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> 
         node_mods: &initial_node_mods,
         config: &config,
         precision: data.items,
-        energy_blade: false,
+        energy_blade,
         jewel_radius: data.jewel_radius,
         extra_jewel_funcs: &[],
     };

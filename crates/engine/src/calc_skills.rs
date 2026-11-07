@@ -437,6 +437,9 @@ fn can_support(
         )
 }
 
+/// The error that has `initEnv` start again with Energy Blade's weapons
+pub const ENERGY_BLADE: &str = "initEnv again: AffectedByEnergyBlade";
+
 /// `calcs.createActiveSkill(activeEffect, supportList, actor, socketGroup,
 /// summonSkill)`
 pub(crate) fn create_active_skill(
@@ -1090,7 +1093,13 @@ fn active_skills(
                 main_skill = group_skills[gi].get(i.saturating_sub(1)).copied();
             }
         }
-        if group.enabled
+        let blade_on = db.stores.stores[db.id]
+            .conditions
+            .get(&crate::mods::Sym::new("AffectedByEnergyBlade"))
+            .copied()
+            .unwrap_or(false);
+        if !blade_on
+            && group.enabled
             && slot_enabled[gi]
             && group.gem_list.iter().any(|g| {
                 g.enabled
@@ -1098,7 +1107,7 @@ fn active_skills(
                         .is_some_and(|e| !e.support && e.name == "Energy Blade")
             })
         {
-            return Err("Energy Blade is not ported".into());
+            return Err(ENERGY_BLADE.into());
         }
     }
     let main_skill = match main_skill {

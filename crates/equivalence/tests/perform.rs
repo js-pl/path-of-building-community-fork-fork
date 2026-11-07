@@ -522,16 +522,6 @@ fn perform_matches_upstream() {
             .into_iter()
             .next()
             .unwrap();
-        if get(
-            &get(&get(&env, "modDB"), "conditions"),
-            "AffectedByEnergyBlade",
-        )
-        .truthy()
-        {
-            *skip_reasons.entry("Energy Blade".into()).or_default() += 1;
-            skipped += 1;
-            continue;
-        }
         // The state when the defence, the estimations and the triggers start
         let stages = ["defence", "buildDefenceEstimations", "triggers"];
         let snaps: Rc<RefCell<Vec<(usize, Snapshot)>>> = Rc::new(RefCell::new(Vec::new()));

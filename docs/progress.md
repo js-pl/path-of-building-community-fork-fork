@@ -53,7 +53,7 @@ the player's in the calculation's skills (`Perform::n_player`).
 and the skill cache (`GlobalCache.cachedData`) run typed in
 `engine::calcs`; with the sidebar's sort of `SkillDPS`, whole builds are
 compared with the oracle's `MAIN` and `CALCS` outputs in
-`crates/equivalence/tests/typed_calcs.rs`: 57 builds equal, the others
+`crates/equivalence/tests/typed_calcs.rs`: 58 builds equal, the others
 skipped at a part not ported yet.
 
 Game data is still read from upstream's processed Lua `data` table
@@ -63,8 +63,6 @@ Game data is still read from upstream's processed Lua `data` table
 ## Not ported yet in `initEnv`
 
 - Cluster jewel subgraphs (the 3.13 corpus builds are skipped for them)
-- Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade` and swaps in
-  generated weapons; gen-0031 is skipped)
 - Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
   node and item power calculators
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
@@ -76,21 +74,18 @@ Game data is still read from upstream's processed Lua `data` table
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The player's output `Minion`, the Calcs tab's choice of a minion's
-  skill (`skillMinionSkillCalcs`), shared minion life pools
+- The player's output `Minion`, shared minion life pools
   (`MinionLifeShares...`) and the offence's `...EqualToParent` crit
 - The party tab
 - Tawhoa's Chosen (`CalcMirages.lua`)
-- Skill functions other than the ten in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
-  mana, PvP scaling, added damage redirection
-  (Cryogenesis), Energy Blade
+  mana, PvP scaling, added damage redirection (Cryogenesis)
 - Breakdowns (the Calcs tab's outputs are ported)
 
 ## Next
 
-Energy Blade and cluster jewels, then the breakdowns, the node and misc
+Cluster jewels, then the breakdowns, the node and misc
 calculators, and the engine API on the typed engine.
 
 ## Upstream quirks met so far

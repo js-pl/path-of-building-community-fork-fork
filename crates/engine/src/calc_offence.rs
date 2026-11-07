@@ -393,7 +393,47 @@ impl<'a> Perform<'a> {
             }
         }
         if self.c.cond(db, "AffectedByEnergyBlade") {
-            return Err("not ported: Energy Blade".into());
+            let cfg = self.cfg(o.skill);
+            let c = Some(&cfg);
+            let dmg_mod = self.c.calc_mod(list, c, &["EnergyBladeDamage"])?;
+            let speed_mod = self.c.calc_mod(list, c, &["EnergyBladeAttackSpeed"])?;
+            for (n, slot) in ["Weapon 1", "Weapon 2"].into_iter().enumerate() {
+                let has = self
+                    .item(actor, slot)
+                    .is_some_and(|i| i.weapon_data.as_ref().is_some_and(|w| w.contains_key(&1)));
+                let name = self.weapon_str(actor, n, "name");
+                let Some(base) = name
+                    .as_deref()
+                    .and_then(|nm| self.input.data.items.base(nm))
+                    .and_then(|b| b.weapon.clone())
+                else {
+                    continue;
+                };
+                if !has {
+                    continue;
+                }
+                let bw = |k: &str| base.get(k).copied();
+                let mut w = self.c.actors.actors[actor].weapon_data[n]
+                    .clone()
+                    .unwrap_or_default();
+                let num = |v: Option<f64>| ModValue::Number(v.unwrap_or(f64::NAN));
+                w.insert("CritChance".into(), num(bw("CritChanceBase")));
+                w.insert(
+                    "AttackRate".into(),
+                    num(bw("AttackRateBase").map(|r| r * speed_mod)),
+                );
+                w.insert("Range".into(), num(bw("Range")));
+                for t in ["Physical", "Lightning", "Cold", "Fire", "Chaos"] {
+                    for end in ["Min", "Max"] {
+                        let add = (self.c.base(list, c, &[&format!("EnergyBlade{end}{t}")])?
+                            * dmg_mod)
+                            .floor();
+                        let v = bw(&format!("{t}{end}")).unwrap_or(0.0) + add;
+                        w.insert(format!("{t}{end}"), ModValue::Number(v));
+                    }
+                }
+                self.c.actors.actors[actor].weapon_data[n] = Some(w);
+            }
         }
         // account for Battlemage
         if self.c.flag(list, None, &["Battlemage"])? && self.slot_has_weapon(actor, "Weapon 1") {
