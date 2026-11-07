@@ -469,3 +469,36 @@ pub fn crit_dot(dot_multi: f64, crit_multi: f64, dot_chance: f64, crit_chance: f
     }
     out
 }
+
+/// A breakdown shown as a table: `{ label = ..., rowList = { }, colList =
+/// { { label = ..., key = ... }, ... } }`
+pub fn row_table(label: &str, cols: &[(&str, &str)]) -> Bd {
+    let mut t = Bd::new();
+    t.set("label", label);
+    t.set("rowList", Bd::new());
+    let mut list = Bd::new();
+    for (l, k) in cols {
+        let mut c = Bd::new();
+        c.set("label", *l);
+        c.set("key", *k);
+        list.push(c);
+    }
+    t.set("colList", list);
+    t
+}
+
+/// A row of a [`row_table`]: its cells by key
+pub fn row<V: Into<BdVal>>(cells: impl IntoIterator<Item = (&'static str, V)>) -> Bd {
+    let mut t = Bd::new();
+    for (k, v) in cells {
+        t.set(k, v);
+    }
+    t
+}
+
+impl Bd {
+    /// Adds a row to `rowList`
+    pub fn add_row(&mut self, row: Bd) {
+        self.table("rowList").push(row);
+    }
+}

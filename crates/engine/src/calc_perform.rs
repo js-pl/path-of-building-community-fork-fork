@@ -259,6 +259,8 @@ pub struct Perform<'a> {
     /// A mirage that took over the main skill (`env.player.mainSkill =
     /// newSkill`): its uuid and skill data, which the cache keeps
     pub replaced_main: Option<(String, BTreeMap<String, ModValue>)>,
+    /// `env.player.allyLifeList`: by pool, each ally's name, life and count
+    pub ally_life_list: Vec<(&'static str, Vec<(String, f64, f64)>)>,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies`,
     /// `nonUniqueFlasksApplyToMinion`
     pub(crate) flasks_to_minion: [bool; 3],
@@ -509,6 +511,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         minion: None,
         n_player: if extra { n - 1 } else { n },
         replaced_main: None,
+        ally_life_list: Vec::new(),
         flasks_to_minion: [false; 3],
         buff_lists: Vec::new(),
         minion_buff_lists: Vec::new(),
@@ -5495,6 +5498,7 @@ impl<'a> Perform<'a> {
         let mut calculated: HashSet<&'static str> = HashSet::new();
         let mut spectre_count = 0.0;
         let mut first_spectre: Option<f64> = None;
+        let mut first_spectre_entry: Option<(usize, usize)> = None;
         let summoned_override = self
             .config_num("multiplierSummonedMinion")
             .filter(|v| *v != 0.0);
@@ -5600,7 +5604,31 @@ impl<'a> Perform<'a> {
                 }
                 self.c
                     .add(pdb, src(pool.life, Base, ml * count, pool.source));
+                let name = self
+                    .mods(i)
+                    .minion
+                    .as_ref()
+                    .and_then(|x| self.data().minions.get(&x.typ))
+                    .and_then(|d| d.str("name"))
+                    .unwrap_or("")
+                    .to_string();
+                let entry = (name, ml * count, count);
+                let list = match self
+                    .ally_life_list
+                    .iter()
+                    .position(|(k, _)| *k == pool.life)
+                {
+                    Some(p) => p,
+                    None => {
+                        self.ally_life_list.push((pool.life, Vec::new()));
+                        self.ally_life_list.len() - 1
+                    }
+                };
+                self.ally_life_list[list].1.push(entry);
                 if is_spectre {
+                    if first_spectre.is_none() {
+                        first_spectre_entry = Some((list, self.ally_life_list[list].1.len() - 1));
+                    }
                     first_spectre.get_or_insert(ml);
                 } else {
                     calculated.insert(pool.life);
@@ -5613,10 +5641,15 @@ impl<'a> Perform<'a> {
             let count = spectre_limit - spectre_count;
             self.c
                 .add(pdb, src(SPECTRE.life, Base, life * count, SPECTRE.source));
+            if let Some((l, e)) = first_spectre_entry {
+                let entry = &mut self.ally_life_list[l].1[e];
+                entry.2 += count;
+                entry.1 += life * count;
+            }
         }
 
         // The totem with the most life
-        let mut normal: Option<f64> = None;
+        let mut normal: Option<(f64, String)> = None;
         let mut vaal: Option<f64> = None;
         for i in 0..self.n_player {
             if self.has_flag(i, "totem")
@@ -5627,11 +5660,13 @@ impl<'a> Perform<'a> {
                 let (life, _) = self.totem_life(i)?;
                 if self.skill_name(i) == "Vaal Rejuvenation Totem" {
                     vaal = Some(life);
-                } else if normal.is_none_or(|n| life > n) {
-                    normal = Some(life);
+                } else if normal.as_ref().is_none_or(|n| life > n.0) {
+                    normal = Some((life, self.skill_name(i).to_string()));
                 }
             }
         }
+        let normal_name = normal.as_ref().map(|n| n.1.clone());
+        let normal = normal.map(|n| n.0);
         let nearest_is_vaal_totem =
             vaal.is_some() && normal.is_none_or(|n| vaal.unwrap_or(0.0) > n);
         let nearest = if nearest_is_vaal_totem { vaal } else { normal };
@@ -5644,6 +5679,12 @@ impl<'a> Perform<'a> {
             && override_.is_none()
         {
             self.c.add(pdb, src("TotalTotemLife", Base, life, "Totem"));
+            let name = if nearest_is_vaal_totem {
+                "Vaal Rejuvenation Totem".to_string()
+            } else {
+                normal_name.clone().unwrap_or_default()
+            };
+            self.set_ally_life_list("TotalTotemLife", vec![(name, life, f64::NAN)]);
         }
         if let Some(life) = vaal
             && (base(self, "takenFromVaalRejuvenationTotemsBeforeYou")? != 0.0
@@ -5662,8 +5703,19 @@ impl<'a> Perform<'a> {
                     "Vaal Rejuvenation Totem",
                 ),
             );
+            self.set_ally_life_list(
+                "TotalVaalRejuvenationTotemLife",
+                vec![("Vaal Rejuvenation Totem".to_string(), life, f64::NAN)],
+            );
         }
         Ok(())
+    }
+
+    fn set_ally_life_list(&mut self, pool: &'static str, list: Vec<(String, f64, f64)>) {
+        match self.ally_life_list.iter_mut().find(|(k, _)| *k == pool) {
+            Some(e) => e.1 = list,
+            None => self.ally_life_list.push((pool, list)),
+        }
     }
 }
 

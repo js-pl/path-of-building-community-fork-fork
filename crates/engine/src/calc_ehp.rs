@@ -9,11 +9,13 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::{Bd, Chain, multi_chain, row, row_table};
 use crate::calc::{m_max, m_min, round};
 use crate::calc_defence::{DMG_TYPES, armour_reduction, armour_reduction_f, is_elemental};
 use crate::calc_perform::Perform;
 use crate::config::Val;
 use crate::mods::{Cfg, ModType};
+use crate::{factor, sf};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -153,6 +155,21 @@ struct DamageIn {
     missing_life: Option<f64>,
     missing_mana: Option<f64>,
     cycles_ran: bool,
+}
+
+/// A guard's breakdown: the life its absorption protects
+fn guard_bd(limit: f64, rate: f64) -> Bd {
+    let protected = limit / (rate / 100.0) * (1.0 - rate / 100.0);
+    Bd::of([
+        "Total life protected:".to_string(),
+        sf!("%d ^8(guard limit)", limit),
+        sf!("/ %.2f ^8(portion taken from guard)", rate / 100.0),
+        sf!(
+            "x %.2f ^8(portion taken from life and energy shield)",
+            1.0 - rate / 100.0
+        ),
+        sf!("= %d", protected),
+    ])
 }
 
 fn calc_life_hit_pool(life: f64, max_life: f64, prevented: f64, below_half: f64) -> f64 {
@@ -921,6 +938,23 @@ impl<'a> Perform<'a> {
                 set(self, &format!("{t}EnemyDamage"), 0.0);
             }
         } else {
+            if let Some(bd) = self.bd(actor) {
+                bd.set(
+                    "totalEnemyDamage",
+                    row_table(
+                        "Total damage from the enemy",
+                        &[
+                            ("Type", "type"),
+                            ("Value", "value"),
+                            ("Mult", "mult"),
+                            ("Crit", "crit"),
+                            ("Conversion", "convMult"),
+                            ("Final", "final"),
+                            ("From", "from"),
+                        ],
+                    ),
+                );
+            }
             let crit_chance = if self.c.flag(edb, None, &["NeverCrit"])? {
                 0.0
             } else if self.c.flag(edb, None, &["AlwaysCrit"])? {
@@ -972,6 +1006,11 @@ impl<'a> Perform<'a> {
             for t in DMG_TYPES {
                 let mult = enemy_mult(self, &names_for(t))?;
                 let mut damage = self.input_num(&format!("enemy{t}Damage"));
+                let source = if damage.is_none() {
+                    "Default"
+                } else {
+                    "Config"
+                };
                 let pen = self.input_num(&format!("enemy{t}Pen"));
                 let overwhelm = self.input_num(&format!("enemy{t}Overwhelm"));
                 if damage.is_none() {
@@ -1056,6 +1095,7 @@ impl<'a> Perform<'a> {
                 let v = o(self, "totalEnemyDamageIn") + damage;
                 set(self, "totalEnemyDamageIn", v);
                 let mut ed = damage * (1.0 - conversion_total / 100.0) * mult * crit_effect;
+                let mut extra = -damage * mult * crit_effect + ed;
                 if let Some((_, froms)) = conversion.iter().find(|(k, _)| *k == t) {
                     for &(from, amount) in froms {
                         let mut names = vec![
@@ -1071,11 +1111,45 @@ impl<'a> Perform<'a> {
                         }
                         let m = enemy_mult(self, &names)?;
                         ed += amount * m * crit_effect;
+                        extra += amount * m * crit_effect;
                     }
                 }
                 set(self, &format!("{t}EnemyDamage"), ed);
                 let v = o(self, "totalEnemyDamage") + ed;
                 set(self, "totalEnemyDamage", v);
+                if let Some(bd) = self.bd(actor) {
+                    let mut b = Bd::of([
+                        sf!("from %s: %d", source, damage),
+                        sf!("* %.2f (modifiers to enemy damage)", mult),
+                        sf!("* %.3f (enemy crit effect)", crit_effect),
+                    ]);
+                    let abs = if extra >= 0.0 { extra } else { -extra };
+                    if extra != 0.0 {
+                        b.push(sf!(
+                            "%s %d (enemy damage conversion)",
+                            if extra > 0.0 { "+" } else { "-" },
+                            abs
+                        ));
+                    }
+                    b.push(sf!("= %d", ed));
+                    bd.set(&format!("{t}EnemyDamage"), b);
+                    let sign = if extra > 0.0 {
+                        "+"
+                    } else if extra < 0.0 {
+                        "-"
+                    } else {
+                        ""
+                    };
+                    bd.table("totalEnemyDamage").add_row(row([
+                        ("type", sf!("%s", t)),
+                        ("value", sf!("%d", damage)),
+                        ("mult", sf!("%.2f", mult)),
+                        ("crit", sf!("%.2f", crit_effect)),
+                        ("convMult", sf!("%s%d", sign, abs)),
+                        ("final", sf!("%d", ed)),
+                        ("from", sf!("%s", source)),
+                    ]));
+                }
             }
         }
 
@@ -1114,6 +1188,11 @@ impl<'a> Perform<'a> {
             shift.push((t, st));
             let v = o(self, &format!("{t}EnemyDamage")) * own / 100.0;
             set(self, &format!("{t}TakenDamage"), v);
+            if let Some(bd) = self.bd(actor) {
+                let mut b = row_table("Taken", &[("Type", "type"), ("Value", "value")]);
+                b.add_row(row([("type", sf!("%s", t)), ("value", sf!("%d", v))]));
+                bd.set(&format!("{t}TakenDamage"), b);
+            }
         }
         let shift_of = |t: &str| -> Vec<(&'static str, f64)> {
             shift
@@ -1132,13 +1211,36 @@ impl<'a> Perform<'a> {
                     let d = o(self, &format!("{t}EnemyDamage")) * pct / 100.0;
                     let v = o(self, &format!("{c}TakenDamage")) + d;
                     set(self, &format!("{c}TakenDamage"), v);
+                    if d > 0.0
+                        && let Some(b) = self
+                            .bd(actor)
+                            .and_then(|bd| bd.table_mut(&format!("{c}TakenDamage")))
+                    {
+                        b.add_row(row([("type", sf!("%s", t)), ("value", sf!("%d", d))]));
+                    }
                 }
             }
         }
         set(self, "totalTakenDamage", 0.0);
+        if let Some(bd) = self.bd(actor) {
+            bd.set(
+                "totalTakenDamage",
+                row_table(
+                    "Total damage taken from the enemy after taken as",
+                    &[("Type", "type"), ("Value", "value")],
+                ),
+            );
+        }
         for t in DMG_TYPES {
-            let v = o(self, "totalTakenDamage") + o(self, &format!("{t}TakenDamage"));
+            let taken = o(self, &format!("{t}TakenDamage"));
+            let v = o(self, "totalTakenDamage") + taken;
             set(self, "totalTakenDamage", v);
+            if let Some(b) = self
+                .bd(actor)
+                .and_then(|bd| bd.table_mut("totalTakenDamage"))
+            {
+                b.add_row(row([("type", sf!("%s", t)), ("value", sf!("%d", taken))]));
+            }
         }
 
         // Damage taken multipliers
@@ -1230,10 +1332,46 @@ impl<'a> Perform<'a> {
                 0.0,
             );
             set(self, &format!("{t}TakenDotMult"), v);
+            if let Some(bd) = self.bd(actor) {
+                let mut b = Bd::new();
+                multi_chain(
+                    &mut b,
+                    Chain {
+                        label: Some("DoT Multiplier:".into()),
+                        factors: vec![
+                            factor!("%.2f ^8(resistance)", 1.0 - resist / 100.0),
+                            factor!(
+                                "%.2f ^8(%s damage reduction)",
+                                1.0 - reduction / 100.0,
+                                t.to_lowercase()
+                            ),
+                            factor!("%.2f ^8(increased/reduced damage taken)", 1.0 + inc / 100.0),
+                            factor!("%.2f ^8(more/less damage taken)", more),
+                        ],
+                        total: Some(sf!("= %.2f", v)),
+                        ..Chain::default()
+                    },
+                );
+                bd.set(&format!("{t}TakenDotMult"), b);
+            }
         }
 
         // Incoming hit damage
         set(self, "totalTakenHit", 0.0);
+        if let Some(bd) = self.bd(actor) {
+            bd.set(
+                "totalTakenHit",
+                row_table(
+                    "Total damage taken after mitigation",
+                    &[
+                        ("Type", "type"),
+                        ("Incoming", "incoming"),
+                        ("Mult", "mult"),
+                        ("Value", "value"),
+                    ],
+                ),
+            );
+        }
         let impale_flags = if matches!(category, "Melee" | "Projectile" | "Average") {
             self.mf("Attack")
         } else {
@@ -1418,6 +1556,44 @@ impl<'a> Perform<'a> {
                 impale =
                     impale * impale_chance / 100.0 * 5.0 * o(self, &format!("{t}TakenReflect"));
             }
+            if let Some(bd) = self.bd(actor) {
+                let mut b = Bd::new();
+                if armour_reduct != 0.0 {
+                    if res_mult != 1.0 {
+                        b.push(sf!(
+                            "Enemy Hit Damage After Resistance: %d ^8(total incoming damage)",
+                            damage * res_mult
+                        ));
+                    } else {
+                        b.push(sf!(
+                            "Enemy Hit Damage: %d ^8(total incoming damage)",
+                            damage
+                        ));
+                    }
+                    if pct_armour != 100.0 && !ward_based {
+                        b.push(sf!("%d%% percent of armour applies", pct_armour));
+                    }
+                    b.push(sf!("Reduction from Armour: %d%%", armour_reduct));
+                }
+                if reduction != 0.0 {
+                    b.push(sf!("Base %s Damage Reduction: %d%%", t, reduction));
+                }
+                if overwhelm != 0.0 {
+                    b.push(sf!("Enemy Overwhelm %s Damage: %d%%", t, overwhelm));
+                }
+                let count = [armour_reduct, reduction, overwhelm]
+                    .iter()
+                    .filter(|&&x| x != 0.0)
+                    .count();
+                if count >= 2 {
+                    b.push(sf!(
+                        "Total %s Damage Reduction: %d%%",
+                        t,
+                        100.0 - reduct_mult * 100.0
+                    ));
+                }
+                bd.set(&format!("{t}DamageReduction"), b);
+            }
             let mut taken_mult = o(self, &format!("{t}TakenHitMult"));
             let mut suppress_mult = 1.0;
             let suppress_full = o(self, "EffectiveSpellSuppressionChance") == 100.0;
@@ -1459,6 +1635,90 @@ impl<'a> Perform<'a> {
             );
             let v = o(self, "totalTakenHit") + taken_hit;
             set(self, "totalTakenHit", v);
+            let any_reflect = self
+                .c
+                .out_val(actor, "AnyTakenReflect")
+                .is_some_and(OutVal::truthy);
+            let taken_reflect = o(self, &format!("{t}TakenReflect"));
+            let final_reflect = base_mult * taken_reflect;
+            let hit_mult = o(self, &format!("{t}TakenHitMult"));
+            if let Some(bd) = self.bd(actor) {
+                let mut b = Bd::new();
+                if resist != 0.0 {
+                    b.push(sf!("Resistance: %.2f", 1.0 - resist / 100.0));
+                }
+                if pen != 0.0 {
+                    b.push(sf!("+ Enemy Pen: %.2f", pen / 100.0));
+                }
+                if resist != 0.0 && pen != 0.0 {
+                    b.push(sf!("= %.2f", res_mult));
+                }
+                if reduction != 0.0 {
+                    b.push(sf!(
+                        "Base %s Damage Taken: %.2f",
+                        t,
+                        1.0 - reduction / 100.0
+                    ));
+                }
+                if armour_reduct != 0.0 {
+                    if res_mult != 1.0 {
+                        b.push(sf!(
+                            "Enemy Hit Damage After Resistance: %d ^8(total incoming damage)",
+                            damage * res_mult
+                        ));
+                    } else {
+                        b.push(sf!(
+                            "Enemy Hit Damage: %d ^8(total incoming damage)",
+                            damage
+                        ));
+                    }
+                    if pct_armour != 100.0 && !ward_based {
+                        b.push(sf!("%d%% percent of armour applies", pct_armour));
+                    }
+                    b.push(sf!(
+                        "Reduction from Armour: %.2f",
+                        1.0 - armour_reduct / 100.0
+                    ));
+                }
+                if overwhelm != 0.0 {
+                    b.push(sf!(
+                        "+ Enemy Overwhelm %s Damage: %.2f",
+                        t,
+                        overwhelm / 100.0
+                    ));
+                }
+                if reduction != 0.0 || armour_reduct != 0.0 || overwhelm != 0.0 {
+                    b.push(sf!("= %.2f", reduct_mult));
+                }
+                if res_mult != 1.0 && reduct_mult != 1.0 {
+                    b.push(sf!("%.2f x %.2f = %.3f", res_mult, reduct_mult, base_mult));
+                }
+                if taken_flat != 0.0 {
+                    b.push(sf!("+ Flat: %d", taken_flat));
+                }
+                if taken_mult != 1.0 {
+                    b.push(sf!("x Taken: %.3f", taken_mult));
+                }
+                if suppress_mult != 1.0 {
+                    b.push(sf!("x Spell Suppression: %.3f", suppress_mult));
+                }
+                if impale != 0.0 {
+                    b.push(sf!("+ Impale: %.1f", impale));
+                }
+                if taken_mult != 1.0 || taken_flat != 0.0 || suppress_mult != 1.0 || impale != 0.0 {
+                    b.push(sf!("= %.3f", hit_mult));
+                }
+                bd.set(&format!("{t}TakenHitMult"), b);
+                if any_reflect {
+                    let mut r = Bd::of([sf!("Resistance: %.3f", 1.0 - resist / 100.0)]);
+                    if pen > 0.0 {
+                        r.push(sf!("Enemy Pen: %.2f", pen));
+                    }
+                    r.push(sf!("Taken: %.3f", taken_reflect));
+                    r.push(sf!("= %.3f", final_reflect));
+                    bd.set(&format!("{t}TakenReflectMult"), r);
+                }
+            }
         }
 
         self.stun(actor, category)?;
@@ -1481,32 +1741,40 @@ impl<'a> Perform<'a> {
     fn stun(&mut self, actor: usize, category: &str) -> Result<()> {
         let db = self.c.db(actor);
         let o = |p: &Self, k: &str| p.o(actor, k);
-        let mut base =
+        let n = crate::pat::num;
+        let (mut base, mut source) =
             if self
                 .c
                 .flag(db, None, &["StunThresholdBasedOnEnergyShieldInsteadOfLife"])?
             {
-                o(self, "EnergyShield")
-                    * self
-                        .c
-                        .base(db, None, &["StunThresholdEnergyShieldPercent"])?
-                    / 100.0
+                let m = self
+                    .c
+                    .base(db, None, &["StunThresholdEnergyShieldPercent"])?;
+                (
+                    o(self, "EnergyShield") * m / 100.0,
+                    format!("{}% of Energy Shield", n(m)),
+                )
             } else if self
                 .c
                 .flag(db, None, &["StunThresholdBasedOnManaInsteadOfLife"])?
             {
-                o(self, "Mana") * self.c.base(db, None, &["StunThresholdManaPercent"])? / 100.0
+                let m = self.c.base(db, None, &["StunThresholdManaPercent"])?;
+                (o(self, "Mana") * m / 100.0, format!("{}% of Mana", n(m)))
             } else if self.c.flag(db, None, &["ChaosInoculation"])? {
-                self.c.base(db, None, &["Life"])?
+                (
+                    self.c.base(db, None, &["Life"])?,
+                    "Life before Chaos Inoculation".to_string(),
+                )
             } else {
-                o(self, "Life")
+                (o(self, "Life"), "Life".to_string())
             };
         if self.c.flag(db, None, &["AddESToStunThreshold"])? {
-            base += o(self, "EnergyShield")
-                * self.c.base(db, None, &["ESToStunThresholdPercent"])?
-                / 100.0;
+            let m = self.c.base(db, None, &["ESToStunThresholdPercent"])?;
+            base += o(self, "EnergyShield") * m / 100.0;
+            source = format!("{source} and {}% of Energy Shield", n(m));
         }
-        let threshold = base * (1.0 + self.c.inc(db, None, &["StunThreshold"])? / 100.0);
+        let threshold_mod = 1.0 + self.c.inc(db, None, &["StunThreshold"])? / 100.0;
+        let threshold = base * threshold_mod;
         self.c.set_out(actor, "StunThreshold", threshold);
         let mut not_avoid = if self.c.flag(db, None, &["StunImmune"])? {
             0.0
@@ -1520,9 +1788,28 @@ impl<'a> Perform<'a> {
             not_avoid *= 0.5;
         }
         self.c.set_out(actor, "StunAvoidChance", 100.0 - not_avoid);
+        if let Some(bd) = self.bd(actor) {
+            let mut b = Bd::of([sf!("%d ^8(base from %s)", base, source)]);
+            if threshold_mod != 1.0 {
+                b.push(sf!("* %.2f ^8(increased threshold)", threshold_mod));
+                b.push(sf!("= %d", threshold));
+            }
+            bd.set("StunThreshold", b);
+            bd.set(
+                "StunAvoidChance",
+                Bd::of([
+                    "^x5CF0BBNOTE: Having any energy shield when the hit occurs grants 50% chance to avoid stun.",
+                    "^x5CF0BBPOB only applies this modifier when ES > Total incoming damage.",
+                ]),
+            );
+        }
         if 100.0 - not_avoid >= 100.0 {
             self.c.set_out(actor, "StunDuration", 0.0);
             self.c.set_out(actor, "BlockDuration", 0.0);
+            if let Some(bd) = self.bd(actor) {
+                bd.set("StunDuration", Bd::of(["Cannot be Stunned"]));
+                bd.set("BlockDuration", Bd::of(["Cannot be Stunned"]));
+            }
         } else {
             let dur = 1.0 + self.c.inc(db, None, &["StunDuration"])? / 100.0;
             let base_dur = self.misc_data("StunBaseDuration");
@@ -1539,6 +1826,30 @@ impl<'a> Perform<'a> {
                 "BlockDuration",
                 (base_dur * dur / block_rec * tick).ceil() / tick,
             );
+            let (sd, bdur) = (o(self, "StunDuration"), o(self, "BlockDuration"));
+            if let Some(bd) = self.bd(actor) {
+                let mut st = Bd::of([sf!("%.2fs ^8(base)", base_dur)]);
+                let mut bl = Bd::of([sf!("%.2fs ^8(base)", base_dur)]);
+                if dur != 1.0 {
+                    st.push(sf!("* %.2f ^8(increased duration)", dur));
+                    bl.push(sf!("* %.2f ^8(increased duration)", dur));
+                }
+                if rec != 1.0 {
+                    st.push(sf!("/ %.2f ^8(increased/reduced recovery)", rec));
+                }
+                if block_rec != 1.0 {
+                    bl.push(sf!(
+                        "/ %.2f ^8(increased/reduced block recovery)",
+                        block_rec
+                    ));
+                }
+                st.push("rounded up to nearest server tick");
+                st.push(sf!("= %.2fs", sd));
+                bl.push("rounded up to nearest server tick");
+                bl.push(sf!("= %.2fs", bdur));
+                bd.set("StunDuration", st);
+                bd.set("BlockDuration", bl);
+            }
         }
         let v = m_min(self.c.base(db, None, &["AvoidInterruptStun"])?, 100.0);
         self.c.set_out(actor, "InterruptStunAvoidChance", v);
@@ -1557,6 +1868,30 @@ impl<'a> Perform<'a> {
         }) * not_avoid
             / 100.0;
         self.c.set_out(actor, "SelfStunChance", v);
+        let (mult, min) = (
+            self.misc_data("StunBaseMult"),
+            self.misc_data("MinStunChanceNeeded"),
+        );
+        if let Some(bd) = self.bd(actor) {
+            let mut b = Bd::of([
+                sf!("%d%% ^8(stun multiplier)", mult),
+                sf!("* %.1f ^8(effective enemy stun damage)", eff),
+                sf!("/ %d ^8(stun threshold)", threshold),
+            ]);
+            if base_chance < min {
+                b.push(sf!("= %.2f%%", base_chance));
+                b.push(sf!("Stun Chance has to be more than %d%% to stun.", min));
+            } else {
+                if not_avoid != 100.0 {
+                    b.push(sf!(
+                        "* %.2f ^8(1 - chance to avoid stun)",
+                        not_avoid / 100.0
+                    ));
+                }
+                b.push(sf!("= %.2f%%", v));
+            }
+            bd.set("SelfStunChance", b);
+        }
         Ok(())
     }
 
@@ -1588,11 +1923,73 @@ impl<'a> Perform<'a> {
         let below_half = self.c.base(db, None, &["LifeLossBelowHalfPrevented"])?;
         let ph = (1.0 - prevented / 100.0) * below_half;
         set(self, "preventedLifeLossBelowHalf", ph);
+        let mut portion = 1.0;
         if !low_life {
-            let portion = m_min(o(self, "Life") * 0.5 / recoverable, 1.0);
+            portion = m_min(o(self, "Life") * 0.5 / recoverable, 1.0);
             set(self, "preventedLifeLossTotal", prevented + ph * portion);
         } else {
             set(self, "preventedLifeLossTotal", prevented + ph);
+        }
+        let total_prevented = o(self, "preventedLifeLossTotal");
+        if let Some(bd) = self.bd(actor) {
+            let mut b = Bd::of(["Total life protected:"]);
+            if prevented != 0.0 {
+                b.push(sf!(
+                    "%.2f ^8(portion taken over 4 seconds instead)",
+                    prevented / 100.0
+                ));
+            }
+            if ph != 0.0 {
+                let plus = if prevented != 0.0 { "+ " } else { "" };
+                if portion != 1.0 {
+                    if prevented != 0.0 {
+                        b.push("");
+                    }
+                    b.push(sf!(
+                        "%s%.2f ^8(initial portion taken by petrified blood)",
+                        plus,
+                        below_half / 100.0
+                    ));
+                    if prevented != 0.0 {
+                        b.push(sf!(
+                            "* %.2f ^8(portion not already taken over time)",
+                            1.0 - prevented / 100.0
+                        ));
+                    }
+                    b.push(sf!("* %.2f ^8(portion of life on low life)", portion));
+                    b.push(sf!(
+                        "= %.2f ^8(final portion taken by petrified blood)",
+                        ph * portion / 100.0
+                    ));
+                    b.push("");
+                } else {
+                    b.push(sf!(
+                        "%s%.2f ^8(%s taken by petrified blood)",
+                        plus,
+                        below_half / 100.0,
+                        if prevented != 0.0 {
+                            "initial portion"
+                        } else {
+                            "portion"
+                        }
+                    ));
+                    if prevented != 0.0 {
+                        b.push(sf!(
+                            "* %.2f ^8(portion not already taken over time)",
+                            1.0 - prevented / 100.0
+                        ));
+                        b.push(sf!(
+                            "= %.2f ^8(final portion taken by petrified blood)",
+                            ph / 100.0
+                        ));
+                    }
+                }
+            }
+            b.push(sf!(
+                "%.2f ^8(portion taken from life)",
+                1.0 - total_prevented / 100.0
+            ));
+            bd.set("preventedLifeLossTotal", b);
         }
         let hit_pool = calc_life_hit_pool(recoverable, o(self, "Life"), prevented, below_half);
         set(self, "LifeHitPool", hit_pool);
@@ -1641,7 +2038,7 @@ impl<'a> Perform<'a> {
         );
         set(self, "sharedMindOverMatter", shared_mom);
         let es_protects = self.c.flag(db, None, &["EnergyShieldProtectsMana"])?;
-        let mom_pool = |p: &Self, life_pool: f64, mom: f64, bypass: f64| -> f64 {
+        let mom_pool = |p: &Self, life_pool: f64, mom: f64, bypass: f64| -> [f64; 4] {
             let mana = m_max(p.o_or(actor, "ManaUnreserved", 0.0), 0.0);
             let max_mom = if mom < 1.0 {
                 life_pool / (1.0 - mom) - life_pool
@@ -1659,15 +2056,45 @@ impl<'a> Perform<'a> {
                 0.0
             };
             let used = m_min(max_mom - max_es, max_mana).floor();
-            life_pool + used + max_es
+            [life_pool + used + max_es, max_mana, used, max_es]
+        };
+        let mom_bd = |b: &mut Bd, mom: f64, r: [f64; 4]| {
+            let [pool, max_mana, mana, es] = r;
+            let protected = (mana + es) / mom - (mana + es);
+            b.push("Effective life from Mind over Matter:");
+            b.push(sf!(
+                "%d life (%d life is protected)",
+                recoverable,
+                protected
+            ));
+            let shadow = if mana == max_mana {
+                String::new()
+            } else {
+                sf!(" (%d mana shadowed by energy shield)", max_mana - mana)
+            };
+            b.push(sf!("%d mana%s", mana, shadow));
+            if es_protects {
+                b.push(sf!("%d energy shield", es));
+            }
+            let es_part = if es_protects {
+                sf!("+ %d ", es)
+            } else {
+                String::new()
+            };
+            b.push(sf!("%d + %d %s= %d", recoverable, mana, es_part, pool));
         };
         if shared_mom > 0.0 {
             let mom = shared_mom / 100.0;
             let bypass = minimum / 100.0;
-            let v = mom_pool(self, recoverable, mom, bypass);
-            set(self, "sharedManaEffectiveLife", v);
-            let v = mom_pool(self, hit_pool, mom, bypass);
+            let r = mom_pool(self, recoverable, mom, bypass);
+            set(self, "sharedManaEffectiveLife", r[0]);
+            let v = mom_pool(self, hit_pool, mom, bypass)[0];
             set(self, "sharedMoMHitPool", v);
+            if let Some(bd) = self.bd(actor) {
+                let mut b = Bd::new();
+                mom_bd(&mut b, mom, r);
+                bd.set("sharedMindOverMatter", b);
+            }
         } else {
             set(self, "sharedManaEffectiveLife", recoverable);
             set(self, "sharedMoMHitPool", hit_pool);
@@ -1688,10 +2115,15 @@ impl<'a> Perform<'a> {
                     .set_out_val(actor, "OnlySharedMindOverMatter", OutVal::Bool(false));
                 let mom = (v + shared_mom) / 100.0;
                 let bypass = bypass_t / 100.0;
-                let x = mom_pool(self, recoverable, mom, bypass);
-                set(self, &format!("{t}ManaEffectiveLife"), x);
-                let x = mom_pool(self, hit_pool, mom, bypass);
+                let r = mom_pool(self, recoverable, mom, bypass);
+                set(self, &format!("{t}ManaEffectiveLife"), r[0]);
+                let x = mom_pool(self, hit_pool, mom, bypass)[0];
                 set(self, &format!("{t}MoMHitPool"), x);
+                if let Some(bd) = self.bd(actor) {
+                    let mut b = Bd::new();
+                    mom_bd(&mut b, mom, r);
+                    bd.set(&format!("{t}MindOverMatter"), b);
+                }
             } else {
                 let x = o(self, "sharedManaEffectiveLife");
                 set(self, &format!("{t}ManaEffectiveLife"), x);
@@ -1709,6 +2141,9 @@ impl<'a> Perform<'a> {
                 .set_out_val(actor, "OnlySharedGuard", OutVal::Bool(true));
             let v = self.c.val(db, "GuardAbsorbLimit", None)?;
             set(self, "sharedGuardAbsorb", v);
+            if let Some(bd) = self.bd(actor) {
+                bd.set("sharedGuardAbsorb", guard_bd(v, rate));
+            }
         }
         for t in DMG_TYPES {
             let r = m_min(
@@ -1723,6 +2158,9 @@ impl<'a> Perform<'a> {
                     .set_out_val(actor, "OnlySharedGuard", OutVal::Bool(false));
                 let v = self.c.val(db, &format!("{t}GuardAbsorbLimit"), None)?;
                 set(self, &format!("{t}GuardAbsorb"), v);
+                if let Some(bd) = self.bd(actor) {
+                    bd.set(&format!("{t}GuardAbsorb"), guard_bd(v, r));
+                }
             }
         }
 
@@ -1770,8 +2208,25 @@ impl<'a> Perform<'a> {
         // Frost shield and allies
         let v = self.c.base(db, None, &["FrostGlobeHealth"])?;
         set(self, "FrostShieldLife", v);
+        let fs = v;
         let v = self.c.base(db, None, &["FrostGlobeDamageMitigation"])?;
         set(self, "FrostShieldDamageMitigation", v);
+        if let Some(bd) = self.bd(actor) {
+            let protected = fs / (v / 100.0) * (1.0 - v / 100.0);
+            bd.set(
+                "FrostShieldLife",
+                Bd::of([
+                    "Total life protected:".to_string(),
+                    sf!("%d ^8(frost shield limit)", fs),
+                    sf!("/ %.2f ^8(portion taken from frost shield)", v / 100.0),
+                    sf!(
+                        "x %.2f ^8(portion taken from life and energy shield)",
+                        1.0 - v / 100.0
+                    ),
+                    sf!("= %d", protected),
+                ]),
+            );
+        }
         for a in &ALLY_POOLS {
             let Some(redirect) = a.redirect else { continue };
             let mut m = self.c.base(db, None, &[redirect])?;
@@ -1811,6 +2266,39 @@ impl<'a> Perform<'a> {
             set(self, "VaalRejuvenationTotemAllyDamageMitigation", v);
             set(self, "TotemAllyDamageMitigation", 0.0);
             self.c.clear_out(actor, "TotalTotemLife");
+        }
+        if self.bd(actor).is_some() {
+            for a in &ALLY_POOLS {
+                let list = if actor == crate::calc::PLAYER {
+                    self.ally_life_list
+                        .iter()
+                        .find(|(k, _)| *k == a.life)
+                        .map(|(_, l)| l.clone())
+                } else {
+                    None
+                };
+                let override_ = self.c.override_num(db, None, &[a.life])?;
+                let Some(life) = self.c.out(actor, a.life) else {
+                    continue;
+                };
+                if list.is_none() && override_.is_none() {
+                    continue;
+                }
+                let mut b = Bd::new();
+                if override_.is_some() {
+                    b.push(sf!("%d ^8(from config)", life));
+                } else {
+                    for (name, life, count) in list.unwrap_or_default() {
+                        let c = if count > 1.0 {
+                            format!("{}x ", crate::pat::num(count))
+                        } else {
+                            String::new()
+                        };
+                        b.push(sf!("%d ^8(%s%s)", life, c, name));
+                    }
+                }
+                self.bd(actor).unwrap().set(a.life, b);
+            }
         }
         let soul_link = self.c.base(db, None, &["TakenFromParentESBeforeYou"])?;
         set(self, "SoulLinkMitigation", soul_link);
@@ -1859,6 +2347,23 @@ impl<'a> Perform<'a> {
             }
             set(self, &format!("{t}TotalPool"), total);
             set(self, &format!("{t}TotalHitPool"), total_hit);
+            let mel = o(self, &format!("{t}ManaEffectiveLife"));
+            if let Some(bd) = self.bd(actor) {
+                let mana_text = if bypass < 100.0 && es_protects {
+                    "Mana and non-bypassed Energy Shield"
+                } else {
+                    "Mana"
+                };
+                let mut b = Bd::of([sf!("Life: %d", recoverable)]);
+                if mel != recoverable {
+                    b.push(sf!("%s through MoM: %d", mana_text, mel - recoverable));
+                }
+                if !es_protects && bypass < 100.0 {
+                    b.push(sf!("Non-bypassed Energy Shield: %d", total - mel));
+                }
+                b.push(sf!("TotalPool: %d", total));
+                bd.set(&format!("{t}TotalPool"), b);
+            }
         }
         let _ = Base;
         Ok(())
@@ -1995,10 +2500,144 @@ impl<'a> Perform<'a> {
             n
         };
         self.c.set_out(actor, "NumberOfMitigatedDamagingHits", m);
+        let article = match category {
+            "Average" | "Untyped" => "n ",
+            _ => " ",
+        };
+        if self.bd(actor).is_some() {
+            let show_block = self
+                .c
+                .out_val(actor, "ShowBlockEffect")
+                .is_some_and(OutVal::truthy);
+            let be = o(self, "BlockEffect");
+            let mut b = Bd::of([sf!("%.2f ^8(chance for block to fail)", 1.0 - block)]);
+            if show_block {
+                b.push(sf!("x %.2f ^8(block effect)", be / 100.0));
+            }
+            if suppress_effect != 1.0 {
+                b.push(sf!("x %.3f ^8(suppression effect)", suppress_effect));
+            }
+            if avg_avoid > 0.0 {
+                b.push(sf!(
+                    "x %.2f ^8(chance for avoidance to fail)",
+                    1.0 - avg_avoid / 100.0
+                ));
+            }
+            b.push(sf!(
+                "= %.1f%% ^8(of damage taken from a%s hit)",
+                chance,
+                format!("{article}{category}")
+            ));
+            self.bd(actor).unwrap().set("ConfiguredDamageChance", b);
+        }
         let total = m / (1.0 - o(self, "ConfiguredNotHitChance") / 100.0);
         self.c.set_out(actor, "TotalNumberOfHits", total);
-        let v = total * o(self, "totalEnemyDamageIn");
+        if self.bd(actor).is_some() {
+            let not_hit = o(self, "ConfiguredNotHitChance");
+            let specific = self
+                .c
+                .out_val(actor, "specificTypeAvoidance")
+                .is_some_and(OutVal::truthy);
+            let ap = o(self, "AvoidProjectilesChance");
+            let mut b = Bd::new();
+            match category {
+                "Melee" | "Projectile" => {
+                    let ev = o(self, &format!("{category}EvadeChance"));
+                    if ev > 0.0 {
+                        b.push(sf!("%.2f ^8(chance for evasion to fail)", 1.0 - ev / 100.0));
+                    }
+                    let ad = o(self, "AttackDodgeChance");
+                    if ad > 0.0 {
+                        b.push(sf!("x %.2f ^8(chance for dodge to fail)", 1.0 - ad / 100.0));
+                    }
+                    if category == "Projectile" && !specific && ap > 0.0 {
+                        b.push(sf!(
+                            "x %.2f ^8(chance for avoidance to fail)",
+                            1.0 - ap / 100.0
+                        ));
+                    }
+                }
+                "Spell" | "SpellProjectile" => {
+                    let sd = o(self, "SpellDodgeChance");
+                    if sd > 0.0 {
+                        b.push(sf!("%.2f ^8(chance for dodge to fail)", 1.0 - sd / 100.0));
+                    }
+                    if category == "SpellProjectile" && !specific && ap > 0.0 {
+                        b.push(sf!(
+                            "x %.2f ^8(chance for avoidance to fail)",
+                            1.0 - ap / 100.0
+                        ));
+                    }
+                }
+                "Average" => {
+                    let (me, pe) = (
+                        o(self, "MeleeEvadeChance"),
+                        o(self, "ProjectileEvadeChance"),
+                    );
+                    if me > 0.0 || pe > 0.0 {
+                        b.push(sf!(
+                            "%.2f ^8(chance for evasion to fail, only applies to the attack portion)",
+                            1.0 - (me + pe) / 2.0 / 100.0
+                        ));
+                    }
+                    let (ad, sd) = (o(self, "AttackDodgeChance"), o(self, "SpellDodgeChance"));
+                    if ad > 0.0 || sd > 0.0 {
+                        b.push(sf!(
+                            "x%.2f ^8(chance for dodge to fail)",
+                            1.0 - (ad + sd) / 2.0 / 100.0
+                        ));
+                    }
+                    if !specific && ap > 0.0 {
+                        b.push(sf!(
+                            "x %.2f ^8(chance for avoidance to fail)",
+                            1.0 - ap / 2.0 / 100.0
+                        ));
+                    }
+                }
+                _ => {}
+            }
+            let aa = o(self, "AvoidAllDamageFromHitsChance");
+            if aa > 0.0 {
+                b.push(sf!(
+                    "x %.2f ^8(chance for damage avoidance to fail)",
+                    1.0 - aa / 100.0
+                ));
+            }
+            if worst > 1.0 {
+                b.push(sf!("unlucky worst of %d", worst));
+            }
+            b.push(sf!(
+                "= %d%% ^8(chance to be hit by a%s hit)",
+                100.0 - not_hit,
+                format!("{article}{category}")
+            ));
+            let bd = self.bd(actor).unwrap();
+            bd.set("ConfiguredNotHitChance", b);
+            bd.set(
+                "TotalNumberOfHits",
+                Bd::of([
+                    sf!("%.2f ^8(Number of mitigated hits)", m),
+                    sf!("/ %.2f ^8(Chance to even be hit)", 1.0 - not_hit / 100.0),
+                    sf!(
+                        "= %.2f ^8(total average number of hits you can take)",
+                        total
+                    ),
+                ]),
+            );
+        }
+        let damage_in = o(self, "totalEnemyDamageIn");
+        let v = total * damage_in;
         self.c.set_out(actor, "TotalEHP", v);
+        if let Some(bd) = self.bd(actor) {
+            bd.set(
+                "TotalEHP",
+                Bd::of([
+                    sf!("%.2f ^8(total average number of hits you can take)", total),
+                    sf!("x %d ^8(total incoming damage)", damage_in),
+                    sf!("= %d ^8(total damage you can take)", v),
+                ]),
+            );
+        }
         let speed = self
             .input
             .config
@@ -2010,6 +2649,19 @@ impl<'a> Perform<'a> {
         skill_time = skill_time / 1000.0 / enemy_speed;
         self.c.set_out(actor, "enemySkillTime", skill_time);
         self.c.set_out(actor, "EHPSurvivalTime", total * skill_time);
+        if let Some(bd) = self.bd(actor) {
+            bd.set(
+                "EHPSurvivalTime",
+                Bd::of([
+                    sf!("%.2f ^8(total average number of hits you can take)", total),
+                    sf!("x %.2f ^8enemy attack/cast time", skill_time),
+                    sf!(
+                        "= %.2f seconds ^8(total time it would take to die)",
+                        total * skill_time
+                    ),
+                ]),
+            );
+        }
         Ok(())
     }
 
