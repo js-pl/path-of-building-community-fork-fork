@@ -63,6 +63,8 @@ pub struct Actor {
     pub item_list: BTreeMap<String, f64>,
     /// `actor.output`
     pub output: HashMap<Sym, OutVal>,
+    /// `actor.breakdown`: only in the Calcs tab's calculation
+    pub breakdown: Option<crate::breakdown::Bd>,
     /// `actor.weaponData1` and `weaponData2`
     pub weapon_data: [Option<Fields>; 2],
     /// `actor.minionData.monsterTags`

@@ -61,6 +61,9 @@ impl Cached {
 pub struct Outputs {
     pub player: Output,
     pub minion: Option<Output>,
+    /// The breakdowns of the Calcs tab's calculation
+    pub player_breakdown: Option<crate::breakdown::Bd>,
+    pub minion_breakdown: Option<crate::breakdown::Bd>,
 }
 
 /// `cacheSkillUUID(skill, env)`
@@ -261,6 +264,7 @@ impl<'d> Calcs<'d> {
                 minion: p
                     .minion_actor()
                     .map(|a| p.c.actors.actors[a].output.clone()),
+                ..Outputs::default()
             };
             let used = multipliers_used(p);
             Ok::<_, String>((outputs, skills, es_protects, extra_points, specs, used))
@@ -881,6 +885,7 @@ impl<'d> Calcs<'d> {
                         minion: p
                             .minion_actor()
                             .map(|a| p.c.actors.actors[a].output.clone()),
+                        ..Outputs::default()
                     },
                     skill_part: p.mods(main).skill_part,
                     skill_part_name: p.mods(main).skill_part_name.clone(),
@@ -1129,6 +1134,10 @@ impl<'d> Calcs<'d> {
                     minion: p
                         .minion_actor()
                         .map(|a| p.c.actors.actors[a].output.clone()),
+                    player_breakdown: p.c.actors.actors[PLAYER].breakdown.clone(),
+                    minion_breakdown: p
+                        .minion_actor()
+                        .and_then(|a| p.c.actors.actors[a].breakdown.clone()),
                 },
                 lists,
             ))

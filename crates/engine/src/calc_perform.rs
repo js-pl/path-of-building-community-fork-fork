@@ -308,6 +308,11 @@ impl<'a> Perform<'a> {
         &self.env.skills.active_skills[i]
     }
 
+    /// `actor.breakdown`, when the calculation builds them
+    pub fn bd(&mut self, actor: usize) -> Option<&mut crate::breakdown::Bd> {
+        self.c.actors.actors[actor].breakdown.as_mut()
+    }
+
     pub fn mods(&self, i: usize) -> &crate::calc_skill_mods::SkillMods {
         self.env.skills.active_skills[i]
             .mods
@@ -663,6 +668,14 @@ impl<'a> Perform<'a> {
             0.0
         };
         self.c.set_out(PLAYER, "LootRarityMagicEnemies", v);
+
+        // The breakdowns of the Calcs tab's calculation
+        if self.input.breakdown {
+            self.c.actors.actors[PLAYER].breakdown = Some(crate::breakdown::Bd::new());
+            if let Some(m) = self.minion_actor() {
+                self.c.actors.actors[m].breakdown = Some(crate::breakdown::Bd::new());
+            }
+        }
 
         if self.c.flag(pdb, None, &["ConvertArmourESToLife"])? {
             for slot in [
