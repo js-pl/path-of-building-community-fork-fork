@@ -240,7 +240,7 @@ fn typed_calcs_match_the_oracle() {
                 continue;
             }
         };
-        let mut calcs = engine::calcs::Calcs::new(&calc_data);
+        let calcs = engine::calcs::Calcs::new(&calc_data);
         let out = match calcs
             .build_output_main(&mut typed_build)
             .and_then(|mut o| engine::calcs::refresh_stat_list(&mut o).map(|_| o))

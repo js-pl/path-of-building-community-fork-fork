@@ -1283,7 +1283,7 @@ fn items_setup_matches_upstream() {
             one_hand: &one_hand,
             minions: &|m: &str| setup_data.minions.contains_key(m),
         };
-        let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
+        let typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
             Ok(b) => b,
             Err(e) => {
                 fail(format!("build: {e}"));
@@ -1343,7 +1343,7 @@ fn items_setup_matches_upstream() {
             jewel_radius: &radius,
         };
         match engine::calc_env::init_env(
-            &mut typed_build,
+            &typed_build,
             &calc_data,
             BuffMode::new(Some("EFFECTIVE")),
         ) {

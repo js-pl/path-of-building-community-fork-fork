@@ -48,9 +48,9 @@ pub struct Env {
     pub enemy_multipliers: HashMap<Sym, f64>,
 }
 
-/// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
-/// groups with the granted skills and the gems' selections.
-pub fn init_env(build: &mut Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
+/// `calcs.initEnv(build, mode)`; [`write_back`] gives the build's Skills
+/// tab the socket groups with the granted skills and the gems' selections.
+pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
     let spec = &build.spec;
     let tree = spec.tree;
     let class_id = spec.cur_class_id.unwrap_or(0);
@@ -196,13 +196,6 @@ pub fn init_env(build: &mut Build, data: &CalcData, mode: BuffMode) -> Result<En
         &mut enemy_multipliers,
         &mods_input,
     )?;
-    if let Some(list) = build
-        .skills
-        .as_mut()
-        .and_then(|s| s.socket_group_list_mut())
-    {
-        *list = groups.clone();
-    }
     Ok(Env {
         mode,
         enemy_level,
@@ -214,4 +207,17 @@ pub fn init_env(build: &mut Build, data: &CalcData, mode: BuffMode) -> Result<En
         skills,
         enemy_multipliers,
     })
+}
+
+/// The socket groups of an environment, with the granted skills and the
+/// gems' selections, into the build's Skills tab (upstream's environment
+/// shares them with the build)
+pub fn write_back(build: &mut Build, env: &Env) {
+    if let Some(list) = build
+        .skills
+        .as_mut()
+        .and_then(|s| s.socket_group_list_mut())
+    {
+        *list = env.groups.clone();
+    }
 }

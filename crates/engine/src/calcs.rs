@@ -16,6 +16,7 @@ use crate::calc_env::{CalcData, Env, init_env};
 use crate::calc_perform::{Perform, PerformInput, no_whitespace, perform};
 use crate::calc_setup::BuffMode;
 use crate::mods::{ModValue, Sym};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
@@ -88,28 +89,28 @@ pub fn env_skill_uuid(env: &Env, i: usize) -> String {
 /// The calculations of one build, with the skill cache they share
 pub struct Calcs<'d> {
     pub data: &'d CalcData<'d>,
-    cache: HashMap<(Mode, String), Rc<Cached>>,
+    cache: RefCell<HashMap<(Mode, String), Rc<Cached>>>,
 }
 
 impl<'d> Calcs<'d> {
     pub fn new(data: &'d CalcData<'d>) -> Calcs<'d> {
         Calcs {
             data,
-            cache: HashMap::new(),
+            cache: RefCell::new(HashMap::new()),
         }
     }
 
     /// `wipeGlobalCache()`
-    pub fn wipe_cache(&mut self) {
-        self.cache.clear();
+    pub fn wipe_cache(&self) {
+        self.cache.borrow_mut().clear();
     }
 
     pub fn cached(&self, mode: Mode, uuid: &str) -> Option<Rc<Cached>> {
-        self.cache.get(&(mode, uuid.to_string())).cloned()
+        self.cache.borrow().get(&(mode, uuid.to_string())).cloned()
     }
 
     /// `calcs.initEnv(build, mode)`
-    pub fn init_env(&self, build: &mut Build, mode: Mode) -> Result<Env> {
+    pub fn init_env(&self, build: &Build, mode: Mode) -> Result<Env> {
         init_env(build, self.data, mode.buff_mode())
     }
 
@@ -117,16 +118,22 @@ impl<'d> Calcs<'d> {
     /// defence, estimations, triggers and offence, then the minion's;
     /// caches the main skill's calculation. `f` reads the calculation
     /// before it is dropped.
+    #[allow(clippy::too_many_arguments)]
     pub fn perform<T>(
-        &mut self,
+        &self,
         build: &Build,
         env: Env,
         mode: Mode,
         skip_ehp: bool,
+        limited: &[String],
         f: impl FnOnce(&Perform) -> T,
     ) -> Result<(T, Env)> {
         let mut input = PerformInput::new(build, self.data, mode == Mode::Calcs)?;
         input.skip_ehp = skip_ehp;
+        input.calcs = Some(self);
+        input.build = Some(build);
+        input.mode = mode;
+        input.limited = limited.to_vec();
         let mut p = perform(env, input)?;
         p.finish()?;
         let main = p.main();
@@ -135,7 +142,9 @@ impl<'d> Calcs<'d> {
             output: p.c.actors.actors[PLAYER].output.clone(),
             skill_data: p.mods(main).skill_data.clone(),
         };
-        self.cache.insert((mode, uuid), Rc::new(cached));
+        self.cache
+            .borrow_mut()
+            .insert((mode, uuid), Rc::new(cached));
         let r = f(&p);
         let mut env = p.env;
         // The minions' skills are made again by the next calculation
@@ -143,21 +152,29 @@ impl<'d> Calcs<'d> {
         Ok((r, env))
     }
 
-    /// `calcs.buildActiveSkill(env, mode, skill, targetUUID)`
-    pub fn build_active_skill(&mut self, build: &mut Build, mode: Mode, uuid: &str) -> Result<()> {
+    /// `calcs.buildActiveSkill(env, mode, skill, targetUUID,
+    /// limitedProcessingFlags)`: `limited` are the skills whose triggers
+    /// and cached stages are not calculated again
+    pub fn build_active_skill(
+        &self,
+        build: &Build,
+        mode: Mode,
+        uuid: &str,
+        limited: &[String],
+    ) -> Result<()> {
         let mut env = self.init_env(build, mode)?;
         let found = (0..env.skills.active_skills.len()).find(|&i| env_skill_uuid(&env, i) == uuid);
         let Some(i) = found else {
             return Ok(());
         };
         env.skills.main_skill = i;
-        self.perform(build, env, mode, true, |_| ())?;
+        self.perform(build, env, mode, true, limited, |_| ())?;
         Ok(())
     }
 
     /// `calcs.calcFullDPS(build, mode)`: the Full DPS results
     /// (`SkillDPS`, `FullDPS`, `FullDotDPS`)
-    pub fn calc_full_dps(&mut self, build: &mut Build, mode: Mode) -> Result<FullDps> {
+    pub fn calc_full_dps(&self, build: &Build, mode: Mode) -> Result<FullDps> {
         let mut env = self.init_env(build, mode)?;
         let mut full = FullDps::default();
         let mut sources = Sources::default();
@@ -176,7 +193,8 @@ impl<'d> Calcs<'d> {
                 continue;
             }
             env.skills.main_skill = i;
-            let (step, next) = self.perform(build, env, mode, true, |p| full_dps_step(p, i))?;
+            let (step, next) =
+                self.perform(build, env, mode, true, &[], |p| full_dps_step(p, i))?;
             env = next;
             full.add(step?, count, &mut sources);
         }
@@ -185,9 +203,11 @@ impl<'d> Calcs<'d> {
     }
 
     /// `calcs.buildOutput(build, "MAIN")`
-    pub fn build_output_main(&mut self, build: &mut Build) -> Result<Outputs> {
+    pub fn build_output_main(&self, build: &mut Build) -> Result<Outputs> {
         let env = self.init_env(build, Mode::Main)?;
-        let (out, _) = self.perform(build, env, Mode::Main, false, |p| {
+        crate::calc_env::write_back(build, &env);
+        let build = &*build;
+        let (out, _) = self.perform(build, env, Mode::Main, false, &[], |p| {
             let skills: Vec<(String, String, bool)> = (0..p.n_player)
                 .map(|i| (skill_uuid(p, i), p.skill_name(i).to_string(), i == p.main()))
                 .collect();
@@ -218,7 +238,7 @@ impl<'d> Calcs<'d> {
         let num = |o: &Output, k: &str| o.get(&Sym::new(k)).and_then(OutVal::num);
         for (uuid, name, is_main) in &skills {
             if self.cached(Mode::Main, uuid).is_none() {
-                self.build_active_skill(build, Mode::Main, uuid)?;
+                self.build_active_skill(build, Mode::Main, uuid, &[])?;
             }
             let Some(cached) = self.cached(Mode::Main, uuid) else {
                 continue;
@@ -375,7 +395,7 @@ fn full_dps_step(p: &Perform, i: usize) -> Result<Step> {
         player: p.c.actors.actors[PLAYER].output.clone(),
         minion,
         counted_once,
-        info_message2: None,
+        info_message2: mods.info_message2.clone(),
     })
 }
 

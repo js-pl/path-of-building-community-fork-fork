@@ -2451,129 +2451,7 @@ impl<'a> Perform<'a> {
     }
 }
 
-/// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
-/// case names of skills, triggers and uniques
-const TRIGGER_CONFIGS: [&str; 81] = [
-    "law of the wilds",
-    "the rippling thoughts",
-    "the surging thoughts",
-    "the hidden blade",
-    "replica eternity shroud",
-    "shroud of the lightless",
-    "limbsplit",
-    "the cauteriser",
-    "duskblight",
-    "lioneye's paws",
-    "replica lioneye's paws",
-    "moonbender's wing",
-    "ngamahu's flame",
-    "cameria's avarice",
-    "starcaller",
-    "uul-netol's embrace",
-    "rigwald's crest",
-    "jorrhast's blacksteel",
-    "ashcaller",
-    "arakaali's fang",
-    "sporeguard",
-    "mark of the elder",
-    "mark of the shaper",
-    "poet's pen",
-    "maloney's mechanism",
-    "asenath's chant",
-    "vixen's entrapment",
-    "flames of judgement",
-    "storm of judgement",
-    "trigger craft",
-    "kitava's thirst",
-    "foulborn kitava's thirst",
-    "mjolner",
-    "wing of the wyvern",
-    "cospri's malice",
-    "seven teachings",
-    "squirming terror",
-    "kinetic flux",
-    "cast on critical strike",
-    "cast on melee kill",
-    "nova",
-    "cast when damage taken",
-    "cast when stunned",
-    "cast on ward break",
-    "spellslinger",
-    "call to arms",
-    "automation",
-    "autoexertion",
-    "seize the flesh",
-    "fissure",
-    "mark on hit",
-    "hextouch",
-    "oskarm",
-    "tempest shield",
-    "shattershard",
-    "battlemage's cry",
-    "arcanist brand",
-    "cast on death",
-    "combust",
-    "prismatic burst",
-    "voidstorm",
-    "shockwave",
-    "void shockwave",
-    "falling crystal",
-    "call the pyre",
-    "manaforged arrows",
-    "doom blast",
-    "cast while channelling",
-    "focus",
-    "snipe",
-    "avenging flame",
-    "intuitive link",
-    "svalinn cast on block",
-    "festering resentment cast on block",
-    "hex on trap",
-    "supporttriggerfirespellonhit",
-    "ghostly artillery",
-    "replica gifts from above",
-    "bursting toad",
-    "TriggeredMoltenStrike",
-    "FieryImpactHeistMaceImplicit",
-];
-
 impl<'a> Perform<'a> {
-    /// `calcs.triggers(env, actor)` of the actor's main skill: only
-    /// detects the skills a trigger handler calculates
-    pub(crate) fn triggers(&mut self, main: usize) -> Result<()> {
-        if !self.has_flag(main, "disable") {
-            let s = self.skill(main);
-            let ge = &s.active_effect.granted_effect;
-            let mut names = vec![ge.id.clone(), ge.name.to_lowercase()];
-            if let Some(t) = self.mods(main).triggered_by {
-                let t = s.effect_list[t].granted_effect.name.to_lowercase();
-                names.push(t.trim_start_matches("awakened ").to_string());
-                names.push(t);
-            }
-            if let Some(ModValue::Str(t)) = self.sd(main, "triggerSource") {
-                names.push(t.to_lowercase());
-            }
-            for e in &s.support_list {
-                if e.granted_effect.from_item && !e.granted_effect.support {
-                    names.push(e.granted_effect.name.to_lowercase());
-                }
-            }
-            if let Some(src) = s
-                .group
-                .and_then(|g| self.env.groups.get(g))
-                .and_then(|g| g.source.clone())
-                && let Some(n) = unique_trigger_name(&src)
-            {
-                names.push(n.to_lowercase());
-            }
-            if names.iter().any(|n| TRIGGER_CONFIGS.contains(&n.as_str())) {
-                return Err("not ported: triggers".into());
-            }
-            self.sd_clear(main, "triggered");
-        }
-        Ok(())
-    }
-
     /// `calcs.perform` after the setup: the player's defence, estimations
     /// (unless `skipEHP`), triggers and offence, then the minion's
     pub fn finish(&mut self) -> Result<()> {
@@ -2597,7 +2475,7 @@ impl<'a> Perform<'a> {
         if !self.input.skip_ehp {
             self.defence_estimations(actor)?;
         }
-        self.triggers(main)?;
+        self.triggers(actor)?;
         self.offence(actor, main)
     }
 
@@ -2605,7 +2483,7 @@ impl<'a> Perform<'a> {
     /// `calcs.offence(env, env.player, env.player.mainSkill)`
     pub fn player_offence(&mut self) -> Result<()> {
         let main = self.main();
-        self.triggers(main)?;
+        self.triggers(crate::calc::PLAYER)?;
         // Mirages
         let used_by_mirage = self
             .cfg(main)
@@ -2647,13 +2525,4 @@ impl<'a> Perform<'a> {
         }
         Ok(())
     }
-}
-
-/// `source:find(".*:.*:(.*),.*")`
-fn unique_trigger_name(src: &str) -> Option<String> {
-    let comma = src.rfind(',')?;
-    let head = &src[..comma];
-    let colon = head.rfind(':')?;
-    let before = &head[..colon];
-    before.contains(':').then(|| head[colon + 1..].to_string())
 }

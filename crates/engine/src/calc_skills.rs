@@ -499,7 +499,7 @@ pub(crate) struct SupportContext<'a> {
 }
 
 impl SupportContext<'_> {
-    fn can_support(&self, support: &GrantedEffect, skill: &ActiveSkill) -> bool {
+    pub(crate) fn can_support(&self, support: &GrantedEffect, skill: &ActiveSkill) -> bool {
         can_support(
             support,
             skill,

@@ -50,6 +50,15 @@ pub struct PerformInput<'a> {
     pub breakdown: bool,
     /// `skipEHP`: no defence estimations and allies' life pools
     pub skip_ehp: bool,
+    /// The calculations this one belongs to, which cache the skills'
+    /// calculations, and the build
+    pub calcs: Option<&'a crate::calcs::Calcs<'a>>,
+    pub build: Option<&'a crate::build::Build<'a>>,
+    /// `env.mode`
+    pub mode: crate::calcs::Mode,
+    /// `env.limitedSkills`: skills whose triggers and cached stages are not
+    /// calculated, by uuid
+    pub limited: Vec<String>,
 }
 
 /// An active skill's mod lists during the calculation
@@ -5618,6 +5627,14 @@ impl<'a> PerformInput<'a> {
             tree_version: &tree.version,
             breakdown,
             skip_ehp: false,
+            calcs: None,
+            build: None,
+            mode: if breakdown {
+                crate::calcs::Mode::Calcs
+            } else {
+                crate::calcs::Mode::Main
+            },
+            limited: Vec::new(),
         })
     }
 }

@@ -591,7 +591,8 @@ fn perform_matches_upstream() {
             one_hand: &one_hand,
             minions: &|m: &str| setup_data.minions.contains_key(m),
         };
-        let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
+        let typed_calcs = engine::calcs::Calcs::new(&calc_data);
+        let typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
             Ok(b) => b,
             Err(e) => {
                 failures.push(format!("{id}: build: {e}"));
@@ -599,7 +600,7 @@ fn perform_matches_upstream() {
             }
         };
         let typed_env = match engine::calc_env::init_env(
-            &mut typed_build,
+            &typed_build,
             &calc_data,
             BuffMode::new(Some("EFFECTIVE")),
         ) {
@@ -609,8 +610,11 @@ fn perform_matches_upstream() {
                 continue;
             }
         };
-        let input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
+        let mut input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
             .unwrap_or_else(|e| panic!("{id}: {e}"));
+        // The triggers' source skills come from their cached calculations
+        input.calcs = Some(&typed_calcs);
+        input.build = Some(&typed_build);
         let p = match engine::calc_perform::perform(typed_env, input) {
             Ok(p) => p,
             Err(e) if e.starts_with("not ported") => {

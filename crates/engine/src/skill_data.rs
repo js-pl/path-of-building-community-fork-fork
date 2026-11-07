@@ -60,6 +60,8 @@ pub struct GrantedEffect {
     pub weapon_types: Option<Vec<String>>,
     pub add_flags: Option<Vec<String>>,
     pub is_trigger: bool,
+    /// `triggered`: the skill is always triggered
+    pub triggered: bool,
     pub cannot_be_supported: bool,
     pub support_gems_only: bool,
     pub has_global_effect: bool,
@@ -379,6 +381,7 @@ impl GrantedEffect {
                 t => Some(truthy_keys(&t)?),
             },
             is_trigger: get(v, "isTrigger").truthy(),
+            triggered: get(v, "triggered").truthy(),
             cannot_be_supported: get(v, "cannotBeSupported").truthy(),
             support_gems_only: get(v, "supportGemsOnly").truthy(),
             has_global_effect: get(v, "hasGlobalEffect").truthy(),

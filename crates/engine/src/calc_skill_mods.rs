@@ -85,6 +85,16 @@ pub struct SkillMods {
     pub buff_list: Vec<Buff>,
     /// `infoTrigger`: what triggers the skill, for Full DPS
     pub info_trigger: Option<String>,
+    /// `infoMessage` and `infoMessage2` the triggers set
+    pub info_message: Option<String>,
+    pub info_message2: Option<String>,
+    /// What the triggers set on `triggeredBy`: its granted effect in place
+    /// of the support's, its main skill, Arcanist Brand's activation
+    /// frequency (inc, more) and attached brands, `ignoresTickRate`
+    pub triggered_by_effect: Option<std::rc::Rc<GrantedEffect>>,
+    pub triggered_by_main: Option<usize>,
+    pub triggered_by_brand: Option<(f64, f64, f64)>,
+    pub triggered_by_ignores_tick_rate: bool,
 }
 
 /// What building the mod lists needs
