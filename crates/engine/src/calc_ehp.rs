@@ -30,6 +30,27 @@ struct AllyPool {
     melee_only: bool,
 }
 
+/// `allyLifePoolList`'s labels, in [`ALLY_POOLS`]'s order
+const ALLY_LABELS: [&str; 9] = [
+    "Minion Life",
+    "Total Sentinel of Radiance Life",
+    "Total Spectre Life",
+    "Nearest Totem Life",
+    "Total Vaal Rejuvenation Totem Life",
+    "Total Void Spawn Life",
+    "Total Stone Golem Life",
+    "Total Allied Energy shield",
+    "Frost Shield Life",
+];
+
+const GEM: &str = "^x1AA29B";
+const SCOURGE: &str = "^xFF6E25";
+const WARD: &str = "^xFFFF77";
+const ES: &str = "^x88FFFF";
+const MANA: &str = "^x7070FF";
+const LIFE: &str = "^xE05030";
+const NEGATIVE: &str = "^xDD0022";
+
 const ALLY_POOLS: [AllyPool; 9] = [
     AllyPool {
         life: "TotalMinionLife",
@@ -126,6 +147,30 @@ struct Pools {
     life_below_half_loss_lost_over_time: Option<f64>,
     overkill: f64,
     hit_pool_remaining: f64,
+    /// `resourcesLostToTypeDamage`: what each damage type drained
+    lost: Vec<(&'static str, Lost)>,
+}
+
+/// The resources one damage type of a hit drained (amounts of at least 1)
+#[derive(Clone, Debug, Default)]
+struct Lost {
+    allies: [Option<f64>; 9],
+    aegis: Option<f64>,
+    shared_elemental_aegis: Option<f64>,
+    shared_aegis: Option<f64>,
+    guard: Option<f64>,
+    shared_guard: Option<f64>,
+    ward: Option<f64>,
+    energy_shield: Option<f64>,
+    mana: Option<f64>,
+    life: Option<f64>,
+    life_loss_prevented: Option<f64>,
+    overkill: Option<f64>,
+}
+
+/// `tempDamage >= 1 and tempDamage or nil`
+fn at_least_one(x: f64) -> Option<f64> {
+    (x >= 1.0).then_some(x)
 }
 
 fn kv_get(v: &[(String, f64)], k: &str) -> f64 {
@@ -294,6 +339,235 @@ impl<'a> Perform<'a> {
         Ok((sum, damages))
     }
 
+    /// `incomingDamageBreakdown(breakdownTable, poolsRemaining, output)`
+    fn incoming_damage_bd(&self, actor: usize, b: &mut Bd, p: &Pools) {
+        let o = |k: &str| self.c.out(actor, k);
+        if let Some(allies) = &p.allies {
+            for (ai, a) in allies.iter().enumerate() {
+                if let Some(a) = a {
+                    let life = o(ALLY_POOLS[ai].life).unwrap_or(f64::NAN);
+                    b.push(sf!(
+                        &format!("\t%d {GEM}{} ^7(%d remaining)", ALLY_LABELS[ai]),
+                        life - a.remaining,
+                        a.remaining
+                    ));
+                }
+            }
+        }
+        let lost = |t: &str| p.lost.iter().find(|(k, _)| *k == t).map(|(_, l)| l);
+        let aegis = p.aegis.clone().unwrap_or_default();
+        let guard = p.guard.clone().unwrap_or_default();
+        for t in DMG_TYPES {
+            if let Some(x) = lost(t).and_then(|l| l.aegis) {
+                b.push(sf!(
+                    &format!("\t%d {GEM}%s Aegis charge ^7(%d remaining)"),
+                    x,
+                    t,
+                    kv_get(&aegis, t)
+                ));
+            }
+        }
+        let se = kv_get(&aegis, "sharedElemental");
+        if let Some(x) = o("sharedElementalAegis")
+            && x != se
+        {
+            b.push(sf!(
+                &format!("\t%d {GEM}Elemental Aegis charge ^7(%d remaining)"),
+                x - se,
+                se
+            ));
+        }
+        if let Some(x) = o("sharedAegis")
+            && x > 0.0
+        {
+            let sh = kv_get(&aegis, "shared");
+            b.push(sf!(
+                &format!("\t%d {GEM}Shared Aegis charge ^7(%d remaining)"),
+                x - sh,
+                sh
+            ));
+        }
+        for t in DMG_TYPES {
+            if let Some(x) = lost(t).and_then(|l| l.guard) {
+                b.push(sf!(
+                    &format!("\n\t%d {SCOURGE}%s Guard charge ^7(%d remaining)"),
+                    x,
+                    t,
+                    kv_get(&guard, t)
+                ));
+            }
+        }
+        if let Some(x) = o("sharedGuardAbsorb")
+            && x > 0.0
+        {
+            let sh = kv_get(&guard, "shared");
+            b.push(sf!(
+                &format!("\t%d {SCOURGE}Shared Guard charge ^7(%d remaining)"),
+                x - sh,
+                sh
+            ));
+        }
+        if let Some(w) = o("Ward")
+            && w > 0.0
+        {
+            b.push(sf!(&format!("\t%d {WARD}Ward"), w));
+        }
+        let es = p.energy_shield.unwrap_or(f64::NAN);
+        if let Some(cap) = o("EnergyShieldRecoveryCap")
+            && cap != es
+            && cap > 0.0
+        {
+            b.push(sf!(
+                &format!("\t%d {ES}Energy Shield ^7(%d remaining)"),
+                cap - es,
+                es
+            ));
+        }
+        let mana = p.mana.unwrap_or(f64::NAN);
+        if let Some(m) = o("ManaUnreserved")
+            && m != mana
+            && m > 0.0
+        {
+            b.push(sf!(
+                &format!("\t%d {MANA}Mana ^7(%d remaining)"),
+                m - mana,
+                mana
+            ));
+        }
+        let prevented = p.life_loss_lost_over_time.unwrap_or(0.0)
+            + p.life_below_half_loss_lost_over_time.unwrap_or(0.0);
+        if prevented > 0.0 {
+            b.push(sf!(&format!("\t%d {LIFE}Life ^7Loss Prevented"), prevented));
+        }
+        let life = p.life.unwrap_or(f64::NAN);
+        b.push(sf!(
+            &format!("\t%d {LIFE}Life ^7(%d remaining)"),
+            o("LifeRecoverable").unwrap_or(f64::NAN) - life,
+            life
+        ));
+        if p.overkill >= 1.0 {
+            b.push(sf!(&format!("\t%d {NEGATIVE}Overkill damage"), p.overkill));
+        }
+    }
+
+    /// The breakdown of the hit of [`Self::defence_estimations`]: the
+    /// resources it drains, in total and by damage type
+    fn taken_hit_bd(&mut self, actor: usize) -> Result<()> {
+        if self.bd(actor).is_none() {
+            return Ok(());
+        }
+        let o = |p: &Self, k: &str| p.o(actor, k);
+        let mut taken: Damage = Vec::new();
+        let mut rows = Vec::new();
+        for t in DMG_TYPES {
+            let hit = o(self, &format!("{t}TakenHit"));
+            if hit > 0.0 {
+                taken.push((t, hit));
+            }
+            rows.push(row([
+                ("type", sf!("%s", t)),
+                (
+                    "incoming",
+                    sf!("%.1f incoming damage", o(self, &format!("{t}TakenDamage"))),
+                ),
+                (
+                    "mult",
+                    sf!("x %.3f damage mult", o(self, &format!("{t}TakenHitMult"))),
+                ),
+                ("value", sf!("%d", hit.ceil())),
+            ]));
+        }
+        let pools = self.reduce_pools(actor, None, &taken)?;
+        let mut total = self
+            .bd(actor)
+            .and_then(|bd| bd.table_mut("totalTakenHit").cloned())
+            .unwrap_or_default();
+        for r in rows {
+            total.add_row(r);
+        }
+        total.push("Such a hit would drain the following resources:");
+        self.incoming_damage_bd(actor, &mut total, &pools);
+        let mut by_type = Vec::new();
+        for t in DMG_TYPES {
+            let l = pools
+                .lost
+                .iter()
+                .find(|(k, _)| *k == t)
+                .map(|(_, l)| l.clone())
+                .unwrap_or_default();
+            let mut b = Bd::of([
+                sf!("Final %s Damage taken:", t),
+                sf!("%.1f incoming damage", o(self, &format!("{t}TakenDamage"))),
+                sf!("x %.3f damage mult", o(self, &format!("{t}TakenHitMult"))),
+                sf!("= %.1f", o(self, &format!("{t}TakenHit"))),
+            ]);
+            b.push("This part of the hit drains the following resources:");
+            let mut sum = 0.0;
+            for (ai, x) in l.allies.iter().enumerate() {
+                if let Some(x) = x {
+                    sum += x;
+                    b.push(sf!(&format!("\t%d {GEM}{}", ALLY_LABELS[ai]), *x));
+                }
+            }
+            if let Some(x) = l.aegis {
+                sum += x;
+                b.push(sf!(&format!("\t%d {GEM}%s Aegis charge"), x, t));
+            }
+            if let Some(x) = l.shared_elemental_aegis {
+                sum += x;
+                b.push(sf!(&format!("\t%d {GEM}Elemental Aegis charge"), x));
+            }
+            if let Some(x) = l.shared_aegis {
+                sum += x;
+                b.push(sf!(&format!("\t%d {GEM}Shared Aegis charge"), x));
+            }
+            if let Some(x) = l.guard {
+                sum += x;
+                b.push(sf!(&format!("\n\t%d {SCOURGE}%s Guard charge"), x, t));
+            }
+            if let Some(x) = l.shared_guard {
+                sum += x;
+                b.push(sf!(&format!("\t%d {SCOURGE}Shared Guard charge"), x));
+            }
+            if let Some(x) = l.ward {
+                sum += x;
+                b.push(sf!(&format!("\t%d {WARD}Ward"), x));
+            }
+            if let Some(x) = l.energy_shield {
+                sum += x;
+                b.push(sf!(&format!("\t%d {ES}Energy Shield"), x));
+            }
+            if let Some(x) = l.mana {
+                sum += x;
+                b.push(sf!(&format!("\t%d {MANA}Mana"), x));
+            }
+            if let Some(x) = l.life_loss_prevented
+                && x > 0.0
+            {
+                sum += x;
+                b.push(sf!(&format!("\t%d {LIFE}Life ^7Loss Prevented"), x));
+            }
+            if let Some(x) = l.life
+                && x > 0.0
+            {
+                sum += x;
+                b.push(sf!(&format!("\t%d {LIFE}Life"), x));
+            }
+            if let Some(x) = l.overkill {
+                sum += x;
+                b.push(sf!(&format!("\t%d {NEGATIVE}Overkill damage"), x));
+            }
+            b.push(sf!("\t^8(%d total)", sum));
+            by_type.push((t, b));
+        }
+        let bd = self.bd(actor).unwrap();
+        bd.set("totalTakenHit", total);
+        for (t, b) in by_type {
+            bd.set(&format!("{t}TakenHit"), b);
+        }
+        Ok(())
+    }
+
     /// `calcs.reducePoolsByDamage(poolTable, damageTable, actor)`
     fn reduce_pools(&self, actor: usize, pools: Option<Pools>, damage: &Damage) -> Result<Pools> {
         let db = self.c.db(actor);
@@ -422,18 +696,22 @@ impl<'a> Perform<'a> {
                 .map_or(f64::NAN, |(_, x)| *x)
         };
         let ward_bypass_mod = self.c.base(db, None, &["WardBypass"])?;
-        for t in DMG_TYPES {
+        let mut lost_by_type: Vec<(&'static str, Lost)> =
+            DMG_TYPES.iter().map(|t| (*t, Lost::default())).collect();
+        for (ti, t) in DMG_TYPES.iter().enumerate() {
+            let t = *t;
             let Some(mut rem) = dmg_get(&table, t) else {
                 continue;
             };
-            for (a, ally) in ALLY_POOLS.iter().zip(allies.iter_mut()) {
-                let _ = a;
+            let lt = &mut lost_by_type[ti].1;
+            for (ai, ally) in allies.iter_mut().enumerate() {
                 if let Some(v) = ally
                     && v.remaining > 0.0
                 {
                     let temp = m_min(rem * v.percent, v.remaining);
                     v.remaining = (v.remaining - temp).floor();
                     rem -= temp;
+                    lt.allies[ai] = at_least_one(temp);
                 }
             }
             match recoupable.iter_mut().find(|(k, _)| *k == t) {
@@ -445,30 +723,35 @@ impl<'a> Perform<'a> {
                 let temp = m_min(rem, a);
                 kv_set(&mut aegis, t, a - temp);
                 rem -= temp;
+                lt.aegis = at_least_one(temp);
             }
             let se = kv_get(&aegis, "sharedElemental");
             if is_elemental(t) && se > 0.0 {
                 let temp = m_min(rem, se);
                 kv_set(&mut aegis, "sharedElemental", se - temp);
                 rem -= temp;
+                lt.shared_elemental_aegis = at_least_one(temp);
             }
             let sh = kv_get(&aegis, "shared");
             if sh > 0.0 {
                 let temp = m_min(rem, sh);
                 kv_set(&mut aegis, "shared", sh - temp);
                 rem -= temp;
+                lt.shared_aegis = at_least_one(temp);
             }
             let g = kv_get(&guard, t);
             if g > 0.0 {
                 let temp = m_min(rem * o(&format!("{t}GuardAbsorbRate")) / 100.0, g);
                 kv_set(&mut guard, t, (g - temp).floor());
                 rem -= temp;
+                lt.guard = at_least_one(temp);
             }
             let gs = kv_get(&guard, "shared");
             if gs > 0.0 {
                 let temp = m_min(rem * o("sharedGuardAbsorbRate") / 100.0, gs);
                 kv_set(&mut guard, "shared", (gs - temp).floor());
                 rem -= temp;
+                lt.shared_guard = at_least_one(temp);
             }
             if ward > 0.0
                 && (ward_bypass_below == 0.0 || damage_total >= ward_before * ward_bypass_below)
@@ -477,6 +760,7 @@ impl<'a> Perform<'a> {
                 ward -= temp;
                 temp *= ward_active;
                 rem -= temp;
+                lt.ward = at_least_one(temp);
             }
             let mom = m_min(
                 o("sharedMindOverMatter") + o(&format!("{t}MindOverMatter")),
@@ -491,6 +775,7 @@ impl<'a> Perform<'a> {
                 }
                 es -= temp;
                 rem -= temp;
+                lt.energy_shield = at_least_one(temp);
             }
             if mom > 0.0 {
                 let mut mom_damage = (rem * mom).ceil();
@@ -502,6 +787,7 @@ impl<'a> Perform<'a> {
                     es -= temp;
                     rem -= temp;
                     mom_damage -= temp;
+                    lt.energy_shield = at_least_one(temp);
                 }
                 let temp = m_min(mom_damage, get(&mom_left, t)).ceil();
                 for (_, x) in mom_left.iter_mut() {
@@ -509,6 +795,7 @@ impl<'a> Perform<'a> {
                 }
                 mana -= temp;
                 rem -= temp;
+                lt.mana = at_least_one(temp);
             }
             let prevented_total = o("preventedLifeLossTotal");
             if prevented_total > 0.0 {
@@ -532,6 +819,8 @@ impl<'a> Perform<'a> {
                     rem -= split;
                     lost_over_time += prevented;
                     life -= lost;
+                    lt.life = Some(lost);
+                    let mut lp = prevented;
                     if life <= half {
                         let unspecific = rem * prevent;
                         lost_over_time += unspecific;
@@ -539,19 +828,24 @@ impl<'a> Perform<'a> {
                         let specific = rem * below_pct;
                         below_half_lost += specific;
                         rem -= specific;
+                        lp += unspecific + specific;
                     }
+                    lt.life_loss_prevented = at_least_one(lp);
                 } else {
                     let temp = rem * o("preventedLifeLoss") / 100.0;
                     lost_over_time += temp;
                     rem -= temp;
+                    lt.life_loss_prevented = at_least_one(temp);
                 }
             }
             if life > 0.0 {
                 let temp = m_min(rem, life);
                 life -= temp;
                 rem -= temp;
+                lt.life = Some(lt.life.unwrap_or(0.0) + if temp > 0.0 { temp } else { 0.0 });
             }
             overkill += rem;
+            lt.overkill = at_least_one(rem);
         }
         let mut mom_remaining = f64::INFINITY;
         let mut es_remaining = f64::INFINITY;
@@ -601,6 +895,7 @@ impl<'a> Perform<'a> {
             life_below_half_loss_lost_over_time: Some(below_half_lost.ceil()),
             overkill: overkill.ceil(),
             hit_pool_remaining: hit_pool.floor(),
+            lost: lost_by_type,
         })
     }
 
@@ -667,6 +962,7 @@ impl<'a> Perform<'a> {
             )),
             overkill: 0.0,
             hit_pool_remaining: 0.0,
+            lost: Vec::new(),
         };
         if d.cycles != 1.0 {
             d.track_recoupable = false;
@@ -1731,10 +2027,23 @@ impl<'a> Perform<'a> {
         self.pvp(actor)?;
         self.maximum_hit(actor, &shift)?;
         for t in DMG_TYPES {
-            let v = o(self, &format!("{t}TotalPool")) / o(self, &format!("{t}TakenDotMult"));
+            let pool = o(self, &format!("{t}TotalPool"));
+            let mult = o(self, &format!("{t}TakenDotMult"));
+            let v = pool / mult;
             set(self, &format!("{t}DotEHP"), v);
+            if let Some(bd) = self.bd(actor) {
+                bd.set(
+                    &format!("{t}DotEHP"),
+                    Bd::of([
+                        sf!("Total Pool: %d", pool),
+                        sf!("Dot Damage Taken modifier: %.2f", mult),
+                        sf!("Total Effective Dot Pool: %d", v),
+                    ]),
+                );
+            }
         }
         self.degens(actor, category, &dot_shift)?;
+        self.taken_hit_bd(actor)?;
         Ok(())
     }
 
@@ -2745,6 +3054,94 @@ impl<'a> Perform<'a> {
                     + pseudo / (survival + pdur)
                     + ex.map_or(0.0, |(_, a, d)| a / (survival + d));
                 self.c.set_out(actor, &format!("{r}RecoupRecoveryAvg"), avg);
+                if self.bd(actor).is_some() {
+                    let mut b = Bd::new();
+                    let mut multiple = 0;
+                    let own = oo(self, &format!("{r}Recoup"));
+                    if own > 0.0 {
+                        b.push(sf!("%d ^8(total damage taken during ehp calcs)", total));
+                        b.push(sf!("* %.2f ^8(percent of damage recouped)", own / 100.0));
+                        multiple += 1;
+                    }
+                    let ele = oo(self, &format!("Elemental{r}Recoup"));
+                    if ele > 0.0 && total_ele > 0.0 {
+                        if multiple > 0 {
+                            b.push("");
+                        }
+                        b.push(sf!(
+                            "%s%d ^8(total elemental damage taken during ehp calcs)",
+                            if multiple > 0 { "+" } else { "" },
+                            total
+                        ));
+                        b.push(sf!("* %.2f ^8(percent of damage recouped)", ele / 100.0));
+                        multiple += 1;
+                    }
+                    for t in DMG_TYPES {
+                        let x = oo(self, &format!("{t}{r}Recoup"));
+                        if x > 0.0 && o(self, &format!("{t}RecoupableDamageTaken")) > 0.0 {
+                            if multiple > 0 {
+                                b.push("");
+                            }
+                            b.push(sf!(
+                                "%s%d ^8(total %s damage taken during ehp calcs)",
+                                if multiple > 0 { "+" } else { "" },
+                                total,
+                                t
+                            ));
+                            b.push(sf!("* %.2f ^8(percent of damage recouped)", x / 100.0));
+                            multiple += 1;
+                        }
+                    }
+                    b.push(sf!("= %d ^8(total damage recoup amount)", rec));
+                    let mut a = b.clone();
+                    b.push(sf!("/ %.2f ^8(over %d seconds)", time, time));
+                    if pseudo > 0.0 {
+                        b.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            pseudo
+                        ));
+                        b.push(sf!("/ %.2f ^8(over %d seconds)", pdur, pdur));
+                    }
+                    if let Some((_, ea, ed)) = ex {
+                        b.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            ea
+                        ));
+                        b.push(sf!("/ %.2f ^8(over %d seconds)", ed, ed));
+                    }
+                    b.push(sf!("= %.2f per second ^8", max));
+                    a.push(sf!(
+                        "/ %.2f ^8(total time of the recoup (survival time + %d seconds))",
+                        survival + time,
+                        time
+                    ));
+                    if pseudo > 0.0 {
+                        a.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            pseudo
+                        ));
+                        a.push(sf!(
+                            "/ %.2f ^8(total time of the recoup (survival time + %d seconds)",
+                            survival + pdur,
+                            pdur
+                        ));
+                    }
+                    if let Some((_, ea, ed)) = ex {
+                        a.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            ea
+                        ));
+                        a.push(sf!(
+                            "/ %.2f ^8(total time of the recoup (survival time + %d seconds)",
+                            survival + ed,
+                            ed
+                        ));
+                    }
+                    a.push(sf!("= %.2f per second ^8", avg));
+                    let bd = self.bd(actor).unwrap();
+                    bd.set(&format!("{r}RecoupRecoveryMax"), b);
+                    bd.set(&format!("{r}RecoupRecoveryAvg"), a);
+                }
             }
         }
         let prevented_total = o(self, "preventedLifeLossTotal");
@@ -2756,11 +3153,44 @@ impl<'a> Perform<'a> {
             let x =
                 o(self, "LifeLossLostOverTime") + o(self, "LifeBelowHalfLossLostOverTime") * lost;
             self.c.set_out(actor, "LifeLossLostMax", x / 4.0);
-            self.c.set_out(
-                actor,
-                "LifeLossLostAvg",
-                x / (o(self, "EHPSurvivalTime") + 4.0),
+            let survival = o(self, "EHPSurvivalTime");
+            self.c
+                .set_out(actor, "LifeLossLostAvg", x / (survival + 4.0));
+            let (over, below) = (
+                o(self, "LifeLossLostOverTime"),
+                o(self, "LifeBelowHalfLossLostOverTime"),
             );
+            if let Some(bd) = self.bd(actor) {
+                let head = |b: &mut Bd| {
+                    if over != 0.0 {
+                        b.push(sf!("( %d ^8(total damage prevented by Progenesis)", over));
+                    }
+                    if below != 0.0 {
+                        b.push(sf!(
+                            "%s %d ^8(total damage prevented by petrified blood)",
+                            if over != 0.0 { "+" } else { "(" },
+                            below
+                        ));
+                        b.push(sf!(
+                            "* %.2f ^8(percent of damage taken from petrified blood)",
+                            lost
+                        ));
+                    }
+                };
+                let mut m = Bd::new();
+                head(&mut m);
+                m.push(sf!(") / %.2f ^8(over 4 seconds)", 4.0));
+                m.push(sf!("= %.2f per second", x / 4.0));
+                let mut a = Bd::new();
+                head(&mut a);
+                a.push(sf!(
+                    ") / %.2f ^8(total time of the degen (survival time + 4 seconds))",
+                    survival + 4.0
+                ));
+                a.push(sf!("= %.2f per second", x / (survival + 4.0)));
+                bd.set("LifeLossLostMax", m);
+                bd.set("LifeLossLostAvg", a);
+            }
         }
         if oo(self, "LifeRecoupRecoveryAvg") > 0.0 || prevented_total > 0.0 {
             let v = oo(self, "LifeRecoupRecoveryMax") - oo(self, "LifeLossLostMax");
@@ -2772,6 +3202,26 @@ impl<'a> Perform<'a> {
             if oo(self, "LifeRecoupRecoveryAvg") > 0.0 && prevented_total > 0.0 {
                 self.c
                     .set_out_val(actor, "showNetRecoup", OutVal::Bool(true));
+                let vals = [
+                    o(self, "LifeRecoupRecoveryMax"),
+                    o(self, "LifeLossLostMax"),
+                    o(self, "netLifeRecoupAndLossLostOverTimeMax"),
+                    o(self, "LifeRecoupRecoveryAvg"),
+                    o(self, "LifeLossLostAvg"),
+                    o(self, "netLifeRecoupAndLossLostOverTimeAvg"),
+                ];
+                if let Some(bd) = self.bd(actor) {
+                    for (k, v) in [("Max", &vals[..3]), ("Avg", &vals[3..])] {
+                        bd.set(
+                            &format!("netLifeRecoupAndLossLostOverTime{k}"),
+                            Bd::of([
+                                sf!("%.2f ^8(total life recouped per second)", v[0]),
+                                sf!("- %.2f ^8(total life taken over time per second)", v[1]),
+                                sf!("= %.2f per second", v[2]),
+                            ]),
+                        );
+                    }
+                }
             }
         }
         Ok(())
@@ -2980,6 +3430,59 @@ impl<'a> Perform<'a> {
             };
             self.c
                 .set_out(actor, &format!("{t}MaximumHitTaken"), final_max);
+            if self.bd(actor).is_some() {
+                let mut b = row_table(
+                    "Maximum hit damage breakdown",
+                    &[
+                        ("Type", "type"),
+                        ("Pool", "pool"),
+                        ("Incoming", "incoming"),
+                        ("Multi", "multi"),
+                        ("Taken", "taken"),
+                    ],
+                );
+                let (full, mut damages) =
+                    self.taken_hit_from_damage(actor, final_max * enemy_mult, t, st)?;
+                let full = if full.is_nan() { 0.0 } else { full };
+                for (tt, amt) in damages.iter_mut() {
+                    let conv = st
+                        .iter()
+                        .find(|(k, _)| k == tt)
+                        .map_or(f64::NAN, |(_, v)| *v);
+                    let incoming = final_max * enemy_mult * conv / 100.0;
+                    if amt.is_nan() {
+                        *amt = 0.0;
+                    }
+                    b.add_row(row([
+                        ("type", sf!("%d%% as %s", conv, *tt)),
+                        ("pool", sf!("%d", o(self, &format!("{tt}TotalHitPool")))),
+                        ("incoming", sf!("%.0f", incoming)),
+                        ("multi", sf!("x%.3f", *amt / incoming)),
+                        ("taken", sf!("%.0f", *amt)),
+                    ]));
+                }
+                let full_multi = full / final_max / enemy_mult;
+                b.push("^8Maximum hit is calculated in reverse -");
+                b.push("^8from health pools, via damage reductions, to the max hit:");
+                b.push(sf!("%d ^8(used pool)", full));
+                if round(full_multi, 2.0) != 1.0 {
+                    b.push(sf!("/ %.2f ^8(modifiers to damage taken)", full_multi));
+                }
+                if enemy_mult != 1.0 {
+                    b.push(sf!("/ %.2f ^8(modifiers to enemy damage)", enemy_mult));
+                }
+                b.push(sf!(
+                    "= %.0f ^8maximum survivable enemy damage%s",
+                    final_max,
+                    if smoothing { " (approximate)" } else { "" }
+                ));
+                b.push("^8Such a hit would drain the following resources:");
+                let pools = self.reduce_pools(actor, None, &damages)?;
+                self.incoming_damage_bd(actor, &mut b, &pools);
+                self.bd(actor)
+                    .unwrap()
+                    .set(&format!("{t}MaximumHitTaken"), b);
+            }
         }
         let mut minimum = f64::INFINITY;
         let mut second = f64::INFINITY;
