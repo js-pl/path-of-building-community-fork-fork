@@ -290,56 +290,121 @@ struct Snapshot {
     player: Db,
     enemy: Db,
     skills: Vec<Db>,
+    /// `env.minion`: its output, database and skills' mod lists
+    minion: Option<(BTreeMap<String, J>, Db, Vec<Db>)>,
 }
 
-fn snapshot(env: &Value) -> Snapshot {
-    let player = get(env, "player");
-    let output = entries(&get(&player, "output"))
+fn lua_output(v: &Value) -> BTreeMap<String, J> {
+    entries(v)
         .into_iter()
         .map(|(k, v)| {
             let k = lua::to_string(&k.to_value()).to_str_lossy().into_owned();
             let j = lua_json(&v, &k);
             (k, j)
         })
-        .collect();
-    let skills = entries(&get(&player, "activeSkillList"))
-        .into_iter()
-        .map(|(_, a)| lua_db(&get(&a, "skillModList")))
-        .collect();
+        .collect()
+}
+
+fn snapshot(env: &Value) -> Snapshot {
+    let player = get(env, "player");
+    let mut output = lua_output(&get(&player, "output"));
+    // The minion's output is compared with the minion
+    output.remove("Minion");
+    let skill_lists = |actor: &Value| -> Vec<Db> {
+        entries(&get(actor, "activeSkillList"))
+            .into_iter()
+            .map(|(_, a)| lua_db(&get(&a, "skillModList")))
+            .collect()
+    };
+    let skills = skill_lists(&player);
+    let minion = get(env, "minion");
+    let minion = (!minion.is_nil()).then(|| {
+        (
+            lua_output(&get(&minion, "output")),
+            lua_db(&get(&minion, "modDB")),
+            skill_lists(&minion),
+        )
+    });
     Snapshot {
         output,
         player: lua_db(&get(env, "modDB")),
         enemy: lua_db(&get(env, "enemyDB")),
         skills,
+        minion,
     }
 }
 
 /// Compares the typed calculation with the translated state
-fn compare_stage(
-    p: &engine::calc_perform::Perform,
-    want: &mut Snapshot,
+fn compare_output(
+    what: &str,
+    output: &HashMap<engine::mods::Sym, OutVal>,
+    want: &BTreeMap<String, J>,
     fail: &mut Vec<String>,
     partial: bool,
 ) {
-    let got: BTreeMap<String, J> = p.c.actors.actors[0]
-        .output
+    let got: BTreeMap<String, J> = output
         .iter()
         .map(|(k, v)| (k.as_str().to_string(), typed_json(v)))
         .collect();
     for k in got
         .keys()
-        .chain(want.output.keys())
+        .chain(want.keys())
         .collect::<std::collections::BTreeSet<_>>()
     {
-        if got.get(k) != want.output.get(k) && !(partial && !got.contains_key(k)) {
+        if got.get(k) != want.get(k) && !(partial && !got.contains_key(k)) {
             fail.push(format!(
-                "output {k}: {} != {}",
+                "{what}output {k}: {} != {}",
                 got.get(k).map_or("missing".into(), |v| v.to_string()),
-                want.output
-                    .get(k)
-                    .map_or("missing".into(), |v| v.to_string())
+                want.get(k).map_or("missing".into(), |v| v.to_string())
             ));
         }
+    }
+}
+
+fn compare_stage(
+    p: &engine::calc_perform::Perform,
+    want: &mut Snapshot,
+    fail: &mut Vec<String>,
+    partial: bool,
+    with_minion: bool,
+) {
+    compare_output(
+        "",
+        &p.c.actors.actors[0].output,
+        &want.output,
+        fail,
+        partial,
+    );
+    match (p.env_minion(), &mut want.minion) {
+        _ if !with_minion => {}
+        (None, None) => {}
+        (Some(m), Some((output, db, skills))) => {
+            compare_output(
+                "minion ",
+                &p.c.actors.actors[m.actor].output,
+                output,
+                fail,
+                false,
+            );
+            compare_db("minion", &typed_db(p.c.store(p.c.db(m.actor))), db, fail);
+            if skills.len() != m.lists.len() {
+                fail.push(format!(
+                    "{} minion skills != {}",
+                    m.lists.len(),
+                    skills.len()
+                ));
+            } else {
+                for (i, (&l, w)) in m.lists.iter().zip(skills.iter_mut()).enumerate() {
+                    compare_db(
+                        &format!("minion skill {i}"),
+                        &typed_db(p.c.store(l)),
+                        w,
+                        fail,
+                    );
+                }
+            }
+        }
+        (t, _) => fail.push(format!("typed minion {}", t.is_some())),
     }
     compare_db(
         "player",
@@ -572,7 +637,10 @@ fn perform_matches_upstream() {
                 break;
             }
             let before = fail.len();
-            compare_stage(&p, want, &mut fail, partial && *stage == stages.len());
+            // The minion's own defence and offence (not ported yet) follow
+            // the player's offence
+            let last = *stage == stages.len();
+            compare_stage(&p, want, &mut fail, partial && last, !last);
             if fail.len() > before {
                 fail.insert(before, format!("at {}:", stage_name(*stage)));
                 break;

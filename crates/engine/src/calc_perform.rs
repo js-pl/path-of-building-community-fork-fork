@@ -3,9 +3,11 @@
 //! life and mana, reservations, charges, buffs, curses, auras and ailments,
 //! up to the defence and offence calculations.
 //!
-//! Not ported yet: minions, the party tab's buffs, skills whose stages come
-//! from their own cached calculation (Blight, Penance Brand, Earthquake),
-//! the overcapped lightning resistance's mana and allies' life pools.
+//! The minions' parts are in `calc_minion.rs`.
+//!
+//! Not ported yet: the party tab's buffs, skills whose stages come from
+//! their own cached calculation (Blight, Penance Brand, Earthquake) and the
+//! overcapped lightning resistance's mana.
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
@@ -67,15 +69,17 @@ pub struct SkillMarks {
 }
 
 /// A curse to slot (`curses`, `minionCurses`)
-#[derive(Clone, Debug)]
-struct Curse {
-    name: String,
-    priority: f64,
-    is_mark: bool,
-    ignore_hex_limit: bool,
-    socketed_curses_hex_limit: bool,
-    mod_list: Option<Vec<Mod>>,
-    buff_mod_list: Option<Vec<Mod>>,
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Curse {
+    pub name: String,
+    pub priority: f64,
+    pub is_mark: bool,
+    pub ignore_hex_limit: bool,
+    pub socketed_curses_hex_limit: bool,
+    pub mod_list: Option<Vec<Mod>>,
+    pub buff_mod_list: Option<Vec<Mod>>,
+    /// What a curse that buffs adds to `env.minion`
+    pub minion_buff_mod_list: Option<Vec<Mod>>,
 }
 
 /// Buffs by name, in the order they were first merged
@@ -180,7 +184,7 @@ pub(crate) fn new_mod(
     m
 }
 
-pub(crate) fn src(name: &str, typ: ModType, value: impl Into<ModValue>, source: &str) -> Mod {
+pub fn src(name: &str, typ: ModType, value: impl Into<ModValue>, source: &str) -> Mod {
     Mod::new(name, typ, value, Some(source))
 }
 
@@ -228,6 +232,16 @@ pub struct Perform<'a> {
     pub weapons_disabled: bool,
     /// `actor.weaponRange1`, `weaponRange2` set by the offence
     pub weapon_range: [Option<f64>; 2],
+    /// The skills' minions (`activeSkill.minion`)
+    pub minions: Vec<crate::calc_minion::MinionActor>,
+    /// `env.minion`, by index in `minions`
+    pub minion: Option<usize>,
+    /// `flasksApplyToMinion`, `quickSilverAppliesToAllies`,
+    /// `nonUniqueFlasksApplyToMinion`
+    pub(crate) flasks_to_minion: [bool; 3],
+    /// The lists of `buffs` and `minionBuffs`
+    pub(crate) buff_lists: Vec<Vec<Mod>>,
+    pub(crate) minion_buff_lists: Vec<Vec<Mod>>,
 }
 
 impl<'a> Perform<'a> {
@@ -406,11 +420,6 @@ impl<'a> Perform<'a> {
 
 /// `calcs.perform(env)` up to the defence and offence calculations
 pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
-    for skill in &env.skills.active_skills {
-        if skill.mods.as_ref().is_some_and(|m| m.minion.is_some()) {
-            return Err("not ported: minions".into());
-        }
-    }
     let mut stores = crate::mods::Stores::default();
     let pdb = stores.push(env.player_db.clone());
     let edb = stores.push(env.enemy_db.clone());
@@ -463,6 +472,11 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         has_guaranteed_bonechill: false,
         weapons_disabled: false,
         weapon_range: [None, None],
+        minions: Vec::new(),
+        minion: None,
+        flasks_to_minion: [false; 3],
+        buff_lists: Vec::new(),
+        minion_buff_lists: Vec::new(),
     };
     p.run()?;
     Ok(p)
@@ -489,7 +503,14 @@ impl<'a> Perform<'a> {
             let list = self.c.push_store(list, Some(PLAYER));
             self.lists.push(SkillLists { base, list });
         }
+        // The minions' skills, and the main skill's minion
+        self.create_minions()?;
         self.update_reserving_skills();
+        let main = self.main();
+        self.minion = self.minions.iter().position(|m| m.skill == main);
+        if let Some(m) = self.minion {
+            self.init_minion_mod_db(m)?;
+        }
 
         if self.c.flag(pdb, None, &["AlchemistsGenius"])? {
             let effect = 1.0 + self.c.inc(pdb, None, &["BuffEffectOnSelf"])? / 100.0;
@@ -554,6 +575,9 @@ impl<'a> Perform<'a> {
         self.c.set_mult(pdb, "WarcryPower", warcry_power);
 
         self.apply_enemy_modifiers(PLAYER, true)?;
+        if let Some(a) = self.minion_actor() {
+            self.apply_enemy_modifiers(a, true)?;
+        }
         self.apply_enemy_modifiers(ENEMY, true)?;
 
         self.skill_setup()?;
@@ -752,6 +776,18 @@ impl<'a> Perform<'a> {
                 .set_out(PLAYER, "FlaskChargeOnCritChance", m_min(100.0, crit));
         }
 
+        if self.minion.is_some() {
+            let main_cfg = self.cfg(self.main());
+            let mdb = self.c.db(self.minion_actor().unwrap_or(PLAYER));
+            self.flasks_to_minion = [
+                self.c
+                    .flag(pdb, Some(&main_cfg), &["FlasksApplyToMinion"])?,
+                self.c
+                    .flag(pdb, Some(&main_cfg), &["QuickSilverAppliesToAllies"])?,
+                self.c
+                    .flag(mdb, None, &["ParentNonUniqueFlasksAppliedToYou"])?,
+            ];
+        }
         let mode = self.env.mode;
         if mode.combat {
             self.merge_flasks(&flasks, false, true)?;
@@ -761,6 +797,43 @@ impl<'a> Perform<'a> {
         // Attributes, life and mana
         self.attribs_conditions(PLAYER)?;
         self.life_mana(PLAYER)?;
+        if let Some(m) = self.minion {
+            let a = self.minions[m].actor;
+            let mdb = self.c.db(a);
+            let hostile = self
+                .mods(self.minions[m].skill)
+                .minion
+                .as_ref()
+                .is_some_and(|x| x.hostile);
+            if hostile {
+                for (v, m) in self.c.tabulate(pdb, None, None, &["EnemyModifier"])? {
+                    let ModValue::Record(r) = &v else { continue };
+                    let Some(ModValue::Mod(inner)) = r.get("mod") else {
+                        continue;
+                    };
+                    let source = inner.source.clone().or(m.source.clone());
+                    let mut added = (**inner).clone();
+                    crate::calc_setup::set_source(&mut added, source.as_deref().unwrap_or(""));
+                    if source.is_none() {
+                        added.source = None;
+                    }
+                    self.c.add(mdb, added);
+                }
+            } else {
+                let main = self.main();
+                let list = self.lists[main].list;
+                let cfg = self.cfg(main);
+                self.add_minion_modifiers(list, Some(&cfg), m)?;
+                for v in self.c.list(mdb, None, &["Keystone"])? {
+                    let ModValue::Str(name) = v else { continue };
+                    if let Some(mods) = self.input.tree.keystone_mods(&name) {
+                        let mods = mods.to_vec();
+                        self.c.add_list(mdb, &mods);
+                    }
+                }
+            }
+            self.attribs_conditions(a)?;
+        }
 
         self.reservations()?;
         let mana_lightning = self
@@ -847,9 +920,17 @@ impl<'a> Perform<'a> {
         }
 
         self.defence_for_conditionals(PLAYER)?;
+        let minion = self.minion_actor();
+        if let Some(a) = minion {
+            self.defence_for_conditionals(a)?;
+        }
 
         self.charges(PLAYER)?;
         self.misc(PLAYER)?;
+        if let Some(a) = minion {
+            self.charges(a)?;
+            self.misc(a)?;
+        }
 
         self.ailments()?;
 
@@ -1310,7 +1391,7 @@ impl<'a> Perform<'a> {
 
     /// `mergeFlasks(flasks, onlyRecovery, checkNonRecoveryFlasksForMinions)`
     /// for the player
-    fn merge_flasks(&mut self, flasks: &[i64], only_recovery: bool, _minions: bool) -> Result<()> {
+    fn merge_flasks(&mut self, flasks: &[i64], only_recovery: bool, minions: bool) -> Result<()> {
         let pdb = self.pdb();
         let player = actor_cfg("player");
         let effect_inc = self.c.inc(pdb, Some(&player), &["FlaskEffect"])?;
@@ -1320,8 +1401,13 @@ impl<'a> Perform<'a> {
         let effect_inc_no_adjacent =
             self.c
                 .inc(pdb, Some(&player), &["MagicFlaskNoAdjacentEffect"])?;
+        let effect_inc_non_player = self.c.inc(pdb, None, &["FlaskEffect"])?;
+        let effect_inc_magic_non_player = self.c.inc(pdb, None, &["MagicUtilityFlaskEffect"])?;
+        let [to_minion, quicksilver_to_allies, non_unique_to_minion] = self.flasks_to_minion;
         let mut buffs: BuffMap = Vec::new();
         let mut buffs_non_utility: BuffMap = Vec::new();
+        let mut buffs_non_player: BuffMap = Vec::new();
+        let mut quicksilver_non_player: BuffMap = Vec::new();
         let mut conditions: Vec<String> = Vec::new();
         let mut conditions_non_utility: Vec<String> = Vec::new();
         let occupied: HashSet<i64> = self
@@ -1390,8 +1476,11 @@ impl<'a> Perform<'a> {
             }
             // calcFlaskMods
             let mut flask_effect_inc = effect_inc + field_num(fd, "effectInc").unwrap_or(0.0);
+            let mut flask_effect_inc_non_player =
+                effect_inc_non_player + field_num(fd, "effectInc").unwrap_or(0.0);
             if item.rarity == "MAGIC" && !(flask.life.is_some() || flask.mana.is_some()) {
                 flask_effect_inc += effect_inc_magic;
+                flask_effect_inc_non_player += effect_inc_magic_non_player;
             }
             if item.rarity == "MAGIC"
                 && effect_inc_no_adjacent != 0.0
@@ -1403,19 +1492,36 @@ impl<'a> Perform<'a> {
                 }
             }
             let effect_mod = 1.0 + flask_effect_inc / 100.0;
+            let effect_mod_non_player = 1.0 + flask_effect_inc_non_player / 100.0;
+            let unique = item.rarity == "UNIQUE" || item.rarity == "RELIC";
+            let to_minions = (!only_recovery || minions)
+                && (to_minion || quicksilver_to_allies || (non_unique_to_minion && !unique));
+            let quicksilver = base_name == "Quicksilver Flask";
             let calc_flask_mods = |base_name: &str,
                                    buff_mods: &[Mod],
                                    mods: &[Mod],
+                                   only_minion: bool,
                                    buffs: &mut BuffMap,
-                                   non_utility: &mut BuffMap|
+                                   non_utility: &mut BuffMap,
+                                   non_player: &mut BuffMap,
+                                   quicksilver_np: &mut BuffMap|
              -> Result<()> {
                 if !buff_mods.is_empty() {
-                    let src_list = scaled(buff_mods, effect_mod, precision);
-                    merge_buff(&src_list, buffs, base_name)?;
+                    if !only_minion {
+                        let src_list = scaled(buff_mods, effect_mod, precision);
+                        merge_buff(&src_list, buffs, base_name)?;
+                    }
+                    if to_minions {
+                        let src_list = scaled(buff_mods, effect_mod_non_player, precision);
+                        merge_buff(&src_list, non_player, base_name)?;
+                        if quicksilver {
+                            merge_buff(&src_list, quicksilver_np, base_name)?;
+                        }
+                    }
                 }
                 if !mods.is_empty() {
                     let src_list = scaled(mods, effect_mod, precision);
-                    let key = if item.rarity == "UNIQUE" || item.rarity == "RELIC" {
+                    let key = if unique {
                         item.title.clone().unwrap_or_default()
                     } else {
                         mods.iter().map(|m| mod_params_key(m) + "&").collect()
@@ -1423,6 +1529,13 @@ impl<'a> Perform<'a> {
                     if !only_recovery {
                         merge_buff(&src_list, buffs, &key)?;
                         merge_buff(&src_list, non_utility, &key)?;
+                    }
+                    if to_minions {
+                        let src_list = scaled(mods, effect_mod_non_player, precision);
+                        merge_buff(&src_list, non_player, &key)?;
+                        if quicksilver {
+                            merge_buff(&src_list, quicksilver_np, &key)?;
+                        }
                     }
                 }
                 Ok(())
@@ -1432,11 +1545,42 @@ impl<'a> Perform<'a> {
                     && !self.c.flag(pdb, None, &["CannotRecoverLifeOutsideLeech"])?
                 {
                     let r = self.flask_recovery("Life", item, effect_inc)?;
-                    calc_flask_mods("LifeFlask", &r, &[], &mut buffs, &mut buffs_non_utility)?;
+                    calc_flask_mods(
+                        "LifeFlask",
+                        &r,
+                        &[],
+                        false,
+                        &mut buffs,
+                        &mut buffs_non_utility,
+                        &mut buffs_non_player,
+                        &mut quicksilver_non_player,
+                    )?;
                 }
                 if flask.mana.is_some() {
                     let r = self.flask_recovery("Mana", item, effect_inc)?;
-                    calc_flask_mods("ManaFlask", &r, &[], &mut buffs, &mut buffs_non_utility)?;
+                    calc_flask_mods(
+                        "ManaFlask",
+                        &r,
+                        &[],
+                        false,
+                        &mut buffs,
+                        &mut buffs_non_utility,
+                        &mut buffs_non_player,
+                        &mut quicksilver_non_player,
+                    )?;
+                }
+                if minions {
+                    let mods = item.mod_list.clone().unwrap_or_default();
+                    calc_flask_mods(
+                        &base_name,
+                        &item.buff_mod_list,
+                        &mods,
+                        true,
+                        &mut buffs,
+                        &mut buffs_non_utility,
+                        &mut buffs_non_player,
+                        &mut quicksilver_non_player,
+                    )?;
                 }
             } else {
                 let mods = item.mod_list.clone().unwrap_or_default();
@@ -1444,8 +1588,11 @@ impl<'a> Perform<'a> {
                     &base_name,
                     &item.buff_mod_list,
                     &mods,
+                    false,
                     &mut buffs,
                     &mut buffs_non_utility,
+                    &mut buffs_non_player,
+                    &mut quicksilver_non_player,
                 )?;
             }
         }
@@ -1460,11 +1607,30 @@ impl<'a> Perform<'a> {
                 self.c.add_list(pdb, &l);
             }
         } else if !self.c.flag(pdb, None, &["FlasksDoNotApplyToPlayer"])? {
-            for c in conditions {
-                self.c.set_cond(pdb, &c, true);
+            for c in &conditions {
+                self.c.set_cond(pdb, c, true);
             }
             for (_, l, _) in buffs {
                 self.c.add_list(pdb, &l);
+            }
+        }
+        if let Some(a) = self.minion_actor() {
+            let mdb = self.c.db(a);
+            if to_minion || non_unique_to_minion {
+                for c in &conditions {
+                    self.c.set_cond(mdb, c, true);
+                }
+                for (_, l, _) in buffs_non_player {
+                    self.c.add_list(mdb, &l);
+                }
+            } else if quicksilver_to_allies && !quicksilver_non_player.is_empty() {
+                for c in ["UsingQuicksilverFlask", "UsingFlask"] {
+                    let v = conditions.iter().any(|x| x == c);
+                    self.c.set_cond(mdb, c, v);
+                }
+                for (_, l, _) in quicksilver_non_player {
+                    self.c.add_list(mdb, &l);
+                }
             }
         }
         Ok(())
@@ -1719,8 +1885,13 @@ impl<'a> Perform<'a> {
         let main = self.main();
         let main_cfg = self.cfg(main);
         if mode.combat {
-            let f = |p: &Self, k: &str| p.has_flag(main, k);
-            if !self.sd_truthy(main, "triggered")
+            let am = self
+                .actor_main_skill(actor)
+                .ok_or("an actor without a main skill")?;
+            let f = |_: &Self, k: &str| am.flags.contains(k);
+            let skills = self.input.data.skills;
+            let has_type = |t: &str| am.types.contains(&skills.skill_type(t).unwrap_or(-1));
+            if !am.data.get("triggered").is_some_and(ModValue::truthy)
                 && !f(self, "trap")
                 && !f(self, "mine")
                 && !f(self, "totem")
@@ -1730,16 +1901,16 @@ impl<'a> Perform<'a> {
                 } else if f(self, "spell") {
                     self.c.set_cond(db, "CastSpellRecently", true);
                 }
-                if self.has_type(main, "Movement") {
+                if has_type("Movement") {
                     self.c.set_cond(db, "UsedMovementSkillRecently", true);
                 }
                 if f(self, "minion") && !f(self, "permanentMinion") {
                     self.c.set_cond(db, "UsedMinionSkillRecently", true);
                 }
-                if self.has_type(main, "Vaal") {
+                if has_type("Vaal") {
                     self.c.set_cond(db, "UsedVaalSkillRecently", true);
                 }
-                if self.has_type(main, "Channel") {
+                if has_type("Channel") {
                     self.c.set_cond(db, "Channelling", true);
                 }
             }
@@ -2881,8 +3052,8 @@ impl<'a> Perform<'a> {
 
 impl<'a> Perform<'a> {
     /// `actor.mainSkill`: the player's main skill
-    fn actor_main(&self, actor: usize) -> Option<usize> {
-        (actor == PLAYER).then(|| self.main())
+    fn actor_main(&self, actor: usize) -> Option<crate::calc_minion::MainSkill> {
+        self.actor_main_skill(actor)
     }
 
     /// `doActorMisc(env, actor)`
@@ -2918,8 +3089,8 @@ impl<'a> Perform<'a> {
             if self.c.flag(db, None, &["Fortified"])?
                 || self.c.base(db, None, &["Multiplier:Fortification"])? > 0.0
             {
-                let skill_list = main.map_or(db, |m| self.lists[m].list);
-                let skill_cfg = main.map(|m| self.cfg(m));
+                let skill_list = main.as_ref().map_or(db, |m| m.list);
+                let skill_cfg = main.as_ref().map(|m| m.cfg.clone());
                 let max_stacks = m_max(
                     match self.c.override_num(db, None, &["MaximumFortification"])? {
                         Some(v) => v,
@@ -3082,7 +3253,7 @@ impl<'a> Perform<'a> {
                 }
             }
             if self.c.flag(db, None, &["Fanaticism"])?
-                && main.is_some_and(|m| self.has_flag(m, "selfCast"))
+                && main.as_ref().is_some_and(|m| m.flags.contains("selfCast"))
             {
                 let effect =
                     (75.0 * (1.0 + self.c.inc(db, None, &["BuffEffectOnSelf"])? / 100.0)).floor();
@@ -3286,11 +3457,8 @@ impl<'a> Perform<'a> {
                 let mut inc = self
                     .c
                     .inc(db, None, &["ElusiveEffect", "BuffEffectOnSelf"])?;
-                let m = main.ok_or("Elusive without a main skill")?;
-                if self
-                    .c
-                    .flag(self.lists[m].list, None, &["SupportedByNightblade"])?
-                {
+                let m = main.as_ref().ok_or("Elusive without a main skill")?;
+                if self.c.flag(m.list, None, &["SupportedByNightblade"])? {
                     inc += self
                         .c
                         .inc(db, None, &["NightbladeSupportedElusiveEffect"])?;
@@ -3606,14 +3774,14 @@ impl<'a> Perform<'a> {
 }
 
 /// A buff's tag field as a string
-fn tag_str(b: &Buff, k: &str) -> Option<String> {
+pub(crate) fn tag_str(b: &Buff, k: &str) -> Option<String> {
     match b.tag.get(k)? {
         ModValue::Str(s) => Some(s.to_string()),
         _ => None,
     }
 }
 
-fn tag_num(b: &Buff, k: &str) -> Option<f64> {
+pub(crate) fn tag_num(b: &Buff, k: &str) -> Option<f64> {
     b.tag.get(k).and_then(ModValue::as_number)
 }
 
@@ -3626,7 +3794,7 @@ pub(crate) fn first_tag_fields(m: &Mod) -> Option<&crate::mods::Record> {
 }
 
 /// Merges `ExtraAuraEffect`-like values: mods with the same params sum
-fn merge_extra(values: Vec<ModValue>) -> Result<Vec<Mod>> {
+pub(crate) fn merge_extra(values: Vec<ModValue>) -> Result<Vec<Mod>> {
     let mut out: Vec<Mod> = Vec::new();
     for v in values {
         let ModValue::Record(r) = &v else { continue };
@@ -3705,7 +3873,7 @@ impl<'a> Perform<'a> {
     }
 
     /// The totem copies of an aura's defensive mods
-    fn totem_aura_mods(&self, lists: [&[Mod]; 2], scale: f64) -> Result<Vec<Mod>> {
+    pub(crate) fn totem_aura_mods(&self, lists: [&[Mod]; 2], scale: f64) -> Result<Vec<Mod>> {
         let mut out = Vec::new();
         let scale_v = |v: f64| {
             if v.floor() == v {
@@ -3754,6 +3922,99 @@ impl<'a> Perform<'a> {
         let mut guards: BuffMap = Vec::new();
         let mut debuffs: BuffMap = Vec::new();
         let mut curses: Vec<Curse> = Vec::new();
+        let mut minion_buffs: BuffMap = Vec::new();
+        let mut minion_curses: Vec<Curse> = Vec::new();
+        let mut minion_curse_limit = 1.0;
+        let mdb = self.minion_actor().map(|a| self.c.db(a));
+        let hostile = self.minion_hostile();
+        let mut link_skills = 0;
+
+        // Active spectres
+        let mut has_spectre = false;
+        let mut active_spectres: Vec<String> = Vec::new();
+        for i in 0..self.lists.len() {
+            if !self.has_flag(i, "disable")
+                && self
+                    .skill(i)
+                    .active_effect
+                    .granted_effect
+                    .id
+                    .starts_with("RaiseSpectre")
+            {
+                has_spectre = true;
+                if let Some(m) = &self.mods(i).minion {
+                    active_spectres.push(m.typ.clone());
+                }
+            }
+        }
+        if has_spectre {
+            for id in self.input.spectre_list {
+                if !active_spectres.contains(id) {
+                    continue;
+                }
+                let setup = self.input.data.setup;
+                let sd = setup
+                    .minions
+                    .get(id)
+                    .ok_or_else(|| format!("no spectre {id}"))?;
+                if !self.c.cond(pdb, "HaveBeastSpectre")
+                    && sd.monster_tags.iter().any(|t| t == "beast")
+                {
+                    self.c.set_cond(pdb, "HaveBeastSpectre", true);
+                }
+                let source = format!("Spectre:{}", sd.str("name").unwrap_or(""));
+                let inner = |m: &Mod| -> Vec<Mod> {
+                    let ModValue::Record(r) = &m.value else {
+                        return vec![];
+                    };
+                    r.fields
+                        .iter()
+                        .filter_map(|(_, v)| match v {
+                            ModValue::Mod(x) => {
+                                let mut x = (**x).clone();
+                                x.source = Some(source.as_str().into());
+                                Some(x)
+                            }
+                            _ => None,
+                        })
+                        .collect()
+                };
+                let entry = |b: &mut BuffMap| -> usize {
+                    match b.iter().position(|e| e.0 == "Spectre") {
+                        Some(k) => k,
+                        None => {
+                            b.push(("Spectre".into(), Vec::new(), false));
+                            b.len() - 1
+                        }
+                    }
+                };
+                for m in &sd.mod_list {
+                    match (m.name.as_str(), m.typ) {
+                        ("EnemyCurseLimit", _) => {
+                            minion_curse_limit = number(&m.value)? + 1.0;
+                            break;
+                        }
+                        ("AllyModifier", List) => {
+                            let b = entry(&mut buffs);
+                            let mb = entry(&mut minion_buffs);
+                            for x in inner(m) {
+                                minion_buffs[mb].1.push(x.clone());
+                                buffs[b].1.push(x);
+                            }
+                        }
+                        ("MinionModifier", List) => {
+                            let mb = entry(&mut minion_buffs);
+                            minion_buffs[mb].1.extend(inner(m));
+                        }
+                        ("PlayerModifier", List) => {
+                            let b = entry(&mut buffs);
+                            buffs[b].1.extend(inner(m));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
 
         // Skills whose stages come from their own calculation
         for i in 0..self.lists.len() {
@@ -3850,6 +4111,23 @@ impl<'a> Perform<'a> {
                             } else {
                                 merge_buff(&l, &mut guards, bname)?;
                             }
+                        }
+                        if buff.typ == "Buff"
+                            && let Some(mdb) = mdb
+                            && !hostile
+                            && (buff.apply_minions
+                                || buff.apply_allies
+                                || self.c.flag(list, None, &["BuffAppliesToAllies"])?)
+                        {
+                            self.marks[i].minion_buff_skill = true;
+                            self.c
+                                .set_cond(mdb, &format!("AffectedBy{}", nospace(bname)), true);
+                            let inc = self.c.inc(store, bcfg.as_ref(), &["BuffEffect"])?
+                                + self.c.inc(mdb, None, &["BuffEffectOnSelf"])?;
+                            let more = self.c.more(store, bcfg.as_ref(), &["BuffEffect"])?
+                                * self.c.more(mdb, None, &["BuffEffectOnSelf"])?;
+                            let l = scaled(&buff.mod_list, (1.0 + inc / 100.0) * more, precision);
+                            merge_buff(&l, &mut minion_buffs, bname)?;
                         }
                     }
                     "Warcry" => {
@@ -3949,6 +4227,64 @@ impl<'a> Perform<'a> {
                             }
                             merge_buff(&l, &mut buffs, bname)?;
                         }
+                        if let Some(mdb) = mdb {
+                            self.marks[i].minion_buff_skill = true;
+                            self.c
+                                .set_cond(mdb, &format!("AffectedBy{warcry_name}"), true);
+                            let inc = self.c.inc(list, Some(&cfg), &["BuffEffect"])?
+                                + self.c.inc(mdb, Some(&cfg), &["BuffEffectOnSelf"])?;
+                            let more = self.c.more(list, Some(&cfg), &["BuffEffect"])?
+                                * self.c.more(mdb, Some(&cfg), &["BuffEffectOnSelf"])?;
+                            let mut l = Vec::new();
+                            for (m, b) in buff.mod_list.iter().zip(&bonus) {
+                                let mult = (1.0 + inc / 100.0) * more * b.unwrap_or(1.0) * uptime;
+                                l.extend(scaled(std::slice::from_ref(m), mult, precision));
+                            }
+                            if self.skill_name(i) == "Rallying Cry" {
+                                let bonus = (m_min(power, 30.0) / 5.0).floor();
+                                let effect = (self.c.base(
+                                    list,
+                                    Some(&main_cfg),
+                                    &["RallyingCryAllyDamageBonusPer5Power"],
+                                )? * bonus)
+                                    .floor();
+                                let inc = self.c.inc(list, Some(&cfg), &["BuffEffect"])?
+                                    + self.c.inc(mdb, Some(&cfg), &["BuffEffectOnSelf"])?;
+                                let more_mult = 1.0
+                                    + self.c.base(
+                                        list,
+                                        Some(&main_cfg),
+                                        &["RallyingCryMinionDamageBonusMultiplier"],
+                                    )?;
+                                let mut extra = Vec::new();
+                                for t in ["Physical", "Lightning", "Cold", "Fire", "Chaos"] {
+                                    for end in ["Min", "Max"] {
+                                        let k = format!("{t}{end}");
+                                        let v = self
+                                            .weapon(PLAYER, 0)
+                                            .and_then(|w| w.get(&k))
+                                            .and_then(ModValue::as_number);
+                                        if let Some(v) = v {
+                                            extra.push(
+                                                src(&k, Base, v * effect / 100.0, "Rallying Cry")
+                                                    .flags(0, self.kf("Attack"))
+                                                    .tag(global_effect(&[
+                                                        ("effectType", "Warcry".into()),
+                                                        ("div", 5.0.into()),
+                                                        ("limit", 30.0.into()),
+                                                    ])),
+                                            );
+                                        }
+                                    }
+                                }
+                                l.extend(scaled(
+                                    &extra,
+                                    (1.0 + inc / 100.0) * more_mult * uptime,
+                                    precision,
+                                ));
+                            }
+                            merge_buff(&l, &mut minion_buffs, bname)?;
+                        }
                     }
                     "Aura" => {
                         if !mode.buffs {
@@ -3984,11 +4320,41 @@ impl<'a> Perform<'a> {
                             l.extend(scaled(&extra, mult, precision));
                             merge_buff(&l, &mut buffs, bname)?;
                         }
-                        if !(self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])?
+                        let allies = !(self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])?
                             || self.c.flag(pdb, None, &["SelfAurasOnlyAffectYou"])?
                             || self
                                 .c
-                                .flag(pdb, None, &["SelfAuraSkillsCannotAffectAllies"])?)
+                                .flag(pdb, None, &["SelfAuraSkillsCannotAffectAllies"])?);
+                        if allies
+                            && let Some(mdb) = mdb
+                            && (!hostile || self.c.flag(pdb, None, &["AurasAffectEnemies"])?)
+                        {
+                            let inc =
+                                self.c
+                                    .inc(list, Some(&cfg), &["AuraEffect", "BuffEffect"])?
+                                    + self.c.inc(
+                                        mdb,
+                                        Some(&cfg),
+                                        &["BuffEffectOnSelf", "AuraEffectOnSelf"],
+                                    )?;
+                            let more =
+                                self.c
+                                    .more(list, Some(&cfg), &["AuraEffect", "BuffEffect"])?
+                                    * self.c.more(
+                                        mdb,
+                                        Some(&cfg),
+                                        &["BuffEffectOnSelf", "AuraEffectOnSelf"],
+                                    )?;
+                            let mult = (1.0 + inc / 100.0) * more;
+                            self.marks[i].minion_buff_skill = true;
+                            self.c
+                                .set_cond(mdb, &format!("AffectedBy{}", nospace(bname)), true);
+                            self.c.set_cond(mdb, "AffectedByAura", true);
+                            let mut l = scaled(&buff.mod_list, mult, precision);
+                            l.extend(scaled(&extra, mult, precision));
+                            merge_buff(&l, &mut minion_buffs, bname)?;
+                        }
+                        if allies
                             && self.c.flag(pdb, None, &["AurasAffectEnemies"])?
                             && !self.c.flag(
                                 list,
@@ -4145,6 +4511,7 @@ impl<'a> Perform<'a> {
                             )?,
                             mod_list: None,
                             buff_mod_list: None,
+                            minion_buff_mod_list: None,
                         };
                         let mut inc = self.c.inc(list, Some(&cfg), &["CurseEffect"])?
                             + self.c.inc(edb, None, &["CurseEffectOnSelf"])?;
@@ -4174,15 +4541,95 @@ impl<'a> Perform<'a> {
                             let bmore = self.c.more(pdb, Some(&cfg), &["BuffEffectOnSelf"])?;
                             curse.buff_mod_list =
                                 Some(scaled(&temp, (1.0 + binc / 100.0) * bmore, precision));
+                            if let Some(mdb) = mdb {
+                                let binc = self.c.inc(mdb, None, &["BuffEffectOnSelf"])?;
+                                let bmore = self.c.more(mdb, None, &["BuffEffectOnSelf"])?;
+                                curse.minion_buff_mod_list =
+                                    Some(scaled(&temp, (1.0 + binc / 100.0) * bmore, precision));
+                            }
                         }
                         curses.push(curse);
+                    }
+                    "Link" => {
+                        let to_minions = match self.minion {
+                            Some(m) => {
+                                let mm = &self.minions[m];
+                                let summon_undamagable =
+                                    self.has_type(mm.skill, "MinionsAreUndamagable");
+                                let mdb = self.c.db(mm.actor);
+                                self.c.flag(pdb, None, &["Condition:CanLinkToMinions"])?
+                                    && self.c.flag(pdb, None, &["Condition:LinkedToMinion"])?
+                                    && !self.c.flag(mdb, None, &["Condition:CannotBeDamaged"])?
+                                    && !summon_undamagable
+                            }
+                            None => false,
+                        };
+                        if !(mode.buffs && link_skills < 1 && to_minions) {
+                            continue;
+                        }
+                        let mut extra: Vec<Mod> = Vec::new();
+                        for v in self.c.list(pdb, Some(&cfg), &["ExtraLinkEffect"])? {
+                            let ModValue::Record(r) = &v else { continue };
+                            let Some(ModValue::Mod(m)) = r.get("mod") else {
+                                continue;
+                            };
+                            match extra
+                                .iter_mut()
+                                .find(|x| crate::mods::list::same_params(x, m))
+                            {
+                                Some(x) => {
+                                    x.value =
+                                        ModValue::Number(number(&x.value)? + number(&m.value)?)
+                                }
+                                None => {
+                                    if m.name.as_str() == "ParentNonUniqueFlasksAppliedToYou" {
+                                        self.flasks_to_minion[2] = true;
+                                    }
+                                    extra.push((**m).clone());
+                                }
+                            }
+                        }
+                        let Some(mdb) = mdb else { continue };
+                        let mut inc =
+                            self.c
+                                .inc(list, Some(&cfg), &["LinkEffect", "BuffEffect"])?;
+                        let mut more =
+                            self.c
+                                .more(list, Some(&cfg), &["LinkEffect", "BuffEffect"])?;
+                        self.marks[i].minion_buff_skill = true;
+                        self.c
+                            .set_cond(mdb, &format!("AffectedBy{}", nospace(bname)), true);
+                        self.c.set_cond(mdb, "AffectedByLink", true);
+                        inc += self
+                            .c
+                            .inc(mdb, None, &["BuffEffectOnSelf", "LinkEffectOnSelf"])?;
+                        more *=
+                            self.c
+                                .more(mdb, None, &["BuffEffectOnSelf", "LinkEffectOnSelf"])?;
+                        let mult = (1.0 + inc / 100.0) * more;
+                        let mut l = scaled(&buff.mod_list, mult, precision);
+                        l.extend(scaled(&extra, mult, precision));
+                        merge_buff(&l, &mut minion_buffs, bname)?;
+                        link_skills = 1;
                     }
                     _ => {}
                 }
             }
-            if self.c.flag(list, None, &["Condition:CanWither"])? {
-                let effect =
-                    (6.0 * (1.0 + self.c.inc(pdb, None, &["WitherEffect"])? / 100.0)).floor();
+            let own_minion = self.minion_of(i).is_some();
+            if self.c.flag(list, None, &["Condition:CanWither"])?
+                || (own_minion
+                    && mdb.is_some_and(|d| {
+                        self.c
+                            .flag(d, None, &["Condition:CanWither"])
+                            .unwrap_or(false)
+                    }))
+            {
+                let name = if own_minion {
+                    "MinionWitherEffect"
+                } else {
+                    "WitherEffect"
+                };
+                let effect = (6.0 * (1.0 + self.c.inc(pdb, None, &[name])? / 100.0)).floor();
                 self.c
                     .add(pdb, Mod::new("WitherEffectStack", MaxT, effect, None));
             }
@@ -4209,10 +4656,17 @@ impl<'a> Perform<'a> {
                     applied_combustion = true;
                 }
             }
+            self.minion_skill_buffs(
+                i,
+                &mut buffs,
+                &mut minion_buffs,
+                &mut debuffs,
+                &mut minion_curses,
+            )?;
         }
 
         if mode.combat {
-            self.merge_flasks(flasks, true, false)?;
+            self.merge_flasks(flasks, true, self.flasks_to_minion[2])?;
         }
 
         // Alternate charges
@@ -4252,26 +4706,32 @@ impl<'a> Perform<'a> {
             }
         }
 
-        // Extra curses
-        for v in self.c.list(pdb, None, &["ExtraCurse"])? {
-            let ModValue::Record(r) = &v else { continue };
-            let Some(ModValue::Str(id)) = r.get("skillId") else {
-                continue;
-            };
-            let Some(ge) = self.input.data.skills.skills.get(&**id).cloned() else {
-                continue;
-            };
-            let level = r.get("level").and_then(ModValue::as_number);
-            let mut effect = crate::calc_skills::SkillEffect::new(ge.clone(), level, 0.0);
-            let mut gem_mods = Vec::new();
-            crate::calc_skill_mods::merge_skill_instance_mods(
-                &mut gem_mods,
-                &mut effect,
-                &[],
-                self.input.data.setup,
-                self.input.data.skills,
-            )?;
-            let curse_mods: Vec<Mod> = gem_mods
+        // Extra curses, of the player and of the minion
+        let mut dests = vec![(pdb, false)];
+        if let Some(mdb) = mdb {
+            dests.push((mdb, true));
+        }
+        for (db, to_minion) in dests {
+            for v in self.c.list(db, None, &["ExtraCurse"])? {
+                let ModValue::Record(r) = &v else { continue };
+                let Some(ModValue::Str(id)) = r.get("skillId") else {
+                    continue;
+                };
+                let Some(ge) = self.input.data.skills.skills.get(&**id).cloned() else {
+                    continue;
+                };
+                let level = r.get("level").and_then(ModValue::as_number);
+                let mut effect = crate::calc_skills::SkillEffect::new(ge.clone(), level, 0.0);
+                let mut gem_mods = Vec::new();
+                crate::calc_skill_mods::merge_skill_instance_mods(
+                    &mut gem_mods,
+                    &mut effect,
+                    &[],
+                    None,
+                    self.input.data.setup,
+                    self.input.data.skills,
+                )?;
+                let curse_mods: Vec<Mod> = gem_mods
                 .iter()
                 .filter(|m| {
                     m.tags.iter().any(|t| match &t.kind {
@@ -4284,38 +4744,48 @@ impl<'a> Perform<'a> {
                 })
                 .cloned()
                 .collect();
-            if r.get("applyToPlayer").is_some_and(ModValue::truthy) {
-                if self.c.base(pdb, None, &["AvoidCurse"])? < 100.0 {
-                    self.c.set_cond(pdb, "Cursed", true);
-                    let n = self.c.mult(pdb, "CurseOnSelf").unwrap_or(0.0);
-                    self.c.set_mult(pdb, "CurseOnSelf", n + 1.0);
-                    self.c
-                        .set_cond(pdb, &format!("AffectedBy{}", nospace(&ge.name)), true);
-                    let cfg = Cfg {
-                        skill_name: Some(ge.name.as_str().into()),
-                        ..Cfg::default()
+                if r.get("applyToPlayer").is_some_and(ModValue::truthy) {
+                    if self.c.base(db, None, &["AvoidCurse"])? < 100.0 {
+                        self.c.set_cond(db, "Cursed", true);
+                        let n = self.c.mult(db, "CurseOnSelf").unwrap_or(0.0);
+                        self.c.set_mult(db, "CurseOnSelf", n + 1.0);
+                        self.c
+                            .set_cond(db, &format!("AffectedBy{}", nospace(&ge.name)), true);
+                        let cfg = Cfg {
+                            skill_name: Some(ge.name.as_str().into()),
+                            ..Cfg::default()
+                        };
+                        let inc = self.c.inc(db, Some(&cfg), &["CurseEffectOnSelf"])?
+                            + crate::mods::list::sum(&gem_mods, Inc, "CurseEffectAgainstPlayer")?;
+                        let more = self.c.more(db, Some(&cfg), &["CurseEffectOnSelf"])?
+                            * crate::mods::list::more(&gem_mods, "CurseEffectAgainstPlayer")?;
+                        self.c.scale_add_list(
+                            db,
+                            &curse_mods,
+                            m_max((1.0 + inc / 100.0) * more, 0.0),
+                        );
+                    }
+                } else if !self.c.flag(edb, None, &["Hexproof"])?
+                    || self.c.flag(db, None, &["CursesIgnoreHexproof"])?
+                {
+                    let scale = (1.0 + self.c.inc(edb, None, &["CurseEffectOnSelf"])? / 100.0)
+                        * self.c.more(edb, None, &["CurseEffectOnSelf"])?;
+                    let dest = if to_minion {
+                        &mut minion_curses
+                    } else {
+                        &mut curses
                     };
-                    let inc = self.c.inc(pdb, Some(&cfg), &["CurseEffectOnSelf"])?
-                        + crate::mods::list::sum(&gem_mods, Inc, "CurseEffectAgainstPlayer")?;
-                    let more = self.c.more(pdb, Some(&cfg), &["CurseEffectOnSelf"])?
-                        * crate::mods::list::more(&gem_mods, "CurseEffectAgainstPlayer")?;
-                    self.c
-                        .scale_add_list(pdb, &curse_mods, m_max((1.0 + inc / 100.0) * more, 0.0));
+                    dest.push(Curse {
+                        name: ge.name.clone(),
+                        priority: self.curse_priority(&ge.name, None),
+                        is_mark: false,
+                        ignore_hex_limit: false,
+                        socketed_curses_hex_limit: false,
+                        mod_list: Some(scaled(&curse_mods, scale, precision)),
+                        buff_mod_list: None,
+                        minion_buff_mod_list: None,
+                    });
                 }
-            } else if !self.c.flag(edb, None, &["Hexproof"])?
-                || self.c.flag(pdb, None, &["CursesIgnoreHexproof"])?
-            {
-                let scale = (1.0 + self.c.inc(edb, None, &["CurseEffectOnSelf"])? / 100.0)
-                    * self.c.more(edb, None, &["CurseEffectOnSelf"])?;
-                curses.push(Curse {
-                    name: ge.name.clone(),
-                    priority: self.curse_priority(&ge.name, None),
-                    is_mark: false,
-                    ignore_hex_limit: false,
-                    socketed_curses_hex_limit: false,
-                    mod_list: Some(scaled(&curse_mods, scale, precision)),
-                    buff_mod_list: None,
-                });
             }
         }
 
@@ -4331,7 +4801,11 @@ impl<'a> Perform<'a> {
         self.c.set_out(PLAYER, "EnemyCurseLimit", limit);
         let mut slots: Vec<Curse> = Vec::new();
         let mut mark_slotted = false;
-        for curse in &curses {
+        let sources = [(&curses, limit), (&minion_curses, minion_curse_limit)];
+        for (curse, limit) in sources
+            .iter()
+            .flat_map(|(c, l)| c.iter().map(move |x| (x, *l)))
+        {
             if curse.ignore_hex_limit || curse.socketed_curses_hex_limit {
                 continue;
             }
@@ -4391,7 +4865,7 @@ impl<'a> Perform<'a> {
                 }
             }
         }
-        for curse in &curses {
+        for curse in curses.iter().chain(minion_curses.iter()) {
             if curse.ignore_hex_limit {
                 match slots.iter_mut().find(|s| s.name == curse.name) {
                     Some(s) => {
@@ -4459,7 +4933,17 @@ impl<'a> Perform<'a> {
                 let n = self.c.mult(pdb, "BuffOnSelf").unwrap_or(0.0);
                 self.c.set_mult(pdb, "BuffOnSelf", n + 1.0);
             }
+            if let Some(m) = self.minion {
+                self.add_minion_modifiers_of(l, Some(&main_cfg), m)?;
+            }
         }
+        if let Some(mdb) = mdb {
+            for (_, l, _) in &minion_buffs {
+                self.c.add_list(mdb, l);
+            }
+        }
+        self.buff_lists = buffs.iter().map(|b| b.1.clone()).collect();
+        self.minion_buff_lists = minion_buffs.iter().map(|b| b.1.clone()).collect();
         for (_, l, _) in &debuffs {
             self.c.add_list(edb, l);
         }
@@ -4474,6 +4958,10 @@ impl<'a> Perform<'a> {
             }
             if let Some(l) = &s.buff_mod_list {
                 self.c.add_list(pdb, l);
+            }
+            if let Some(l) = &s.minion_buff_mod_list {
+                let mdb = mdb.ok_or("attempt to index a nil value (env.minion)")?;
+                self.c.add_list(mdb, l);
             }
         }
         self.curse_slots = slots.iter().map(|s| s.name.clone()).collect();
@@ -4555,6 +5043,16 @@ impl<'a> Perform<'a> {
                 }
             }
             if flag("fromAllies") || !self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])? {
+                if let Some(mdb) = mdb {
+                    let inc = self
+                        .c
+                        .inc(mdb, None, &["BuffEffectOnSelf", "AuraEffectOnSelf"])?;
+                    let more = self
+                        .c
+                        .more(mdb, None, &["BuffEffectOnSelf", "AuraEffectOnSelf"])?;
+                    self.c
+                        .scale_add_list(mdb, std::slice::from_ref(m), (1.0 + inc / 100.0) * more);
+                }
                 let name = m.name.as_str();
                 let blacklist = name == "Speed" || name == "CritMultiplier" || name == "CritChance";
                 if self.has_flag(main, "totem") && !blacklist {
@@ -4854,6 +5352,47 @@ impl<'a> Perform<'a> {
     /// The allies' life pools the player's damage can be taken from
     fn ally_life(&mut self) -> Result<()> {
         let pdb = self.pdb();
+        struct Pool {
+            life: &'static str,
+            redirect: &'static str,
+            source: &'static str,
+            limit: Option<&'static str>,
+        }
+        const SPECTRE: Pool = Pool {
+            life: "TotalSpectreLife",
+            redirect: "takenFromSpectresBeforeYou",
+            source: "Spectres",
+            limit: Some("ActiveSpectreLimit"),
+        };
+        const COMPANIONSHIP: Pool = Pool {
+            life: "TotalMinionLife",
+            redirect: "takenFromMinionBeforeYou",
+            source: "Minion",
+            limit: None,
+        };
+        let by_skill = |name: &str| -> Option<Pool> {
+            Some(match name {
+                "Summon Sentinel of Radiance" => Pool {
+                    life: "TotalRadianceSentinelLife",
+                    redirect: "takenFromRadianceSentinelBeforeYou",
+                    source: "Sentinel of Radiance",
+                    limit: None,
+                },
+                "Summon Void Spawn" => Pool {
+                    life: "TotalVoidSpawnLife",
+                    redirect: "takenFromVoidSpawnBeforeYou",
+                    source: "Void Spawns",
+                    limit: Some("ActiveVoidSpawnLimit"),
+                },
+                "Summon Stone Golem of Safeguarding" => Pool {
+                    life: "TotalStoneGolemLife",
+                    redirect: "takenFromStoneGolemBeforeYou",
+                    source: "Stone Golem",
+                    limit: None,
+                },
+                _ => return None,
+            })
+        };
         let redirects = [
             "takenFromSpectresBeforeYou",
             "takenFromMinionBeforeYou",
@@ -4863,8 +5402,180 @@ impl<'a> Perform<'a> {
             "takenFromTotemsBeforeYou",
             "takenFromVaalRejuvenationTotemsBeforeYou",
         ];
-        if self.c.base(pdb, None, &redirects)? != 0.0 {
-            return Err("not ported: allies' life pools".into());
+        if self.c.base(pdb, None, &redirects)? == 0.0 {
+            return Ok(());
+        }
+        let base = |p: &Self, k: &str| p.c.base(pdb, None, &[k]);
+        let mut calculated: HashSet<&'static str> = HashSet::new();
+        let mut spectre_count = 0.0;
+        let mut first_spectre: Option<f64> = None;
+        let summoned_override = self
+            .config_num("multiplierSummonedMinion")
+            .filter(|v| *v != 0.0);
+        let spectre_limit = m_min(
+            self.c.out(PLAYER, "ActiveSpectreLimit").unwrap_or(0.0),
+            summoned_override.unwrap_or(f64::INFINITY),
+        );
+        for i in 0..self.lists.len() {
+            let Some(m) = self.minions.iter().position(|x| x.skill == i) else {
+                continue;
+            };
+            if self.has_flag(i, "disable") || self.has_type(i, "MinionsAreUndamagable") {
+                continue;
+            }
+            let spectre = self.has_flag(i, "spectre");
+            let skill_pool = if spectre {
+                Some(SPECTRE)
+            } else {
+                by_skill(self.skill_name(i))
+            };
+            let companionship = self.mods(i).buff_list.iter().any(|b| {
+                b.mod_list
+                    .iter()
+                    .any(|x| x.name.as_str() == COMPANIONSHIP.redirect)
+            });
+            let mut pools: Vec<Pool> = skill_pool.into_iter().collect();
+            if companionship {
+                let shares = match pools.first() {
+                    Some(sp) => {
+                        base(self, sp.redirect)? != 0.0
+                            && base(self, COMPANIONSHIP.redirect)? != 0.0
+                    }
+                    None => false,
+                };
+                if shares {
+                    let life = pools[0].life;
+                    pools = vec![COMPANIONSHIP];
+                    self.c.add(
+                        pdb,
+                        src(
+                            &format!("MinionLifeShares{life}"),
+                            FlagT,
+                            true,
+                            "Companionship",
+                        ),
+                    );
+                } else {
+                    pools.push(COMPANIONSHIP);
+                }
+            }
+            let mut minion_life: Option<f64> = None;
+            for pool in &pools {
+                let is_spectre = pool.life == SPECTRE.life;
+                let can_add = ((is_spectre && spectre_count < spectre_limit)
+                    || (!is_spectre && !calculated.contains(pool.life)))
+                    && base(self, pool.redirect)? != 0.0
+                    && self.c.override_num(pdb, None, &[pool.life])?.is_none();
+                if !can_add {
+                    continue;
+                }
+                let actor = self.minions[m].actor;
+                if minion_life.is_none() {
+                    if Some(m) != self.minion {
+                        self.init_minion_mod_db(m)?;
+                        let list = self.lists[i].list;
+                        let cfg = self.cfg(i);
+                        self.add_minion_modifiers(list, Some(&cfg), m)?;
+                        for l in self.buff_lists.clone() {
+                            self.add_minion_modifiers_of(&l, Some(&cfg), m)?;
+                        }
+                        let mdb = self.c.db(actor);
+                        for l in self.minion_buff_lists.clone() {
+                            self.c.add_list(mdb, &l);
+                        }
+                        for v in self.c.list(mdb, None, &["Keystone"])? {
+                            let ModValue::Str(name) = v else { continue };
+                            if let Some(mods) = self.input.tree.keystone_mods(&name) {
+                                let mods = mods.to_vec();
+                                self.c.add_list(mdb, &mods);
+                            }
+                        }
+                        self.attribs_conditions(actor)?;
+                    } else {
+                        self.life_mana(actor)?;
+                    }
+                    minion_life = Some(
+                        self.c
+                            .out(actor, "Life")
+                            .ok_or("attempt to perform arithmetic on a nil value (minionLife)")?,
+                    );
+                }
+                let ml = minion_life.unwrap_or(f64::NAN);
+                let mut count = match pool.limit {
+                    Some(l) => match self.c.out(PLAYER, l) {
+                        Some(v) => v,
+                        None => self.c.val(self.lists[i].list, l, None)?,
+                    },
+                    None => 1.0,
+                };
+                if is_spectre {
+                    count = 1.0;
+                    spectre_count += 1.0;
+                }
+                self.c
+                    .add(pdb, src(pool.life, Base, ml * count, pool.source));
+                if is_spectre {
+                    first_spectre.get_or_insert(ml);
+                } else {
+                    calculated.insert(pool.life);
+                }
+            }
+        }
+        if let Some(life) = first_spectre
+            && spectre_count < spectre_limit
+        {
+            let count = spectre_limit - spectre_count;
+            self.c
+                .add(pdb, src(SPECTRE.life, Base, life * count, SPECTRE.source));
+        }
+
+        // The totem with the most life
+        let mut normal: Option<f64> = None;
+        let mut vaal: Option<f64> = None;
+        for i in 0..self.lists.len() {
+            if self.has_flag(i, "totem")
+                && !self.has_flag(i, "disable")
+                && self.sd(i, "totemLevel").is_some()
+                && self.mods(i).skill_totem_id.is_some()
+            {
+                let (life, _) = self.totem_life(i)?;
+                if self.skill_name(i) == "Vaal Rejuvenation Totem" {
+                    vaal = Some(life);
+                } else if normal.is_none_or(|n| life > n) {
+                    normal = Some(life);
+                }
+            }
+        }
+        let nearest_is_vaal_totem =
+            vaal.is_some() && normal.is_none_or(|n| vaal.unwrap_or(0.0) > n);
+        let nearest = if nearest_is_vaal_totem { vaal } else { normal };
+        let override_ = self.c.override_num(pdb, None, &["TotalTotemLife"])?;
+        let redirect = base(self, "takenFromTotemsBeforeYou")?;
+        let nearest_is_vaal = nearest.is_some() && nearest_is_vaal_totem && override_.is_none();
+        if let Some(life) = nearest
+            && !nearest_is_vaal
+            && redirect != 0.0
+            && override_.is_none()
+        {
+            self.c.add(pdb, src("TotalTotemLife", Base, life, "Totem"));
+        }
+        if let Some(life) = vaal
+            && (base(self, "takenFromVaalRejuvenationTotemsBeforeYou")? != 0.0
+                || (nearest_is_vaal && redirect != 0.0))
+            && self
+                .c
+                .override_num(pdb, None, &["TotalVaalRejuvenationTotemLife"])?
+                .is_none()
+        {
+            self.c.add(
+                pdb,
+                src(
+                    "TotalVaalRejuvenationTotemLife",
+                    Base,
+                    life,
+                    "Vaal Rejuvenation Totem",
+                ),
+            );
         }
         Ok(())
     }

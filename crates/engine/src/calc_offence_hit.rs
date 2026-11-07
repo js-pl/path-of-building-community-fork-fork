@@ -2330,6 +2330,16 @@ impl<'a> Perform<'a> {
         if self.input.breakdown {
             return Err("not ported: the Calcs tab's offence".into());
         }
+        if self.mods(i).minion.is_some() {
+            let g = |p: &Self, k: &str| p.c.out(actor, k);
+            let speed = g(self, "HitSpeed")
+                .or_else(|| g(self, "Speed"))
+                .unwrap_or(f64::NAN);
+            let v = g(self, "SummonedMinionsPerCast").unwrap_or(f64::NAN)
+                * speed
+                * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            self.sd_set(i, "summonSpeed", v);
+        }
         let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
         let base = self.misc_data("LeechRateBase");
         for pool in ["Life", "EnergyShield", "Mana"] {

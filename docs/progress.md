@@ -32,13 +32,15 @@ covers everything from the items on; 57 builds compared, 4 skipped).
 then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
-enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 40 builds compared, 36 of them
-through the offence; minion builds and the gaps below are skipped.
+enemy's databases, every skill's mod list, and up to the triggers
+`env.minion`'s output, database and skills' mod lists) in
+`crates/equivalence/tests/perform.rs`: 57 builds compared, 49 of them
+through the player's offence; the gaps below are skipped.
 
 | Upstream | Typed |
 |---|---|
 | `calcs.perform` | `calc.rs` (stores and queries), `calc_perform.rs` |
+| `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers` | `calc_minion.rs`: a minion actor per skill with a minion |
 | `calcs.defence` | `calc_defence.rs` |
 | `calcs.buildDefenceEstimations` | `calc_ehp.rs` |
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
@@ -65,9 +67,13 @@ Game data is still read from upstream's processed Lua `data` table
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- Minions (`createMinionSkills`, `initMinionModDB`, the minion branches of
-  perform, defence and offence), allies' life pools (`calcTotemLife` of
-  other skills), the party tab
+- The minion's own calculations after the player's (`calcs.defence`,
+  `buildDefenceEstimations`, `triggers` and `offence` of `env.minion`),
+  with the offence's `...EqualToParent` crit, and the player's output
+  `Minion`; the Calcs tab's choice of a minion's skill
+  (`skillMinionSkillCalcs`); shared minion life pools
+  (`MinionLifeShares...`)
+- The party tab
 - Triggers (`CalcTriggers.lua`'s handlers) and mirages (`CalcMirages.lua`)
 - Skill functions other than the ten in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
@@ -78,7 +84,9 @@ a skip:
 
 ## Next
 
-Minions, then triggers and mirages, then `Calcs.lua`'s calculators
+The minion's defence and offence (the offence is written for the player's
+skills; it needs to run on a minion's skill), then triggers and mirages,
+then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 

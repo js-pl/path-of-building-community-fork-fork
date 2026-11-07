@@ -703,14 +703,24 @@ impl<'a> Perform<'a> {
                 }
             }
         }
-        if self
-            .c
-            .flag(list, None, &["ClawCritChanceAppliesToMinions"])?
-            || self
-                .c
-                .flag(list, None, &["ClawCritMultiplierAppliesToMinions"])?
-        {
-            return Err("not ported: minions".into());
+        // Law of the Wilds: claw crit to the minion
+        for (flag, typ, name) in [
+            ("ClawCritChanceAppliesToMinions", Inc, "CritChance"),
+            ("ClawCritMultiplierAppliesToMinions", Base, "CritMultiplier"),
+        ] {
+            if self.c.flag(list, None, &[flag])? {
+                let mdb = self
+                    .minion_actor()
+                    .map(|a| self.c.db(a))
+                    .ok_or("attempt to index a nil value (env.minion)")?;
+                for (_, m) in self.c.tabulate(list, Some(typ), Some(&claw_hit), &[name])? {
+                    if m.flags & claw != 0 {
+                        let v = number(&m.value)?;
+                        self.c
+                            .add(mdb, Mod::new(name, m.typ, v, m.source.as_deref()));
+                    }
+                }
+            }
         }
         for (flag, stat, name) in [
             (
@@ -1385,8 +1395,27 @@ impl<'a> Perform<'a> {
         let cfg = self.cfg(i);
         let c = Some(&cfg);
         let set = |p: &mut Self, k: &str, v: f64| p.c.set_out(actor, k, v);
-        if self.mods(i).minion.is_some() {
-            return Err("not ported: minions".into());
+        if let Some(minion) = self.mods(i).minion.clone() {
+            let md = self
+                .data()
+                .minions
+                .get(&minion.typ)
+                .ok_or_else(|| format!("no minion {}", minion.typ))?;
+            if let Some(limit) = md.str("limit") {
+                let v = match self.c.override_num(self.pdb(), None, &[limit])? {
+                    Some(v) => v,
+                    None => {
+                        self.c.val(list, limit, c)?
+                            * self.c.more(list, c, &["ActiveMinionLimit"])?
+                    }
+                };
+                set(self, "ActiveMinionLimit", v.floor());
+            }
+            let mut per_cast = self.c.val(list, "MinionPerCastCount", c)?.floor();
+            if per_cast == 0.0 {
+                per_cast = 1.0;
+            }
+            set(self, "SummonedMinionsPerCast", per_cast);
         }
         if self.has_flag(i, "chaining") {
             if self.c.flag(list, c, &["CannotChain"])?
@@ -1907,7 +1936,13 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "DurationMod", dmod);
         let base = self.sd_num(i, "duration").unwrap_or(0.0)
             + self.c.base(list, c, &["Duration", "PrimaryDuration"])?;
-        if base > 0.0 {
+        let permanent = match &self.mods(i).minion {
+            Some(m) => self
+                .c
+                .flag(list, c, &[&format!("{}PermanentDuration", m.typ)])?,
+            None => false,
+        };
+        if base > 0.0 && !permanent {
             let mut d = base * dmod;
             if self.sd_truthy(i, "debuff") {
                 d *= debuff_mult;

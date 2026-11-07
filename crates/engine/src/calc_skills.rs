@@ -313,6 +313,8 @@ pub struct SkillsSetup {
     pub weapon_data: [Fields; 2],
     /// Whether each group's slot is in use (`group.slotEnabled`)
     pub slot_enabled: Vec<bool>,
+    /// The supports the setup marked `fromItem` on the shared skill data
+    pub from_item: HashSet<String>,
 }
 
 /// `calcLib.doesTypeExpressionMatch(checkTypes, skillTypes, minionTypes)`
@@ -355,6 +357,7 @@ fn can_support(
     groups: &[SocketGroup],
     all_one_hand: bool,
     data: &SkillData,
+    summon: Option<&ActiveSkill>,
 ) -> bool {
     let active = &skill.active_effect;
     let effect = &active.granted_effect;
@@ -380,14 +383,24 @@ fn can_support(
     {
         return false;
     }
+    // A minion's skill takes the types of the skill that summons it
+    let effective = summon.unwrap_or(skill);
     let minion = if support.ignore_minion_types {
         None
     } else {
-        skill.minion_skill_types.as_ref()
+        effective.minion_skill_types.as_ref()
     };
     if !support.exclude_skill_types.is_empty()
-        && type_expression_matches(&support.exclude_skill_types, &skill.skill_types, None, data)
+        && type_expression_matches(
+            &support.exclude_skill_types,
+            &effective.skill_types,
+            None,
+            data,
+        )
     {
+        return false;
+    }
+    if support.is_trigger && summon.is_some() {
         return false;
     }
     if let Some(weapons) = &support.weapon_types {
@@ -416,14 +429,15 @@ fn can_support(
     support.require_skill_types.is_empty()
         || type_expression_matches(
             &support.require_skill_types,
-            &skill.skill_types,
+            &effective.skill_types,
             minion,
             data,
         )
 }
 
-/// `calcs.createActiveSkill(activeEffect, supportList, actor, socketGroup)`
-fn create_active_skill(
+/// `calcs.createActiveSkill(activeEffect, supportList, actor, socketGroup,
+/// summonSkill)`
+pub(crate) fn create_active_skill(
     active: SkillEffect,
     supports: Vec<SkillEffect>,
     group: Option<usize>,
@@ -463,7 +477,9 @@ fn create_active_skill(
         let support = skill.support_list[i].clone();
         let g = &support.granted_effect;
         if g.support && ctx.can_support(g, &skill) {
-            if let Some(flags) = &g.add_flags {
+            if let Some(flags) = &g.add_flags
+                && ctx.summon.is_none()
+            {
                 skill.skill_flags.extend(flags.iter().cloned());
             }
             skill.effect_list.push(support);
@@ -473,11 +489,13 @@ fn create_active_skill(
 }
 
 /// What the support checks read
-struct SupportContext<'a> {
-    from_item: HashSet<String>,
-    groups: &'a [SocketGroup],
-    all_one_hand: bool,
-    data: &'a SkillData,
+pub(crate) struct SupportContext<'a> {
+    pub from_item: HashSet<String>,
+    pub groups: &'a [SocketGroup],
+    pub all_one_hand: bool,
+    pub data: &'a SkillData,
+    /// The skill that summons the minion whose skills these are
+    pub summon: Option<&'a ActiveSkill>,
 }
 
 impl SupportContext<'_> {
@@ -489,6 +507,7 @@ impl SupportContext<'_> {
             self.groups,
             self.all_one_hand,
             self.data,
+            self.summon,
         )
     }
 }
@@ -972,6 +991,7 @@ fn active_skills(
         groups,
         all_one_hand,
         data,
+        summon: None,
     };
     // The active skills of the groups in use, with their supports
     let mut active_skills = Vec::new();
@@ -1084,11 +1104,13 @@ fn active_skills(
             active_skills.len() - 1
         }
     };
+    let from_item = ctx.from_item;
     Ok(SkillsSetup {
         active_skills,
         main_skill,
         main_socket_group: main_index,
         weapon_data,
         slot_enabled,
+        from_item,
     })
 }

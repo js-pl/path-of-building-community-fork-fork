@@ -277,7 +277,11 @@ impl SetupData {
             non_elemental_ailment_types: strings(&get(data, "nonElementalAilmentTypeList"))?,
             tables: [
                 "monsterLifeTable",
+                "monsterLifeTable2",
+                "monsterLifeTable3",
                 "monsterAllyLifeTable",
+                "monsterArmourTable",
+                "monsterEvasionTable",
                 "totemLifeMult",
                 "monsterVarietyLifeMult",
                 "mapLevelLifeMult",
