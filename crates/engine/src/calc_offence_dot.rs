@@ -15,6 +15,7 @@ use crate::calc_offence_hit::Combine;
 use crate::calc_perform::Perform;
 use crate::mods::Cfg;
 use crate::mods::ModValue;
+use crate::mods::Sym;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -791,6 +792,65 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "ImpaleDPS", impale);
             combined += impale;
         }
+        // A mirage's damage adds to the skill's
+        let mut best_cull = 1.0;
+        let mirage = self
+            .mods(i)
+            .mirage
+            .as_ref()
+            .map(|m| (m.count, m.output.clone()));
+        let mo = |out: &std::collections::HashMap<Sym, OutVal>, k: &str| match out.get(&Sym::new(k))
+        {
+            Some(OutVal::Num(x)) => Some(*x),
+            _ => None,
+        };
+        if let Some((count, out)) = mirage
+            && let Some(total) = mo(&out, "TotalDPS")
+        {
+            let count = count.unwrap_or(1.0);
+            let mut mirage_dps = total * count;
+            combined += total * count;
+            for (k, mk) in [
+                ("MirageBurningGroundDPS", "BurningGroundDPS"),
+                ("MirageCausticGroundDPS", "CausticGroundDPS"),
+            ] {
+                match mo(&out, mk) {
+                    Some(v) => self.c.set_out(actor, k, v),
+                    None => self.c.clear_out(actor, k),
+                }
+            }
+            for k in ["IgniteDPS", "BleedDPS"] {
+                if let Some(v) = mo(&out, k)
+                    && v > g(self, k).unwrap_or(0.0)
+                {
+                    mirage_dps += v;
+                    self.c.set_out(actor, k, 0.0);
+                }
+            }
+            for k in ["PoisonDPS", "ImpaleDPS"] {
+                if let Some(v) = mo(&out, k) {
+                    mirage_dps += v * count;
+                    combined += v * count;
+                }
+            }
+            if let Some(v) = mo(&out, "DecayDPS") {
+                mirage_dps += v;
+                combined += v;
+            }
+            let stack = self.has_flag(i, "DotCanStack");
+            if let Some(v) = mo(&out, "TotalDot")
+                && (stack || g(self, "TotalDot").is_none_or(|t| t == 0.0))
+            {
+                let m = if stack { count } else { 1.0 };
+                mirage_dps += v * m;
+                combined += v * m;
+            }
+            self.c.set_out(actor, "MirageDPS", mirage_dps);
+            let cull = mo(&out, "CullMultiplier").unwrap_or(f64::NAN);
+            if cull > 1.0 {
+                best_cull = cull;
+            }
+        }
         let total_dot = g(self, "TotalDot").unwrap_or(0.0)
             + g(self, "TotalPoisonDPS").unwrap_or(0.0)
             + m_max(
@@ -816,7 +876,7 @@ impl<'a> Perform<'a> {
         if !show_average {
             combined += capped;
         }
-        let best_cull = m_max(1.0, n(self, "CullMultiplier"));
+        let best_cull = m_max(best_cull, n(self, "CullMultiplier"));
         self.c
             .set_out(actor, "CullingDPS", combined * (best_cull - 1.0));
         let reservation = n(self, "ReservationDpsMultiplier");

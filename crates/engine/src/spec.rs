@@ -5,9 +5,11 @@
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 //!
+//! Cluster jewel subgraphs are in [`cluster`].
+//!
 //! Not ported yet: jewels that change the tree (Intuitive Leap and the like,
-//! timeless jewels, Impossible Escape, Split Personality), tattoos, cluster
-//! jewel subgraphs, tree conversion and URLs.
+//! timeless jewels, Impossible Escape, Split Personality), tattoos, tree
+//! conversion and URLs.
 //!
 //! Upstream keeps the allocated nodes and mastery selections in tables keyed
 //! by node id and visits them with `pairs`; which paths win ties and the
@@ -20,6 +22,8 @@ use crate::mods::{Mod, Sym};
 use crate::tree::{self, NodeType, PassiveTree, StatLine};
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
+
+mod cluster;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -107,8 +111,10 @@ pub struct NodeStats {
 #[derive(Clone, Debug)]
 pub struct SpecNode {
     pub id: u32,
-    /// Index of the node in the tree
+    /// Index of the node in the tree, unless it is a subgraph's
     pub tree: usize,
+    /// A cluster jewel subgraph's node, which the tree does not have
+    pub synthetic: Option<Rc<tree::Node>>,
     /// Linked nodes of the spec, by index
     pub linked: Vec<usize>,
     pub alloc: bool,
@@ -150,6 +156,10 @@ pub struct PassiveSpec<'t> {
     /// Jewel socket node id to the id of the item in it
     pub jewels: BTreeMap<u32, f64>,
     pub title: Option<String>,
+    /// `clusterHashFormatVersion`: 1 for builds saved with legacy cluster
+    /// node hashes
+    pub cluster_hash_format_version: f64,
+    legacy_cluster_map: Option<cluster::LegacyMap>,
 }
 
 impl<'t> PassiveSpec<'t> {
@@ -174,6 +184,8 @@ impl<'t> PassiveSpec<'t> {
             allocated_mastery_type_count: 0,
             jewels: BTreeMap::new(),
             title: None,
+            cluster_hash_format_version: 2.0,
+            legacy_cluster_map: None,
         };
         // A copy of the tree without proxies, groupless nodes and nested
         // cluster sockets
@@ -188,6 +200,7 @@ impl<'t> PassiveSpec<'t> {
                 spec.nodes.push(SpecNode {
                     id: n.id,
                     tree: ti,
+                    synthetic: None,
                     linked: Vec::new(),
                     alloc: false,
                     depends: Vec::new(),
@@ -215,8 +228,12 @@ impl<'t> PassiveSpec<'t> {
         Ok(spec)
     }
 
-    pub fn tree_node(&self, i: usize) -> &'t tree::Node {
-        &self.tree.nodes[self.nodes[i].tree]
+    /// The node's data: the tree's, or a subgraph's
+    pub fn tree_node(&self, i: usize) -> &tree::Node {
+        match &self.nodes[i].synthetic {
+            Some(n) => n,
+            None => &self.tree.nodes[self.nodes[i].tree],
+        }
     }
 
     fn kind(&self, i: usize) -> NodeType {
@@ -359,6 +376,14 @@ impl<'t> PassiveSpec<'t> {
     /// the old URL format only are not ported.
     pub fn load(&mut self, xml: &crate::xml::Element) -> Result<()> {
         self.title = xml.attr("title").map(String::from);
+        self.cluster_hash_format_version = xml
+            .attr("clusterHashFormatVersion")
+            .and_then(crate::pat::to_number)
+            .unwrap_or(if xml.attr("nodes").is_some() {
+                1.0
+            } else {
+                2.0
+            });
         let mut url = false;
         for node in xml.elements() {
             if node.elem == "URL" {
@@ -458,19 +483,15 @@ impl<'t> PassiveSpec<'t> {
         self.build_all_depends_and_paths()
     }
 
-    /// `PostLoad()`, which rebuilds the cluster jewel subgraphs (not ported:
-    /// there are none here): allocated ids the spec now has are allocated,
-    /// then dependencies and paths are rebuilt.
-    pub fn post_load(&mut self) -> Result<()> {
-        for id in std::mem::take(&mut self.alloc_subgraph_nodes) {
-            if let Some(&i) = self.index.get(&id) {
-                self.nodes[i].alloc = true;
-                if !self.alloc_nodes.contains(id) {
-                    self.alloc_nodes.insert(id, i);
-                }
-            }
-        }
-        self.build_all_depends_and_paths()
+    /// `PostLoad()`: builds the cluster jewel subgraphs of the jewels
+    /// socketed in `items`, allocates the subgraph nodes the spec lists and
+    /// rebuilds dependencies and paths
+    pub fn post_load(
+        &mut self,
+        items: &crate::items_tab::ItemsTab,
+        data: &crate::item_data::ItemData,
+    ) -> Result<()> {
+        self.build_cluster_jewel_graphs(items, data)
     }
 
     /// `ProcessStats` on a node with the given lines, keeping its unknown

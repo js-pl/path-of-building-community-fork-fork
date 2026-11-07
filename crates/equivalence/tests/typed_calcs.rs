@@ -205,16 +205,6 @@ fn typed_calcs_match_the_oracle() {
             continue;
         }
         let xml = std::fs::read_to_string(&path).unwrap();
-        host.load_build_xml(xml.as_bytes(), &id)
-            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
-        let build = host.build().unwrap();
-        if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
-            *skip_reasons
-                .entry("cluster jewel subgraphs".into())
-                .or_default() += 1;
-            skipped += 1;
-            continue;
-        }
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
         let version = engine::build::tree_version(&root);
         let tree = trees.get(&version, &parser);

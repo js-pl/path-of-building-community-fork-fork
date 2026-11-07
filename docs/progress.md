@@ -10,7 +10,7 @@ The whole of `calcs.initEnv` runs typed from a build file:
 chains the slices in upstream's order. Each slice is compared with the
 translated `initEnv` for every corpus build in
 `crates/equivalence/tests/calc_setup.rs` (`items_setup_matches_upstream`
-covers everything from the items on; 57 builds compared, 4 skipped).
+covers everything from the items on; 61 builds compared).
 
 | Upstream | Typed |
 |---|---|
@@ -18,6 +18,7 @@ covers everything from the items on; 57 builds compared, 4 skipped).
 | `ConfigTab:Load`, config sets, defaults | `config_tab.rs` (options in `config.rs`) |
 | `ItemsTab` slots and sets | `items_tab.rs` |
 | `PassiveSpec:Load` | `spec.rs` |
+| cluster jewel subgraphs, legacy cluster hashes (`BuildClusterJewelGraphs`) | `spec/cluster.rs` |
 | base mods, bandit, pantheon, config | `calc_setup.rs` (`base_dbs`) |
 | tree before items, `mergeKeystones` | `calc_setup.rs` (`build_mod_list_for_node_list`) |
 | radius jewel functions | `jewel.rs` |
@@ -34,8 +35,7 @@ the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list, and `env.minion`'s output,
 database and skills' mod lists) in `crates/equivalence/tests/perform.rs`:
-57 builds compared, 49 of them through the player's offence and 5 minions
-through their own; the gaps below are skipped. The minions' skills follow
+61 builds compared, with their minions; the gaps below are skipped. The minions' skills follow
 the player's in the calculation's skills (`Perform::n_player`).
 
 | Upstream | Typed |
@@ -53,8 +53,7 @@ the player's in the calculation's skills (`Perform::n_player`).
 and the skill cache (`GlobalCache.cachedData`) run typed in
 `engine::calcs`; with the sidebar's sort of `SkillDPS`, whole builds are
 compared with the oracle's `MAIN` and `CALCS` outputs in
-`crates/equivalence/tests/typed_calcs.rs`: 58 builds equal, the others
-skipped at a part not ported yet.
+`crates/equivalence/tests/typed_calcs.rs`: every corpus build equal (61).
 
 Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
@@ -62,7 +61,6 @@ Game data is still read from upstream's processed Lua `data` table
 
 ## Not ported yet in `initEnv`
 
-- Cluster jewel subgraphs (the 3.13 corpus builds are skipped for them)
 - Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
   node and item power calculators
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
@@ -85,8 +83,8 @@ a skip:
 
 ## Next
 
-Cluster jewels, then the breakdowns, the node and misc
-calculators, and the engine API on the typed engine.
+The breakdowns, the node and misc calculators, and the engine API on the
+typed engine.
 
 ## Upstream quirks met so far
 
@@ -105,6 +103,8 @@ the tests align these:
   translation, so tests accept the typed function there
 - `skillModList:More("MORE", cfg, "Accuracy")` in `calcs.offence` passes
   the string as the cfg: the typed offence queries with an empty cfg
+- `calcs.copyActiveSkill` (mirages) rebuilds the skill from its gem's own
+  level and quality, without the levels and quality items and sockets add
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact

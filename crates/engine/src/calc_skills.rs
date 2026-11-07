@@ -300,6 +300,9 @@ pub struct SkillsInput<'a> {
     pub enemy_db: &'a Store,
     /// The Calcs tab's calculation, whose main skill is its own
     pub calcs: bool,
+    /// A skill, by its cache uuid, to copy as the last skill
+    /// (`calcs.copyActiveSkill`)
+    pub copy_of: Option<&'a str>,
 }
 
 /// The active skills of the player and what creating them sets
@@ -1120,6 +1123,26 @@ fn active_skills(
             active_skills.len() - 1
         }
     };
+    // `calcs.copyActiveSkill`: the skill again, from its gem's own level and
+    // quality, without its gem's socket and properties
+    if let Some(uuid) = input.copy_of {
+        let orig = active_skills
+            .iter()
+            .find(|s| crate::calcs::skill_uuid_in(s, groups) == uuid)
+            .ok_or("[calcs.copyActiveSkill] no such skill")?;
+        let a = &orig.active_effect;
+        let mut effect = SkillEffect::new(a.granted_effect.clone(), a.level, a.quality);
+        if let Some((g, k)) = a.src {
+            let gem = &groups[g].gem_list[k];
+            effect.level = gem.level;
+            effect.quality = gem.quality.unwrap_or(0.0);
+            effect.src = a.src;
+            effect.gem = a.gem.clone();
+        }
+        let (supports, group) = (orig.support_list.clone(), orig.group);
+        let copy = create_active_skill(effect, supports, group, &ctx);
+        active_skills.push(copy);
+    }
     let from_item = ctx.from_item;
     Ok(SkillsSetup {
         active_skills,

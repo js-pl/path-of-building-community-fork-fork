@@ -1401,7 +1401,7 @@ impl Item {
                                 .base_name
                                 .as_ref()
                                 .and_then(|b| data.cluster_jewels.get(b))
-                                && cj.skills.contains(&spec_val)
+                                && cj.skills.contains_key(&spec_val)
                             {
                                 self.cluster_jewel_skill = Some(spec_val.clone());
                             }
@@ -3354,7 +3354,7 @@ impl Item {
                 );
             }
             if let Some(s) = skill(&jd)
-                && !cj.skills.contains(&s)
+                && !cj.skills.contains_key(&s)
             {
                 jd.remove("clusterJewelSkill");
             }

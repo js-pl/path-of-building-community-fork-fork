@@ -16,6 +16,7 @@ use crate::calc_env::{CalcData, Env, init_env};
 use crate::calc_perform::{Perform, PerformInput, no_whitespace, perform};
 use crate::calc_setup::BuffMode;
 use crate::mods::{ModValue, Sym};
+use crate::skills::SocketGroup;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
@@ -69,9 +70,13 @@ pub fn skill_uuid(p: &Perform, i: usize) -> String {
 
 /// `cacheSkillUUID(skill, env)` of an environment's skill
 pub fn env_skill_uuid(env: &Env, i: usize) -> String {
-    let skill = &env.skills.active_skills[i];
+    skill_uuid_in(&env.skills.active_skills[i], &env.groups)
+}
+
+/// `cacheSkillUUID(skill, env)` of a skill of the socket groups
+pub fn skill_uuid_in(skill: &crate::calc_skills::ActiveSkill, groups: &[SocketGroup]) -> String {
     let name = no_whitespace(&skill.active_effect.granted_effect.name);
-    let group = skill.group.and_then(|g| env.groups.get(g));
+    let group = skill.group.and_then(|g| groups.get(g));
     let slot = group
         .and_then(|g| g.slot.as_deref())
         .map_or("NO_SLOT".to_string(), |s| no_whitespace(&s.to_uppercase()));
@@ -818,11 +823,18 @@ impl<'d> Calcs<'d> {
         limited: &[String],
         pre: crate::calc_perform::ExtraMain<'b>,
     ) -> Result<MirageOut> {
-        let mut env = self.init_env(build, Mode::Calculator)?;
-        let j = (0..env.skills.active_skills.len())
-            .find(|&i| env_skill_uuid(&env, i) == uuid)
-            .ok_or("[calcs.copyActiveSkill] no such skill")?;
-        let mut copy = env.skills.active_skills[j].clone();
+        let mut env = crate::calc_env::init_env_copy(
+            build,
+            self.data,
+            Mode::Calculator.buff_mode(),
+            false,
+            Some(uuid),
+        )?;
+        let mut copy = env
+            .skills
+            .active_skills
+            .pop()
+            .ok_or("no copy of the skill")?;
         let other = self
             .data
             .skills

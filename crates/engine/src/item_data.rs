@@ -138,7 +138,22 @@ pub struct ClusterJewel {
     pub size_index: f64,
     pub min_nodes: f64,
     pub max_nodes: f64,
-    pub skills: HashSet<String>,
+    /// Small passive skills by id
+    pub skills: HashMap<String, ClusterSkill>,
+    /// Orbit indices of the small, notable and socket nodes, in the
+    /// cluster's template space
+    pub small_indicies: Vec<i64>,
+    pub notable_indicies: Vec<i64>,
+    pub socket_indicies: Vec<i64>,
+    pub total_indicies: i64,
+}
+
+/// A small passive skill a cluster jewel adds
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterSkill {
+    pub name: Rc<str>,
+    pub has_mastery_icon: bool,
+    pub stats: Vec<Rc<str>>,
 }
 
 /// One value of a line in `data.modScalability`
@@ -158,6 +173,10 @@ pub struct ItemData {
     /// Unique title to its (original mod, Foulborn mod) pairs
     pub foulborn_map: HashMap<String, Vec<(String, String)>>,
     pub cluster_jewels: HashMap<String, ClusterJewel>,
+    /// `data.clusterJewels.notableSortOrder`
+    pub cluster_notable_sort_order: HashMap<String, f64>,
+    /// `data.clusterJewels.orbitOffsets`: by proxy node id and size index
+    pub cluster_orbit_offsets: HashMap<u32, HashMap<i64, i64>>,
     pub mod_scalability: HashMap<String, Vec<Scalability>>,
     pub high_precision_mods: HashMap<(String, String), f64>,
     /// `data.itemTagSpecial` and `data.itemTagSpecialExclusionPattern`:
@@ -382,7 +401,28 @@ impl ItemData {
                 .collect::<Result<_>>()?;
             d.foulborn_map.insert(title, list);
         }
-        for (k, v) in pairs(&get(&get(data, "clusterJewels"), "jewels")) {
+        let clusters = get(data, "clusterJewels");
+        let ints = |v: &Value| -> Result<Vec<i64>> {
+            array(v)
+                .iter()
+                .map(|x| number(x).map(|n| n as i64))
+                .collect()
+        };
+        for (k, v) in pairs(&get(&clusters, "jewels")) {
+            let mut skills = HashMap::new();
+            for (id, sk) in pairs(&get(&v, "skills")) {
+                skills.insert(
+                    key_string(&id)?,
+                    ClusterSkill {
+                        name: text(&get(&sk, "name"))?,
+                        has_mastery_icon: get(&sk, "masteryIcon").truthy(),
+                        stats: array(&get(&sk, "stats"))
+                            .iter()
+                            .map(text)
+                            .collect::<Result<_>>()?,
+                    },
+                );
+            }
             d.cluster_jewels.insert(
                 key_string(&k)?,
                 ClusterJewel {
@@ -390,12 +430,26 @@ impl ItemData {
                     size_index: number(&get(&v, "sizeIndex"))?,
                     min_nodes: number(&get(&v, "minNodes"))?,
                     max_nodes: number(&get(&v, "maxNodes"))?,
-                    skills: pairs(&get(&v, "skills"))
-                        .iter()
-                        .map(|(k, _)| key_string(k))
-                        .collect::<Result<_>>()?,
+                    skills,
+                    small_indicies: ints(&get(&v, "smallIndicies"))?,
+                    notable_indicies: ints(&get(&v, "notableIndicies"))?,
+                    socket_indicies: ints(&get(&v, "socketIndicies"))?,
+                    total_indicies: number(&get(&v, "totalIndicies"))? as i64,
                 },
             );
+        }
+        d.cluster_notable_sort_order = number_map(&get(&clusters, "notableSortOrder"))?;
+        for (k, v) in pairs(&get(&clusters, "orbitOffsets")) {
+            let Key::Int(proxy) = k else {
+                return Err(format!("orbit offsets of {k:?}"));
+            };
+            let mut by_size = HashMap::new();
+            for (size, off) in pairs(&v) {
+                if let Key::Int(size) = size {
+                    by_size.insert(size, number(&off)? as i64);
+                }
+            }
+            d.cluster_orbit_offsets.insert(proxy as u32, by_size);
         }
         for (k, v) in pairs(&get(data, "modScalability")) {
             let list = array(&v)

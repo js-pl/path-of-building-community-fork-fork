@@ -51,8 +51,22 @@ pub struct Env {
 /// `calcs.initEnv(build, mode)`; [`write_back`] gives the build's Skills
 /// tab the socket groups with the granted skills and the gems' selections.
 pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> Result<Env> {
-    match init_env_with(build, data, mode, calcs, false) {
-        Err(e) if e == calc_skills::ENERGY_BLADE => init_env_with(build, data, mode, calcs, true),
+    init_env_copy(build, data, mode, calcs, None)
+}
+
+/// [`init_env`], then `calcs.copyActiveSkill`'s copy of the skill with
+/// the cache uuid `copy_of` as the last skill, its mod list built last
+pub fn init_env_copy(
+    build: &Build,
+    data: &CalcData,
+    mode: BuffMode,
+    calcs: bool,
+    copy_of: Option<&str>,
+) -> Result<Env> {
+    match init_env_with(build, data, mode, calcs, false, copy_of) {
+        Err(e) if e == calc_skills::ENERGY_BLADE => {
+            init_env_with(build, data, mode, calcs, true, copy_of)
+        }
         r => r,
     }
 }
@@ -65,6 +79,7 @@ fn init_env_with(
     mode: BuffMode,
     calcs: bool,
     energy_blade: bool,
+    copy_of: Option<&str>,
 ) -> Result<Env> {
     // The Calcs tab's buff mode
     let mode = if calcs {
@@ -197,6 +212,7 @@ fn init_env_with(
             build.info.main_socket_group
         }),
         calcs,
+        copy_of,
         imbued_support_by_slot: &imbued,
         matching_socket_quality_bonus: data
             .setup

@@ -125,7 +125,10 @@ fn items_tabs_match_upstream() {
         load_tree(&version, &mut trees);
         let tree = &trees[&version];
         let mut spec = PassiveSpec::new(tree, &parser).unwrap();
-        if let Err(e) = spec.load(spec_xml).and_then(|_| spec.post_load()) {
+        if let Err(e) = spec
+            .load(spec_xml)
+            .and_then(|_| spec.post_load(&tab, &item_data))
+        {
             eprintln!("{id}: skipped: {e}");
             skipped += 1;
             continue;

@@ -60,6 +60,8 @@ pub struct Group {
     pub is_proxy: bool,
     pub ascendancy_name: Option<Sym>,
     pub is_ascendancy_start: bool,
+    /// The group's node ids (`group.n`), in the data's order
+    pub nodes: Vec<u32>,
 }
 
 /// A mastery's effect choice, by effect id.
@@ -173,6 +175,11 @@ pub struct PassiveTree {
     /// `alternate_ascendancies` by index, without the legacy ones; `None`
     /// when the tree has none
     pub alternate_ascendancies: Option<Vec<(i64, Ascendancy)>>,
+    /// `skillsPerOrbit`, `orbitRadii` and the angles of each orbit's
+    /// positions, by orbit
+    pub skills_per_orbit: Vec<f64>,
+    pub orbit_radii: Vec<f64>,
+    pub orbit_angles: Vec<Vec<f64>>,
 }
 
 /// `(inner, outer)` of upstream's jewel radii for a tree version
@@ -560,6 +567,7 @@ impl PassiveTree {
                     is_proxy: truthy(&g, "isProxy"),
                     ascendancy_name: None,
                     is_ascendancy_start: false,
+                    nodes: array_ids(&get(&g, if new_format { "nodes" } else { "n" }))?,
                 },
             );
             group_ids.push(gi);
@@ -582,6 +590,9 @@ impl PassiveTree {
             sockets: Vec::new(),
             mastery_effects: HashMap::new(),
             alternate_ascendancies: None,
+            skills_per_orbit: per_orbit,
+            orbit_radii: radii_of_orbit,
+            orbit_angles: angles,
         };
         if !alternates.is_empty() {
             let mut list = Vec::new();
@@ -780,12 +791,13 @@ impl PassiveTree {
             let (mut angle, mut x, mut y) = (None, None, None);
             if let Some(g) = group {
                 let (o, oi) = (orbit.unwrap_or(0), orbit_index.unwrap_or(0));
-                let a = angles
+                let a = tree
+                    .orbit_angles
                     .get(o as usize)
                     .and_then(|v| v.get(oi as usize))
                     .copied()
                     .ok_or_else(|| format!("node {id}: no angle for orbit {o} index {oi}"))?;
-                let r = radii_of_orbit[o as usize];
+                let r = tree.orbit_radii[o as usize];
                 let grp = &tree.groups[&g];
                 angle = Some(a);
                 x = Some(grp.x + a.sin() * r);
@@ -963,6 +975,21 @@ impl PassiveTree {
     pub fn group_ids(&self) -> &[i64] {
         &self.group_ids
     }
+}
+
+/// Node ids listed as numbers or strings
+fn array_ids(v: &Value) -> Result<Vec<u32>> {
+    let mut out = Vec::new();
+    for x in v.as_table().map(|t| t.array()).unwrap_or_default() {
+        let n = match &x {
+            Value::Str(s) => {
+                lua::str_to_number(s.as_bytes()).ok_or_else(|| format!("node id {s:?}"))?
+            }
+            v => number(v)?,
+        };
+        out.push(n as u32);
+    }
+    Ok(out)
 }
 
 fn rt_index(v: &Value, i: i64) -> Value {

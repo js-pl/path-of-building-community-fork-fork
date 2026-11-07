@@ -346,7 +346,12 @@ fn initial_node_mods_match_upstream() {
         let version = spec_xml.attr("treeVersion").unwrap_or("2_6").to_string();
         let tree = trees.get(&version, &parser);
         let mut spec = PassiveSpec::new(tree, &parser).unwrap();
-        if let Err(e) = spec.load(spec_xml).and_then(|_| spec.post_load()) {
+        // Without the items: builds with cluster jewels are skipped below
+        let no_items = engine::items_tab::ItemsTab::default();
+        if let Err(e) = spec
+            .load(spec_xml)
+            .and_then(|_| spec.post_load(&no_items, &item_data))
+        {
             eprintln!("{id}: skipped: {e}");
             skipped += 1;
             continue;
@@ -358,7 +363,7 @@ fn initial_node_mods_match_upstream() {
             .next()
             .unwrap();
         if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
-            eprintln!("{id}: skipped: cluster jewel subgraphs are not ported");
+            eprintln!("{id}: skipped: cluster jewel subgraphs need the items");
             skipped += 1;
             continue;
         }
@@ -512,11 +517,6 @@ fn items_setup_matches_upstream() {
         let (Some(items_xml), Some(tree_xml)) = (pob.child("Items"), pob.child("Tree")) else {
             continue;
         };
-        if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
-            eprintln!("{id}: skipped: cluster jewel subgraphs are not ported");
-            skipped += 1;
-            continue;
-        }
         let specs: Vec<_> = tree_xml.elements().filter(|e| e.elem == "Spec").collect();
         let active = tree_xml
             .attr("activeSpec")
@@ -526,12 +526,6 @@ fn items_setup_matches_upstream() {
         let spec_xml = specs[active - 1];
         let version = spec_xml.attr("treeVersion").unwrap_or("2_6").to_string();
         let tree = trees.get(&version, &parser);
-        let mut spec = PassiveSpec::new(tree, &parser).unwrap();
-        if let Err(e) = spec.load(spec_xml).and_then(|_| spec.post_load()) {
-            eprintln!("{id}: skipped: {e}");
-            skipped += 1;
-            continue;
-        }
         let mut tab = match ItemsTab::load(items_xml, &ctx, &socket_ids) {
             Ok(t) => t,
             Err(e) => {
@@ -539,6 +533,15 @@ fn items_setup_matches_upstream() {
                 continue;
             }
         };
+        let mut spec = PassiveSpec::new(tree, &parser).unwrap();
+        if let Err(e) = spec
+            .load(spec_xml)
+            .and_then(|_| spec.post_load(&tab, &item_data))
+        {
+            eprintln!("{id}: skipped: {e}");
+            skipped += 1;
+            continue;
+        }
         tab.populate_slots(&mut spec, tree, &one_hand);
         let mut skills = pob.child("Skills").map(|x| Skills::load(x, &skill_data));
         let groups: Vec<SocketGroup> = skills
@@ -984,6 +987,7 @@ fn items_setup_matches_upstream() {
             imbued_support_by_slot: &imbued,
             matching_socket_quality_bonus: setup_data.misc["MatchingSocketQualityBonus"],
             enemy_db: &enemy_base,
+            copy_of: None,
             calcs: false,
         };
         let mut player_db = env_setup.mod_db.clone();

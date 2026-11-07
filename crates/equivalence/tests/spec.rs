@@ -5,8 +5,9 @@
 //! the order of the allocated nodes.
 //!
 //! Specs with jewels that change the tree (Intuitive Leap and the like,
-//! timeless jewels, Impossible Escape, Split Personality), tattoos or
-//! cluster jewel subgraphs are not ported yet; they are skipped and counted.
+//! timeless jewels, Impossible Escape, Split Personality) or tattoos are not
+//! ported yet; they are skipped and counted. Specs with cluster jewel
+//! subgraphs need the build's items: they are compared in `calc_setup`.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
@@ -180,8 +181,11 @@ fn specs_match_upstream() {
                 &effects,
             )
             .unwrap_or_else(|e| panic!("{id} spec {si}: {e}"));
-            spec.post_load()
-                .unwrap_or_else(|e| panic!("{id} spec {si}: {e}"));
+            spec.post_load(
+                &engine::items_tab::ItemsTab::default(),
+                &engine::item_data::ItemData::default(),
+            )
+            .unwrap_or_else(|e| panic!("{id} spec {si}: {e}"));
             let mut fail = |what: String| {
                 if failures.len() < 60 {
                     failures.push(format!("{id} spec {}: {what}", si + 1));

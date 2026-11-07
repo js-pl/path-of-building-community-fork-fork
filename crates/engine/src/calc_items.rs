@@ -248,7 +248,12 @@ fn add_radius_jewels(
     }
     let spec = input.spec;
     let tree = spec.tree;
-    let socket = tree.node(node_id).ok_or(format!("no socket {node_id}"))?;
+    // The spec's socket: a subgraph's has no nodes in radius
+    let socket = spec
+        .index
+        .get(&node_id)
+        .map(|&i| spec.tree_node(i))
+        .ok_or(format!("no socket {node_id}"))?;
     let in_radius = |index: Option<f64>| -> Option<&Vec<u32>> {
         let index = index.filter(|i| i.fract() == 0.0 && *i >= 1.0)?;
         socket.nodes_in_radius.as_ref()?.get(index as usize - 1)
