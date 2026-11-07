@@ -111,7 +111,7 @@ impl<'d> Calcs<'d> {
 
     /// `calcs.initEnv(build, mode)`
     pub fn init_env(&self, build: &Build, mode: Mode) -> Result<Env> {
-        init_env(build, self.data, mode.buff_mode())
+        init_env(build, self.data, mode.buff_mode(), mode == Mode::Calcs)
     }
 
     /// `calcs.perform(env, skipEHP)` to its end: the setup, the player's
@@ -224,6 +224,14 @@ impl<'d> Calcs<'d> {
 
     /// `calcs.buildOutput(build, "MAIN")`
     pub fn build_output_main(&self, build: &mut Build) -> Result<Outputs> {
+        Ok(self.build_output_main_with(build)?.0)
+    }
+
+    /// `calcs.buildOutput(build, "MAIN")`, with its `multipliersUsed`
+    pub fn build_output_main_with(
+        &self,
+        build: &mut Build,
+    ) -> Result<(Outputs, std::collections::HashSet<String>)> {
         let env = self.init_env(build, Mode::Main)?;
         crate::calc_env::write_back(build, &env);
         let build = &*build;
@@ -249,9 +257,10 @@ impl<'d> Calcs<'d> {
                     .minion_actor()
                     .map(|a| p.c.actors.actors[a].output.clone()),
             };
-            Ok::<_, String>((outputs, skills, es_protects, extra_points, specs))
+            let used = multipliers_used(p);
+            Ok::<_, String>((outputs, skills, es_protects, extra_points, specs, used))
         })?;
-        let (mut outputs, skills, es_protects, extra_points, specs) = out?;
+        let (mut outputs, skills, es_protects, extra_points, specs, used) = out?;
         let full = self.calc_full_dps(build, Mode::Calculator)?;
         let player = &mut outputs.player;
         full.write(player);
@@ -319,7 +328,7 @@ impl<'d> Calcs<'d> {
         for (k, v) in specs {
             player.insert(Sym::new(k), OutVal::Num(v));
         }
-        Ok(outputs)
+        Ok((outputs, used))
     }
 }
 
@@ -868,5 +877,265 @@ impl<'d> Calcs<'d> {
             },
         )?;
         Ok(out)
+    }
+}
+
+/// The `multipliersUsed` of the main calculation: the multipliers the
+/// player's mods and skills' mods are tagged with (`buildOutput`, `MAIN`)
+fn multipliers_used(p: &Perform) -> std::collections::HashSet<String> {
+    use crate::mods::store::Mods;
+    use crate::mods::tag::{Names, TagKind};
+    let mut used = std::collections::HashSet::new();
+    let mut scan = |m: &crate::mods::Mod| {
+        if m.source.as_deref() == Some("Base") {
+            return;
+        }
+        for t in &m.tags {
+            let (vars, actor) = match &t.kind {
+                TagKind::Other { kind, .. } if kind.as_str() == "IgnoreCond" => break,
+                TagKind::Multiplier(x) => (&x.vars, &x.actor),
+                TagKind::MultiplierThreshold(x) => (&x.vars, &x.actor),
+                _ => continue,
+            };
+            if actor.is_none() {
+                match vars {
+                    Some(Names::One(v)) => {
+                        used.insert(v.as_str().to_string());
+                    }
+                    Some(Names::List(l)) => {
+                        for v in l {
+                            used.insert(v.as_str().to_string());
+                        }
+                    }
+                    None => {}
+                }
+            }
+        }
+    };
+    let mods_of = |id| -> Vec<crate::mods::Mod> {
+        match &p.c.store(id).mods {
+            Mods::Db(m) => m.values().flatten().cloned().collect(),
+            Mods::List(l) => l.clone(),
+        }
+    };
+    for m in mods_of(p.c.db(PLAYER)) {
+        scan(&m);
+    }
+    for i in 0..p.n_player {
+        for m in mods_of(p.lists[i].base) {
+            scan(&m);
+        }
+    }
+    used
+}
+
+/// The Calcs tab's lists of the buffs, combat buffs and curses
+/// (`buildOutput`, `CALCS`)
+fn calcs_lists(
+    p: &Perform,
+    main_multipliers: &std::collections::HashSet<String>,
+) -> Result<Vec<(String, OutVal)>> {
+    let pdb = p.c.db(PLAYER);
+    let out = |a: usize, k: &str| p.c.out(a, k).unwrap_or(f64::NAN);
+    let mut combat: Vec<String> = Vec::new();
+    for (k, label) in [
+        ("PowerCharges", "Power Charges"),
+        ("AbsorptionCharges", "Absorption Charges"),
+        ("FrenzyCharges", "Frenzy Charges"),
+        ("AfflictionCharges", "Affliction Charges"),
+        ("EnduranceCharges", "Endurance Charges"),
+        ("BrutalCharges", "Brutal Charges"),
+        ("BrineCharges", "Brine Charges"),
+        ("SiphoningCharges", "Siphoning Charges"),
+        ("ChallengerCharges", "Challenger Charges"),
+        ("BlitzCharges", "Blitz Charges"),
+    ] {
+        if out(PLAYER, k) > 0.0 {
+            combat.push(format!("{} {label}", out(PLAYER, k) as i64));
+        }
+    }
+    if main_multipliers.contains("InspirationCharge") {
+        combat.push(format!(
+            "{} Inspiration Charges",
+            out(PLAYER, "InspirationCharges") as i64
+        ));
+    }
+    if out(PLAYER, "GhostShrouds") > 0.0 {
+        combat.push(format!(
+            "{} Ghost Shrouds",
+            out(PLAYER, "GhostShrouds") as i64
+        ));
+    }
+    if out(PLAYER, "CrabBarriers") > 0.0 {
+        combat.push(format!(
+            "{} Crab Barriers",
+            out(PLAYER, "CrabBarriers") as i64
+        ));
+    }
+    for (m, k, label) in [
+        ("BloodCharge", "BloodCharges", "Blood Charges"),
+        ("SpiritCharge", "SpiritCharges", "Spirit Charges"),
+        ("SpiritInfusion", "SpiritInfusions", "Spirit Infusions"),
+    ] {
+        if main_multipliers.contains(m) {
+            combat.push(format!("{} {label}", out(PLAYER, k) as i64));
+        }
+    }
+    let main = p.main();
+    if p.c.flag(p.lists[main].base, None, &["Cruelty"])? {
+        combat.push("Cruelty".into());
+    }
+    for (flag, label) in [
+        ("Fortify", "Fortify"),
+        ("Onslaught", "Onslaught"),
+        ("UnholyMight", "Unholy Might"),
+        ("ChaoticMight", "Chaotic Might"),
+        ("Tailwind", "Tailwind"),
+        ("Adrenaline", "Adrenaline"),
+        ("AlchemistsGenius", "Alchemist's Genius"),
+        ("HerEmbrace", "Her Embrace"),
+        ("AccelerationShrine", "Acceleration Shrine"),
+        ("BrutalShrine", "Brutal Shrine"),
+        ("DiamondShrine", "Diamond Shrine"),
+        ("DivineShrine", "Divine Shrine"),
+        ("EchoingShrine", "Echoing Shrine"),
+        ("GloomShrine", "Gloom Shrine"),
+        ("GreaterFreezingShrine", "Greater Freezing Shrine"),
+        ("GreaterShockingShrine", "Greater Shocking Shrine"),
+        ("GreaterSkeletalShrine", "Greater Skeletal Shrine"),
+        ("ImpenetrableShrine", "Impenetrable Shrine"),
+        ("MassiveShrine", "Massive Shrine"),
+        ("ReplenishingShrine", "Replenishing Shrine"),
+        ("ResistanceShrine", "Resistance Shrine"),
+        ("ResonatingShrine", "Resonating Shrine"),
+        ("LesserAccelerationShrine", "Lesser Acceleration Shrine"),
+        ("LesserBrutalShrine", "Lesser Brutal Shrine"),
+        ("LesserImpenetrableShrine", "Lesser Impenetrable Shrine"),
+        ("LesserMassiveShrine", "Lesser Massive Shrine"),
+        ("LesserReplenishingShrine", "Lesser Replenishing Shrine"),
+        ("LesserResistanceShrine", "Lesser Resistance Shrine"),
+    ] {
+        if p.c.flag(pdb, None, &[flag])? {
+            combat.push(label.into());
+        }
+    }
+    let mut buffs: Vec<String> = p.buff_names.clone();
+    if p.c.flag(pdb, None, &["Elusive"])? {
+        combat.push("Elusive".into());
+    }
+    buffs.sort();
+    let mut curses: Vec<String> = p.debuffs.iter().map(|d| d.0.clone()).collect();
+    curses.sort();
+    for c in curses.iter_mut() {
+        let mods = &p.debuffs.iter().find(|d| d.0 == *c).ok_or("no debuff")?.1;
+        let stacks = crate::mods::list::sum(
+            mods,
+            crate::mods::ModType::Base,
+            &format!("Multiplier:{c}Stack"),
+        )?;
+        if stacks > 0.0 {
+            let plural = if stacks > 1.0 { "s" } else { "" };
+            *c = format!("{c} ({} stack{plural})", crate::pat::num(stacks));
+        }
+    }
+    curses.extend(p.curse_slots.iter().cloned());
+    let curse_list = curses.join(", ");
+    let mut out_lists = vec![
+        ("BuffList".to_string(), OutVal::Str(buffs.join(", ").into())),
+        (
+            "CombatList".to_string(),
+            OutVal::Str(combat.join(", ").into()),
+        ),
+        (
+            "CurseList".to_string(),
+            OutVal::Str(curse_list.as_str().into()),
+        ),
+    ];
+    if let Some(a) = p.minion_actor() {
+        let mdb = p.c.db(a);
+        let mut combat: Vec<String> = Vec::new();
+        for (k, label) in [
+            ("PowerCharges", "Power Charges"),
+            ("FrenzyCharges", "Frenzy Charges"),
+            ("EnduranceCharges", "Endurance Charges"),
+        ] {
+            if out(a, k) > 0.0 {
+                combat.push(format!("{} {label}", out(a, k) as i64));
+            }
+        }
+        for (flag, label) in [
+            ("Fortify", "Fortify"),
+            ("Onslaught", "Onslaught"),
+            ("UnholyMight", "Unholy Might"),
+            ("ChaoticMight", "Chaotic Might"),
+            ("Tailwind", "Tailwind"),
+            ("DiamondShrine", "Diamond Shrine"),
+            ("MassiveShrine", "Massive Shrine"),
+        ] {
+            if p.c.flag(mdb, None, &[flag])? {
+                combat.push(label.into());
+            }
+        }
+        let mut buffs = p.minion_buff_names.clone();
+        buffs.sort();
+        out_lists.push((
+            "Minion.BuffList".into(),
+            OutVal::Str(buffs.join(", ").into()),
+        ));
+        out_lists.push((
+            "Minion.CombatList".into(),
+            OutVal::Str(combat.join(", ").into()),
+        ));
+        out_lists.push(("Minion.CurseList".into(), OutVal::Str(curse_list.into())));
+    }
+    Ok(out_lists)
+}
+
+impl<'d> Calcs<'d> {
+    /// `calcsTab:BuildOutput()`: `calcs.buildOutput(build, "MAIN")`, then
+    /// `"CALCS"`
+    pub fn build_outputs(&self, build: &mut Build) -> Result<(Outputs, Outputs)> {
+        let (main, used) = self.build_output_main_with(build)?;
+        let calcs = self.build_output_calcs(build, &used)?;
+        Ok((main, calcs))
+    }
+
+    /// `calcs.buildOutput(build, "CALCS")`
+    pub fn build_output_calcs(
+        &self,
+        build: &mut Build,
+        main_multipliers: &std::collections::HashSet<String>,
+    ) -> Result<Outputs> {
+        let env = self.init_env(build, Mode::Calcs)?;
+        crate::calc_env::write_back(build, &env);
+        let build = &*build;
+        let (out, _) = self.perform(build, env, Mode::Calcs, false, &[], |p| {
+            let lists = calcs_lists(p, main_multipliers)?;
+            Ok::<_, String>((
+                Outputs {
+                    player: p.c.actors.actors[PLAYER].output.clone(),
+                    minion: p
+                        .minion_actor()
+                        .map(|a| p.c.actors.actors[a].output.clone()),
+                },
+                lists,
+            ))
+        })?;
+        let (mut outputs, lists) = out?;
+        let full = self.calc_full_dps(build, Mode::Calculator)?;
+        full.write(&mut outputs.player);
+        for (k, v) in lists {
+            match k.strip_prefix("Minion.") {
+                Some(k) => {
+                    if let Some(m) = outputs.minion.as_mut() {
+                        m.insert(Sym::new(k), v);
+                    }
+                }
+                None => {
+                    outputs.player.insert(Sym::new(&k), v);
+                }
+            }
+        }
+        Ok(outputs)
     }
 }

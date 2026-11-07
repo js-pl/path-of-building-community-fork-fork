@@ -88,6 +88,36 @@ pub struct Build<'t> {
     pub spec: PassiveSpec<'t>,
     pub items: ItemsTab,
     pub skills: Option<Skills>,
+    /// The Calcs tab's inputs (`calcsTab.input`: `misc_buffMode`,
+    /// `skill_number`, ...)
+    pub calcs_input: crate::config::Inputs,
+}
+
+/// `CalcsTabClass:Load`: the Calcs tab's inputs
+fn calcs_input(xml: Option<&Element>) -> crate::config::Inputs {
+    let mut input = crate::config::Inputs::default();
+    input.insert("skill_number".into(), Val::Number(1.0));
+    input.insert("misc_buffMode".into(), Val::Str("EFFECTIVE".into()));
+    let Some(xml) = xml else { return input };
+    for node in xml.elements().filter(|e| e.elem == "Input") {
+        let Some(name) = node.attr("name") else {
+            continue;
+        };
+        let v = if let Some(n) = node.attr("number") {
+            match pat::to_number(n) {
+                Some(n) => Val::Number(n),
+                None => continue,
+            }
+        } else if let Some(s) = node.attr("string") {
+            Val::Str(s.into())
+        } else if let Some(b) = node.attr("boolean") {
+            Val::Bool(b == "true")
+        } else {
+            continue;
+        };
+        input.insert(name.to_string(), v);
+    }
+    input
 }
 
 /// The version of the active spec's tree, which loading the build needs
@@ -172,6 +202,7 @@ impl<'t> Build<'t> {
             spec,
             items,
             skills,
+            calcs_input: calcs_input(pob.child("Calcs")),
         })
     }
 }

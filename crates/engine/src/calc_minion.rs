@@ -300,6 +300,8 @@ impl<'a> Perform<'a> {
                 enemy_level: self.env.enemy_level,
                 iron_mass: setup.items.iron_mass_mods.is_some(),
                 enemy_db: &no_enemy,
+                calcs: self.input.mode == crate::calcs::Mode::Calcs,
+                main_skill: None,
             };
             let pdb = self.c.db(PLAYER);
             let id = self.c.db(actor);
@@ -322,6 +324,7 @@ impl<'a> Perform<'a> {
                 &mut HashMap::new(),
                 &input,
                 Some(&ctx),
+                false,
             )?;
             let mods = ms
                 .mods

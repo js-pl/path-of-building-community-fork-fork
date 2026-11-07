@@ -984,6 +984,7 @@ fn items_setup_matches_upstream() {
             imbued_support_by_slot: &imbued,
             matching_socket_quality_bonus: setup_data.misc["MatchingSocketQualityBonus"],
             enemy_db: &enemy_base,
+            calcs: false,
         };
         let mut player_db = env_setup.mod_db.clone();
         let setup = match calc_skills::create_active_skills(&skills_input, &mut player_db) {
@@ -1111,6 +1112,8 @@ fn items_setup_matches_upstream() {
             enemy_level: get(&env, "enemyLevel").as_number().unwrap(),
             iron_mass: out.iron_mass_mods.is_some(),
             enemy_db: &enemy_base,
+            calcs: false,
+            main_skill: None,
         };
         let mut enemy_multipliers = HashMap::new();
         let mut mgroups = tgroups.clone();
@@ -1342,8 +1345,12 @@ fn items_setup_matches_upstream() {
             parser: &parser,
             jewel_radius: &radius,
         };
-        match engine::calc_env::init_env(&typed_build, &calc_data, BuffMode::new(Some("EFFECTIVE")))
-        {
+        match engine::calc_env::init_env(
+            &typed_build,
+            &calc_data,
+            BuffMode::new(Some("EFFECTIVE")),
+            false,
+        ) {
             Ok(typed_env) => {
                 let same_db = |a: &Store, b: &Store| {
                     typed_mods(a) == typed_mods(b)

@@ -603,6 +603,7 @@ fn perform_matches_upstream() {
             &typed_build,
             &calc_data,
             BuffMode::new(Some("EFFECTIVE")),
+            false,
         ) {
             Ok(e) => e,
             Err(e) => {

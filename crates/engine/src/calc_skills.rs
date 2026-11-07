@@ -298,6 +298,8 @@ pub struct SkillsInput<'a> {
     pub matching_socket_quality_bonus: f64,
     /// The enemy's database (`env.enemyDB`)
     pub enemy_db: &'a Store,
+    /// The Calcs tab's calculation, whose main skill is its own
+    pub calcs: bool,
 }
 
 /// The active skills of the player and what creating them sets
@@ -1079,7 +1081,12 @@ fn active_skills(
             }
             if gi + 1 == main_index && !group_skills[gi].is_empty() {
                 let n = group_skills[gi].len() as f64;
-                let i = n.min(group.main_active_skill) as usize;
+                let chosen = if input.calcs {
+                    group.main_active_skill_calcs
+                } else {
+                    group.main_active_skill
+                };
+                let i = n.min(chosen) as usize;
                 main_skill = group_skills[gi].get(i.saturating_sub(1)).copied();
             }
         }

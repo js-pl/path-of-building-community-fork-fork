@@ -1,6 +1,6 @@
 //! Whole builds on the typed engine: `engine::calcs` (`calcs.buildOutput`
 //! with Full DPS) calculates every corpus build as the oracle did
-//! (`tests/oracle/<id>.json`, `MAIN`). Builds that reach a part not ported
+//! (`tests/oracle/<id>.json`, `MAIN` and `CALCS`). Builds that reach a part not ported
 //! yet are skipped and counted.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
@@ -242,9 +242,11 @@ fn typed_calcs_match_the_oracle() {
         };
         let calcs = engine::calcs::Calcs::new(&calc_data);
         let out = match calcs
-            .build_output_main(&mut typed_build)
-            .and_then(|mut o| engine::calcs::refresh_stat_list(&mut o).map(|_| o))
-        {
+            .build_outputs(&mut typed_build)
+            .and_then(|(mut m, c)| {
+                engine::calcs::refresh_stat_list(&mut m)?;
+                Ok((m, c))
+            }) {
             Ok(o) => o,
             Err(e) if e.contains("not ported") => {
                 eprintln!("{id}: skipped: {e}");
@@ -263,15 +265,16 @@ fn typed_calcs_match_the_oracle() {
             &std::fs::read_to_string(oracle_dir().join(format!("{id}.json"))).unwrap(),
         )
         .unwrap();
-        let want = oracle_json(&want["MAIN"]);
-        let mut got = Map::new();
-        got.insert("player".into(), output_json(&out.player));
-        if let Some(m) = &out.minion {
-            got.insert("minion".into(), output_json(m));
-        }
-        let got = J::Object(got);
         let mut d = Vec::new();
-        diff(&got, &want, "", &mut d, 20);
+        for (mode, out) in [("MAIN", &out.0), ("CALCS", &out.1)] {
+            let want = oracle_json(&want[mode]);
+            let mut got = Map::new();
+            got.insert("player".into(), output_json(&out.player));
+            if let Some(m) = &out.minion {
+                got.insert("minion".into(), output_json(m));
+            }
+            diff(&J::Object(got), &want, mode, &mut d, 20);
+        }
         if !d.is_empty() {
             failures.push(format!(
                 "{id}: differs from the oracle (got != want):\n  {}",

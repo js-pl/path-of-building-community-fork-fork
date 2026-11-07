@@ -2332,8 +2332,21 @@ impl<'a> Perform<'a> {
                 self.combine_stat(o, k, Combine::Dps, None);
             }
         }
-        if self.input.breakdown {
-            return Err("not ported: the Calcs tab's offence".into());
+        if self.input.mode == crate::calcs::Mode::Calcs {
+            let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+            let text = if self.sd_truthy(i, "showAverage") {
+                format!(
+                    "{} average damage",
+                    format_num_sep(&format!("{:.1}", g(self, "AverageDamage")))
+                )
+            } else {
+                format!(
+                    "{} DPS",
+                    format_num_sep(&format!("{:.1}", g(self, "TotalDPS")))
+                )
+            };
+            self.c
+                .set_out_val(actor, "DisplayDamage", OutVal::Str(text.into()));
         }
         if self.mods(i).minion.is_some() {
             let g = |p: &Self, k: &str| p.c.out(actor, k);
@@ -2403,4 +2416,28 @@ impl<'a> Perform<'a> {
         }
         self.offence_ailments(o)
     }
+}
+
+/// `formatNumSep(str)` of a number formatted with `%.1f`, with the default
+/// separators (`,` for thousands, `.` for decimals)
+pub(crate) fn format_num_sep(s: &str) -> String {
+    let (minus, rest) = match s.strip_prefix('-') {
+        Some(r) => ("-", r),
+        None => ("", s),
+    };
+    let (int, frac) = match rest.find('.') {
+        Some(k) => (&rest[..k], &rest[k..]),
+        None => (rest, ""),
+    };
+    if !int.chars().all(|c| c.is_ascii_digit()) {
+        return s.to_string();
+    }
+    let mut out = String::new();
+    for (k, c) in int.chars().enumerate() {
+        if k > 0 && (int.len() - k) % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    format!("{minus}{out}{frac}")
 }

@@ -49,10 +49,10 @@ the player's in the calculation's skills (`Perform::n_player`).
 | `calcs.triggers` | `calc_triggers.rs`: the trigger handlers; source skills from their cached calculations |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirages.rs`, `calcs.rs` (`mirage_perform`): the copy is an extra main skill after the player's; Tawhoa's Chosen is not ported |
 
-`calcs.buildOutput` (`MAIN`), `calcs.calcFullDPS`, `calcs.buildActiveSkill`
+`calcs.buildOutput` (`MAIN` and `CALCS`, with the Calcs tab's inputs), `calcs.calcFullDPS`, `calcs.buildActiveSkill`
 and the skill cache (`GlobalCache.cachedData`) run typed in
 `engine::calcs`; with the sidebar's sort of `SkillDPS`, whole builds are
-compared with the oracle's `MAIN` output in
+compared with the oracle's `MAIN` and `CALCS` outputs in
 `crates/equivalence/tests/typed_calcs.rs`: 57 builds equal, the others
 skipped at a part not ported yet.
 
@@ -86,12 +86,11 @@ a skip:
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
   mana, PvP scaling, added damage redirection
   (Cryogenesis), Energy Blade
-- Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`)
+- Breakdowns (the Calcs tab's outputs are ported)
 
 ## Next
 
-Energy Blade and cluster jewels, then the Calcs
-tab's output (`CALCS`) with the breakdowns, the node and misc
+Energy Blade and cluster jewels, then the breakdowns, the node and misc
 calculators, and the engine API on the typed engine.
 
 ## Upstream quirks met so far

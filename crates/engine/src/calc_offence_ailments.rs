@@ -587,6 +587,9 @@ impl<'a> Perform<'a> {
             self.set_po(o, "BleedDPS", m_min(base, self.misc_data("DotDpsCap")));
             self.set_go(o, "BleedStacks", stacks);
             self.set_go(o, "BleedDamage", base * duration);
+            if self.input.breakdown {
+                self.blend_crit_dot_multi(o, "Bleed", ailment_crit);
+            }
         }
         let _ = db;
         Ok(())
@@ -763,6 +766,13 @@ impl<'a> Perform<'a> {
             let single = m_min(m_min(base * effect * rate_mod * eff, cap), cap);
             self.set_po(o, "PoisonDPS", single);
             self.set_po(o, "PoisonDamage", single * duration);
+            if self.input.breakdown {
+                self.blend_crit_dot_multi(
+                    o,
+                    "Poison",
+                    self.go(o, "CritChance").unwrap_or(f64::NAN),
+                );
+            }
             let ground = m_max(
                 self.c
                     .max(list, None, &["PoisonDpsAsCausticGround"])?
@@ -954,6 +964,9 @@ impl<'a> Perform<'a> {
                     .set_out_val(o.actor, "BurningGroundFromIgnite", OutVal::Bool(true));
             }
             self.set_go(o, "IgniteDamage", dps * duration);
+            if self.input.breakdown {
+                self.blend_crit_dot_multi(o, "Ignite", ailment_crit);
+            }
             if can_stack {
                 self.set_po(o, "IgniteDamage", dps * duration);
                 self.set_po(o, "IgniteStacksMax", max_stacks);
@@ -1193,5 +1206,31 @@ pub(crate) fn set_cond(cfg: &mut Cfg, var: &str, on: bool) {
         conds.insert(Sym::new(var));
     } else {
         conds.remove(&Sym::new(var));
+    }
+}
+
+impl<'a> Perform<'a> {
+    /// The Calcs tab's DoT multiplier of an ailment, weighted between hits
+    /// and crits (`breakdown.critDot`)
+    fn blend_crit_dot_multi(&mut self, o: &mut Off, ailment: &str, ailment_crit: f64) {
+        let m = self.po(o, &format!("{ailment}DotMulti"));
+        let Some(cm) = self.po(o, &format!("Crit{ailment}DotMulti")) else {
+            return;
+        };
+        if Some(cm) == m {
+            return;
+        }
+        let m = m.unwrap_or(f64::NAN);
+        let n = |p: &Self, k: &str| p.po(o, k).unwrap_or(f64::NAN);
+        let crit = self.go(o, "CritChance").unwrap_or(f64::NAN);
+        let from_hit = n(self, &format!("{ailment}ChanceOnHit")) / 100.0 * (1.0 - crit / 100.0);
+        let from_crit = n(self, &format!("{ailment}ChanceOnCrit")) / 100.0 * ailment_crit / 100.0;
+        let total_hit = from_hit / (from_hit + from_crit);
+        let total_crit = from_crit / (from_hit + from_crit);
+        self.set_po(
+            o,
+            &format!("{ailment}DotMulti"),
+            m * total_hit + cm * total_crit,
+        );
     }
 }

@@ -265,6 +265,10 @@ pub struct Perform<'a> {
     /// The lists of `buffs` and `minionBuffs`
     pub(crate) buff_lists: Vec<Vec<Mod>>,
     pub(crate) minion_buff_lists: Vec<Vec<Mod>>,
+    /// The names of `env.buffs` and `env.minionBuffs`, and `env.debuffs`
+    pub buff_names: Vec<String>,
+    pub minion_buff_names: Vec<String>,
+    pub debuffs: Vec<(String, Vec<Mod>)>,
 }
 
 impl<'a> Perform<'a> {
@@ -503,6 +507,9 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         flasks_to_minion: [false; 3],
         buff_lists: Vec::new(),
         minion_buff_lists: Vec::new(),
+        buff_names: Vec::new(),
+        minion_buff_names: Vec::new(),
+        debuffs: Vec::new(),
     };
     p.run()?;
     Ok(p)
@@ -5007,6 +5014,9 @@ impl<'a> Perform<'a> {
         }
         self.buff_lists = buffs.iter().map(|b| b.1.clone()).collect();
         self.minion_buff_lists = minion_buffs.iter().map(|b| b.1.clone()).collect();
+        self.buff_names = buffs.iter().map(|b| b.0.clone()).collect();
+        self.minion_buff_names = minion_buffs.iter().map(|b| b.0.clone()).collect();
+        self.debuffs = debuffs.iter().map(|b| (b.0.clone(), b.1.clone())).collect();
         for (_, l, _) in &debuffs {
             self.c.add_list(edb, l);
         }

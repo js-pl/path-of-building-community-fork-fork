@@ -50,7 +50,16 @@ pub struct Env {
 
 /// `calcs.initEnv(build, mode)`; [`write_back`] gives the build's Skills
 /// tab the socket groups with the granted skills and the gems' selections.
-pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
+pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> Result<Env> {
+    // The Calcs tab's buff mode
+    let mode = if calcs {
+        match build.calcs_input.get("misc_buffMode") {
+            Some(crate::config::Val::Str(m)) => BuffMode::new(Some(m)),
+            _ => BuffMode::new(None),
+        }
+    } else {
+        mode
+    };
     let spec = &build.spec;
     let tree = spec.tree;
     let class_id = spec.cur_class_id.unwrap_or(0);
@@ -159,7 +168,15 @@ pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
         skill_data: data.skills,
         item_list: &setup.items.item_list,
         unarmed: &unarmed,
-        main_socket_group: Some(build.info.main_socket_group),
+        main_socket_group: Some(if calcs {
+            match build.calcs_input.get("skill_number") {
+                Some(crate::config::Val::Number(n)) => *n,
+                _ => 1.0,
+            }
+        } else {
+            build.info.main_socket_group
+        }),
+        calcs,
         imbued_support_by_slot: &imbued,
         matching_socket_quality_bonus: data
             .setup
@@ -187,6 +204,8 @@ pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
         enemy_level,
         iron_mass: setup.items.iron_mass_mods.is_some(),
         enemy_db: &enemy_db,
+        calcs,
+        main_skill: Some(skills.main_skill),
     };
     let mut enemy_multipliers = HashMap::new();
     calc_skill_mods::build_skill_mod_lists(
