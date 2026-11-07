@@ -95,6 +95,17 @@ pub struct SkillMods {
     pub triggered_by_main: Option<usize>,
     pub triggered_by_brand: Option<(f64, f64, f64)>,
     pub triggered_by_ignores_tick_rate: bool,
+    /// `activeSkill.mirage`: the mirage that uses the skill, for Full DPS
+    pub mirage: Option<MirageInfo>,
+}
+
+/// A mirage that uses a skill (`activeSkill.mirage`)
+#[derive(Clone, Debug, Default)]
+pub struct MirageInfo {
+    pub name: String,
+    pub count: Option<f64>,
+    pub skill_part_name: Option<String>,
+    pub output: std::collections::HashMap<Sym, crate::actor::OutVal>,
 }
 
 /// What building the mod lists needs

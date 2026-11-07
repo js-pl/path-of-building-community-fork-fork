@@ -47,13 +47,13 @@ the player's in the calculation's skills (`Perform::n_player`).
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
 | `calcs.triggers` | `calc_triggers.rs`: the trigger handlers; source skills from their cached calculations |
-| `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
+| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirages.rs`, `calcs.rs` (`mirage_perform`): the copy is an extra main skill after the player's; Tawhoa's Chosen is not ported |
 
 `calcs.buildOutput` (`MAIN`), `calcs.calcFullDPS`, `calcs.buildActiveSkill`
 and the skill cache (`GlobalCache.cachedData`) run typed in
 `engine::calcs`; with the sidebar's sort of `SkillDPS`, whole builds are
 compared with the oracle's `MAIN` output in
-`crates/equivalence/tests/typed_calcs.rs`: 56 builds equal, the others
+`crates/equivalence/tests/typed_calcs.rs`: 57 builds equal, the others
 skipped at a part not ported yet.
 
 Game data is still read from upstream's processed Lua `data` table
@@ -80,7 +80,7 @@ a skip:
   skill (`skillMinionSkillCalcs`), shared minion life pools
   (`MinionLifeShares...`) and the offence's `...EqualToParent` crit
 - The party tab
-- Mirages (`CalcMirages.lua`)
+- Tawhoa's Chosen (`CalcMirages.lua`)
 - Skill functions other than the ten in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
@@ -90,7 +90,7 @@ a skip:
 
 ## Next
 
-Mirages, self hit damage and cluster jewels, then the Calcs
+Energy Blade and cluster jewels, then the Calcs
 tab's output (`CALCS`) with the breakdowns, the node and misc
 calculators, and the engine API on the typed engine.
 

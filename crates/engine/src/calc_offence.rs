@@ -2484,22 +2484,9 @@ impl<'a> Perform<'a> {
     pub fn player_offence(&mut self) -> Result<()> {
         let main = self.main();
         self.triggers(crate::calc::PLAYER)?;
-        // Mirages
-        let used_by_mirage = self
-            .cfg(main)
-            .skill_cond
-            .as_ref()
-            .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
-        if !used_by_mirage && !self.has_flag(main, "disable") {
-            let name = self.skill_name(main).to_string();
-            if self.sd_truthy(main, "triggeredByMirageArcher")
-                || name == "Reflection"
-                || name == "Tawhoa's Chosen"
-                || self.sd_truthy(main, "triggeredBySacredWisps")
-                || self.sd_truthy(main, "triggeredByGeneralsCry")
-            {
-                return Err("not ported: mirages".into());
-            }
+        // Mirages, which may take over the main skill and its output
+        if self.mirages()? {
+            return Ok(());
         }
         self.offence(crate::calc::PLAYER, main)?;
         // The main skill's gem level and quality

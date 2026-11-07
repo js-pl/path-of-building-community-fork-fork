@@ -59,7 +59,14 @@ pub struct PerformInput<'a> {
     /// `env.limitedSkills`: skills whose triggers and cached stages are not
     /// calculated, by uuid
     pub limited: Vec<String>,
+    /// The last skill is the main skill but not in the player's skills (a
+    /// mirage's copy, `calcs.copyActiveSkill`); this runs on it before the
+    /// calculation, as upstream's `preCalcFunc` does on the copy
+    pub extra_main: Option<ExtraMain<'a>>,
 }
+
+/// What runs on a mirage's copy of a skill before its calculation
+pub type ExtraMain<'a> = Box<dyn FnOnce(&mut Perform<'a>, usize) -> Result<()> + 'a>;
 
 /// An active skill's mod lists during the calculation
 #[derive(Clone, Copy, Debug)]
@@ -249,6 +256,9 @@ pub struct Perform<'a> {
     pub minion: Option<usize>,
     /// The number of the player's skills, which come first in the skills
     pub n_player: usize,
+    /// A mirage that took over the main skill (`env.player.mainSkill =
+    /// newSkill`): its uuid and skill data, which the cache keeps
+    pub replaced_main: Option<(String, BTreeMap<String, ModValue>)>,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies`,
     /// `nonUniqueFlasksApplyToMinion`
     pub(crate) flasks_to_minion: [bool; 3],
@@ -470,6 +480,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         replaced: HashSet::new(),
     };
     let n = env.skills.active_skills.len();
+    let extra = input.extra_main.is_some();
     let mut p = Perform {
         c,
         env,
@@ -487,7 +498,8 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         weapon_range: [None, None],
         minions: Vec::new(),
         minion: None,
-        n_player: n,
+        n_player: if extra { n - 1 } else { n },
+        replaced_main: None,
         flasks_to_minion: [false; 3],
         buff_lists: Vec::new(),
         minion_buff_lists: Vec::new(),
@@ -497,25 +509,58 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
 }
 
 impl<'a> Perform<'a> {
+    /// A skill's `baseSkillModList` under the player's database, and its
+    /// `skillModList`
+    fn skill_lists(&mut self, i: usize) -> SkillLists {
+        let pdb = self.pdb();
+        let mut base = Store::list();
+        base.parent = Some(pdb);
+        for m in &self.mods(i).mods {
+            base.add(m.clone());
+        }
+        let base = self.c.push_store(base, Some(PLAYER));
+        let mut list = Store::list();
+        list.parent = Some(base);
+        let list = self.c.push_store(list, Some(PLAYER));
+        SkillLists { base, list }
+    }
+
     fn run(&mut self) -> Result<()> {
         let pdb = self.pdb();
         let edb = self.edb();
+        // A mirage's copy: its lists, with its mods from the setup
+        let extra_lists = if let Some(f) = self.input.extra_main.take() {
+            let i = self.n_player;
+            let lists = self.skill_lists(i);
+            // Upstream's `preCalcFunc` reads the copy's list before the
+            // calculation; its lists keep their place after the player's
+            let mut tmp = std::mem::take(&mut self.lists);
+            tmp.resize(
+                i,
+                SkillLists {
+                    base: lists.base,
+                    list: lists.list,
+                },
+            );
+            tmp.push(lists);
+            self.lists = tmp;
+            f(self, i)?;
+            Some(lists)
+        } else {
+            None
+        };
         // Merge keystone modifiers
         self.keystones_added.clear();
         self.merge_keystones(pdb)?;
 
         // The skills' mod lists
+        self.lists.clear();
         for i in 0..self.n_player {
-            let mut base = Store::list();
-            base.parent = Some(pdb);
-            for m in &self.mods(i).mods {
-                base.add(m.clone());
-            }
-            let base = self.c.push_store(base, Some(PLAYER));
-            let mut list = Store::list();
-            list.parent = Some(base);
-            let list = self.c.push_store(list, Some(PLAYER));
-            self.lists.push(SkillLists { base, list });
+            let l = self.skill_lists(i);
+            self.lists.push(l);
+        }
+        if let Some(l) = extra_lists {
+            self.lists.push(l);
         }
         // The minions' skills, and the main skill's minion
         self.create_minions()?;
@@ -5635,6 +5680,7 @@ impl<'a> PerformInput<'a> {
                 crate::calcs::Mode::Main
             },
             limited: Vec::new(),
+            extra_main: None,
         })
     }
 }

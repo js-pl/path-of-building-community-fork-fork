@@ -147,7 +147,8 @@ impl<'a> Perform<'a> {
     /// The minions' actors and skills: for each skill with a minion, a
     /// new database and `calcs.createMinionSkills(env, activeSkill)`
     pub(crate) fn create_minions(&mut self) -> Result<()> {
-        for i in 0..self.n_player {
+        let extra = (self.env.skills.active_skills.len() > self.n_player).then_some(self.n_player);
+        for i in (0..self.n_player).chain(extra) {
             let Some(minion) = self.mods(i).minion.clone() else {
                 continue;
             };

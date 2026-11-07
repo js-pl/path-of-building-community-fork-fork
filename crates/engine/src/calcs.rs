@@ -128,19 +128,39 @@ impl<'d> Calcs<'d> {
         limited: &[String],
         f: impl FnOnce(&Perform) -> T,
     ) -> Result<(T, Env)> {
+        self.perform_with(build, env, mode, skip_ehp, limited, None, f)
+    }
+
+    /// [`Calcs::perform`] with a mirage's copy of a skill as the last
+    /// skill and main skill
+    #[allow(clippy::too_many_arguments)]
+    pub fn perform_with<'b, T>(
+        &'b self,
+        build: &'b Build,
+        env: Env,
+        mode: Mode,
+        skip_ehp: bool,
+        limited: &[String],
+        extra_main: Option<crate::calc_perform::ExtraMain<'b>>,
+        f: impl FnOnce(&Perform) -> T,
+    ) -> Result<(T, Env)> {
         let mut input = PerformInput::new(build, self.data, mode == Mode::Calcs)?;
         input.skip_ehp = skip_ehp;
         input.calcs = Some(self);
         input.build = Some(build);
         input.mode = mode;
         input.limited = limited.to_vec();
+        input.extra_main = extra_main;
         let mut p = perform(env, input)?;
         p.finish()?;
         let main = p.main();
-        let uuid = skill_uuid(&p, main);
+        let (uuid, skill_data) = match &p.replaced_main {
+            Some((u, d)) => (u.clone(), d.clone()),
+            None => (skill_uuid(&p, main), p.mods(main).skill_data.clone()),
+        };
         let cached = Cached {
             output: p.c.actors.actors[PLAYER].output.clone(),
-            skill_data: p.mods(main).skill_data.clone(),
+            skill_data,
         };
         self.cache
             .borrow_mut()
@@ -363,6 +383,7 @@ struct Step {
     /// damage once
     counted_once: bool,
     info_message2: Option<String>,
+    mirage: Option<crate::calc_skill_mods::MirageInfo>,
 }
 
 fn full_dps_step(p: &Perform, i: usize) -> Result<Step> {
@@ -396,6 +417,7 @@ fn full_dps_step(p: &Perform, i: usize) -> Result<Step> {
         minion,
         counted_once,
         info_message2: mods.info_message2.clone(),
+        mirage: mods.mirage.clone(),
     })
 }
 
@@ -485,6 +507,56 @@ impl FullDps {
             if step.counted_once {
                 count = 1.0;
                 step.info_message2 = Some("Skill Damage".into());
+            }
+        }
+        if let Some(m) = &step.mirage {
+            let mo = &m.output;
+            let mcount = m.count.unwrap_or(1.0) * count;
+            if let Some(dps) = num(mo, "TotalDPS").filter(|d| *d > 0.0) {
+                self.skills.push(entry(&[
+                    ("name", s(&format!("{} (Mirage)", m.name))),
+                    ("dps", n(dps)),
+                    ("count", n(mcount)),
+                    ("skillPart", m.skill_part_name.as_deref().and_then(s)),
+                ]));
+                self.combined_dps += dps * mcount;
+            }
+            let mname = format!("{} (Mirage)", step.name);
+            if let Some(v) = num(mo, "BleedDPS").filter(|v| *v > self.bleed_dps) {
+                self.bleed_dps = v;
+                src.bleed = mname.clone();
+            }
+            if let Some(v) = num(mo, "IgniteDPS").filter(|v| *v > self.ignite_dps) {
+                self.ignite_dps = v;
+                src.ignite = mname.clone();
+            }
+            if num(mo, "PoisonDPS").is_some_and(|v| v > 0.0) {
+                self.total_poison_dps += num(mo, "TotalPoisonDPS").unwrap_or(f64::NAN) * mcount;
+            }
+            if let Some(v) = num(mo, "ImpaleDPS").filter(|v| *v > 0.0) {
+                self.impale_dps += v * mcount;
+            }
+            if let Some(v) = num(mo, "DecayDPS").filter(|v| *v > 0.0) {
+                self.decay_dps += v;
+            }
+            let player_dot = num(&step.player, "TotalDot");
+            if let Some(v) = num(mo, "TotalDot").filter(|v| *v > 0.0)
+                && (step.dot_can_stack || player_dot == Some(0.0))
+            {
+                self.dot_dps += v * if step.dot_can_stack { mcount } else { 1.0 };
+            }
+            if let Some(v) =
+                num(mo, "CullMultiplier").filter(|v| *v > 1.0 && *v > self.culling_multi)
+            {
+                self.culling_multi = v;
+            }
+            if let Some(v) = num(mo, "BurningGroundDPS").filter(|v| *v > self.burning_ground_dps) {
+                self.burning_ground_dps = v;
+                src.burning_ground = mname.clone();
+            }
+            if let Some(v) = num(mo, "CausticGroundDPS").filter(|v| *v > self.caustic_ground_dps) {
+                self.caustic_ground_dps = v;
+                src.caustic_ground = mname;
             }
         }
         let po = &step.player;
@@ -713,4 +785,88 @@ pub fn refresh_stat_list(out: &mut Outputs) -> Result<()> {
         out.player.insert(k, OutVal::List(Rc::new(l)));
     }
     Ok(())
+}
+
+/// What a mirage's calculation leaves (`newEnv`, `newSkill`)
+#[derive(Clone, Debug, Default)]
+pub struct MirageOut {
+    pub outputs: Outputs,
+    /// The copy's skill part and its name, and its skill data
+    pub skill_part: Option<f64>,
+    pub skill_part_name: Option<String>,
+    pub skill_data: BTreeMap<String, ModValue>,
+}
+
+impl<'d> Calcs<'d> {
+    /// `calcs.copyActiveSkill(env, "CALCULATOR", skill)` and the copy's
+    /// calculation (`calculateMirage`): the copy is used by the mirage,
+    /// `pre` is upstream's `preCalcFunc` on it
+    pub fn mirage_perform<'b>(
+        &'b self,
+        build: &'b Build,
+        uuid: &str,
+        mirage_uses: Option<f64>,
+        limited: &[String],
+        pre: crate::calc_perform::ExtraMain<'b>,
+    ) -> Result<MirageOut> {
+        let mut env = self.init_env(build, Mode::Calculator)?;
+        let j = (0..env.skills.active_skills.len())
+            .find(|&i| env_skill_uuid(&env, i) == uuid)
+            .ok_or("[calcs.copyActiveSkill] no such skill")?;
+        let mut copy = env.skills.active_skills[j].clone();
+        let other = self
+            .data
+            .skills
+            .skill_type("OtherThingUsesSkill")
+            .ok_or("no skill type OtherThingUsesSkill")?;
+        copy.skill_types.insert(other);
+        let mods = copy.mods.as_mut().ok_or("a skill without its mod list")?;
+        let cond = Sym::new("usedByMirage");
+        mods.skill_cfg
+            .skill_cond
+            .get_or_insert_with(Default::default)
+            .insert(cond);
+        mods.skill_cfg.skill_types = Some(copy.skill_types.clone());
+        for c in mods.weapon_cfgs.iter_mut().flatten() {
+            c.skill_cond
+                .get_or_insert_with(Default::default)
+                .insert(cond);
+            c.skill_types = Some(copy.skill_types.clone());
+        }
+        mods.skill_flags.remove("multiPart");
+        mods.skill_flags.remove("haveMinion");
+        match mirage_uses {
+            Some(u) => mods
+                .skill_data
+                .insert("mirageUses".into(), ModValue::Number(u)),
+            None => mods.skill_data.remove("mirageUses"),
+        };
+        env.skills.active_skills.push(copy);
+        env.skills.main_skill = env.skills.active_skills.len() - 1;
+        let mut limited = limited.to_vec();
+        limited.push(uuid.to_string());
+        let (out, _) = self.perform_with(
+            build,
+            env,
+            Mode::Calculator,
+            false,
+            &limited,
+            Some(pre),
+            |p| {
+                let main = p.main();
+                MirageOut {
+                    outputs: Outputs {
+                        player: p.c.actors.actors[PLAYER].output.clone(),
+                        minion: p
+                            .minion_actor()
+                            .map(|a| p.c.actors.actors[a].output.clone()),
+                    },
+                    skill_part: p.mods(main).skill_part,
+                    skill_part_name: p.mods(main).skill_part_name.clone(),
+                    skill_data: p.mods(main).skill_data.clone(),
+                }
+            },
+        )?;
+        Ok(out)
+    }
 }
