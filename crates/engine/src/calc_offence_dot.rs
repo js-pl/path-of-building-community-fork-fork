@@ -14,6 +14,7 @@ use crate::calc_offence::Off;
 use crate::calc_offence_hit::Combine;
 use crate::calc_perform::Perform;
 use crate::mods::Cfg;
+use crate::mods::ModValue;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -455,23 +456,210 @@ impl<'a> Perform<'a> {
     fn self_hit(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
         let name = self.skill_name(i).to_string();
-        let any =
-            |p: &Self, n: &str| -> Result<bool> { Ok(!p.c.list(list, None, &[n])?.is_empty()) };
+        let rec = |v: &ModValue, k: &str| match v {
+            ModValue::Record(r) => r.get(k).cloned(),
+            _ => None,
+        };
+        // `string.gsub(" "..t, "%W%l", string.upper):sub(2)`
+        let title = |v: &ModValue| -> Option<String> {
+            let ModValue::Str(t) = rec(v, "damageType")? else {
+                return None;
+            };
+            let mut out = String::new();
+            let mut prev_word = false;
+            for ch in t.chars() {
+                if !prev_word && ch.is_ascii_lowercase() {
+                    out.push(ch.to_ascii_uppercase());
+                } else {
+                    out.push(ch);
+                }
+                prev_word = ch.is_ascii_alphanumeric();
+            }
+            Some(out)
+        };
+        let num = |v: &ModValue, k: &str| rec(v, k).and_then(|x| x.as_number());
+        let out = |p: &Self, k: &str| p.c.out(actor, k);
+        let mut sources: Vec<(String, f64)> = Vec::new();
+        // Heartbound Loop, Storm Secret and Enmity's Embrace add their rings
+        let summed = |p: &Self, stat: &str| -> Result<Option<(String, f64)>> {
+            let (mut t, mut v) = (None, None);
+            for x in p.c.list(list, None, &[stat])? {
+                v = Some(v.unwrap_or(0.0) + num(&x, "baseDamage").unwrap_or(f64::NAN));
+                t = title(&x);
+            }
+            Ok(t.zip(v))
+        };
+        let first = |p: &Self, stat: &str, k: &str| -> Result<Option<(String, f64)>> {
+            Ok(p.c
+                .list(list, None, &[stat])?
+                .first()
+                .and_then(|x| title(x).zip(num(x, k))))
+        };
+        if name == "Summon Skeletons"
+            && let Some((t, v)) = summed(self, "HeartboundLoopSelfDamage")?
+        {
+            let per_cast = out(self, "SummonedMinionsPerCast").unwrap_or(f64::NAN);
+            let d = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push(("Heartbound Loop".into(), d * per_cast));
+        }
+        if name == "Herald of Thunder"
+            && let Some((t, v)) = summed(self, "StormSecretSelfDamage")?
+        {
+            let d = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push(("Storm Secret".into(), d));
+        }
+        if self.has_flag(i, "ignite")
+            && let Some((t, v)) = first(self, "EyeOfInnocenceSelfDamage", "baseDamage")?
+        {
+            let d = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push(("Eye of Innocence".into(), d));
+        }
+        if let Some((t, mult)) = first(self, "EchoesOfCreationSelfDamage", "dmgMult")? {
+            let mut warcries = out(self, "GlobalWarcryUptimeRatio").unwrap_or(f64::NAN) / 100.0;
+            if self.c.flag(list, None, &["Condition:WarcryMaxHit"])? {
+                warcries = self
+                    .c
+                    .base(self.pdb(), None, &["Multiplier:ExertingWarcryCount"])?;
+            }
+            let base = out(self, "Life").unwrap_or(0.0) * mult / 100.0 * warcries;
+            let d = self.dmg_taken_conversion(o, &t, base)?;
+            sources.push(("Echoes of Creation".into(), d));
+        }
         let has_cost = matches!(
             self.c.out_val(actor, "ManaHasCost"),
             Some(OutVal::Bool(true))
         );
-        if (name == "Summon Skeletons" && any(self, "HeartboundLoopSelfDamage")?)
-            || (name == "Herald of Thunder" && any(self, "StormSecretSelfDamage")?)
-            || (self.has_flag(i, "ignite") && any(self, "EyeOfInnocenceSelfDamage")?)
-            || any(self, "EchoesOfCreationSelfDamage")?
-            || (has_cost && any(self, "ScoldsBridleSelfDamage")?)
-            || self.c.flag(self.lists[i].base, None, &["HasTrauma"])?
-            || any(self, "EnmitysEmbraceSelfDamage")?
-        {
-            return Err("not ported: self hit damage".into());
+        if has_cost && let Some((t, mult)) = first(self, "ScoldsBridleSelfDamage", "dmgMult")? {
+            let base = out(self, "ManaCost").unwrap_or(0.0) * mult / 100.0;
+            let d = self.dmg_taken_conversion(o, &t, base)?;
+            sources.push(("Scold's Bridle".into(), d));
+        }
+        if self.c.flag(self.lists[i].base, None, &["HasTrauma"])? {
+            let stacks = m_max(self.c.base(list, None, &["Multiplier:TraumaStacks"])?, 1.0);
+            let per = self.c.base(list, None, &["TraumaSelfDamageTakenLife"])?;
+            let d = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
+            sources.push(("Trauma".into(), d));
+        }
+        if let Some((t, v)) = summed(self, "EnmitysEmbraceSelfDamage")? {
+            let d = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push(("Enmity's Embrace".into(), d));
+        }
+        for (_, d) in sources {
+            let v = out(self, "SelfHitDamage").unwrap_or(0.0) + d;
+            self.c.set_out(actor, "SelfHitDamage", v);
         }
         Ok(())
+    }
+
+    /// `calcs.applyDmgTakenConversion(activeSkill, output, breakdown,
+    /// sourceType, baseDmg)`: the damage taken after conversion,
+    /// resistances, armour and damage reduction
+    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<f64> {
+        let (list, actor) = (o.list, o.actor);
+        let types = ["Physical", "Lightning", "Cold", "Fire", "Chaos"];
+        let elemental = |t: &str| matches!(t, "Fire" | "Cold" | "Lightning");
+        let mut shift = Vec::new();
+        let mut total_as = 0.0;
+        for t in types {
+            let a = format!("{source}DamageTakenAs{t}");
+            let b = format!("{source}DamageFromHitsTakenAs{t}");
+            let c = format!("ElementalDamageTakenAs{t}");
+            let d = format!("ElementalDamageFromHitsTakenAs{t}");
+            let mut names = vec![a.as_str(), b.as_str()];
+            if elemental(source) {
+                names.push(&c);
+                names.push(&d);
+            }
+            let v = self.c.base(list, None, &names)?;
+            total_as += v;
+            shift.push(v);
+        }
+        let out = |k: &str| self.c.out(actor, k);
+        let mut total = 0.0;
+        for (k, t) in types.iter().enumerate() {
+            let taken_as = if *t == source {
+                m_max(1.0 - total_as / 100.0, 0.0)
+            } else {
+                shift[k] / 100.0
+            };
+            if taken_as == 0.0 {
+                continue;
+            }
+            let damage = base * taken_as;
+            let a = format!("{t}DamageTaken");
+            let b = format!("{t}DamageTakenWhenHit");
+            let names = ["DamageTaken", a.as_str(), "DamageTakenWhenHit", b.as_str()];
+            let mut inc = self.c.inc(list, None, &names)?;
+            let mut more = self.c.more(list, None, &names)?;
+            if elemental(t) {
+                let e = ["ElementalDamageTaken", "ElementalDamageTakenWhenHit"];
+                inc += self.c.inc(list, None, &e)?;
+                more *= self.c.more(list, None, &e)?;
+            }
+            let taken_mods = m_max((1.0 + inc / 100.0) * more, 0.0);
+            let reduction =
+                if self
+                    .c
+                    .flag(list, None, &[&format!("SelfIgnoreBase{t}DamageReduction")])?
+                {
+                    0.0
+                } else {
+                    out(&format!("Base{t}DamageReductionWhenHit"))
+                        .or(out(&format!("Base{t}DamageReduction")))
+                        .unwrap_or(f64::NAN)
+                };
+            let resist = if self
+                .c
+                .flag(list, None, &[&format!("SelfIgnore{t}Resistance")])?
+            {
+                0.0
+            } else {
+                out(&format!("{t}ResistWhenHit"))
+                    .or(out(&format!("{t}Resist")))
+                    .unwrap_or(f64::NAN)
+            };
+            let res_mult = 1.0 - resist / 100.0;
+            let applies = m_min(
+                if !self.c.flag(
+                    list,
+                    None,
+                    &[&format!("ArmourDoesNotApplyTo{t}DamageTaken")],
+                )? {
+                    self.c
+                        .base(list, None, &[&format!("ArmourAppliesTo{t}DamageTaken")])?
+                } else {
+                    0.0
+                },
+                100.0,
+            );
+            let ward =
+                *t == "Physical" && self.c.flag(list, None, &["PhysicalReductionBasedOnWard"])?;
+            let max = out("DamageReductionMax").unwrap_or(f64::NAN);
+            let mut armour_reduct = 0.0;
+            if applies > 0.0 || ward {
+                let mut eff = (out("Armour").unwrap_or(f64::NAN) * applies / 100.0)
+                    * (1.0 + out("ArmourDefense").unwrap_or(f64::NAN));
+                if ward {
+                    let m = self
+                        .c
+                        .override_num(list, None, &["PhysicalReductionBasedOnWardPercent"])?
+                        .unwrap_or(f64::NAN)
+                        / 100.0;
+                    eff = out("Ward").unwrap_or(f64::NAN) * m;
+                }
+                let eff_damage = damage * res_mult;
+                armour_reduct = if eff != 0.0 && damage * res_mult != 0.0 {
+                    crate::calc::round(eff / (eff + eff_damage * 5.0) * 100.0, 0.0)
+                } else {
+                    0.0
+                };
+                armour_reduct = m_min(max, armour_reduct);
+            }
+            let reduct_mult =
+                (1.0 - m_max(m_min(max, armour_reduct + reduction), 0.0) / 100.0) * taken_mods;
+            total += damage * (res_mult * reduct_mult);
+        }
+        Ok(total)
     }
 
     /// The combined DPS estimate, with damage over time

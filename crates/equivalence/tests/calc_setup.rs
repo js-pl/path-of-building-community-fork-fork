@@ -1342,11 +1342,8 @@ fn items_setup_matches_upstream() {
             parser: &parser,
             jewel_radius: &radius,
         };
-        match engine::calc_env::init_env(
-            &typed_build,
-            &calc_data,
-            BuffMode::new(Some("EFFECTIVE")),
-        ) {
+        match engine::calc_env::init_env(&typed_build, &calc_data, BuffMode::new(Some("EFFECTIVE")))
+        {
             Ok(typed_env) => {
                 let same_db = |a: &Store, b: &Store| {
                     typed_mods(a) == typed_mods(b)

@@ -247,6 +247,7 @@ fn typed_calcs_match_the_oracle() {
         {
             Ok(o) => o,
             Err(e) if e.contains("not ported") => {
+                eprintln!("{id}: skipped: {e}");
                 let e = e[e.find("not ported").unwrap()..].to_string();
                 *skip_reasons.entry(e).or_default() += 1;
                 skipped += 1;

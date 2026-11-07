@@ -1295,6 +1295,21 @@ impl<'a> Perform<'a> {
                 self.set_go(o, "HitTime", hit_time);
                 self.set_go(o, "HitSpeed", 1.0 / hit_time);
             }
+            ("AvengingFlame", "preDamageFunc") => {
+                let totem_life = match (self.sd(i, "triggerSourceUUID"), self.input.calcs) {
+                    (Some(ModValue::Str(u)), Some(calcs)) => calcs
+                        .cached(crate::calcs::Mode::Main, u)
+                        .or_else(|| calcs.cached(crate::calcs::Mode::Calcs, u))
+                        .and_then(|c| c.num("TotemLife"))
+                        .unwrap_or(0.0),
+                    _ => 0.0,
+                };
+                let add = totem_life * sd(self, "lifeDealtAsFire") / 100.0;
+                for k in ["FireMax", "FireMin"] {
+                    let v = self.sd_num(i, k).unwrap_or(0.0) + add;
+                    self.sd_set(i, k, v);
+                }
+            }
             ("DeathWish", "preDamageFunc") => {
                 if part == Some(2.0) {
                     let v = out(self, "Life") * sd(self, "selfFireExplosionLifeMultiplier");
