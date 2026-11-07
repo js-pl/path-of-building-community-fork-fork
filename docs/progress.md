@@ -91,9 +91,8 @@ a skip:
 
 Triggers (14 corpus builds stop there in `typed_calcs`), the skill
 functions (13), mirages, self hit damage and cluster jewels, then the Calcs
-tab's output (`CALCS`), then `Calcs.lua`'s calculators
-(`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
-Port further skill functions as builds need them.
+tab's output (`CALCS`) with the breakdowns, the node and misc
+calculators, and the engine API on the typed engine.
 
 ## Upstream quirks met so far
 
