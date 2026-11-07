@@ -277,15 +277,15 @@ impl<'a> Perform<'a> {
         self.c.db(ENEMY)
     }
 
-    pub(crate) fn main(&self) -> usize {
+    pub fn main(&self) -> usize {
         self.env.skills.main_skill
     }
 
-    pub(crate) fn skill(&self, i: usize) -> &crate::calc_skills::ActiveSkill {
+    pub fn skill(&self, i: usize) -> &crate::calc_skills::ActiveSkill {
         &self.env.skills.active_skills[i]
     }
 
-    pub(crate) fn mods(&self, i: usize) -> &crate::calc_skill_mods::SkillMods {
+    pub fn mods(&self, i: usize) -> &crate::calc_skill_mods::SkillMods {
         self.env.skills.active_skills[i]
             .mods
             .as_ref()
@@ -299,7 +299,7 @@ impl<'a> Perform<'a> {
             .expect("an active skill with its mod list")
     }
 
-    pub(crate) fn cfg(&self, i: usize) -> Cfg {
+    pub fn cfg(&self, i: usize) -> Cfg {
         self.mods(i).skill_cfg.clone()
     }
 

@@ -336,6 +336,9 @@ impl<'a> Perform<'a> {
                 accuracy_vs = v;
             }
             self.set_po(o, "Accuracy", accuracy);
+            // The weapon's `skillStats` is the pass's output as it grows
+            let cfg = self.pcfg(o);
+            let c = Some(&cfg);
             let acc_hit = if !o.is_attack
                 || self.c.flag(list, c, &["CannotBeEvaded"])?
                 || self.sd_truthy(i, "cannotBeEvaded")
@@ -361,6 +364,8 @@ impl<'a> Perform<'a> {
                 self.c
                     .set_out_val(actor, "enemyHasSpellBlock", OutVal::Bool(true));
             }
+            let cfg = self.pcfg(o);
+            let c = Some(&cfg);
             let cond = format!("{}AccRatingHigherThanMaxLife", label.replace(' ', ""));
             let life = self.c.out(PLAYER, "Life").unwrap_or(f64::NAN);
             self.c.set_cond(list, &cond, accuracy > life);
