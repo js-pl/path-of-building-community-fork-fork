@@ -9,7 +9,7 @@
 use crate::calc::{m_max, m_min};
 use crate::calc_offence::Off;
 use crate::calc_perform::Perform;
-use crate::mods::{Mod, ModType};
+use crate::mods::{Mod, ModType, ModValue};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -158,8 +158,336 @@ impl<'a> Perform<'a> {
                     );
                 }
             }
+            ("CycloneAltX", "initialFunc") => {
+                let w = |p: &Self, n: usize, k: &str| p.weapon_num(actor, n, k);
+                let range_sum = |p: &Self, n: usize| -> Result<f64> {
+                    let wc = p.mods(i).weapon_cfgs[n].clone();
+                    Ok(p.c.base(list, wc.as_ref(), &["MeleeWeaponRange"])?
+                        + 10.0 * p.c.base(list, wc.as_ref(), &["MeleeWeaponRangeMetre"])?
+                        + w(p, n, "rangeBonus").unwrap_or(f64::NAN))
+                };
+                let range = if self.has_flag(i, "weapon1Attack") && w(self, 0, "range").is_some() {
+                    let r1 = range_sum(self, 0)?;
+                    if self.has_flag(i, "weapon2Attack") && w(self, 1, "range").is_some() {
+                        (r1 + range_sum(self, 1)?) / 2.0
+                    } else {
+                        r1
+                    }
+                } else {
+                    self.c.base(list, c, &["UnarmedRange"])?
+                        + 10.0 * self.c.base(list, c, &["UnarmedRangeMetre"])?
+                };
+                self.c.add(
+                    list,
+                    Mod::new(
+                        "Multiplier:AdditionalMeleeRange",
+                        ModType::Base,
+                        range,
+                        Some("Skill:CycloneAltX"),
+                    ),
+                );
+            }
+            (
+                "ArmageddonBrand" | "ArmageddonBrandAltY" | "StormBrandAltX" | "BrandSupport",
+                "preDamageFunc",
+            ) => {
+                let v = brand_time(self)?;
+                self.sd_set(i, "hitTimeOverride", v);
+            }
+            ("GalvanicField" | "GalvanicFieldAltX", "preDamageFunc") => {
+                let v = sd(self, "repeatFrequency");
+                self.sd_set(i, "hitTimeOverride", v);
+            }
+            ("BallLightningAltY", "preDamageFunc") => {
+                let strikes = (sd(self, "duration") / sd(self, "strikeInterval")).floor();
+                let m = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0) * strikes;
+                self.sd_set(i, "dpsMultiplier", m);
+                self.c.set_out(actor, "NormalHitsPerCast", strikes);
+                let o2 = self.c.out(actor, "SkillDPSMultiplier").unwrap_or(1.0) * strikes;
+                self.c.set_out(actor, "SkillDPSMultiplier", o2);
+            }
+            ("Bodyswap" | "BodyswapAltX", "preDamageFunc") => {
+                if part == Some(1.0) {
+                    let pool = if self.has_flag(i, "totem") {
+                        "TotemLife"
+                    } else {
+                        "Life"
+                    };
+                    let v = self.c.out(actor, pool).unwrap_or(f64::NAN)
+                        * sd(self, "selfFireExplosionLifeMultiplier");
+                    self.sd_set(i, "FireBonusMin", v);
+                    self.sd_set(i, "FireBonusMax", v);
+                }
+            }
+            ("ChargedDash" | "ChargedDashAltX", "preDamageFunc") => {
+                if part == Some(3.0) {
+                    let v = self.c.inc(list, c, &["chargedDashFinalDamageModifier"])?;
+                    let mut t = crate::mods::Tag::other("Release Damage", []);
+                    if let crate::mods::tag::TagKind::Other { fields, .. } = &mut t.kind {
+                        fields
+                            .fields
+                            .push((crate::mods::Sym::new("skillPart"), 3.0.into()));
+                    }
+                    let m = Mod::new("Damage", ModType::More, v, Some("Skill:ChargedDash"))
+                        .flags(self.mf("Attack"), 0)
+                        .tag(t);
+                    self.c.add(list, m);
+                }
+            }
+            ("DarkPactAltX", "preDamageFunc") => {
+                let pool = if self.has_flag(i, "totem") {
+                    "TotemLife"
+                } else {
+                    "Life"
+                };
+                let life = self.c.out(actor, pool).unwrap_or(f64::NAN);
+                let add = life * sd(self, "percentageLifeSacrificed") / 100.0
+                    * (sd(self, "percentageSacrificedDealtAsChaos") / 100.0);
+                let add = if part == Some(2.0) {
+                    add.floor()
+                } else {
+                    let ruin = 7.0
+                        / (1.0
+                            + m_min(100.0, self.sd_num(i, "additionalRuinChance").unwrap_or(0.0))
+                                / 100.0);
+                    (add / ruin).floor()
+                };
+                for k in ["ChaosMin", "ChaosMax"] {
+                    let v = sd(self, k) + add;
+                    self.sd_set(i, k, v);
+                }
+            }
+            ("ForbiddenRite" | "ForbiddenRiteAltX", "preDamageFunc") => {
+                // The transfigured gem takes energy shield only
+                let alt = id == "ForbiddenRiteAltX";
+                let names = [
+                    "DamageTaken",
+                    "ChaosDamageTaken",
+                    "DamageTakenWhenHit",
+                    "ChaosDamageTakenWhenHit",
+                ];
+                let flat = self.c.base(list, None, &names)?;
+                let inc = self.c.inc(list, None, &names)?;
+                let more = self.c.more(list, None, &names)?;
+                let taken = m_max((1.0 + inc / 100.0) * more, 0.0);
+                let chaos_flat = crate::calc::floor(crate::calc::round(flat * taken, 0.0), 0.0);
+                let totem = self.has_flag(i, "totem");
+                let out = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+                let (life, es, res) = if totem {
+                    (
+                        out(self, "TotemLife"),
+                        out(self, "TotemEnergyShield"),
+                        out(self, "TotemChaosResist"),
+                    )
+                } else {
+                    (
+                        out(self, "Life"),
+                        out(self, "EnergyShield"),
+                        out(self, "ChaosResist"),
+                    )
+                };
+                let add = if alt {
+                    es * sd(self, "energyShieldDealtAsChaos")
+                } else {
+                    life * sd(self, "lifeDealtAsChaos") + es * sd(self, "energyShieldDealtAsChaos")
+                };
+                let r = |v: f64| crate::calc::round(v, 0.0);
+                let fl = |v: f64| crate::calc::floor(v, 0.0);
+                let taken_life = if alt {
+                    0.0
+                } else {
+                    fl(r(life * sd(self, "SelfDamageTakenLife")) * (100.0 - res) / 100.0 * taken)
+                };
+                let taken_es =
+                    fl(r(es * sd(self, "SelfDamageTakenES")) * (100.0 - res) / 100.0 * taken);
+                for k in ["ChaosMin", "ChaosMax"] {
+                    let v = sd(self, k) + add;
+                    self.sd_set(i, k, v);
+                }
+                if part == Some(2.0) {
+                    let m = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0)
+                        * (out(self, "ProjectileCount") + 1.0);
+                    self.sd_set(i, "dpsMultiplier", m);
+                }
+                let total = if alt {
+                    taken_es + chaos_flat
+                } else {
+                    taken_life + taken_es + chaos_flat
+                };
+                self.c.set_out(actor, "FRDamageTaken", total);
+            }
+            ("MoltenShell", "preDamageFunc") => {
+                let add = self.sd_num(i, "MoltenShellDamageMitigated").unwrap_or(0.0)
+                    * sd(self, "moltenShellReflect")
+                    / 100.0;
+                self.sd_set(i, "FireMin", add);
+                self.sd_set(i, "FireMax", add);
+            }
+            ("RighteousFireAltX", "preDamageFunc") => {
+                if self.c.out(actor, "LifeUnreserved").unwrap_or(f64::NAN) > 1.0 {
+                    let v = self.c.out(actor, "Mana").unwrap_or(f64::NAN)
+                        * sd(self, "RFManaMultiplier");
+                    self.sd_set(i, "FireDot", v);
+                }
+            }
+            ("ExplosiveTrap" | "ExplosiveTrapAltX", "preDamageFunc") => {
+                let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
+                    Some(v) => v,
+                    None => self.c.base(list, c, &["EnemyRadius"])?,
+                };
+                let full = self
+                    .c
+                    .out(actor, "AreaOfEffectRadiusSecondary")
+                    .unwrap_or(f64::NAN);
+                let width = sd(self, "radiusTertiaryBaseMargin") * 2.0 + 1.0;
+                let mut occ: Vec<(f64, f64)> = match self
+                    .c
+                    .out_val(actor, "AreaOfEffectRadiusTertiaryOccurrences")
+                {
+                    Some(crate::actor::OutVal::Table(t)) => t
+                        .iter()
+                        .filter_map(|(k, v)| Some((k.parse::<f64>().ok()?, v.num()?)))
+                        .collect(),
+                    _ => return Err("attempt to index a nil value (TertiaryOccurrences)".into()),
+                };
+                occ.sort_by(|a, b| a.0.total_cmp(&b.0));
+                let mut overlap = 0.0;
+                for (small, count) in occ {
+                    let r = small + enemy_radius - 1.0;
+                    let hit = m_min(r * r / (full * full), 1.0);
+                    overlap += hit * count / width;
+                }
+                self.c.set_out(actor, "OverlapChance", overlap * 100.0);
+                let small = self.c.base(list, c, &["SmallExplosions"])?;
+                self.c.set_out(actor, "SmallExplosionsPerTrap", small);
+                let mult = match part {
+                    Some(2.0) => 1.0 + small * overlap,
+                    Some(3.0) => 1.0 + small,
+                    _ => 1.0,
+                };
+                if mult != 1.0 {
+                    let m = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0) * mult;
+                    self.sd_set(i, "dpsMultiplier", m);
+                    let o2 = self.c.out(actor, "SkillDPSMultiplier").unwrap_or(1.0) * mult;
+                    self.c.set_out(actor, "SkillDPSMultiplier", o2);
+                }
+            }
+            ("EnemyExplode", "preDamageFunc") => self.enemy_explode(o)?,
             _ => return Err(format!("not ported: {name} of {id}")),
         }
+        Ok(())
+    }
+
+    /// `preDamageFunc` of `EnemyExplode`
+    fn enemy_explode(&mut self, o: &mut Off) -> Result<()> {
+        let (i, list, actor) = (o.skill, o.list, o.actor);
+        let cfg = self.cfg(i);
+        let c = Some(&cfg);
+        let part = self.mods(i).skill_part;
+        let mut chance_out = 0.0;
+        let rec = |v: &ModValue, k: &str| match v {
+            ModValue::Record(r) => r.get(k).cloned(),
+            _ => None,
+        };
+        let rnum =
+            |v: &ModValue, k: &str| rec(v, k).and_then(|x| x.as_number()).unwrap_or(f64::NAN);
+        let rstr = |v: &ModValue, k: &str| match rec(v, k) {
+            Some(ModValue::Str(s)) => s.to_string(),
+            _ => String::new(),
+        };
+        if part != Some(3.0) {
+            let source = {
+                let s = self.skill(i);
+                let gem = s
+                    .active_effect
+                    .src
+                    .and_then(|(g, k)| self.env.groups.get(g)?.gem_list.get(k))
+                    .ok_or("attempt to index a nil value (srcInstance)")?;
+                match gem.explode_source.as_ref().ok_or("no explodeSource")? {
+                    crate::skills::ExplodeSource::Item(id) => {
+                        let item = self.input.tab.item(*id).ok_or("no explode source item")?;
+                        item.mod_source.clone()
+                    }
+                    crate::skills::ExplodeSource::Node(n) => {
+                        format!("Tree:{n}")
+                    }
+                }
+            };
+            for (v, m) in self
+                .c
+                .tabulate(list, Some(ModType::List), c, &["ExplodeMod"])?
+            {
+                if m.source.as_deref() != Some(source.as_str()) {
+                    continue;
+                }
+                let typ = rstr(&v, "type");
+                let amount = rnum(&v, "amount");
+                if typ == "RandomElement" {
+                    for e in ["Fire", "Cold", "Lightning"] {
+                        self.sd_set(i, &format!("{e}EffectiveExplodePercentage"), amount / 3.0);
+                    }
+                } else {
+                    self.sd_set(i, &format!("{typ}EffectiveExplodePercentage"), amount);
+                }
+                chance_out = if part == Some(2.0) {
+                    1.0
+                } else {
+                    rnum(&v, "chance")
+                };
+            }
+        } else {
+            // By type, then amount, in the order first met
+            let mut types: Vec<(String, Vec<(f64, f64)>)> = Vec::new();
+            for v in self.c.list(list, c, &["ExplodeMod"])? {
+                let typ = rstr(&v, "type");
+                let (amount, chance) = (rnum(&v, "amount"), rnum(&v, "chance"));
+                let k = match types.iter().position(|t| t.0 == typ) {
+                    Some(k) => k,
+                    None => {
+                        types.push((typ, Vec::new()));
+                        types.len() - 1
+                    }
+                };
+                match types[k].1.iter_mut().find(|a| a.0 == amount) {
+                    Some(a) => a.1 += chance,
+                    None => types[k].1.push((amount, chance)),
+                }
+            }
+            for (typ, amounts) in types {
+                let mut phys = 0.0;
+                for (amount, chance) in amounts {
+                    let ac = amount * chance;
+                    let add = |p: &mut Self, k: &str, v: f64| {
+                        let cur = p.sd_num(i, k).unwrap_or(0.0);
+                        p.sd_set(i, k, cur + v);
+                    };
+                    if typ == "RandomElement" {
+                        for e in ["Fire", "Cold", "Lightning"] {
+                            add(self, &format!("{e}EffectiveExplodePercentage"), ac / 3.0);
+                        }
+                    } else {
+                        add(self, &format!("{typ}EffectiveExplodePercentage"), ac);
+                    }
+                    if typ == "Physical" {
+                        phys = 1.0 - ((1.0 - phys) * (1.0 - chance));
+                    }
+                    chance_out = 1.0 - ((1.0 - chance_out) * (1.0 - chance));
+                }
+                if typ == "Physical" && phys != 0.0 {
+                    self.c.add(
+                        list,
+                        Mod::new(
+                            "CalcArmourAsThoughDealing",
+                            ModType::More,
+                            100.0 / m_min(phys, 1.0) - 100.0,
+                            None,
+                        ),
+                    );
+                }
+            }
+        }
+        self.c
+            .set_out(actor, "ExplodeChance", m_min(chance_out * 100.0, 100.0));
         Ok(())
     }
 }
