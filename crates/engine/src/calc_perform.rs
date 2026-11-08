@@ -338,6 +338,31 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
+    /// `breakdown[key] = breakdown.mod(list, cfg, names...)`
+    pub(crate) fn bd_mod(
+        &mut self,
+        actor: usize,
+        key: &str,
+        list: crate::mods::StoreId,
+        cfg: Option<&crate::mods::Cfg>,
+        names: &[&str],
+    ) -> Result<()> {
+        if self.bd(actor).is_none() {
+            return Ok(());
+        }
+        let inc = self.c.inc(list, cfg, names)?;
+        let more = self.c.more(list, cfg, names)?;
+        let b = crate::breakdown::mod_(inc, more);
+        let bd = self.bd(actor).unwrap();
+        match b {
+            Some(b) => bd.set(key, b),
+            None => {
+                bd.fields.remove(key);
+            }
+        }
+        Ok(())
+    }
+
     /// `actor.breakdown`, when the calculation builds them
     pub fn bd(&mut self, actor: usize) -> Option<&mut crate::breakdown::Bd> {
         self.c.actors.actors[actor].breakdown.as_mut()
@@ -375,6 +400,14 @@ impl<'a> Perform<'a> {
 
     pub(crate) fn sd(&self, i: usize, k: &str) -> Option<&ModValue> {
         self.mods(i).skill_data.get(k)
+    }
+
+    /// A skill data string
+    pub(crate) fn sd_str(&self, i: usize, k: &str) -> Option<String> {
+        match self.sd(i, k) {
+            Some(ModValue::Str(s)) => Some(s.to_string()),
+            _ => None,
+        }
     }
 
     pub(crate) fn sd_num(&self, i: usize, k: &str) -> Option<f64> {

@@ -1097,6 +1097,14 @@ impl<'a> Perform<'a> {
             ) => {
                 let radius = sd(self, "radius");
                 self.c.set_out(actor, "AreaOfEffectRadius", radius);
+                if let Some(bd) = self.bd(actor) {
+                    bd.set(
+                        "AreaOfEffectRadius",
+                        crate::breakdown::Bd::of([
+                            "Targeting area of this skill is not affected by Area of Effect modifiers.",
+                        ]),
+                    );
+                }
                 let rate = if id == "LightningSpireTrap" {
                     let inc = 1.0 + self.c.inc(list, c, &["TrapThrowingSpeed"])? / 100.0;
                     let more = self.c.more(list, c, &["TrapThrowingSpeed"])?;
