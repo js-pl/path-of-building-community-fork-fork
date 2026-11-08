@@ -67,6 +67,18 @@ impl<'a> Perform<'a> {
         }
     }
 
+    /// The current pass's breakdown (`breakdown.MainHand`, ... or the
+    /// actor's)
+    pub(crate) fn pbd(&mut self, o: &Off) -> Option<&mut crate::breakdown::Bd> {
+        let weapon = o.passes[o.pass].weapon;
+        let bd = self.bd(o.actor)?;
+        match weapon {
+            Some(0) => bd.table_mut("MainHand"),
+            Some(_) => bd.table_mut("OffHand"),
+            None => Some(bd),
+        }
+    }
+
     /// The global output (`globalOutput[k]`)
     pub(crate) fn go(&self, o: &Off, k: &str) -> Option<f64> {
         self.c.out(o.actor, k)
@@ -272,6 +284,12 @@ impl<'a> Perform<'a> {
                         source.insert("AttackRate".into(), ModValue::Number(1000.0 / t));
                     }
                 }
+                if let Some(bd) = self.bd(actor) {
+                    bd.set(
+                        if n == 0 { "MainHand" } else { "OffHand" },
+                        crate::breakdown::Bd::new(),
+                    );
+                }
                 o.passes.push(Pass {
                     label: if n == 0 { "Main Hand" } else { "Off Hand" },
                     weapon: Some(n),
@@ -301,6 +319,7 @@ impl<'a> Perform<'a> {
             self.c
                 .flag(list, None, &["Condition:OffHandAccuracyIsMainHandAccuracy"])?;
         let mut stored_accuracy: Option<(f64, f64)> = None;
+        let mut trauma_bd = crate::breakdown::Bd::new();
         for p in 0..o.passes.len() {
             o.pass = p;
             let label = o.passes[p].label;
@@ -326,6 +345,39 @@ impl<'a> Perform<'a> {
                 .more(list, Some(&bug), &["Accuracy", "AccuracyVsEnemy"])?;
             let mut accuracy = m_max(0.0, (base * (1.0 + inc / 100.0) * more).floor());
             let mut accuracy_vs = m_max(0.0, (base_vs * (1.0 + inc_vs / 100.0) * more_vs).floor());
+            if let Some(bd) = self.pbd(o) {
+                use crate::breakdown::{Bd, Chain, multi_chain};
+                let mut b = Bd::new();
+                multi_chain(
+                    &mut b,
+                    Chain {
+                        base: Some(crate::factor!("%g ^8(base)", base)),
+                        factors: vec![
+                            crate::factor!("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                            crate::factor!("%.2f ^8(more/less)", more),
+                        ],
+                        total: Some(crate::sf!("= %g", accuracy)),
+                        ..Default::default()
+                    },
+                );
+                if accuracy != accuracy_vs {
+                    b.push("");
+                    multi_chain(
+                        &mut b,
+                        Chain {
+                            label: Some("Effective Accuracy vs Enemy".into()),
+                            base: Some(crate::factor!("%g ^8(base)", base_vs)),
+                            factors: vec![
+                                crate::factor!("%.2f ^8(increased/reduced)", 1.0 + inc_vs / 100.0),
+                                crate::factor!("%.2f ^8(more/less)", more_vs),
+                            ],
+                            total: Some(crate::sf!("= %g", accuracy_vs)),
+                            ..Default::default()
+                        },
+                    );
+                }
+                bd.set("Accuracy", b);
+            }
             if off_hand_acc && label == "Main Hand" {
                 stored_accuracy = Some((accuracy, accuracy_vs));
             } else if off_hand_acc
@@ -334,6 +386,15 @@ impl<'a> Perform<'a> {
             {
                 accuracy = a;
                 accuracy_vs = v;
+                if let Some(bd) = self.pbd(o) {
+                    bd.set(
+                        "Accuracy",
+                        crate::breakdown::Bd::of([format!(
+                            "Using Main Hand Accuracy due to Mastery: {}",
+                            crate::pat::num(a)
+                        )]),
+                    );
+                }
             }
             self.set_po(o, "Accuracy", accuracy);
             // The weapon's `skillStats` is the pass's output as it grows
@@ -347,7 +408,30 @@ impl<'a> Perform<'a> {
                 100.0
             } else {
                 let evasion = m_max(round(self.c.val(edb, "Evasion", None)?, 0.0), 0.0);
-                hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?
+                let h =
+                    hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?;
+                let lvl = self.env.enemy_level;
+                let over = self.input.config.contains_key("enemyLevel");
+                if let Some(bd) = self.pbd(o) {
+                    let n = crate::pat::num;
+                    bd.set(
+                        "AccuracyHitChance",
+                        crate::breakdown::Bd::of([
+                            format!(
+                                "Enemy level: {}{}",
+                                n(lvl),
+                                if over {
+                                    " ^8(overridden from the Configuration tab"
+                                } else {
+                                    " ^8(can be overridden in the Configuration tab)"
+                                }
+                            ),
+                            format!("Enemy evasion: {}", n(evasion)),
+                            format!("Approximate hit chance: {}%", n(h)),
+                        ]),
+                    );
+                }
+                h
             };
             self.set_po(o, "AccuracyHitChance", acc_hit);
             let mut block = m_max(
@@ -359,7 +443,20 @@ impl<'a> Perform<'a> {
                 block = 0.0;
             }
             self.set_po(o, "enemyBlockChance", block);
-            self.set_po(o, "HitChance", acc_hit * (1.0 - block / 100.0));
+            let hc = acc_hit * (1.0 - block / 100.0);
+            self.set_po(o, "HitChance", hc);
+            if block > 0.0
+                && let Some(bd) = self.pbd(o)
+            {
+                let n = crate::pat::num;
+                let mut b = crate::breakdown::Bd::new();
+                if acc_hit < 100.0 {
+                    b.push(format!("Accuracy Hit Chance: {}%", n(acc_hit)));
+                }
+                b.push(format!("Enemy Block Chance: {}%", n(block)));
+                b.push(format!("Approximate hit chance: {}%", n(hc)));
+                bd.set("HitChance", b);
+            }
             if block > 0.0 && !o.is_attack {
                 self.c
                     .set_out_val(actor, "enemyHasSpellBlock", OutVal::Bool(true));
@@ -448,8 +545,106 @@ impl<'a> Perform<'a> {
                     let rate_before = per_attack * (hit / 100.0) * before_inc / repeats;
                     let mut trauma = rate_before * (1.0 + inc / 100.0)
                         / (1.0 / duration - rate_before * inc_per / 100.0);
+                    let trauma_shown = trauma;
+                    let mut invalid = false;
                     if trauma < 0.0 || inc_per * trauma > inc_cap {
                         trauma = per_attack * (hit / 100.0) * cap / repeats * duration;
+                        invalid = true;
+                    }
+                    if self.pbd(o).is_some() {
+                        use crate::breakdown::{Bd, Chain, multi_chain};
+                        use crate::{factor, sf};
+                        let mut b = Bd::new();
+                        if inc_per == 0.0 {
+                            multi_chain(
+                                &mut b,
+                                Chain {
+                                    label: Some("Trauma".into()),
+                                    base: Some(factor!(
+                                        "%.2f ^8(attack speed)",
+                                        before_inc * (1.0 + inc / 100.0)
+                                    )),
+                                    factors: vec![
+                                        factor!("%.2f ^8(trauma per attack)", per_attack),
+                                        factor!("%.2f ^8(chance to hit)", hit / 100.0),
+                                        factor!("%.2f ^8(duration)", duration),
+                                    ],
+                                    no_total: true,
+                                    ..Default::default()
+                                },
+                            );
+                            if repeats != 1.0 {
+                                b.push(sf!("/ %.2f ^8(repeats)", repeats));
+                            }
+                        } else {
+                            multi_chain(
+                                &mut b,
+                                Chain {
+                                    label: Some(
+                                        "Attack Speed before increased Attack Speed".into(),
+                                    ),
+                                    base: Some(factor!("%.2f ^8(base)", 1.0 / base_time)),
+                                    factors: vec![
+                                        factor!("%.2f ^8(more/less)", more),
+                                        factor!("%.2f ^8(action speed modifier)", action),
+                                    ],
+                                    total: Some(sf!("= %.2f ^8attacks per second", before_inc)),
+                                    ..Default::default()
+                                },
+                            );
+                            b.push("");
+                            multi_chain(
+                                &mut b,
+                                Chain {
+                                    label: Some(
+                                        "Trauma per second before increased Attack Speed".into(),
+                                    ),
+                                    base: Some(factor!("%.2f ^8(base)", before_inc)),
+                                    factors: vec![
+                                        factor!("%.2f ^8(trauma per attack)", per_attack),
+                                        factor!("%.2f ^8(chance to hit)", hit / 100.0),
+                                    ],
+                                    no_total: true,
+                                    ..Default::default()
+                                },
+                            );
+                            if repeats != 1.0 {
+                                b.push(sf!("/ %.2f ^8(repeats)", repeats));
+                            }
+                            b.push(sf!("= %.2f ^8trauma per second", rate_before));
+                            b.push("");
+                            b.push("Trauma");
+                            b.push(sf!("%.2f ^8(base)", rate_before));
+                            b.push(sf!("x %.2f ^8(increased/reduced)", 1.0 + inc / 100.0));
+                            b.push(sf!(
+                                "/ %.4f ^8(1 / duration - trauma per second * increased attack speed per trauma / 100)",
+                                1.0 / duration - rate_before * inc_per / 100.0
+                            ));
+                        }
+                        let neg = if invalid { "^xDD0022" } else { "" };
+                        b.push(sf!(&format!("= {neg}%d ^8trauma"), trauma_shown));
+                        if invalid {
+                            b.push("");
+                            b.push("Attack Speed exceeds cap; Recalculating");
+                            multi_chain(
+                                &mut b,
+                                Chain {
+                                    base: Some(factor!("%.2f ^8(base)", cap)),
+                                    factors: vec![
+                                        factor!("%.2f ^8(trauma per attack)", per_attack),
+                                        factor!("%.2f ^8(chance to hit)", hit / 100.0),
+                                        factor!("%.2f ^8(duration)", duration),
+                                    ],
+                                    no_total: true,
+                                    ..Default::default()
+                                },
+                            );
+                            if repeats != 1.0 {
+                                b.push(sf!("/ %.2f ^8(repeats)", repeats));
+                            }
+                            b.push(sf!("= %d ^8trauma", trauma));
+                        }
+                        trauma_bd = b;
                     }
                     if self.has_flag(i, "bothWeaponAttack") {
                         trauma /= 2.0;
@@ -515,7 +710,63 @@ impl<'a> Perform<'a> {
                     speed = m_min(speed, tick * repeats);
                 }
                 self.set_po(o, "Speed", speed);
-                self.set_po(o, "Time", if speed == 0.0 { 0.0 } else { 1.0 / speed });
+                let time = if speed == 0.0 { 0.0 } else { 1.0 / speed };
+                self.set_po(o, "Time", time);
+                if self.pbd(o).is_some() {
+                    use crate::breakdown::{Bd, Chain, multi_chain};
+                    use crate::{factor, sf};
+                    let cast_rate = self.po(o, "CastRate").unwrap_or(f64::NAN);
+                    let asm = if self.has_flag(i, "totem") {
+                        self.po(o, "TotemActionSpeed").unwrap_or(f64::NAN)
+                    } else if self.has_flag(i, "selfCast") {
+                        action
+                    } else {
+                        1.0
+                    };
+                    let cd = self.po(o, "Cooldown");
+                    let attack_time = self.c.calc_mod(list, sc, &["SkillAttackTime"])?;
+                    let mut b = Bd::new();
+                    multi_chain(
+                        &mut b,
+                        Chain {
+                            base: Some(factor!("%.2f ^8(base)", 1.0 / base_time)),
+                            factors: vec![
+                                factor!("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                                factor!("%.2f ^8(more/less)", more),
+                                factor!("%.2f ^8(action speed modifier)", asm),
+                            ],
+                            total: Some(sf!("= %.2f ^8casts per second", cast_rate)),
+                            ..Default::default()
+                        },
+                    );
+                    if let Some(cd) = cd
+                        && 1.0 / cd < cast_rate
+                    {
+                        b.push("\n");
+                        b.push(sf!("1 / %.2f ^8(skill cooldown)", cd));
+                        if repeats > 1.0 {
+                            b.push(sf!("x %d ^8(repeat count)", repeats));
+                        }
+                        b.push(sf!("= %.2f ^8(casts per second)", repeats / cd));
+                        b.push("\n");
+                        b.push(sf!("= %.2f ^8(lower of cast rates)", speed));
+                    }
+                    let bd = self.pbd(o).unwrap();
+                    bd.set("Speed", b);
+                    if attack_time > 0.0 {
+                        let mut t = Bd::new();
+                        multi_chain(
+                            &mut t,
+                            Chain {
+                                base: Some(factor!("%.2f ^8(base)", 1.0 / (speed * attack_time))),
+                                factors: vec![factor!("%.2f ^8(total modifier)", attack_time)],
+                                total: Some(sf!("= %.2f ^8seconds per attack", time)),
+                                ..Default::default()
+                            },
+                        );
+                        bd.set("Time", t);
+                    }
+                }
             }
             self.hit_time(o, false)?;
         }
@@ -536,6 +787,9 @@ impl<'a> Perform<'a> {
         self.sd_set(i, "dpsMultiplier", dps_mult);
         if self.c.flag(list, None, &["TriggeredBySnipe"])? {
             self.set_flag(i, "channelRelease", true);
+        }
+        if let Some(bd) = self.bd(actor) {
+            bd.set("SustainableTrauma", trauma_bd);
         }
         // `Flag(...) and Sum(...)`: nil without the flag
         if self.c.flag(list, None, &["HasTrauma"])? {
@@ -579,10 +833,84 @@ impl<'a> Perform<'a> {
                         None => self.c.clear_out(actor, k),
                     }
                 }
+                let sp = self.c.out(actor, "Speed").unwrap_or(f64::NAN);
+                if let Some(bd) = self.bd(actor) {
+                    bd.set(
+                        "Speed",
+                        crate::breakdown::Bd::of([
+                            "Use Offhand Weapon Attack Speed:".to_string(),
+                            crate::sf!("= %.2f", sp),
+                        ]),
+                    );
+                }
+            } else if self.has_flag(i, "bothWeaponAttack") {
+                let sp = self.c.out(actor, "Speed").unwrap_or(f64::NAN);
+                let (m, oh) = (
+                    get_num(&o.hands[0], "Speed").unwrap_or(f64::NAN),
+                    get_num(&o.hands[1], "Speed").unwrap_or(f64::NAN),
+                );
+                if let Some(bd) = self.bd(actor) {
+                    bd.set(
+                        "Speed",
+                        crate::breakdown::Bd::of([
+                            "Both weapons:".to_string(),
+                            crate::sf!("2 / (1 / %.2f + 1 / %.2f)", m, oh),
+                            crate::sf!("= %.2f", sp),
+                        ]),
+                    );
+                }
             }
             // the global output
             o.pass = usize::MAX;
             self.hit_time(o, true)?;
+        }
+        if self.bd(actor).is_some() {
+            use crate::sf;
+            let on_death = self.sd_truthy(i, "triggeredOnDeath");
+            let out = |p: &Self, k: &str| p.c.out(actor, k);
+            let ht = out(self, "HitTime").unwrap_or(f64::NAN);
+            let hs = out(self, "HitSpeed").unwrap_or(f64::NAN);
+            let cd = out(self, "Cooldown");
+            let time = out(self, "Time");
+            if self.sd(i, "hitTimeOverride").is_some_and(ModValue::truthy) && !on_death {
+                self.bd(actor).unwrap().set(
+                    "HitSpeed",
+                    crate::breakdown::Bd::of([
+                        sf!("1 / %.2f ^8(hit time override)", ht),
+                        sf!("= %.2f", hs),
+                    ]),
+                );
+            } else if let (Some(m), Some(t)) = (self.sd_num(i, "hitTimeMultiplier"), time)
+                && !on_death
+            {
+                let mut h = crate::breakdown::Bd::new();
+                if m.floor() != m {
+                    h.push(sf!(
+                        "^x5CF0BBNOTE: First stage has a %.2fx channel time multiplier",
+                        m - m.floor()
+                    ));
+                }
+                if o.is_attack {
+                    h.push(sf!("%.2f ^8(attack time)", t));
+                } else {
+                    h.push(sf!("%.2f ^8(cast time)", t));
+                }
+                h.push(sf!("x %.2f ^8(channel time multiplier)", m));
+                h.push(sf!("= %.2f", ht));
+                let triggered = self.sd_truthy(i, "triggered");
+                let mut sp = crate::breakdown::Bd::new();
+                match cd {
+                    Some(cd) if triggered => {
+                        sp.push(sf!("1 / min(%.2f, %.2f) ^8min(hit time, cooldown)", ht, cd))
+                    }
+                    Some(cd) => sp.push(sf!("1 / (%.2f + %.2f) ^8(hit time + cooldown)", ht, cd)),
+                    None => sp.push(sf!("1 / %.2f ^8(hit time)", ht)),
+                }
+                sp.push(sf!("= %.2f", hs));
+                let bd = self.bd(actor).unwrap();
+                bd.set("HitTime", h);
+                bd.set("HitSpeed", sp);
+            }
         }
         // Grab quantity multiplier
         let q = m_max(self.c.base(list, sc, &["QuantityMultiplier"])?, 1.0);

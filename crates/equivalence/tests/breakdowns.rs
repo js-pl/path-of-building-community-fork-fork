@@ -177,6 +177,33 @@ fn fmt(v: Option<&J>) -> String {
     }
 }
 
+/// Compares breakdowns key by key: keys only the translation has are
+/// counted as missing (not ported yet), keys only the typed engine has are
+/// differences. The weapon passes' breakdowns are compared the same way.
+fn compare_keys(
+    got: &Map<String, J>,
+    want: &Map<String, J>,
+    path: &str,
+    d: &mut Vec<String>,
+    missing: &mut BTreeMap<String, usize>,
+) {
+    for (k, w) in want {
+        let p = format!("{path}.{k}");
+        match (got.get(k), w) {
+            (Some(J::Object(g)), J::Object(w)) if k == "MainHand" || k == "OffHand" => {
+                compare_keys(g, w, &p, d, missing)
+            }
+            (Some(g), _) => diff(g, w, &p, d, 30),
+            (None, _) => *missing.entry(p).or_default() += 1,
+        }
+    }
+    for k in got.keys() {
+        if !want.contains_key(k) {
+            d.push(format!("{path}.{k}: extra"));
+        }
+    }
+}
+
 #[test]
 fn breakdowns_match_upstream() {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
@@ -299,19 +326,7 @@ fn breakdowns_match_upstream() {
             let J::Object(got) = bd_json(got) else {
                 unreachable!()
             };
-            for (k, w) in &want {
-                match got.get(k) {
-                    Some(g) => diff(g, w, &format!("{who}.{k}"), &mut d, 30),
-                    None => {
-                        *missing.entry(format!("{who}.{k}")).or_default() += 1;
-                    }
-                }
-            }
-            for k in got.keys() {
-                if !want.contains_key(k) {
-                    d.push(format!("{who}.{k}: extra"));
-                }
-            }
+            compare_keys(&got, &want, who, &mut d, &mut missing);
         }
         if !d.is_empty() {
             failures.push(format!("{id} (got != want):\n  {}", d.join("\n  ")));
