@@ -29,7 +29,16 @@ impl<'a> Perform<'a> {
                 / p.c.more(list, c, &["BrandActivationFrequency"])?)
         };
         match (id, name) {
-            ("ArmageddonBrand", "preDamageFunc") => {
+            (
+                "ArmageddonBrand"
+                | "ArmageddonBrandAltY"
+                | "BrandSupport"
+                | "PenanceBrandAltX"
+                | "PenanceBrandAltY"
+                | "StormBrand"
+                | "StormBrandAltX",
+                "preDamageFunc",
+            ) => {
                 let v = brand_time(self)?;
                 self.sd_set(i, "hitTimeOverride", v);
             }
@@ -136,10 +145,6 @@ impl<'a> Perform<'a> {
                             .inc(list, c, &["Speed", "BrandActivationFrequency"])?
                             / 100.0)
                     / self.c.more(list, c, &["BrandActivationFrequency"])?;
-                self.sd_set(i, "hitTimeOverride", v);
-            }
-            ("StormBrand", "preDamageFunc") => {
-                let v = brand_time(self)?;
                 self.sd_set(i, "hitTimeOverride", v);
             }
             ("VaalMoltenShell", "preDamageFunc") => {

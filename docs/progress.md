@@ -33,7 +33,7 @@ then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 57 builds compared, 53 of them
+`crates/equivalence/tests/perform.rs`: 57 builds compared, 56 of them
 through the offence; the gaps below are skipped.
 
 | Upstream | Typed |
@@ -44,7 +44,8 @@ through the offence; the gaps below are skipped.
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
-| `calcs.triggers`, `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
+| `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
+| `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
 
 Every skill with a minion has an actor of its own after the player and the
 enemy (`Perform::minions`); its skills follow the player's in
@@ -75,8 +76,12 @@ Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
 - The party tab, and a minion's curses on itself
-- Triggers (`CalcTriggers.lua`'s handlers) and mirages (`CalcMirages.lua`)
-- Skill functions other than the thirteen in `calc_skill_funcs.rs`
+- Mirages (`CalcMirages.lua`), and calculations of other skills
+  (`calcs.buildActiveSkill`, `calcs.copyActiveSkill`, `GlobalCache`), which
+  triggers finding their source skill, cached stages and mirages need
+- Trigger configurations other than those in `calc_triggers.rs`
+  (`Perform::trigger_config`), breakdowns of triggers
+- Skill functions other than those in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
@@ -84,7 +89,9 @@ a skip:
 
 ## Next
 
-Triggers and mirages, then `Calcs.lua`'s calculators
+Calculations of other skills (a recalculation of the build with another
+main skill and a cache of its results, as `GlobalCache`), with them
+mirages and the rest of the triggers, then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 

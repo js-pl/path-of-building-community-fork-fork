@@ -2463,7 +2463,7 @@ impl<'a> Perform<'a> {
 
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
-const TRIGGER_CONFIGS: [&str; 81] = [
+pub(crate) const TRIGGER_CONFIGS: [&str; 81] = [
     "law of the wilds",
     "the rippling thoughts",
     "the surging thoughts",
@@ -2548,45 +2548,6 @@ const TRIGGER_CONFIGS: [&str; 81] = [
 ];
 
 impl<'a> Perform<'a> {
-    /// `calcs.triggers(env, actor)`: which skills a trigger handler
-    /// calculates is not ported yet; otherwise the skill is not triggered
-    pub(crate) fn triggers(&mut self, actor: usize) -> Result<()> {
-        let Some(main) = self.actor_main(actor) else {
-            return Ok(());
-        };
-        if !self.has_flag(main, "disable") {
-            let s = self.skill(main);
-            let ge = &s.active_effect.granted_effect;
-            let mut names = vec![ge.id.clone(), ge.name.to_lowercase()];
-            if let Some(t) = self.mods(main).triggered_by {
-                let t = s.effect_list[t].granted_effect.name.to_lowercase();
-                names.push(t.trim_start_matches("awakened ").to_string());
-                names.push(t);
-            }
-            if let Some(ModValue::Str(t)) = self.sd(main, "triggerSource") {
-                names.push(t.to_lowercase());
-            }
-            for e in &s.support_list {
-                if e.granted_effect.from_item && !e.granted_effect.support {
-                    names.push(e.granted_effect.name.to_lowercase());
-                }
-            }
-            if let Some(src) = s
-                .group
-                .and_then(|g| self.env.groups.get(g))
-                .and_then(|g| g.source.clone())
-                && let Some(n) = unique_trigger_name(&src)
-            {
-                names.push(n.to_lowercase());
-            }
-            if names.iter().any(|n| TRIGGER_CONFIGS.contains(&n.as_str())) {
-                return Err("not ported: triggers".into());
-            }
-            self.sd_clear(main, "triggered");
-        }
-        Ok(())
-    }
-
     /// `calcs.triggers(env, env.player)`, `calcs.mirages(env)`, then
     /// `calcs.offence(env, env.player, env.player.mainSkill)`
     pub fn player_offence(&mut self) -> Result<()> {
@@ -2606,7 +2567,7 @@ impl<'a> Perform<'a> {
                 || self.sd_truthy(main, "triggeredBySacredWisps")
                 || self.sd_truthy(main, "triggeredByGeneralsCry")
             {
-                return Err("not ported: mirages".into());
+                return Err(format!("not ported: the mirage of {name}"));
             }
         }
         self.offence(crate::calc::PLAYER, main)?;
@@ -2636,7 +2597,7 @@ impl<'a> Perform<'a> {
 }
 
 /// `source:find(".*:.*:(.*),.*")`
-fn unique_trigger_name(src: &str) -> Option<String> {
+pub(crate) fn unique_trigger_name(src: &str) -> Option<String> {
     let comma = src.rfind(',')?;
     let head = &src[..comma];
     let colon = head.rfind(':')?;

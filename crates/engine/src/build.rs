@@ -78,6 +78,7 @@ pub struct LoadContext<'a> {
 }
 
 /// A loaded build: what the calculations read of it
+#[derive(Clone)]
 pub struct Build<'t> {
     pub info: BuildInfo,
     pub config: ConfigTab,

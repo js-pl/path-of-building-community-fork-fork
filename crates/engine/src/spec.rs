@@ -127,6 +127,7 @@ pub struct SpecNode {
     visited: bool,
 }
 
+#[derive(Clone)]
 pub struct PassiveSpec<'t> {
     pub tree: &'t PassiveTree,
     parser: &'t ModParser,
