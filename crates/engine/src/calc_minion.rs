@@ -54,7 +54,7 @@ fn round(v: f64) -> f64 {
 }
 
 /// `table[level]` of a numeric data table by level
-fn table_at(p: &Perform, table: &str, level: f64) -> Option<f64> {
+pub(crate) fn table_at(p: &Perform, table: &str, level: f64) -> Option<f64> {
     if level.fract() != 0.0 {
         return None;
     }

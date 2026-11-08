@@ -31,6 +31,10 @@ pub type Result<T> = std::result::Result<T, String>;
 
 use ModType::{Base, Flag as FlagT, Inc, List, Max as MaxT, More, Override};
 
+/// An entry of an ally life list: the minion's name, its total life and
+/// its count
+pub type AllyLife = (String, f64, f64);
+
 /// What `perform` reads besides the setup
 pub struct PerformInput<'a> {
     pub data: &'a CalcData<'a>,
@@ -262,7 +266,7 @@ pub struct Perform<'a> {
     /// newSkill`): its uuid and skill data, which the cache keeps
     pub replaced_main: Option<(String, BTreeMap<String, ModValue>)>,
     /// `env.player.allyLifeList`: by pool, each ally's name, life and count
-    pub ally_life_list: Vec<(&'static str, Vec<(String, f64, f64)>)>,
+    pub ally_life_list: Vec<(&'static str, Vec<AllyLife>)>,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies`,
     /// `nonUniqueFlasksApplyToMinion`
     pub(crate) flasks_to_minion: [bool; 3],

@@ -157,6 +157,7 @@ impl<'a> Perform<'a> {
         chance: Option<&str>,
     ) {
         let sym = Sym::new(stat);
+        let mut bd_lines: Vec<String> = Vec::new();
         let (mh, oh) = (&o.hands[0], &o.hands[1]);
         let num = |m: &OutMap, k: &str| get_num(m, k);
         let or = || {
@@ -194,19 +195,44 @@ impl<'a> Perform<'a> {
                 }
                 Combine::Chance | Combine::ChanceAilment => match (num(mh, stat), num(oh, stat)) {
                     (Some(a), Some(b)) => {
+                        use crate::sf;
                         let c = chance.expect("a chance stat");
                         let main = num(mh, c).unwrap_or(f64::NAN)
                             * num(mh, "HitChance").unwrap_or(f64::NAN);
                         let off = num(oh, c).unwrap_or(f64::NAN)
                             * num(oh, "HitChance").unwrap_or(f64::NAN);
                         if mode == Combine::Chance {
-                            if self.sd_truthy(o.skill, "doubleHitsWhenDualWielding") {
-                                Some(OutVal::Num(a * (main / 10000.0) + b * (off / 10000.0)))
-                            } else {
-                                let mp = main / (main + off);
-                                let op = off / (main + off);
-                                Some(OutVal::Num(a * mp + b * op))
-                            }
+                            let (mc, oc, main_label, off_label) =
+                                if self.sd_truthy(o.skill, "doubleHitsWhenDualWielding") {
+                                    (
+                                        main / 10000.0,
+                                        off / 10000.0,
+                                        "x %.3f ^8(chance of main hand)",
+                                        "x %.3f ^8(chance of  off hand)",
+                                    )
+                                } else {
+                                    (
+                                        main / (main + off),
+                                        off / (main + off),
+                                        "x %.3f ^8(portion of instances created by main hand)",
+                                        "x %.3f ^8(portion of instances created by off hand)",
+                                    )
+                                };
+                            let v = a * mc + b * oc;
+                            bd_lines.extend([
+                                "Contribution from Main Hand:".to_string(),
+                                sf!("%.1f", a),
+                                sf!(main_label, mc),
+                                sf!("= %.1f", a * mc),
+                                "Contribution from Off Hand:".to_string(),
+                                sf!("%.1f", b),
+                                sf!(off_label, oc),
+                                sf!("= %.1f", b * oc),
+                                "Total:".to_string(),
+                                sf!("%.1f + %.1f", a * mc, b * oc),
+                                sf!("= %.1f", v),
+                            ]);
+                            Some(OutVal::Num(v))
                         } else {
                             let max = m_max(a, b);
                             let min = m_min(a, b);
@@ -216,10 +242,46 @@ impl<'a> Perform<'a> {
                                 self.go(o, &stack).unwrap_or(1.0)
                                     / self.go(o, &format!("{stack}Max")).unwrap_or(1.0),
                             );
-                            Some(OutVal::Num(max * stacks + min * (1.0 - stacks)))
+                            let v = max * stacks + min * (1.0 - stacks);
+                            bd_lines.push(String::new());
+                            bd_lines.push(sf!(
+                                "%.2f%% of ailment stacks use maximum damage",
+                                stacks * 100.0
+                            ));
+                            bd_lines.push(sf!(
+                                "Max Damage comes from %s",
+                                if a >= b { "Main Hand" } else { "Off Hand" }
+                            ));
+                            bd_lines.push(sf!("= %.1f", max * stacks));
+                            if stacks < 1.0 {
+                                bd_lines.push(sf!(
+                                    "%.2f%% of ailment stacks use non-maximum damage",
+                                    (1.0 - stacks) * 100.0
+                                ));
+                                bd_lines.push(sf!("= %.1f", min * (1.0 - stacks)));
+                            }
+                            bd_lines.push(String::new());
+                            bd_lines.push("Total:".into());
+                            if stacks < 1.0 {
+                                bd_lines.push(sf!(
+                                    "%.1f + %.1f",
+                                    max * stacks,
+                                    min * (1.0 - stacks)
+                                ));
+                            }
+                            bd_lines.push(sf!("= %.1f", v));
+                            Some(OutVal::Num(v))
                         }
                     }
-                    _ => or(),
+                    (a, _) => {
+                        if mode == Combine::ChanceAilment {
+                            bd_lines.push(crate::sf!(
+                                "All ailment stacks comes from %s",
+                                if a.is_some() { "Main Hand" } else { "Off Hand" }
+                            ));
+                        }
+                        or()
+                    }
                 },
                 Combine::Or => unreachable!(),
             }
@@ -227,6 +289,14 @@ impl<'a> Perform<'a> {
         match value {
             Some(v) => self.c.set_out_val(o.actor, stat, v),
             None => self.c.clear_out(o.actor, stat),
+        }
+        if !bd_lines.is_empty()
+            && let Some(bd) = self.bd(o.actor)
+        {
+            let t = bd.table(stat);
+            for l in bd_lines {
+                t.push(l);
+            }
         }
     }
 
@@ -1209,6 +1279,18 @@ impl<'a> Perform<'a> {
             ratio = m_max(ratio, self.go(o, r).unwrap_or(0.0));
         }
         self.set_go(o, "ExertedAttackUptimeRatio", ratio);
+        if self.bd(actor).is_some() {
+            use crate::sf;
+            let mut b = crate::breakdown::Bd::of(["Maximum of:"]);
+            for (_, _, _, r, _, _) in EXERTING_CRIES {
+                if let Some(v) = self.go(o, r) {
+                    let name = r.strip_suffix("UpTimeRatio").unwrap_or(r);
+                    b.push(sf!("%d%% ^8(%s Cry Uptime)", v, name));
+                }
+            }
+            b.push(sf!("= %d%%", ratio));
+            self.bd(actor).unwrap().set("ExertedAttackUptimeRatio", b);
+        }
         if ratio > 0.0
             && self
                 .c
@@ -3154,6 +3236,65 @@ impl<'a> Perform<'a> {
             ] {
                 self.combine_stat(o, k, Combine::Dps, None);
             }
+            if self.has_flag(i, "bothWeaponAttack") && self.bd(actor).is_some() {
+                use crate::sf;
+                let (m, oh) = (
+                    get_num(&o.hands[0], "AverageDamage").unwrap_or(f64::NAN),
+                    get_num(&o.hands[1], "AverageDamage").unwrap_or(f64::NAN),
+                );
+                let avg = self.c.out(actor, "AverageDamage").unwrap_or(f64::NAN);
+                let line = if self.sd_truthy(i, "doubleHitsWhenDualWielding") {
+                    sf!(
+                        "%.1f + %.1f ^8(skill hits with both weapons at once)",
+                        m,
+                        oh
+                    )
+                } else {
+                    sf!("(%.1f + %.1f) / 2 ^8(skill alternates weapons)", m, oh)
+                };
+                self.bd(actor).unwrap().set(
+                    "AverageDamage",
+                    crate::breakdown::Bd::of([
+                        "Both weapons:".to_string(),
+                        line,
+                        sf!("= %.1f", avg),
+                    ]),
+                );
+            }
+        }
+        if self.bd(actor).is_some() {
+            use crate::sf;
+            let g = |p: &Self, k: &str| p.c.out(actor, k);
+            let avg = g(self, "AverageDamage").unwrap_or(f64::NAN);
+            let rate_line = |kind: &str| match g(self, "HitSpeed") {
+                Some(h) => sf!("x %.2f ^8(hit rate)", h),
+                None => sf!(
+                    &format!("x %.2f ^8({kind} rate)"),
+                    g(self, "Speed").unwrap_or(f64::NAN)
+                ),
+            };
+            let mut b = if o.is_attack {
+                crate::breakdown::Bd::of([sf!("%.1f ^8(average damage)", avg), rate_line("attack")])
+            } else if self.sd_truthy(i, "triggered") {
+                crate::breakdown::Bd::of([
+                    sf!("%.1f ^8(average damage)", avg),
+                    rate_line("trigger"),
+                ])
+            } else {
+                crate::breakdown::Bd::of([sf!("%.1f ^8(average hit)", avg), rate_line("cast")])
+            };
+            let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            if dps_mult != 1.0 {
+                b.push(sf!("x %g ^8(DPS multiplier for this skill)", dps_mult));
+            }
+            if o.quantity_multiplier > 1.0 {
+                b.push(sf!(
+                    "x %g ^8(quantity multiplier for this skill)",
+                    o.quantity_multiplier
+                ));
+            }
+            b.push(sf!("= %.1f", g(self, "TotalDPS").unwrap_or(f64::NAN)));
+            self.bd(actor).unwrap().set("TotalDPS", b);
         }
         if self.input.mode == crate::calcs::Mode::Calcs {
             let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
@@ -3227,6 +3368,27 @@ impl<'a> Perform<'a> {
         self.set_flag(i, "leechLife", g(self, "LifeLeechRate") > 0.0);
         self.set_flag(i, "leechES", g(self, "EnergyShieldLeechRate") > 0.0);
         self.set_flag(i, "leechMana", g(self, "ManaLeechRate") > 0.0);
+        if self.bd(actor).is_some() {
+            let speed = g(self, "HitSpeed");
+            let speed = if speed.is_nan() {
+                g(self, "Speed")
+            } else {
+                speed
+            };
+            let hit_rate = g(self, "HitChance") / 100.0
+                * speed
+                * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            for (flag, pool, key) in [
+                ("leechLife", "Life", "LifeLeech"),
+                ("leechES", "EnergyShield", "EnergyShieldLeech"),
+                ("leechMana", "Mana", "ManaLeech"),
+            ] {
+                if self.has_flag(i, flag) {
+                    let b = self.leech_bd(actor, pool, hit_rate)?;
+                    self.bd(actor).unwrap().set(key, b);
+                }
+            }
+        }
         let show_average = self.sd_truthy(i, "showAverage");
         for pool in ["Life", "EnergyShield", "Mana"] {
             if show_average {
@@ -3238,6 +3400,92 @@ impl<'a> Perform<'a> {
             }
         }
         self.offence_ailments(o)
+    }
+}
+
+impl<'a> Perform<'a> {
+    /// `breakdown.leech(instant, instantRate, instances, pool, rate, max,
+    /// dur, instantLeechProportion, hitRate)` of the actor's pool
+    fn leech_bd(&self, actor: usize, pool: &str, hit_rate: f64) -> Result<crate::breakdown::Bd> {
+        use crate::sf;
+        let g = |k: &str| self.c.out(actor, k).unwrap_or(f64::NAN);
+        let instant = g(&format!("{pool}LeechInstant"));
+        let instant_rate = g(&format!("{pool}LeechInstantRate"));
+        let instances = g(&format!("{pool}LeechInstances"));
+        let size = g(pool);
+        let max = g(&format!("Max{pool}LeechRate"));
+        let dur = g(&format!("{pool}LeechDuration"));
+        let prop = g(&format!("{pool}LeechInstantProportion"));
+        let base = self.misc_data("LeechRateBase");
+        let db = self.c.db(actor);
+        // the module's `skillCfg` is an undefined global
+        let rate_mod = self.c.calc_mod(db, None, &[&format!("{pool}LeechRate")])?;
+        let show_average = self
+            .actor_main_index(actor)
+            .is_some_and(|m| self.sd_truthy(m, "showAverage"));
+        let mut out = crate::breakdown::Bd::new();
+        let instant_line = |out: &mut crate::breakdown::Bd| {
+            if prop != 1.0 {
+                out.push(sf!(
+                    "Instant Leech: %.1f ^8(%d%% x %.1f)",
+                    instant,
+                    prop * 100.0,
+                    dur * size * base / (1.0 - prop)
+                ));
+            } else {
+                out.push(sf!("Instant Leech: %.1f", instant));
+            }
+        };
+        let base_lines = |out: &mut crate::breakdown::Bd| {
+            out.push(sf!("%d ^8(size of leech destination pool)", size));
+            out.push(sf!(
+                "x %.2f ^8(base leech rate is %d%% per second)",
+                base,
+                100.0 * base
+            ));
+            if rate_mod != 1.0 {
+                out.push(sf!("x %.2f ^8(leech rate modifier)", rate_mod));
+            }
+        };
+        if show_average {
+            if instant > 0.0 {
+                instant_line(&mut out);
+            }
+            if instances > 0.0 {
+                out.push("Total leeched per instance:");
+                base_lines(&mut out);
+                out.push(sf!("x %.2fs ^8(instance duration)", dur));
+                out.push(sf!("= %.1f", size * base * rate_mod * dur));
+            }
+        } else {
+            if instant_rate > 0.0 {
+                instant_line(&mut out);
+                out.push(sf!(
+                    "Instant Leech per second: %.1f ^8(%.1f x %.2f)",
+                    instant_rate,
+                    instant,
+                    hit_rate
+                ));
+            }
+            if instances > 0.0 {
+                out.push("Rate per instance:");
+                base_lines(&mut out);
+                out.push(sf!("= %.1f ^8per second", size * base * rate_mod));
+                out.push("Maximum leech rate against one target:");
+                out.push(sf!("%.1f", size * base * rate_mod));
+                out.push(sf!("x %.2f ^8(average instances)", instances));
+                let total = size * base * rate_mod * instances;
+                out.push(sf!("= %.1f ^8per second", total));
+                if total <= max {
+                    out.push(sf!("Time to reach max: %.1fs", dur));
+                }
+                out.push(sf!("Leech rate cap: %.1f", max));
+                if total > max {
+                    out.push(sf!("Time to reach cap: %.1fs", dur / total * max));
+                }
+            }
+        }
+        Ok(out)
     }
 }
 

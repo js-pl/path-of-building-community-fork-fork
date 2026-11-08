@@ -110,6 +110,22 @@ impl<'a> Perform<'a> {
                 let more = self.c.more(edb, None, &names)?;
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
                 self.c.set_out(actor, "DecayEffMult", eff);
+                if eff != 1.0 && self.bd(actor).is_some() {
+                    let src = self.dot_source_res("Chaos")?;
+                    let b = crate::breakdown::eff_mult(
+                        "Chaos",
+                        resist,
+                        0.0,
+                        inc,
+                        eff,
+                        more,
+                        Some(&src),
+                        true,
+                        None,
+                        None,
+                    );
+                    self.bd(actor).unwrap().set("DecayEffMult", b);
+                }
             }
             let inc = self.c.inc(list, Some(&dot), &["Damage", "ChaosDamage"])?;
             let more = self.c.more(list, Some(&dot), &["Damage", "ChaosDamage"])?;
@@ -120,13 +136,27 @@ impl<'a> Perform<'a> {
                         + self.c.base(list, Some(&dot), &["ChaosDotMultiplier"])?
                 }
             };
-            self.c.set_out(
-                actor,
-                "DecayDPS",
-                decay * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * eff,
-            );
-            self.c
-                .set_out(actor, "DecayDuration", 8.0 * o.debuff_duration_mult);
+            let dps = decay * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * eff;
+            self.c.set_out(actor, "DecayDPS", dps);
+            let duration = 8.0 * o.debuff_duration_mult;
+            self.c.set_out(actor, "DecayDuration", duration);
+            if let Some(bd) = self.bd(actor) {
+                use crate::sf;
+                let mut b = crate::breakdown::Bd::new();
+                crate::breakdown::dot(&mut b, decay, inc, more, Some(mult), None, None, eff, dps);
+                bd.set("DecayDPS", b);
+                if duration != 8.0 {
+                    let mut d = crate::breakdown::Bd::of([sf!("%.2fs ^8(base duration)", 8.0)]);
+                    if o.debuff_duration_mult != 1.0 {
+                        d.push(sf!(
+                            "/ %.2f ^8(debuff expires slower/faster)",
+                            1.0 / o.debuff_duration_mult
+                        ));
+                    }
+                    d.push(sf!("= %.2fs", duration));
+                    bd.set("DecayDuration", d);
+                }
+            }
         }
         let db = o.db;
         let ground = self.c.base(db, None, &["DropsBurningGround"])?;
@@ -258,6 +288,22 @@ impl<'a> Perform<'a> {
                 };
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
                 self.c.set_out(actor, &format!("{t}DotEffMult"), eff);
+                if eff != 1.0 && self.bd(actor).is_some() {
+                    let src = self.dot_source_res(t)?;
+                    let b = crate::breakdown::eff_mult(
+                        t,
+                        resist,
+                        0.0,
+                        inc,
+                        eff,
+                        more,
+                        Some(&src),
+                        true,
+                        None,
+                        None,
+                    );
+                    self.bd(actor).unwrap().set(&format!("{t}DotEffMult"), b);
+                }
             }
             let td = format!("{t}Damage");
             let mut names = vec!["Damage", td.as_str()];
@@ -282,11 +328,21 @@ impl<'a> Perform<'a> {
                 && !self.has_type(i, "RemoteMined")
                 && !self.has_type(i, "Banner")
             {
-                self.c.calc_mod(list, Some(&typ), &["AuraEffect"])?
+                Some(self.c.calc_mod(list, Some(&typ), &["AuraEffect"])?)
             } else {
-                1.0
+                None
             };
-            let total = base * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * aura * eff;
+            let total = base
+                * (1.0 + inc / 100.0)
+                * more
+                * (1.0 + mult / 100.0)
+                * aura.unwrap_or(1.0)
+                * eff;
+            if let Some(bd) = self.bd(actor) {
+                let mut b = crate::breakdown::Bd::new();
+                crate::breakdown::dot(&mut b, base, inc, more, Some(mult), None, aura, eff, total);
+                bd.set(&key, b);
+            }
             let instance = g(self, "TotalDotInstance").unwrap_or(f64::NAN);
             match g(self, &key) {
                 Some(v) if v != 0.0 => {
@@ -312,16 +368,28 @@ impl<'a> Perform<'a> {
                 g(self, "Speed")
             }
             .unwrap_or(f64::NAN);
-            let total = m_min(
-                instance
-                    * speed
-                    * g(self, "Duration").unwrap_or(f64::NAN)
-                    * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN)
-                    * o.quantity_multiplier,
-                cap,
-            );
+            let duration = g(self, "Duration").unwrap_or(f64::NAN);
+            let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            let qm = o.quantity_multiplier;
+            let total = m_min(instance * speed * duration * dps_mult * qm, cap);
             self.c.set_out(actor, "TotalDot", total);
             self.c.set_out(actor, "TotalDotCalcSection", total);
+            if let Some(bd) = self.bd(actor) {
+                use crate::sf;
+                let mut b = crate::breakdown::Bd::of([
+                    sf!("%.1f ^8(Damage per Instance)", instance),
+                    sf!("x %.2f ^8(hits per second)", speed),
+                    sf!("x %.2f ^8(skill duration)", duration),
+                ]);
+                if dps_mult != 1.0 {
+                    b.push(sf!("x %g ^8(DPS multiplier for this skill)", dps_mult));
+                }
+                if qm > 1.0 {
+                    b.push(sf!("x %g ^8(quantity multiplier for this skill)", qm));
+                }
+                b.push(sf!("= %.1f", total));
+                bd.set("TotalDot", b);
+            }
         } else if let Some((flag, out, from)) = [
             (
                 "dotIsBurningGround",
@@ -406,13 +474,20 @@ impl<'a> Perform<'a> {
                 resource
             };
             let repeats = g(self, "Repeats").unwrap_or(1.0);
+            let time_type;
             let use_speed = if self.has_flag(i, "trap") || self.has_flag(i, "mine") {
+                time_type = if self.has_flag(i, "trap") {
+                    "trap throwing"
+                } else {
+                    "mine laying"
+                };
                 let pre = g(self, "TrapThrowingSpeed").or_else(|| g(self, "MineLayingSpeed"));
                 match g(self, "TrapCooldown").or(cooldown) {
                     Some(cd) if cd > 0.0 => 1.0 / cd,
                     _ => pre.unwrap_or(f64::NAN),
                 }
             } else if self.has_flag(i, "totem") {
+                time_type = "totem placement";
                 let place = g(self, "TotemPlacementSpeed").unwrap_or(f64::NAN);
                 (match cooldown {
                     Some(cd) if cd > 0.0 => {
@@ -428,8 +503,18 @@ impl<'a> Perform<'a> {
                 && self.c.flag(list, None, &["UseMaxUnleash"])?
                 && let Some(h) = self.sd_num(self.main(), "hitTimeOverride")
             {
+                time_type = "full unleash";
                 h / repeats
             } else {
+                time_type = if self.sd_truthy(i, "triggered") {
+                    "trigger"
+                } else if self.has_flag(i, "totem") {
+                    "totem placement"
+                } else if self.has_flag(i, "attack") {
+                    "attack"
+                } else {
+                    "cast"
+                };
                 (match cooldown {
                     Some(cd) if cd > 0.0 => {
                         if speed > 0.0 {
@@ -449,6 +534,17 @@ impl<'a> Perform<'a> {
             let v = g(self, &format!("{used}PerSecondCost")).unwrap_or(0.0)
                 + g(self, &format!("{resource}Cost")).unwrap_or(f64::NAN) * use_speed;
             self.c.set_out(actor, &format!("{used}PerSecondCost"), v);
+            if let Some(bd) = self.bd(actor) {
+                use crate::sf;
+                let mut b = match bd.get(&format!("{resource}Cost")) {
+                    Some(crate::breakdown::BdVal::Table(t)) => t.clone(),
+                    _ => crate::breakdown::Bd::new(),
+                };
+                b.lines.pop();
+                b.push(sf!(&format!("x %.2f ^8({time_type} speed)"), use_speed));
+                b.push(sf!("= %.2f per second", v));
+                bd.set(&format!("{used}PerSecondCost"), b);
+            }
         }
         Ok(())
     }
@@ -751,19 +847,18 @@ impl<'a> Perform<'a> {
         let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
         if self.has_flag(i, "impale") {
             let hand = |_: &Self, h: usize, k: &str| crate::calc_offence::get_num(&o.hands[h], k);
-            let mut impale = if self.has_flag(i, "attack")
+            let dual = self.has_flag(i, "attack")
                 && self.sd_truthy(i, "doubleHitsWhenDualWielding")
-                && self.has_flag(i, "bothWeaponAttack")
-            {
-                (0..2)
-                    .map(|h| {
-                        hand(self, h, "impaleStoredHitAvg").unwrap_or(f64::NAN)
-                            * (hand(self, h, "ImpaleModifier").unwrap_or(1.0) - 1.0)
-                            * hand(self, h, "HitChance").unwrap_or(f64::NAN)
-                            / 100.0
-                            * dps_mult
-                    })
-                    .sum()
+                && self.has_flag(i, "bothWeaponAttack");
+            let hand_dps = |p: &Self, h: usize| {
+                hand(p, h, "impaleStoredHitAvg").unwrap_or(f64::NAN)
+                    * (hand(p, h, "ImpaleModifier").unwrap_or(1.0) - 1.0)
+                    * hand(p, h, "HitChance").unwrap_or(f64::NAN)
+                    / 100.0
+                    * dps_mult
+            };
+            let mut impale = if dual {
+                hand_dps(self, 0) + hand_dps(self, 1)
             } else {
                 n(self, "impaleStoredHitAvg")
                     * (g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0)
@@ -791,6 +886,73 @@ impl<'a> Perform<'a> {
             }
             self.c.set_out(actor, "ImpaleDPS", impale);
             combined += impale;
+            if self.bd(actor).is_some() {
+                use crate::sf;
+                let mut b = crate::breakdown::Bd::new();
+                if dual {
+                    for (h, name, short, nl) in
+                        [(0, "Main Hand", "MH", "\n"), (1, "Off Hand", "OH", "")]
+                    {
+                        b.push(format!("{name}:"));
+                        b.push(sf!(
+                            &format!("%.2f ^8({short} average physical hit before mitigation)"),
+                            hand(self, h, "impaleStoredHitAvg").unwrap_or(f64::NAN)
+                        ));
+                        b.push(sf!(
+                            &format!("x %.2f ^8({short} chance to hit)"),
+                            hand(self, h, "HitChance").unwrap_or(f64::NAN) / 100.0
+                        ));
+                        b.push(sf!(
+                            &format!("x %.2f ^8({short} impale damage multiplier){nl}"),
+                            hand(self, h, "ImpaleModifier").unwrap_or(1.0) - 1.0
+                        ));
+                        b.push(sf!("= %.2f", hand_dps(self, h)));
+                    }
+                    b.push("Combined total:");
+                    b.push(sf!("%.2f + %.2f", hand_dps(self, 0), hand_dps(self, 1)));
+                } else {
+                    b.push(sf!(
+                        "%.2f ^8(average physical hit before mitigation)",
+                        n(self, "impaleStoredHitAvg")
+                    ));
+                    b.push(sf!(
+                        "x %.2f ^8(chance to hit)",
+                        n(self, "HitChance") / 100.0
+                    ));
+                    b.push(sf!(
+                        "x %.2f ^8(impale damage multiplier)",
+                        g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0
+                    ));
+                }
+                if self.has_flag(i, "notAverage") {
+                    b.push(match g(self, "HitSpeed") {
+                        Some(h) => sf!("x %.2f ^8(hit rate)", h),
+                        None => sf!(
+                            "x %.2f ^8(%s rate)",
+                            n(self, "Speed"),
+                            if self.has_flag(i, "attack") {
+                                "attack"
+                            } else {
+                                "cast"
+                            }
+                        ),
+                    });
+                }
+                if dps_mult != 1.0 {
+                    b.push(sf!("x %g ^8(dps multiplier for this skill)", dps_mult));
+                }
+                if o.quantity_multiplier > 1.0 {
+                    b.push(sf!(
+                        "x %g ^8(quantity multiplier for this skill)",
+                        o.quantity_multiplier
+                    ));
+                }
+                if n(self, "ImpaleDuration") <= 0.0 {
+                    b.push("x 0 ^8(no Impale Duration)");
+                }
+                b.push(sf!("= %.1f", impale));
+                self.bd(actor).unwrap().set("ImpaleDPS", b);
+            }
         }
         // A mirage's damage adds to the skill's
         let mut best_cull = 1.0;

@@ -335,7 +335,7 @@ fn breakdowns_match_upstream() {
     eprintln!("{compared} builds compared, {skipped} skipped");
     if std::env::var("BREAKDOWN_MISSING").is_ok() {
         let mut m: Vec<_> = missing.into_iter().collect();
-        m.sort_by(|a, b| b.1.cmp(&a.1));
+        m.sort_by_key(|x| std::cmp::Reverse(x.1));
         for (k, n) in m {
             eprintln!("missing {k}: {n}");
         }
