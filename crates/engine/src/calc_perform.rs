@@ -48,6 +48,12 @@ pub struct PerformInput<'a> {
     pub tree_version: &'a str,
     /// A calculation of the Calcs tab, which builds breakdowns
     pub breakdown: bool,
+    /// Calculations of other skills and their cache
+    pub recalc: Option<&'a dyn crate::calc_cache::Recalc>,
+    /// `env.limitedSkills`: the skills whose own calculations are skipped
+    pub limited: Vec<String>,
+    /// `skipEHP`: no defence estimations and allies' life pools
+    pub skip_ehp: bool,
 }
 
 /// An active skill's mod lists during the calculation
@@ -4342,17 +4348,69 @@ impl<'a> Perform<'a> {
             if !part2 {
                 continue;
             }
+            if self.is_limited(i) {
+                continue;
+            }
+            let list = self.lists[i].list;
+            let n = nospace(&name);
+            let cached_out = |p: &Self, k: &str| -> Result<f64> {
+                let c = p.cached_calc(i, true)?.ok_or_else(|| {
+                    format!("attempt to index a nil value (the cached calculation of {name})")
+                })?;
+                c.out(k)
+                    .ok_or_else(|| format!("attempt to perform arithmetic on a nil value ({k})"))
+            };
             match name.as_str() {
-                "Blight"
-                | "Blight of Contagion"
-                | "Blight of Atrophy"
-                | "Penance Brand of Dissipation"
-                | "Earthquake of Amplification" => {
-                    return Err(format!("not ported: the cached calculation of {name}"));
+                "Blight" | "Blight of Contagion" | "Blight of Atrophy" => {
+                    let rate = cached_out(self, "Speed")?;
+                    let duration = cached_out(self, "Duration")?;
+                    let base = self
+                        .c
+                        .base(list, Some(&main_cfg), &["BlightBaseMaxStages"])?;
+                    let max = m_min((rate * duration).floor() - 1.0, base - 1.0);
+                    self.c.add(
+                        list,
+                        src(&format!("Multiplier:{n}MaxStages"), Base, max, "Base"),
+                    );
+                    self.c.add(
+                        list,
+                        src(&format!("Multiplier:{n}StageAfterFirst"), Base, max, "Base"),
+                    );
+                }
+                "Penance Brand of Dissipation" => {
+                    let c = self.cached_calc(i, true)?.ok_or(
+                        "attempt to index a nil value (the cached calculation of Penance Brand)",
+                    )?;
+                    let freq = c.out("HitSpeed").unwrap_or(0.0);
+                    let duration = c
+                        .out("Duration")
+                        .ok_or("attempt to perform arithmetic on a nil value (Duration)")?;
+                    let ticks = m_max(m_min((freq * duration).floor() - 1.0, 19.0), 0.0);
+                    for k in ["MaxStages", "StageAfterFirst"] {
+                        self.c.add(
+                            list,
+                            src(
+                                &format!("Multiplier:PenanceBrandofDissipation{k}"),
+                                Base,
+                                ticks,
+                                "Base",
+                            ),
+                        );
+                    }
+                }
+                "Earthquake of Amplification" => {
+                    let duration = cached_out(self, "Duration")?;
+                    self.c.add(
+                        list,
+                        src(
+                            "Multiplier:100msEarthquakeDuration",
+                            Base,
+                            (duration * 10.0).floor(),
+                            "Skill:EarthquakeAltX",
+                        ),
+                    );
                 }
                 "Scorching Ray" | "Scorching Ray of Immolation" => {
-                    let list = self.lists[i].list;
-                    let n = nospace(&name);
                     self.c.add(
                         list,
                         src(&format!("Multiplier:{n}MaxStages"), Base, 7.0, "Base"),
@@ -5661,6 +5719,9 @@ impl<'a> Perform<'a> {
 
     /// The allies' life pools the player's damage can be taken from
     fn ally_life(&mut self) -> Result<()> {
+        if self.input.skip_ehp {
+            return Ok(());
+        }
         let pdb = self.pdb();
         let redirects = [
             "takenFromSpectresBeforeYou",
@@ -5912,6 +5973,9 @@ impl<'a> PerformInput<'a> {
             class_stats: [stat(0), stat(1), stat(2)],
             tree_version: &tree.version,
             breakdown,
+            recalc: None,
+            limited: Vec::new(),
+            skip_ehp: false,
         })
     }
 }

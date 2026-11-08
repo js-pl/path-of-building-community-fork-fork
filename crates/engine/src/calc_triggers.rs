@@ -13,7 +13,7 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::calc::{PLAYER, m_max, m_min, round};
-use crate::calc_perform::{Perform, Result, nospace};
+use crate::calc_perform::{Perform, Result};
 use crate::mods::{ModType, ModValue};
 
 /// A skill as the rotation simulation sees it
@@ -62,27 +62,7 @@ fn floor_b(x: f64, base: f64) -> f64 {
 impl<'a> Perform<'a> {
     /// `cacheSkillUUID(skill, env)`
     pub(crate) fn skill_uuid(&self, i: usize) -> String {
-        let skill = self.skill(i);
-        let name = nospace(&crate::pat::gsub(
-            &skill.active_effect.granted_effect.name,
-            "%s+",
-            "",
-        ));
-        let group = skill
-            .group
-            .and_then(|g| self.env.groups.get(g).map(|x| (g, x)));
-        let slot = group
-            .and_then(|(_, g)| g.slot.as_deref())
-            .map(|s| crate::pat::gsub(&s.to_uppercase(), "%s+", ""))
-            .unwrap_or_else(|| "NO_SLOT".into());
-        let mut slot_index = 1;
-        if let (Some((g, _)), Some((sg, k))) = (group, skill.active_effect.src)
-            && sg == g
-        {
-            slot_index = k + 1;
-        }
-        let group_index = group.map_or(1, |(g, _)| g + 1);
-        format!("{name}_{slot}_{slot_index}_{group_index}")
+        crate::calc_cache::skill_uuid(self.skill(i), &self.env.groups)
     }
 
     /// `isTriggered(skill)`
@@ -122,7 +102,7 @@ impl<'a> Perform<'a> {
         let Some(main) = self.actor_main(actor) else {
             return Ok(());
         };
-        if self.has_flag(main, "disable") {
+        if self.has_flag(main, "disable") || self.is_limited(main) {
             return Ok(());
         }
         let skill = self.skill(main);
@@ -256,6 +236,36 @@ impl<'a> Perform<'a> {
         }))
     }
 
+    /// `findTriggerSkill(env, skill, source, triggerRate)` with the
+    /// default comparer: the skill if its cached rate beats the source's
+    fn find_trigger_skill(
+        &self,
+        skill: usize,
+        source: Option<usize>,
+        rate: Option<f64>,
+    ) -> Result<(Option<usize>, Option<f64>)> {
+        if let Some(c) = self.cached_calc(skill, false)? {
+            let speed = c.out("HitSpeed").or_else(|| c.out("Speed"));
+            let better = match source {
+                None => speed.is_some(),
+                Some(_) => speed.is_some_and(|s| s > rate.unwrap_or(0.0)),
+            };
+            let used_by_mirage = self
+                .cfg(skill)
+                .skill_cond
+                .as_ref()
+                .is_some_and(|c| c.contains(&crate::mods::Sym::new("usedByMirage")));
+            if better
+                && !self.has_flag(skill, "disable")
+                && !used_by_mirage
+                && !self.has_type(skill, "OtherThingUsesSkill")
+            {
+                return Ok((Some(skill), speed));
+            }
+        }
+        Ok((source, rate))
+    }
+
     /// `packageSkillDataForSimulation(skill, env)`
     fn package_skill(&self, i: usize) -> Result<SimSkill> {
         let (list, cfg) = (self.lists[i].list, self.cfg(i));
@@ -356,7 +366,10 @@ impl<'a> Perform<'a> {
             .actor_main(actor)
             .ok_or("an actor without a main skill")?;
         let player_main = self.main();
-        let source = config.source;
+        let mut config = config;
+        let mut source = config.source;
+        // `uuid`: the source's, once a skill was looked at as one
+        let mut source_uuid: Option<String> = None;
         let mut triggered = config.triggered_skills.clone();
         let mut trig_rate = config.trig_rate;
         let weapon_flag = if config.source_weapon {
@@ -385,7 +398,8 @@ impl<'a> Perform<'a> {
                         || config.allow_triggered)
                     && i != main
                 {
-                    return Err("not ported: calculations of other skills".into());
+                    (source, trig_rate) = self.find_trigger_skill(i, source, trig_rate)?;
+                    source_uuid = source.map(|s| self.skill_uuid(s));
                 }
                 if let Some(cond) = config.triggered_skill_cond
                     && cond(self, i)
@@ -421,6 +435,33 @@ impl<'a> Perform<'a> {
                 trig_rate = Some(rate / 2.0);
             }
         }
+        let cached = match (&source_uuid, self.input.recalc) {
+            (Some(u), Some(r)) => r.cached(u),
+            _ => None,
+        };
+        if let (Some(s), Some(c)) = (source, &cached) {
+            if self.c.flag(self.lists[s].list, None, &["HasSeals"])?
+                && self.has_type(s, "CanRapidFire")
+            {
+                let mult = c
+                    .skill
+                    .mods
+                    .as_ref()
+                    .and_then(|m| m.skill_data.get("dpsMultiplier"))
+                    .and_then(ModValue::as_number)
+                    .unwrap_or(1.0);
+                trig_rate = trig_rate.map(|r| r * mult);
+                self.set_flag(main, "HasSeals", true);
+                self.sd_set(main, "ignoresTickRate", true);
+            }
+            let part = self.mods(s).skill_part_name.clone().unwrap_or_default();
+            if crate::pat::find(&part, "(.*)All(.*)Projectiles(.*)").is_some()
+                && self.has_flag(s, "projectile")
+            {
+                let mult = c.out("ProjectileCount").unwrap_or(1.0);
+                trig_rate = trig_rate.map(|r| r * mult);
+            }
+        }
         let stored = self.sd_num(main, "storedUses");
         if !self.sd_truthy(main, "ignoresTickRate") && stored.is_some_and(|s| s > 1.0) {
             self.sd_set(main, "ignoresTickRate", true);
@@ -429,6 +470,13 @@ impl<'a> Perform<'a> {
             let s = source.ok_or("attempt to index a nil value (local 'source')")?;
             let repeats = 1.0 + self.c.base(self.lists[s].list, None, &["RepeatCount"])?;
             trig_rate = trig_rate.map(|r| r / repeats);
+        }
+        let melee_source = source.is_some_and(|s| self.has_type(s, "Melee"));
+        if (self.sd_truthy(main, "triggeredByBattleMageCry") || self.skill_name(main) == "Combust")
+            && cached.is_some()
+            && melee_source
+        {
+            return Err("not ported: the uptime of exerting warcries as a trigger".into());
         }
         if self.sd_truthy(main, "triggeredByManaforged") && trig_rate.is_some_and(|r| r > 0.0) {
             return Err("not ported: Manaforged Arrows".into());
@@ -516,9 +564,53 @@ impl<'a> Perform<'a> {
             let mut chance = 100.0;
             if let Some(s) = source
                 && (self.has_type(s, "Melee") || self.has_type(s, "Attack"))
+                && let Some(c) = &cached
                 && !config.trigger_on_use
             {
-                return Err("not ported: calculations of other skills".into());
+                let dual = self.weapon_str(PLAYER, 0, "type").is_some()
+                    && self.weapon_str(PLAYER, 1, "type").is_some()
+                    && self.sd_truthy(s, "doubleHitsWhenDualWielding");
+                let hand = |k: &str, hand: &str| -> f64 {
+                    match c.output.get(&crate::mods::Sym::new(hand)) {
+                        Some(crate::actor::OutVal::Table(t)) => t
+                            .get(k)
+                            .and_then(crate::actor::OutVal::num)
+                            .unwrap_or(f64::NAN),
+                        _ => f64::NAN,
+                    }
+                };
+                let both = |k: &str| {
+                    let (m, o) = (hand(k, "MainHand"), hand(k, "OffHand"));
+                    m * o / 100.0 + m * (100.0 - o) / 100.0 + (100.0 - m) * o / 100.0
+                };
+                let hit = c.out("HitChance").unwrap_or(0.0);
+                if hit != 100.0 {
+                    chance = if dual {
+                        chance * both("HitChance") / 100.0
+                    } else {
+                        chance * hit / 100.0
+                    };
+                }
+                if self.sd_truthy(main, "triggerOnCrit") {
+                    let on_crit = self.sd_num(main, "chanceToTriggerOnCrit").or_else(|| {
+                        c.skill
+                            .mods
+                            .as_ref()
+                            .and_then(|m| m.skill_data.get("chanceToTriggerOnCrit"))
+                            .and_then(ModValue::as_number)
+                    });
+                    if config.trigger_chance.is_none() {
+                        config.trigger_chance = on_crit;
+                    }
+                    let crit = c.out("CritChance").unwrap_or(0.0);
+                    if crit != 100.0 {
+                        chance = if dual {
+                            chance * both("CritChance") / 100.0
+                        } else {
+                            chance * crit / 100.0
+                        };
+                    }
+                }
             }
             if let Some(tc) = config.trigger_chance
                 && tc != 100.0

@@ -6,6 +6,7 @@
 pub mod actor;
 pub mod build;
 pub mod calc;
+pub mod calc_cache;
 pub mod calc_defence;
 pub mod calc_ehp;
 pub mod calc_env;

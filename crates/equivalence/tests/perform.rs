@@ -582,8 +582,14 @@ fn perform_matches_upstream() {
                 continue;
             }
         };
-        let input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
+        let recalc = engine::calc_cache::Recalculator::new(
+            &typed_build,
+            &calc_data,
+            BuffMode::new(Some("EFFECTIVE")),
+        );
+        let mut input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
             .unwrap_or_else(|e| panic!("{id}: {e}"));
+        input.recalc = Some(&recalc);
         let p = match engine::calc_perform::perform(typed_env, input) {
             Ok(p) => p,
             Err(e) if e.starts_with("not ported") => {
