@@ -43,6 +43,16 @@ pub struct ItemsInput<'a, 't> {
     /// `override.extraJewelFuncs`: the `ExtraJewelFunc` mods of the first
     /// pass, which give every socketed jewel more functions
     pub extra_jewel_funcs: &'a [Mod],
+    /// `env.allocNodes` before the granted passives
+    pub alloc: &'a OrderedMap<usize>,
+    /// `override.repSlotName` and `override.repItem`
+    pub rep_item: Option<(&'a str, Option<&'a Item>)>,
+    /// `override.removeNodes` keyed by node id, which the granted passives
+    /// check
+    pub remove_ids: &'a [u32],
+    /// `override.toggleFlask` and `override.toggleTincture`, by item id
+    pub toggle_flask: Option<i64>,
+    pub toggle_tincture: Option<i64>,
 }
 
 /// A skill an item grants (`env.grantedSkillsItems`)
@@ -300,7 +310,7 @@ fn add_radius_jewels(
         if typ != RadiusType::Self_ && socket.nodes_in_radius.is_some() {
             let ids = ids.ok_or("a jewel function without a radius")?;
             for &id in ids {
-                if !spec.alloc_nodes.contains(id) {
+                if !input.alloc.contains(id) {
                     out.extra_radius_nodes.insert(id, ());
                 }
             }
@@ -343,17 +353,35 @@ fn equip<'a>(
         if slot_name == "Ring 3" && !ring3 {
             continue;
         }
-        let item = tab.item(slot.sel_item_id);
+        let mut item = tab.item(slot.sel_item_id);
+        let mut item_id = slot.sel_item_id;
+        if let Some((rep_slot, rep)) = input.rep_item {
+            if slot_name == rep_slot {
+                item = rep;
+                item_id = rep.and_then(|r| r.id).unwrap_or(0.0);
+            } else if let Some(rep) = rep
+                && rep_slot.starts_with("Weapon 1")
+                && slot_name.starts_with("Weapon 2")
+                // upstream's Bow case reads `item` before it is set, so
+                // it never applies
+                && matches!(
+                    typ(rep),
+                    "Staff" | "Two Handed Sword" | "Two Handed Axe" | "Two Handed Mace"
+                )
+            {
+                continue;
+            }
+        }
         if let Some(item) = item {
             for skill in &item.granted_skills {
                 out.granted_skills.push(ItemSkill {
                     skill: skill.clone(),
-                    item_id: slot.sel_item_id,
+                    item_id,
                     slot_name: slot_name.clone(),
                 });
             }
             if list::flag(&item.base_mod_list, "CanExplode")? {
-                out.explode_sources.push(slot.sel_item_id);
+                out.explode_sources.push(item_id);
             }
         }
         if slot
@@ -366,7 +394,7 @@ fn equip<'a>(
             slot_name = slot_name.replace(" Swap", "");
         }
         if let Some(node_id) = slot.node_id {
-            if !spec.alloc_nodes.contains(node_id) {
+            if !input.alloc.contains(node_id) {
                 continue;
             }
             if let Some(item) = item {
@@ -394,7 +422,7 @@ fn equip<'a>(
                     }
                     *count += 1.0;
                 }
-                add_radius_jewels(out, input, node_id, item, slot.sel_item_id)?;
+                add_radius_jewels(out, input, node_id, item, item_id)?;
             }
         }
         if let Some(item) = item
@@ -631,7 +659,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             }
             out.add_mult(&mult, 1.0);
         }
-        let aegis = spec.alloc_nodes.contains(45175)
+        let aegis = input.alloc.contains(45175)
             && spec
                 .tree
                 .node(45175)
@@ -799,6 +827,19 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
     ] {
         if let Some(v) = input.config.get(option).filter(|v| v.truthy()) {
             out.set_mult(&format!("Empty{color}SocketsInAnySlot"), v.num());
+        }
+    }
+    for (toggle, list) in [
+        (input.toggle_flask, &mut out.flasks),
+        (input.toggle_tincture, &mut out.tinctures),
+    ] {
+        if let Some(id) = toggle {
+            match list.iter().position(|&x| x == id) {
+                Some(k) => {
+                    list.remove(k);
+                }
+                None => list.push(id),
+            }
         }
     }
     Ok(out)

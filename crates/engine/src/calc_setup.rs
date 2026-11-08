@@ -1545,25 +1545,52 @@ pub(crate) fn set_source(m: &mut Mod, source: &str) {
 
 /// The allocation counts' multipliers of `initEnv`
 pub fn allocation_mods(spec: &PassiveSpec, db: &mut Store) {
+    allocation_count_mods(&AllocCounts::of(spec), db);
+}
+
+/// The allocation counts of `initEnv`: the spec's, changed by the
+/// override's added and removed nodes
+#[derive(Clone, Debug, Default)]
+pub struct AllocCounts {
+    pub notable: i64,
+    pub keystone: i64,
+    pub mastery: i64,
+    pub mastery_type_count: i64,
+    /// By mastery name, in the order first counted
+    pub mastery_types: Vec<(std::rc::Rc<str>, i64)>,
+}
+
+impl AllocCounts {
+    pub fn of(spec: &PassiveSpec) -> AllocCounts {
+        AllocCounts {
+            notable: spec.allocated_notable_count as i64,
+            keystone: spec.allocated_keystone_count as i64,
+            mastery: spec.allocated_mastery_count as i64,
+            mastery_type_count: spec.allocated_mastery_type_count as i64,
+            mastery_types: spec
+                .allocated_mastery_types
+                .iter()
+                .map(|(n, c)| (n.clone(), *c as i64))
+                .collect(),
+        }
+    }
+}
+
+/// The `Multiplier:Allocated...` mods of allocation counts
+pub fn allocation_count_mods(c: &AllocCounts, db: &mut Store) {
     let counts = [
-        ("Multiplier:AllocatedNotable", spec.allocated_notable_count),
-        (
-            "Multiplier:AllocatedKeystone",
-            spec.allocated_keystone_count,
-        ),
-        ("Multiplier:AllocatedMastery", spec.allocated_mastery_count),
-        (
-            "Multiplier:AllocatedMasteryType",
-            spec.allocated_mastery_type_count,
-        ),
+        ("Multiplier:AllocatedNotable", c.notable),
+        ("Multiplier:AllocatedKeystone", c.keystone),
+        ("Multiplier:AllocatedMastery", c.mastery),
+        ("Multiplier:AllocatedMasteryType", c.mastery_type_count),
     ];
     for (name, n) in counts {
         if n > 0 {
             db.add(Mod::new(name, ModType::Base, n as f64, None));
         }
     }
-    if let Some((_, n)) = spec
-        .allocated_mastery_types
+    if let Some((_, n)) = c
+        .mastery_types
         .iter()
         .find(|(name, _)| &**name == "Life Mastery")
         && *n > 0

@@ -13,7 +13,7 @@ use crate::actor::OutVal;
 use crate::breakdown::{Bd, BdVal};
 use crate::build::Build;
 use crate::calc::PLAYER;
-use crate::calc_env::{CalcData, Env, init_env};
+use crate::calc_env::{CalcData, Env};
 use crate::calc_perform::{Perform, PerformInput, no_whitespace, perform};
 use crate::calc_setup::BuffMode;
 use crate::mods::{ModValue, Sym};
@@ -99,6 +99,9 @@ pub fn skill_uuid_in(skill: &crate::calc_skills::ActiveSkill, groups: &[SocketGr
 pub struct Calcs<'d> {
     pub data: &'d CalcData<'d>,
     cache: RefCell<HashMap<(Mode, String), Rc<Cached>>>,
+    /// The override of the calculation running (`env.override`), which
+    /// the skills it calculates again share
+    pub override_: RefCell<crate::calc_env::Override>,
 }
 
 impl<'d> Calcs<'d> {
@@ -106,6 +109,7 @@ impl<'d> Calcs<'d> {
         Calcs {
             data,
             cache: RefCell::new(HashMap::new()),
+            override_: RefCell::new(crate::calc_env::Override::default()),
         }
     }
 
@@ -120,7 +124,15 @@ impl<'d> Calcs<'d> {
 
     /// `calcs.initEnv(build, mode)`
     pub fn init_env(&self, build: &Build, mode: Mode) -> Result<Env> {
-        init_env(build, self.data, mode.buff_mode(), mode == Mode::Calcs)
+        crate::calc_env::init_env_copy(
+            build,
+            self.data,
+            mode.buff_mode(),
+            mode == Mode::Calcs,
+            mode == Mode::Main,
+            None,
+            &self.override_.borrow(),
+        )
     }
 
     /// `calcs.perform(env, skipEHP)` to its end: the setup, the player's
@@ -229,6 +241,50 @@ impl<'d> Calcs<'d> {
         }
         full.finish(&sources, dot_cap);
         Ok(full)
+    }
+
+    /// `calcs.getMiscCalculator(build)`'s base pass: the player's output
+    /// in `CALCULATOR` mode, with Full DPS if a skill is in it, and
+    /// whether one is
+    pub fn misc_calculator_base(&self, build: &Build) -> Result<(Output, bool)> {
+        *self.override_.borrow_mut() = crate::calc_env::Override::default();
+        let env = self.init_env(build, Mode::Calculator)?;
+        let (mut out, _) = self.perform(build, env, Mode::Calculator, false, &[], |p| {
+            p.c.actors.actors[PLAYER].output.clone()
+        })?;
+        let full = self.calc_full_dps(build, Mode::Calculator)?;
+        let used = !full.skills.is_empty();
+        if used {
+            full.write(&mut out);
+        }
+        Ok((out, used))
+    }
+
+    /// A call of `calcs.getMiscCalculator(build)`'s function:
+    /// `calcFunc(override, useFullDPS)`. `used_full_dps` is the base
+    /// pass's; `tree_view` is `build.viewMode == "TREE"`
+    pub fn misc_calculate(
+        &self,
+        build: &Build,
+        ov: crate::calc_env::Override,
+        use_full_dps: Option<bool>,
+        used_full_dps: bool,
+        tree_view: bool,
+    ) -> Result<Output> {
+        *self.override_.borrow_mut() = ov;
+        let r = (|| {
+            let env = self.init_env(build, Mode::Calculator)?;
+            let (mut out, _) = self.perform(build, env, Mode::Calculator, false, &[], |p| {
+                p.c.actors.actors[PLAYER].output.clone()
+            })?;
+            if (use_full_dps != Some(false) || tree_view) && used_full_dps {
+                let full = self.calc_full_dps(build, Mode::Calculator)?;
+                full.write(&mut out);
+            }
+            Ok(out)
+        })();
+        *self.override_.borrow_mut() = crate::calc_env::Override::default();
+        r
     }
 
     /// `calcs.buildOutput(build, "MAIN")`
@@ -833,7 +889,9 @@ impl<'d> Calcs<'d> {
             self.data,
             Mode::Calculator.buff_mode(),
             false,
+            false,
             Some(uuid),
+            &self.override_.borrow(),
         )?;
         let mut copy = env
             .skills

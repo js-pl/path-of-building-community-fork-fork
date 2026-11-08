@@ -591,6 +591,11 @@ fn items_setup_matches_upstream() {
             energy_blade: false,
             jewel_radius: &radius,
             extra_jewel_funcs: &[],
+            alloc: &spec.alloc_nodes,
+            rep_item: None,
+            remove_ids: &[],
+            toggle_flask: None,
+            toggle_tincture: None,
         };
         // The player's database before the items
         let ltree = get(&get(&env, "spec"), "tree");

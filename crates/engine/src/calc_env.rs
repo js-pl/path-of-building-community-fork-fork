@@ -48,10 +48,106 @@ pub struct Env {
     pub enemy_multipliers: HashMap<Sym, f64>,
 }
 
+/// The changes a calculator makes to a build for one calculation
+/// (`calcs.initEnv`'s `override`)
+#[derive(Clone, Debug, Default)]
+pub struct Override {
+    /// `override.conditions`
+    pub conditions: Vec<String>,
+    /// `override.addNodes`: spec node indices, in the table's order
+    pub add_nodes: Vec<usize>,
+    /// `override.removeNodes` keyed by node: spec node indices
+    pub remove_nodes: Vec<usize>,
+    /// `override.removeNodes` keyed by node id, which only the granted
+    /// passives check
+    pub remove_ids: Vec<u32>,
+    /// `override.repSlotName` and `override.repItem`
+    pub rep_item: Option<(String, Option<std::rc::Rc<crate::item::Item>>)>,
+    /// `override.toggleFlask` and `override.toggleTincture`, by item id
+    pub toggle_flask: Option<i64>,
+    pub toggle_tincture: Option<i64>,
+}
+
+impl Override {
+    pub fn is_empty(&self) -> bool {
+        self.conditions.is_empty()
+            && self.add_nodes.is_empty()
+            && self.remove_nodes.is_empty()
+            && self.remove_ids.is_empty()
+            && self.rep_item.is_none()
+            && self.toggle_flask.is_none()
+            && self.toggle_tincture.is_none()
+    }
+}
+
+/// `env.allocNodes` and the allocation counts of an override
+fn override_alloc(
+    spec: &crate::spec::PassiveSpec,
+    o: &Override,
+) -> (crate::spec::OrderedMap<usize>, calc_setup::AllocCounts) {
+    use crate::tree::NodeType;
+    let mut counts = calc_setup::AllocCounts::of(spec);
+    if o.add_nodes.is_empty() && o.remove_nodes.is_empty() {
+        let mut alloc = crate::spec::OrderedMap::default();
+        for (id, &i) in spec.alloc_nodes.iter() {
+            alloc.insert(id, i);
+        }
+        return (alloc, counts);
+    }
+    let mut nodes = crate::spec::OrderedMap::default();
+    let kind = |i: usize| spec.tree_node(i).kind;
+    for &i in &o.add_nodes {
+        nodes.insert(spec.nodes[i].id, i);
+        match kind(i) {
+            NodeType::Mastery => {
+                counts.mastery += 1;
+                let name = spec.tree_node(i).dn.clone();
+                match counts.mastery_types.iter_mut().find(|(n, _)| *n == name) {
+                    None => {
+                        counts.mastery_types.push((name, 1));
+                        counts.mastery_type_count += 1;
+                    }
+                    Some((_, c)) => {
+                        if *c == 0 {
+                            counts.mastery_type_count += 1;
+                        }
+                        *c += 1;
+                    }
+                }
+            }
+            NodeType::Notable => counts.notable += 1,
+            NodeType::Keystone => counts.keystone += 1,
+            _ => {}
+        }
+    }
+    for (id, &i) in spec.alloc_nodes.iter() {
+        if !o.remove_nodes.contains(&i) {
+            nodes.insert(id, i);
+            continue;
+        }
+        match kind(i) {
+            NodeType::Mastery => {
+                counts.mastery -= 1;
+                let name = spec.tree_node(i).dn.clone();
+                if let Some((_, c)) = counts.mastery_types.iter_mut().find(|(n, _)| *n == name) {
+                    *c -= 1;
+                    if *c == 0 {
+                        counts.mastery_type_count -= 1;
+                    }
+                }
+            }
+            NodeType::Notable => counts.notable -= 1,
+            NodeType::Keystone => counts.keystone -= 1,
+            _ => {}
+        }
+    }
+    (nodes, counts)
+}
+
 /// `calcs.initEnv(build, mode)`; [`write_back`] gives the build's Skills
 /// tab the socket groups with the granted skills and the gems' selections.
 pub fn init_env(build: &Build, data: &CalcData, mode: BuffMode, calcs: bool) -> Result<Env> {
-    init_env_copy(build, data, mode, calcs, None)
+    init_env_copy(build, data, mode, calcs, true, None, &Override::default())
 }
 
 /// [`init_env`], then `calcs.copyActiveSkill`'s copy of the skill with
@@ -61,11 +157,13 @@ pub fn init_env_copy(
     data: &CalcData,
     mode: BuffMode,
     calcs: bool,
+    main: bool,
     copy_of: Option<&str>,
+    ov: &Override,
 ) -> Result<Env> {
-    match init_env_with(build, data, mode, calcs, false, copy_of) {
+    match init_env_with(build, data, mode, calcs, main, false, copy_of, ov) {
         Err(e) if e == calc_skills::ENERGY_BLADE => {
-            init_env_with(build, data, mode, calcs, true, copy_of)
+            init_env_with(build, data, mode, calcs, main, true, copy_of, ov)
         }
         r => r,
     }
@@ -73,13 +171,16 @@ pub fn init_env_copy(
 
 /// `calcs.initEnv(build, mode, override)` with `override.conditions`
 /// holding `AffectedByEnergyBlade` or not
+#[allow(clippy::too_many_arguments)]
 fn init_env_with(
     build: &Build,
     data: &CalcData,
     mode: BuffMode,
     calcs: bool,
+    main: bool,
     energy_blade: bool,
     copy_of: Option<&str>,
+    ov: &Override,
 ) -> Result<Env> {
     // The Calcs tab's buff mode
     let mode = if calcs {
@@ -125,18 +226,22 @@ fn init_env_with(
         mode,
     };
     let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
+    for c in &ov.conditions {
+        player_db.conditions.insert(crate::mods::Sym::new(c), true);
+    }
     if energy_blade {
         player_db
             .conditions
             .insert(crate::mods::Sym::new("AffectedByEnergyBlade"), true);
     }
-    calc_setup::allocation_mods(spec, &mut player_db);
+    let (alloc_nodes, counts) = override_alloc(spec, ov);
+    calc_setup::allocation_count_mods(&counts, &mut player_db);
     // The tree before the items
-    let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+    let alloc: Vec<usize> = alloc_nodes.iter().map(|(_, &i)| i).collect();
     let (mut initial_node_mods, _) = calc_setup::build_mod_list_for_node_list(
         spec,
         &alloc,
-        &spec.alloc_nodes,
+        &alloc_nodes,
         &mut [],
         &[],
         true,
@@ -158,6 +263,14 @@ fn init_env_with(
         energy_blade,
         jewel_radius: data.jewel_radius,
         extra_jewel_funcs: &[],
+        alloc: &alloc_nodes,
+        rep_item: ov
+            .rep_item
+            .as_ref()
+            .map(|(s, i)| (s.as_str(), i.as_deref())),
+        remove_ids: &ov.remove_ids,
+        toggle_flask: ov.toggle_flask,
+        toggle_tincture: ov.toggle_tincture,
     };
     let setup = calc_tree::setup(&player_db, &items_input, data.items)?;
     let mut player_db = setup.mod_db.clone();
@@ -182,7 +295,11 @@ fn init_env_with(
             .map(|&id| ExplodeSource::Item(id)),
     );
     let mut groups = groups;
-    calc_skills::add_granted_groups(&mut groups, &granted, &explode, data.skills);
+    // Only `MAIN` mode updates the build's groups of granted skills; the
+    // other modes see them as the last `MAIN` calculation left them
+    if main {
+        calc_skills::add_granted_groups(&mut groups, &granted, &explode, data.skills);
+    }
     update_socket_groups(&mut groups, &build.items);
     // The active skills
     let imbued = build

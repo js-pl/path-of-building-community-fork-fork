@@ -232,6 +232,12 @@ impl<'a> Perform<'a> {
                 let uuid = skill_uuid(self, k);
                 if calcs.cached(mode, &uuid).is_none() {
                     calcs.build_active_skill(build, mode, &uuid, &self.input.limited)?;
+                } else if !calcs.override_.borrow().is_empty() {
+                    // Upstream copies the cached skill, whose mods still
+                    // see the player of the calculation that cached it
+                    return Err(
+                        "not ported: The Saviour's cached skill under a calculator override".into(),
+                    );
                 }
                 if let Some(c) = calcs.cached(mode, &uuid)
                     && c.num("CritChance").is_some_and(|v| v > 0.0)

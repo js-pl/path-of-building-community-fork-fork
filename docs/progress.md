@@ -67,10 +67,20 @@ Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
 `Data.lua` to the importer comes later.
 
+`calcs.getMiscCalculator` runs typed (`Calcs::misc_calculator_base`,
+`Calcs::misc_calculate`) with `initEnv`'s overrides (`calc_env::Override`:
+conditions, nodes added and removed, an item replaced, a flask or tincture
+switched); `crates/equivalence/tests/calculators.rs` compares the base pass
+and overrides of each kind with the translation's: every corpus build equal
+(61). `calcs.getNodeCalculator` is not used by upstream's UI and is not
+ported.
+
 ## Not ported yet in `initEnv`
 
-- Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
-  node and item power calculators
+- `override.spec` and `override.extraJewelFuncs` given by a caller;
+  mastery effect nodes in `override.addNodes` (the power builder's)
+- The Saviour's mirage under an override: upstream copies the cached
+  skill, whose mods still see the player of the calculation that cached it
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
   skills, the character level's auto mode, timeless jewel data
 - Passives granted only by the latest tree
@@ -90,7 +100,8 @@ a skip:
 
 ## Next
 
-The node and misc calculators, and the engine API on the typed engine.
+Node power (`CalcsTab:PowerBuilder`) on the misc calculator, then the
+engine API on the typed engine.
 
 ## Upstream quirks met so far
 
@@ -114,6 +125,15 @@ the tests align these:
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
+- only `MAIN` mode updates the build's socket groups of granted skills;
+  calculators keep those the last `MAIN` calculation left, so an item an
+  override takes out still grants its skill
+- `override.repItem` for a two-hand bow in `Weapon 1` reads the slot's
+  item before it is set, so the off hand stays
+- `override.removeNodes` is keyed by node where the tree is built and by
+  node id where granted passives are, so one key only reaches one of them
+- the translated program keeps state across the builds one host loads;
+  `tests/calculators.rs` runs a build that differs again in a fresh one
 
 ## Working notes
 
