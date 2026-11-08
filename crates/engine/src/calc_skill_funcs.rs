@@ -99,6 +99,49 @@ impl<'a> Perform<'a> {
                     self.c.set_out(actor, "SkillDPSMultiplier", cur * mult);
                 }
             }
+            ("Cyclone" | "VaalCyclone", "initialFunc") => {
+                let w = |p: &Self, n: usize, k: &str| {
+                    p.weapon(actor, n)
+                        .and_then(|w| w.get(k))
+                        .and_then(crate::mods::ModValue::as_number)
+                };
+                let wcfg = |p: &Self, n: usize| p.mods(i).weapon_cfgs[n].clone();
+                let range_of = |p: &Self, n: usize| -> Result<f64> {
+                    let cfg = wcfg(p, n);
+                    Ok(p.c.base(list, cfg.as_ref(), &["MeleeWeaponRange"])?
+                        + 10.0 * p.c.base(list, cfg.as_ref(), &["MeleeWeaponRangeMetre"])?
+                        + w(p, n, "rangeBonus").unwrap_or(f64::NAN))
+                };
+                let range = if self.has_flag(i, "weapon1Attack") && w(self, 0, "range").is_some() {
+                    let r1 = range_of(self, 0)?;
+                    if self.has_flag(i, "weapon2Attack") && w(self, 1, "range").is_some() {
+                        (r1 + range_of(self, 1)?) / 2.0
+                    } else {
+                        r1
+                    }
+                } else {
+                    self.c.base(list, c, &["UnarmedRange"])?
+                        + 10.0 * self.c.base(list, c, &["UnarmedRangeMetre"])?
+                };
+                self.c.add(
+                    list,
+                    Mod::new(
+                        "Multiplier:AdditionalMeleeRange",
+                        ModType::Base,
+                        range,
+                        Some("Skill:Cyclone"),
+                    ),
+                );
+            }
+            ("IceSpear", "preDamageFunc") => {
+                if part == Some(3.0) || part == Some(4.0) {
+                    let count = self.c.out(actor, "ProjectileCount").ok_or(
+                        "attempt to perform arithmetic on a nil value (field 'ProjectileCount')",
+                    )?;
+                    let cur = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0);
+                    self.sd_set(i, "dpsMultiplier", cur * count);
+                }
+            }
             ("BladeFlurryAltX", "preDamageFunc") => {
                 let stages = sd(self, "numStages");
                 if part == Some(2.0) && stages > 0.0 {
