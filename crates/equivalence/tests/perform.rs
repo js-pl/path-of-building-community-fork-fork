@@ -290,6 +290,8 @@ struct Snapshot {
     player: Db,
     enemy: Db,
     skills: Vec<Db>,
+    /// `env.minion`'s database and skills
+    minion: Option<(Db, Vec<Db>)>,
 }
 
 fn snapshot(env: &Value) -> Snapshot {
@@ -306,11 +308,20 @@ fn snapshot(env: &Value) -> Snapshot {
         .into_iter()
         .map(|(_, a)| lua_db(&get(&a, "skillModList")))
         .collect();
+    let minion = get(env, "minion");
+    let minion = (!minion.is_nil()).then(|| {
+        let skills = entries(&get(&minion, "activeSkillList"))
+            .into_iter()
+            .map(|(_, a)| lua_db(&get(&a, "skillModList")))
+            .collect();
+        (lua_db(&get(&minion, "modDB")), skills)
+    });
     Snapshot {
         output,
         player: lua_db(&get(env, "modDB")),
         enemy: lua_db(&get(env, "enemyDB")),
         skills,
+        minion,
     }
 }
 
@@ -321,23 +332,36 @@ fn compare_stage(
     fail: &mut Vec<String>,
     partial: bool,
 ) {
-    let got: BTreeMap<String, J> = p.c.actors.actors[0]
-        .output
-        .iter()
-        .map(|(k, v)| (k.as_str().to_string(), typed_json(v)))
-        .collect();
+    let out_json = |a: usize| -> BTreeMap<String, J> {
+        p.c.actors.actors[a]
+            .output
+            .iter()
+            .map(|(k, v)| (k.as_str().to_string(), typed_json(v)))
+            .collect()
+    };
+    let mut got = out_json(0);
+    let mut want_out = want.output.clone();
+    // `output.Minion` is the minion's output: compared by key
+    if let Some(a) = p.minion_actor() {
+        for (k, v) in out_json(a) {
+            got.insert(format!("Minion.{k}"), v);
+        }
+    }
+    if let Some(J::Object(m)) = want_out.remove("Minion") {
+        for (k, v) in m {
+            want_out.insert(format!("Minion.{k}"), v);
+        }
+    }
     for k in got
         .keys()
-        .chain(want.output.keys())
+        .chain(want_out.keys())
         .collect::<std::collections::BTreeSet<_>>()
     {
-        if got.get(k) != want.output.get(k) && !(partial && !got.contains_key(k)) {
+        if got.get(k) != want_out.get(k) && !(partial && !got.contains_key(k)) {
             fail.push(format!(
                 "output {k}: {} != {}",
                 got.get(k).map_or("missing".into(), |v| v.to_string()),
-                want.output
-                    .get(k)
-                    .map_or("missing".into(), |v| v.to_string())
+                want_out.get(k).map_or("missing".into(), |v| v.to_string())
             ));
         }
     }
@@ -353,12 +377,32 @@ fn compare_stage(
         &mut want.enemy,
         fail,
     );
-    if want.skills.len() != p.lists.len() {
-        fail.push(format!("{} skills != {}", p.lists.len(), want.skills.len()));
+    if want.skills.len() != p.n_player {
+        fail.push(format!("{} skills != {}", p.n_player, want.skills.len()));
     } else {
         for (i, (l, w)) in p.lists.iter().zip(want.skills.iter_mut()).enumerate() {
             compare_db(&format!("skill {i}"), &typed_db(p.c.store(l.list)), w, fail);
         }
+    }
+    match (p.env_minion, &mut want.minion) {
+        (None, None) => {}
+        (Some(m), Some((db, skills))) => {
+            let m = &p.minions[m];
+            compare_db("minion", &typed_db(p.c.store(p.c.db(m.actor))), db, fail);
+            if skills.len() != m.skills.len() {
+                fail.push(format!(
+                    "{} minion skills != {}",
+                    m.skills.len(),
+                    skills.len()
+                ));
+            } else {
+                for (k, (&i, w)) in m.skills.iter().zip(skills.iter_mut()).enumerate() {
+                    let list = p.c.store(p.lists[i].list);
+                    compare_db(&format!("minion skill {k}"), &typed_db(list), w, fail);
+                }
+            }
+        }
+        (t, _) => fail.push(format!("typed minion {t:?}, translated differs")),
     }
 }
 
@@ -560,7 +604,7 @@ fn perform_matches_upstream() {
                 0 => Ok(()),
                 1 => p.defence(0),
                 2 => p.defence_estimations(0),
-                _ => p.player_offence(),
+                _ => p.player_offence().and_then(|_| p.minion_calcs()),
             };
             if let Err(e) = result {
                 if e.starts_with("not ported") {

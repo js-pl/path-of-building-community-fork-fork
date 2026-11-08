@@ -9,7 +9,7 @@
 use crate::calc::{m_max, m_min};
 use crate::calc_offence::Off;
 use crate::calc_perform::Perform;
-use crate::mods::{Mod, ModType};
+use crate::mods::{Mod, ModType, ModValue, Tag};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -29,6 +29,67 @@ impl<'a> Perform<'a> {
                 / p.c.more(list, c, &["BrandActivationFrequency"])?)
         };
         match (id, name) {
+            ("ArmageddonBrand", "preDamageFunc") => {
+                let v = brand_time(self)?;
+                self.sd_set(i, "hitTimeOverride", v);
+            }
+            ("ChargedDash", "preDamageFunc") => {
+                if part == Some(3.0) {
+                    let v = self.c.inc(list, c, &["chargedDashFinalDamageModifier"])?;
+                    let tag = Tag::other("Release Damage", [("skillPart", ModValue::Number(3.0))]);
+                    let m = Mod::new("Damage", ModType::More, v, Some("Skill:ChargedDash"))
+                        .flags(self.mf("Attack"), 0)
+                        .tag(tag);
+                    self.c.add(list, m);
+                }
+            }
+            ("ExplosiveTrap" | "ExplosiveTrapAltX", "preDamageFunc") => {
+                let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
+                    Some(v) => v,
+                    None => self.c.base(list, c, &["EnemyRadius"])?,
+                };
+                let full = self
+                    .c
+                    .out(actor, "AreaOfEffectRadiusSecondary")
+                    .unwrap_or(f64::NAN);
+                let width = sd(self, "radiusTertiaryBaseMargin") * 2.0 + 1.0;
+                let occurrences =
+                    match self
+                        .c
+                        .out_val(actor, "AreaOfEffectRadiusTertiaryOccurrences")
+                    {
+                        Some(crate::actor::OutVal::Table(t)) => t.clone(),
+                        _ => return Err(
+                            "attempt to index a nil value (AreaOfEffectRadiusTertiaryOccurrences)"
+                                .into(),
+                        ),
+                    };
+                let mut overlap = 0.0;
+                let mut radii: Vec<(f64, f64)> = occurrences
+                    .iter()
+                    .filter_map(|(k, v)| Some((k.parse::<f64>().ok()?, v.num()?)))
+                    .collect();
+                radii.sort_by(|a, b| a.0.total_cmp(&b.0));
+                for (small, count) in radii {
+                    let damaging = small + enemy_radius - 1.0;
+                    let chance = m_min(damaging * damaging / (full * full), 1.0);
+                    overlap += chance * count / width;
+                }
+                self.c.set_out(actor, "OverlapChance", overlap * 100.0);
+                let small = self.c.base(list, c, &["SmallExplosions"])?;
+                self.c.set_out(actor, "SmallExplosionsPerTrap", small);
+                let mult = match part {
+                    Some(2.0) => 1.0 + small * overlap,
+                    Some(3.0) => 1.0 + small,
+                    _ => 1.0,
+                };
+                if mult != 1.0 {
+                    let cur = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0);
+                    self.sd_set(i, "dpsMultiplier", cur * mult);
+                    let cur = self.c.out(actor, "SkillDPSMultiplier").unwrap_or(1.0);
+                    self.c.set_out(actor, "SkillDPSMultiplier", cur * mult);
+                }
+            }
             ("BladeFlurryAltX", "preDamageFunc") => {
                 let stages = sd(self, "numStages");
                 if part == Some(2.0) && stages > 0.0 {

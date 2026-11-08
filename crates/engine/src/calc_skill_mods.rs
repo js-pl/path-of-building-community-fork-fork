@@ -214,12 +214,14 @@ pub(crate) fn merge_skill_instance_mods(
     list: &mut Vec<Mod>,
     effect: &mut SkillEffect,
     extra: &[(String, f64)],
+    actor_level: Option<f64>,
     setup: &SetupData,
     skill_data: &SkillData,
 ) -> Result<()> {
     validate_effect(effect);
     let ge = effect.granted_effect.clone();
-    let mut stats = build_skill_instance_stats(effect.level, effect.quality, None, &ge, setup);
+    let mut stats =
+        build_skill_instance_stats(effect.level, effect.quality, actor_level, &ge, setup);
     for (k, v) in extra {
         match stats.iter_mut().find(|(s, _)| s == k) {
             Some((_, x)) => *x += v,
@@ -349,7 +351,14 @@ pub fn build_skill_mod_lists(
     );
     let mut result = Ok(());
     for skill in skills.iter_mut() {
-        if let Err(e) = build_skill_mod_list(skill, groups, &mut db, enemy_multipliers, input) {
+        if let Err(e) = build_skill_mod_list(
+            skill,
+            groups,
+            &mut db,
+            enemy_multipliers,
+            input,
+            &Owner::PLAYER,
+        ) {
             result = Err(e);
             break;
         }
@@ -358,13 +367,53 @@ pub fn build_skill_mod_lists(
     result
 }
 
+/// Whose skill a mod list is built for (`activeSkill.actor`), with the
+/// skill that summons a minion's skills (`activeSkill.summonSkill`)
+pub struct Owner<'s> {
+    /// The actor in the database's actors
+    pub actor: usize,
+    /// The summoning skill's name
+    pub summon: Option<&'s str>,
+    /// The minion's data and level, for a minion's skills
+    pub minion: Option<(&'s crate::calc_setup::MinionData, f64)>,
+}
+
+impl Owner<'_> {
+    pub const PLAYER: Owner<'static> = Owner {
+        actor: 0,
+        summon: None,
+        minion: None,
+    };
+}
+
+/// Builds a minion's skill's mod list (`calcs.buildActiveSkillModList` in
+/// `calcs.createMinionSkills`): `db` holds the player's and the enemy's
+/// databases and the minion as `owner.actor`.
+pub(crate) fn build_minion_skill_mod_list(
+    skill: &mut ActiveSkill,
+    db: &mut PlayerDb,
+    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    input: &ModsInput,
+    owner: &Owner,
+) -> Result<()> {
+    build_skill_mod_list(skill, &mut [], db, enemy_multipliers, input, owner)
+}
+
 fn build_skill_mod_list(
     skill: &mut ActiveSkill,
     groups: &mut [SocketGroup],
     db: &mut PlayerDb,
     enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
     input: &ModsInput,
+    owner: &Owner,
 ) -> Result<()> {
+    let actor = &db.actors.actors[owner.actor];
+    let actor_items = actor.item_list.clone();
+    let actor_weapons: [Fields; 2] = [
+        actor.weapon_data[0].clone().unwrap_or_default(),
+        actor.weapon_data[1].clone().unwrap_or_default(),
+    ];
+    let summoned = owner.summon.is_some();
     let data = input.skill_data;
     let st = |n: &str| data.skill_type(n).unwrap_or(-1);
     let mf = |n: &str| input.setup.mod_flag(n);
@@ -421,13 +470,13 @@ fn build_skill_mod_list(
         }
     }
     let item_type = |slot: &str| {
-        input
-            .item_list
+        actor_items
             .get(slot)
             .and_then(|&id| input.tab.item(id))
             .and_then(|i| i.typ.clone())
     };
     if (has_type("RequiresShield") || flags.contains("shieldAttack"))
+        && !summoned
         && item_type("Weapon 2").as_deref() != Some("Shield")
     {
         flags.insert("disable".into());
@@ -468,7 +517,13 @@ fn build_skill_mod_list(
         let attack = flags.contains("attack") || flags.contains("dotFromAttack");
         let (mut w1, mut w1_info) = (None, None);
         if !flags.contains("forceOffHand") {
-            (w1, w1_info) = weapon_flags(&input.weapon_data[0], &weapon_types, input);
+            (w1, w1_info) = weapon_flags(&actor_weapons[0], &weapon_types, input);
+        }
+        if w1.is_none() && summoned {
+            // Minion skills ignore weapon types
+            let info = input.setup.weapon_type_info.get("None");
+            w1 = info.map(|i| mf(&i.flag));
+            w1_info = info;
         }
         if let Some(w1f) = w1 {
             if attack {
@@ -481,19 +536,22 @@ fn build_skill_mod_list(
                     flags.remove("melee");
                 }
             }
-        } else if has_type("DualWieldOnly") || flags.contains("forceMainHand") || w1_info.is_some()
+        } else if (has_type("DualWieldOnly")
+            || flags.contains("forceMainHand")
+            || w1_info.is_some())
+            && !summoned
         {
             flags.insert("disable".into());
             out.disable_reason = Some("Main Hand weapon is not usable with this skill".into());
         }
         if !flags.contains("forceMainHand") {
-            let (w2, w2_info) = weapon_flags(&input.weapon_data[1], &weapon_types, input);
+            let (w2, w2_info) = weapon_flags(&actor_weapons[1], &weapon_types, input);
             let typ = |w: &Fields| w.get("type").cloned();
             let all_1h = |w: &Fields| w.get("countsAsAll1H").is_some_and(ModValue::truthy);
             if let Some(w2f) = w2 {
                 if has_type("DualWieldRequiresDifferentTypes")
-                    && typ(&input.weapon_data[0]) == typ(&input.weapon_data[1])
-                    && !(all_1h(&input.weapon_data[1]) || all_1h(&input.weapon_data[0]))
+                    && typ(&actor_weapons[0]) == typ(&actor_weapons[1])
+                    && !(all_1h(&actor_weapons[1]) || all_1h(&actor_weapons[0]))
                 {
                     flags.insert("disable".into());
                     out.disable_reason
@@ -502,7 +560,7 @@ fn build_skill_mod_list(
                     out.weapon_flags[1] = Some(w2f);
                     flags.insert("weapon2Attack".into());
                 }
-            } else if has_type("DualWieldOnly") || w2_info.is_some() {
+            } else if (has_type("DualWieldOnly") || w2_info.is_some()) && !summoned {
                 flags.insert("disable".into());
                 out.disable_reason
                     .get_or_insert_with(|| "Off Hand weapon is not usable with this skill".into());
@@ -613,7 +671,7 @@ fn build_skill_mod_list(
         flags: Some(mod_flags | out.weapon_flags[0].or(out.weapon_flags[1]).unwrap_or(0)),
         keyword_flags: Some(kw),
         skill_name: Some(crate::pat::gsub(&ge.name, "^Vaal ", "").into()),
-        summon_skill_name: None,
+        summon_skill_name: owner.summon.map(Into::into),
         skill_id: Some(Some(ge.id.as_str().into())),
         base_flags: Some(ge.base_flags.iter().map(|f| Sym::new(f)).collect()),
         skill_part: out.skill_part,
@@ -648,11 +706,31 @@ fn build_skill_mod_list(
             out.weapon_cfgs[n] = Some(c);
         }
     }
-    // The skill's mod list, under the player's database
+    // The skill's mod list, under the actor's database
+    let actor_db = db.actors.actors[owner.actor].store;
+    let mut mods: Vec<Mod> = Vec::new();
+    if let Some((md, _)) = owner.minion
+        && let Some(fixup) = md.num("damageFixup")
+    {
+        let mut m = Mod::new(
+            "Damage",
+            ModType::More,
+            -100.0 * fixup,
+            Some("Damage Fixup"),
+        );
+        m.flags = mf("Attack");
+        mods.push(m);
+        let mut m = Mod::new("Speed", ModType::More, 100.0 * fixup, Some("Damage Fixup"));
+        m.flags = mf("Attack");
+        mods.push(m);
+    }
     let mut store = Store::list();
-    store.parent = Some(db.id);
+    store.parent = Some(actor_db);
+    for m in &mods {
+        store.add(m.clone());
+    }
     let list_id: StoreId = db.stores.push(store);
-    db.actors.store_actor.insert(list_id, 0);
+    db.actors.store_actor.insert(list_id, owner.actor);
     let flag = |db: &PlayerDb, cfg: Option<&Cfg>, name: &str| -> Result<bool> {
         db.query().flag(list_id, cfg, &[Sym::new(name)])
     };
@@ -675,11 +753,11 @@ fn build_skill_mod_list(
     if has(&flags, "disable") {
         flags = ["disable".to_string()].into_iter().collect();
         validate_effect(&mut skill.active_effect);
+        out.mods = mods;
         out.skill_flags = flags;
         skill.mods = Some(out);
         return Ok(());
     }
-    let mut mods: Vec<Mod> = Vec::new();
     let new_mod =
         |name: &str, typ: ModType, v: f64, source: Option<&str>, flags: u32, tags: Vec<Tag>| {
             let mut m = Mod::new(name, typ, v, source);
@@ -694,7 +772,14 @@ fn build_skill_mod_list(
             continue;
         }
         let mut effect = skill.effect_list[i].clone();
-        merge_skill_instance_mods(&mut mods, &mut effect, &[], input.setup, input.skill_data)?;
+        merge_skill_instance_mods(
+            &mut mods,
+            &mut effect,
+            &[],
+            None,
+            input.setup,
+            input.skill_data,
+        )?;
         let sge = effect.granted_effect.clone();
         let level = effect
             .level
@@ -790,7 +875,7 @@ fn build_skill_mod_list(
     let set_mods = |db: &mut PlayerDb, mods: &[Mod]| {
         let s = &mut db.stores.stores[list_id];
         *s = Store::list();
-        s.parent = Some(db.id);
+        s.parent = Some(actor_db);
         for m in mods {
             s.add(m.clone());
         }
@@ -875,6 +960,7 @@ fn build_skill_mod_list(
         &mut mods,
         &mut active,
         &extra,
+        owner.minion.map(|(_, l)| l),
         input.setup,
         input.skill_data,
     )?;
@@ -1048,9 +1134,11 @@ fn build_skill_mod_list(
         }
     }
     // The minion
-    make_minion(
-        &mut out, skill, groups, &mut flags, &level, &cfg, db, list_id, input,
-    )?;
+    if owner.minion.is_none() {
+        make_minion(
+            &mut out, skill, groups, &mut flags, &level, &cfg, db, list_id, input,
+        )?;
+    }
     // Global effects become buffs
     set_mods(db, &mods);
     let mut kept = Vec::new();

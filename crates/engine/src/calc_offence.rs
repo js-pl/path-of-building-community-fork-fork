@@ -710,7 +710,25 @@ impl<'a> Perform<'a> {
                 .c
                 .flag(list, None, &["ClawCritMultiplierAppliesToMinions"])?
         {
-            return Err("not ported: minions".into());
+            let mdb = self
+                .minion_actor()
+                .map(|a| self.c.db(a))
+                .ok_or("attempt to index a nil value (field 'minion')")?;
+            for (flag, typ, stat) in [
+                ("ClawCritChanceAppliesToMinions", Inc, "CritChance"),
+                ("ClawCritMultiplierAppliesToMinions", Base, "CritMultiplier"),
+            ] {
+                if !self.c.flag(list, None, &[flag])? {
+                    continue;
+                }
+                for (_, m) in self.c.tabulate(list, Some(typ), Some(&claw_hit), &[stat])? {
+                    if m.flags & claw != 0 {
+                        let v = number(&m.value)?;
+                        self.c
+                            .add(mdb, Mod::new(stat, m.typ, v, m.source.as_deref()));
+                    }
+                }
+            }
         }
         for (flag, stat, name) in [
             (
@@ -1385,8 +1403,29 @@ impl<'a> Perform<'a> {
         let cfg = self.cfg(i);
         let c = Some(&cfg);
         let set = |p: &mut Self, k: &str, v: f64| p.c.set_out(actor, k, v);
-        if self.mods(i).minion.is_some() {
-            return Err("not ported: minions".into());
+        if let Some(m) = self.mods(i).minion.clone() {
+            let limit = self
+                .data()
+                .minions
+                .get(&m.typ)
+                .and_then(|d| d.str("limit"))
+                .map(str::to_string);
+            if let Some(limit) = limit {
+                let pdb = self.pdb();
+                let v = match self.c.override_num(pdb, None, &[&limit])? {
+                    Some(v) => v,
+                    None => {
+                        self.c.val(list, &limit, c)?
+                            * self.c.more(list, c, &["ActiveMinionLimit"])?
+                    }
+                };
+                set(self, "ActiveMinionLimit", v.floor());
+            }
+            let mut n = self.c.val(list, "MinionPerCastCount", c)?.floor();
+            if n == 0.0 {
+                n = 1.0;
+            }
+            set(self, "SummonedMinionsPerCast", n);
         }
         if self.has_flag(i, "chaining") {
             if self.c.flag(list, c, &["CannotChain"])?
@@ -1907,7 +1946,13 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "DurationMod", dmod);
         let base = self.sd_num(i, "duration").unwrap_or(0.0)
             + self.c.base(list, c, &["Duration", "PrimaryDuration"])?;
-        if base > 0.0 {
+        let permanent = match &self.mods(i).minion {
+            Some(m) => self
+                .c
+                .flag(list, c, &[&format!("{}PermanentDuration", m.typ)])?,
+            None => false,
+        };
+        if base > 0.0 && !permanent {
             let mut d = base * dmod;
             if self.sd_truthy(i, "debuff") {
                 d *= debuff_mult;
@@ -2503,10 +2548,12 @@ const TRIGGER_CONFIGS: [&str; 81] = [
 ];
 
 impl<'a> Perform<'a> {
-    /// `calcs.triggers(env, env.player)`, `calcs.mirages(env)`, then
-    /// `calcs.offence(env, env.player, env.player.mainSkill)`
-    pub fn player_offence(&mut self) -> Result<()> {
-        let main = self.main();
+    /// `calcs.triggers(env, actor)`: which skills a trigger handler
+    /// calculates is not ported yet; otherwise the skill is not triggered
+    pub(crate) fn triggers(&mut self, actor: usize) -> Result<()> {
+        let Some(main) = self.actor_main(actor) else {
+            return Ok(());
+        };
         if !self.has_flag(main, "disable") {
             let s = self.skill(main);
             let ge = &s.active_effect.granted_effect;
@@ -2537,6 +2584,14 @@ impl<'a> Perform<'a> {
             }
             self.sd_clear(main, "triggered");
         }
+        Ok(())
+    }
+
+    /// `calcs.triggers(env, env.player)`, `calcs.mirages(env)`, then
+    /// `calcs.offence(env, env.player, env.player.mainSkill)`
+    pub fn player_offence(&mut self) -> Result<()> {
+        let main = self.main();
+        self.triggers(crate::calc::PLAYER)?;
         // Mirages
         let used_by_mirage = self
             .cfg(main)

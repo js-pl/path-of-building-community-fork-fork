@@ -33,8 +33,8 @@ then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 40 builds compared, 36 of them
-through the offence; minion builds and the gaps below are skipped.
+`crates/equivalence/tests/perform.rs`: 57 builds compared, 53 of them
+through the offence; the gaps below are skipped.
 
 | Upstream | Typed |
 |---|---|
@@ -43,7 +43,16 @@ through the offence; minion builds and the gaps below are skipped.
 | `calcs.buildDefenceEstimations` | `calc_ehp.rs` |
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
+| `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
 | `calcs.triggers`, `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
+
+Every skill with a minion has an actor of its own after the player and the
+enemy (`Perform::minions`); its skills follow the player's in
+`Perform::lists` from `Perform::n_player` on, their mod lists on the
+minion's database. `env.minion` is the main skill's. The test compares the
+minion's output (as the player's `output.Minion`), its database and its
+skills' mod lists at each stage, and after the minion's own defence and
+offence.
 
 Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
@@ -65,20 +74,17 @@ Game data is still read from upstream's processed Lua `data` table
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- Minions (`createMinionSkills`, `initMinionModDB`, the minion branches of
-  perform, defence and offence), allies' life pools (`calcTotemLife` of
-  other skills), the party tab
+- The party tab, and a minion's curses on itself
 - Triggers (`CalcTriggers.lua`'s handlers) and mirages (`CalcMirages.lua`)
-- Skill functions other than the ten in `calc_skill_funcs.rs`
+- Skill functions other than the thirteen in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
-  mana, self hit damage, PvP scaling, added damage redirection
-  (Cryogenesis), Energy Blade
+  mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
 - Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`)
 
 ## Next
 
-Minions, then triggers and mirages, then `Calcs.lua`'s calculators
+Triggers and mirages, then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 
