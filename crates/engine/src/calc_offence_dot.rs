@@ -576,7 +576,15 @@ impl<'a> Perform<'a> {
         };
         let num = |v: &ModValue, k: &str| rec(v, k).and_then(|x| x.as_number());
         let out = |p: &Self, k: &str| p.c.out(actor, k);
-        let mut sources: Vec<(String, f64)> = Vec::new();
+        use crate::sf;
+        let mut sources: Vec<(f64, Vec<String>)> = Vec::new();
+        // the lines of a source: its base damage first, its total last
+        let wrap = |head: String, (_, mut lines): (f64, Vec<String>), tail: String, total: f64| {
+            lines.insert(0, head);
+            lines.insert(1, String::new());
+            lines.push(tail);
+            (total, lines)
+        };
         // Heartbound Loop, Storm Secret and Enmity's Embrace add their rings
         let summed = |p: &Self, stat: &str| -> Result<Option<(String, f64)>> {
             let (mut t, mut v) = (None, None);
@@ -596,20 +604,49 @@ impl<'a> Perform<'a> {
             && let Some((t, v)) = summed(self, "HeartboundLoopSelfDamage")?
         {
             let per_cast = out(self, "SummonedMinionsPerCast").unwrap_or(f64::NAN);
-            let d = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push(("Heartbound Loop".into(), d * per_cast));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!("Heartbound Loop base damage: %d", v),
+                r,
+                sf!(
+                    "Total Heartbound Loop damage taken per cast/attack: %.2f * %d ^8(minions per cast)^7 = %.2f",
+                    d,
+                    per_cast,
+                    d * per_cast
+                ),
+                d * per_cast,
+            ));
         }
         if name == "Herald of Thunder"
             && let Some((t, v)) = summed(self, "StormSecretSelfDamage")?
         {
-            let d = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push(("Storm Secret".into(), d));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!("Storm Secret base damage: %d", v),
+                r,
+                sf!(
+                    "Total Storm Secret damage taken per Herald of Thunder Hit: %.2f",
+                    d
+                ),
+                d,
+            ));
         }
         if self.has_flag(i, "ignite")
             && let Some((t, v)) = first(self, "EyeOfInnocenceSelfDamage", "baseDamage")?
         {
-            let d = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push(("Eye of Innocence".into(), d));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!("Eye of Innocence base damage: %d", v),
+                r,
+                sf!(
+                    "Total Eye of Innocence damage taken per cast/attack: %.2f ",
+                    d
+                ),
+                d,
+            ));
         }
         if let Some((t, mult)) = first(self, "EchoesOfCreationSelfDamage", "dmgMult")? {
             let mut warcries = out(self, "GlobalWarcryUptimeRatio").unwrap_or(f64::NAN) / 100.0;
@@ -618,32 +655,101 @@ impl<'a> Perform<'a> {
                     .c
                     .base(self.pdb(), None, &["Multiplier:ExertingWarcryCount"])?;
             }
-            let base = out(self, "Life").unwrap_or(0.0) * mult / 100.0 * warcries;
-            let d = self.dmg_taken_conversion(o, &t, base)?;
-            sources.push(("Echoes of Creation".into(), d));
+            let life = out(self, "Life").unwrap_or(0.0);
+            let base = life * mult / 100.0 * warcries;
+            let r = self.dmg_taken_conversion(o, &t, base)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!(
+                    "Echoes of Creation base damage: %d ^8(Life)^7 * %d%% * %.2f ^8(Avg. Warcry Count)^7 = %.2f",
+                    life,
+                    mult,
+                    warcries,
+                    base
+                ),
+                r,
+                sf!("Total Echoes of Creation damage taken per Attack: %.2f ", d),
+                d,
+            ));
         }
         let has_cost = matches!(
             self.c.out_val(actor, "ManaHasCost"),
             Some(OutVal::Bool(true))
         );
         if has_cost && let Some((t, mult)) = first(self, "ScoldsBridleSelfDamage", "dmgMult")? {
-            let base = out(self, "ManaCost").unwrap_or(0.0) * mult / 100.0;
-            let d = self.dmg_taken_conversion(o, &t, base)?;
-            sources.push(("Scold's Bridle".into(), d));
+            let cost = out(self, "ManaCost").unwrap_or(0.0);
+            let base = cost * mult / 100.0;
+            let r = self.dmg_taken_conversion(o, &t, base)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!(
+                    "Scold's Bridle base damage: %d ^8(Mana Cost)^7 * %d%% = %.2f",
+                    cost,
+                    mult,
+                    base
+                ),
+                r,
+                sf!(
+                    "Total Scold's Bridle damage taken per cast/attack: %.2f ",
+                    d
+                ),
+                d,
+            ));
         }
         if self.c.flag(self.lists[i].base, None, &["HasTrauma"])? {
             let stacks = m_max(self.c.base(list, None, &["Multiplier:TraumaStacks"])?, 1.0);
             let per = self.c.base(list, None, &["TraumaSelfDamageTakenLife"])?;
-            let d = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
-            sources.push(("Trauma".into(), d));
+            let r = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
+            let d = r.0;
+            let cfg = self.cfg(i);
+            let sustainable =
+                self.c
+                    .base(list, Some(&cfg), &["Multiplier:SustainableTraumaStacks"])?
+                    == stacks;
+            sources.push(wrap(
+                sf!(
+                    "%d ^8(base %s damage)^7 * %.2f ^8(%s trauma)^7 = %.2f %s damage",
+                    per,
+                    "Physical",
+                    stacks,
+                    if sustainable {
+                        "sustainable"
+                    } else {
+                        "current"
+                    },
+                    per * stacks,
+                    "Physical"
+                ),
+                r,
+                sf!("Total Trauma damage taken per cast/attack: %.2f ", d),
+                d,
+            ));
         }
         if let Some((t, v)) = summed(self, "EnmitysEmbraceSelfDamage")? {
-            let d = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push(("Enmity's Embrace".into(), d));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let d = r.0;
+            sources.push(wrap(
+                sf!("Enmity's Embrace base damage: %d", v),
+                r,
+                sf!(
+                    "Total Enmity's Embrace damage taken per cast/attack: %.2f ",
+                    d
+                ),
+                d,
+            ));
         }
-        for (_, d) in sources {
+        let mut lines: Vec<String> = Vec::new();
+        for (d, l) in sources {
             let v = out(self, "SelfHitDamage").unwrap_or(0.0) + d;
             self.c.set_out(actor, "SelfHitDamage", v);
+            lines.extend(l);
+            lines.push(String::new());
+        }
+        if !lines.is_empty() && self.bd(actor).is_some() {
+            lines.pop();
+            self.bd(actor)
+                .unwrap()
+                .set("SelfHitDamage", crate::breakdown::Bd::of(lines));
         }
         Ok(())
     }
@@ -651,7 +757,9 @@ impl<'a> Perform<'a> {
     /// `calcs.applyDmgTakenConversion(activeSkill, output, breakdown,
     /// sourceType, baseDmg)`: the damage taken after conversion,
     /// resistances, armour and damage reduction
-    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<f64> {
+    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<(f64, Vec<String>)> {
+        use crate::sf;
+        let mut lines = Vec::new();
         let (list, actor) = (o.list, o.actor);
         let types = ["Physical", "Lightning", "Cold", "Fire", "Chaos"];
         let elemental = |t: &str| matches!(t, "Fire" | "Cold" | "Lightning");
@@ -754,9 +862,30 @@ impl<'a> Perform<'a> {
             }
             let reduct_mult =
                 (1.0 - m_max(m_min(max, armour_reduct + reduction), 0.0) / 100.0) * taken_mods;
-            total += damage * (res_mult * reduct_mult);
+            let combined = res_mult * reduct_mult;
+            let fin = damage * combined;
+            total += fin;
+            lines.push(format!("{t} Damage Taken"));
+            if taken_as != 1.0 {
+                lines.push(sf!(
+                    "^8=^7 %d^8 (Base Damage)^7 * %.2f^8 (Damage taken as %s)",
+                    base,
+                    taken_as,
+                    *t
+                ));
+            }
+            if combined != 1.0 {
+                lines.push(sf!(
+                    "^8=^7 %d^8 (%s Damage)^7 * %.4f^8 (Damage taken multi)",
+                    damage,
+                    *t,
+                    combined
+                ));
+            }
+            lines.push(sf!("^8=^7 %d^8 (%s Damage taken)", fin, *t));
+            lines.push(String::new());
         }
-        Ok(total)
+        Ok((total, lines))
     }
 
     /// The combined DPS estimate, with damage over time

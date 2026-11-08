@@ -12,6 +12,8 @@ use crate::calc_perform::Perform;
 use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Tag};
 
+use crate::sf;
+
 pub type Result<T> = std::result::Result<T, String>;
 
 /// A `DistanceRamp` tag
@@ -228,6 +230,8 @@ impl<'a> Perform<'a> {
                 self.c.set_out(actor, "NormalHitsPerCast", strikes);
                 let o2 = self.c.out(actor, "SkillDPSMultiplier").unwrap_or(1.0) * strikes;
                 self.c.set_out(actor, "SkillDPSMultiplier", o2);
+                let b = strikes_bd(sd(self, "strikeInterval"), sd(self, "duration"), strikes);
+                self.set_bd(actor, "NormalHitsPerCast", b);
             }
             ("Bodyswap" | "BodyswapAltX", "preDamageFunc") => {
                 if part == Some(1.0) {
@@ -338,6 +342,45 @@ impl<'a> Perform<'a> {
                     taken_life + taken_es + chaos_flat
                 };
                 self.c.set_out(actor, "FRDamageTaken", total);
+                if self.bd(actor).is_some() {
+                    let sl = if alt {
+                        0.0
+                    } else {
+                        sd(self, "SelfDamageTakenLife")
+                    };
+                    let se = sd(self, "SelfDamageTakenES");
+                    let mut b = crate::breakdown::Bd::of([sf!(
+                        "Damage Taken per cast from Forbidden Rite: %d",
+                        total
+                    )]);
+                    if !alt {
+                        b.push(sf!(
+                            "^8=^7 %d^8 (Life) *^7 %d%%^8 (of Life taken as Chaos Damage)",
+                            life,
+                            sl * 100.0
+                        ));
+                    }
+                    if es != 0.0 {
+                        b.push(sf!(
+                            "^8+^7 %d^8 (ES) *^7 %d%%^8 (of ES taken as Chaos Damage)",
+                            es,
+                            se * 100.0
+                        ));
+                    }
+                    let dmg = if alt { es * se } else { life * sl + es * se };
+                    b.push(sf!(
+                        "^8=^7 %d^8 (Chaos Damage) *^7 %d%%^8 (Chaos Resistance)",
+                        dmg,
+                        res
+                    ));
+                    if chaos_flat != 0.0 {
+                        b.push(sf!("^8 -^7 %d^8 (Flat Damage reduction)", -flat));
+                    }
+                    if taken != 1.0 {
+                        b.push(sf!("^8 *^7 %.2f^8 (Damage taken Multiplier)", taken));
+                    }
+                    self.set_bd(actor, "FRDamageTaken", b);
+                }
             }
             ("MoltenShell", "preDamageFunc") => {
                 let add = self.sd_num(i, "MoltenShellDamageMitigated").unwrap_or(0.0)
@@ -375,7 +418,7 @@ impl<'a> Perform<'a> {
                 };
                 occ.sort_by(|a, b| a.0.total_cmp(&b.0));
                 let mut overlap = 0.0;
-                for (small, count) in occ {
+                for &(small, count) in &occ {
                     let r = small + enemy_radius - 1.0;
                     let hit = m_min(r * r / (full * full), 1.0);
                     overlap += hit * count / width;
@@ -383,11 +426,49 @@ impl<'a> Perform<'a> {
                 self.c.set_out(actor, "OverlapChance", overlap * 100.0);
                 let small = self.c.base(list, c, &["SmallExplosions"])?;
                 self.c.set_out(actor, "SmallExplosionsPerTrap", small);
+                if self.bd(actor).is_some() {
+                    let mut b = crate::breakdown::Bd::of([
+                        "Chance for individual small explosion to land within range to damage enemy:",
+                        "^8= (area where a small explosion can spawn to damage enemy) / (total area)",
+                        "^8= (^7tertiary radius^8 + ^7enemy radius^8 - 1) ^ 2 / ^7secondary radius^8 ^ 2",
+                        "^8Result is the weighted sum of overlap chances for each possible tertiary radius",
+                    ]);
+                    let n = occ.len();
+                    for (k, &(small, count)) in occ.iter().enumerate() {
+                        b.push(sf!(
+                            "^8(^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2 *^7 %d/%d%s",
+                            small,
+                            enemy_radius,
+                            full,
+                            count,
+                            width,
+                            if k + 1 == n { "" } else { " ^8+" }
+                        ));
+                    }
+                    b.push(sf!("^8=^7 %.3f^8%%", overlap * 100.0));
+                    self.set_bd(actor, "OverlapChance", b);
+                }
                 let mult = match part {
                     Some(2.0) => 1.0 + small * overlap,
                     Some(3.0) => 1.0 + small,
                     _ => 1.0,
                 };
+                let b = match part {
+                    Some(2.0) => Some(crate::breakdown::Bd::of([
+                        "DPS multiplier".to_string(),
+                        "^8= 1 + ^7small explosions^8 * ^7overlap chance^8".to_string(),
+                        sf!("^8= 1 +^7 %d^8 *^7 %.2f^8", small, overlap),
+                        sf!("^8=^7 %.3f", mult),
+                    ])),
+                    Some(3.0) => Some(crate::breakdown::Bd::of([
+                        "DPS multiplier".to_string(),
+                        sf!("^8= 1 +^7 %d (small explosions)", mult),
+                    ])),
+                    _ => None,
+                };
+                if let Some(b) = b {
+                    self.set_bd(actor, "SkillDPSMultiplier", b);
+                }
                 if mult != 1.0 {
                     let m = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0) * mult;
                     self.sd_set(i, "dpsMultiplier", m);
@@ -481,8 +562,16 @@ impl<'a> Perform<'a> {
                 );
             }
             ("FlamethrowerTrap" | "FlamethrowerTrapAltX", "preDamageFunc") => {
-                let traps = out(self, "Duration") / out(self, "TrapCooldown");
+                let (duration, cooldown) = (out(self, "Duration"), out(self, "TrapCooldown"));
+                let traps = duration / cooldown;
                 self.c.set_out(actor, "AverageActiveTraps", traps);
+                let b = crate::breakdown::Bd::of([
+                    "Average active traps, not considering stored cooldown uses:".to_string(),
+                    sf!("%.2f^8 (skill duration)", duration),
+                    sf!("/ %.2f^8 (cooldown)", cooldown),
+                    sf!("= %.2f traps", traps),
+                ]);
+                self.set_bd(actor, "AverageActiveTraps", b);
                 let alt = id == "FlamethrowerTrapAltX";
                 let hit = if !alt && (part == Some(2.0) || part == Some(4.0)) {
                     0.3
@@ -1001,8 +1090,29 @@ impl<'a> Perform<'a> {
                     let duration = sd(self, "duration") * dinc * dmore;
                     let pulses = (duration * rate).floor();
                     self.c.set_out(actor, "PulsesPerTrap", pulses);
-                    active_traps = pulses / rate / out(self, "TrapCooldown");
+                    let cooldown = out(self, "TrapCooldown");
+                    active_traps = pulses / rate / cooldown;
                     self.c.set_out(actor, "AverageActiveTraps", active_traps);
+                    if self.bd(actor).is_some() {
+                        let p = Pulses {
+                            interval: sd(self, "repeatInterval"),
+                            inc,
+                            more,
+                            rate,
+                            duration,
+                            base_duration: sd(self, "duration"),
+                            dinc,
+                            dmore,
+                            pulses,
+                        };
+                        self.set_bd(actor, "WavePulseRate", p.rate_bd());
+                        self.set_bd(actor, "PulsesPerTrap", p.pulses_bd(true));
+                        self.set_bd(
+                            actor,
+                            "AverageActiveTraps",
+                            p.traps_bd(true, "cooldown", cooldown, active_traps),
+                        );
+                    }
                 }
                 let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
                     Some(v) => v,
@@ -1012,6 +1122,12 @@ impl<'a> Perform<'a> {
                 let full = out(self, "AreaOfEffectRadius");
                 let overlap = m_min(r * r / (full * full), 1.0);
                 self.c.set_out(actor, "OverlapChance", overlap * 100.0);
+                let wave = out(self, "AreaOfEffectRadiusSecondary");
+                self.set_bd(
+                    actor,
+                    "OverlapChance",
+                    wave_overlap_bd(wave, enemy_radius, full, overlap),
+                );
                 let waves = self.c.base(list, c, &["MaximumWaves"])?;
                 let mult = match part {
                     Some(2.0) => waves * overlap,
@@ -1021,6 +1137,16 @@ impl<'a> Perform<'a> {
                     Some(6.0) if id == "SeismicTrap" => active_traps * waves,
                     _ => 1.0,
                 };
+                if let Some(b) = waves_dps_bd(
+                    part,
+                    waves,
+                    overlap,
+                    active_traps,
+                    mult,
+                    id == "SeismicTrap",
+                ) {
+                    self.set_bd(actor, "SkillDPSMultiplier", b);
+                }
                 self.scale_dps(i, actor, mult);
             }
             ("BallLightning", "preDamageFunc") => {
@@ -1042,7 +1168,45 @@ impl<'a> Perform<'a> {
                         let last = (m_min(self.misc_data("ProjectileDistanceCap"), dist + radius)
                             / per_strike)
                             .floor();
-                        m_max(0.0, m_min(max_strikes, last + 1.0 - first))
+                        let n = m_max(0.0, m_min(max_strikes, last + 1.0 - first));
+                        if self.bd(actor).is_some() {
+                            let last = first + n - 1.0;
+                            let speed = sd(self, "projectileSpeed") * (inc * more);
+                            let b = crate::breakdown::Bd::of([
+                                sf!("^8Balls travel at^7 %.2f^8 units/sec.", speed),
+                                sf!(
+                                    "^8Lightning bolts strike all nearby enemies every^7 %.2f^8 seconds (^7%.2f^8 strikes/sec).",
+                                    per,
+                                    1.0 / per
+                                ),
+                                sf!(
+                                    "^8Balls travel^7 %.2f^8 units between each bolt strike.",
+                                    per_strike
+                                ),
+                                sf!(
+                                    "^8Assumes balls are cast^7 %d^8 units from the enemy.",
+                                    dist
+                                ),
+                                sf!(
+                                    "^8Balls can strike enemies up to^7 %d^8 units away from themselves.",
+                                    radius
+                                ),
+                                sf!(
+                                    "^8The first strike is at^7 %.2f^8 seconds after it is cast, when the ball is^7 %d^8 units from the cast point.",
+                                    first * per,
+                                    first * per_strike
+                                ),
+                                sf!(
+                                    "^8The last strike is at^7 %.2f^8 seconds after it is cast, when the ball is^7 %d^8 units from the cast point.",
+                                    last * per,
+                                    last * per_strike
+                                ),
+                            ]);
+                            // upstream sets the output only with a breakdown
+                            self.c.set_out(actor, "NormalHitsPerCast", n);
+                            self.set_bd(actor, "NormalHitsPerCast", b);
+                        }
+                        n
                     }
                     _ => 0.0,
                 };
@@ -1053,6 +1217,8 @@ impl<'a> Perform<'a> {
                     let strikes = (sd(self, "duration") / sd(self, "strikeInterval")).floor();
                     self.scale_dps(i, actor, strikes);
                     self.c.set_out(actor, "NormalHitsPerCast", strikes);
+                    let b = strikes_bd(sd(self, "strikeInterval"), sd(self, "duration"), strikes);
+                    self.set_bd(actor, "NormalHitsPerCast", b);
                 }
             }
             ("KineticFusillade" | "KineticFusilladeAltX", "preDamageFunc") => {
@@ -1066,6 +1232,35 @@ impl<'a> Perform<'a> {
                         self.c
                             .add(list, Mod::new("Damage", ModType::More, avg, Some(&source)));
                         self.c.set_out(actor, "KineticFusilladeAvgMoreMult", avg);
+                        if self.bd(actor).is_some() {
+                            let mut b = crate::breakdown::Bd::of([
+                                sf!(
+                                    "^8Each projectile deals^7 %d%%^8 more damage per previous projectile",
+                                    per
+                                ),
+                                sf!("^8With^7 %d^8 projectiles, damage progression is:^7", n),
+                            ]);
+                            let mut k = 1.0;
+                            while k <= n {
+                                b.push(sf!(
+                                    "  ^8Projectile %d:^7 %d%%^8 more damage",
+                                    k,
+                                    per * (k - 1.0)
+                                ));
+                                k += 1.0;
+                            }
+                            b.push(sf!("^8Average more multiplier:^7 %.1f%%", avg));
+                            let max = self
+                                .c
+                                .override_num(list, c, &["ProjectileCountMaximum"])?
+                                .unwrap_or(f64::NAN);
+                            self.set_bd(actor, "KineticFusilladeSequentialBreakdown", b);
+                            let bd = self.bd(actor).unwrap();
+                            bd.table("ProjectileCount").push(sf!(
+                                "^8Maximum number of Kinetic Fusilade projectiles:^7 %d",
+                                max
+                            ));
+                        }
                     }
                 }
             }
@@ -1078,9 +1273,90 @@ impl<'a> Perform<'a> {
                 let delay = (sd(self, "duration") + sd(self, "delayPerProjectile") * (n - 1.0))
                     * out(self, "DurationMod");
                 let tick = self.misc_data("ServerTickTime");
-                let max_aps = 1.0 / ((delay / tick).ceil() * tick);
+                let rounded = (delay / tick).ceil() * tick;
+                let max_aps = 1.0 / rounded;
                 self.c
                     .set_out(actor, "KineticFusilladeMaxEffectiveAPS", max_aps);
+                if self.bd(actor).is_some() {
+                    let hover = sd(self, "duration");
+                    let per = sd(self, "delayPerProjectile");
+                    let added = per * (n - 1.0);
+                    let dm = out(self, "DurationMod");
+                    let max_pred = 1.0 / delay;
+                    let mut b = crate::breakdown::Bd::of([
+                        sf!("^8Base hover delay:^7 %.1fs", hover),
+                        sf!("^8Base delay between projectiles:^7 %.2fs", per),
+                        sf!(
+                            "^8Base time for^7 %d added ^8projectiles:^7 %.2fs x %d = %.1fs",
+                            n - 1.0,
+                            per,
+                            n - 1.0,
+                            added
+                        ),
+                        sf!("^8Duration modifier:^7 %.4f", dm),
+                        String::new(),
+                        "^6Lockstep".to_string(),
+                        sf!(
+                            "^8Effective delay:^7 (%.1f + %.2f) x %.4f = %.4fs",
+                            hover,
+                            added,
+                            dm,
+                            delay
+                        ),
+                        sf!("^8Rounded up to nearest server tick^7 = %.4fs", rounded),
+                        sf!(
+                            "^8Max effective attack rate:^7 1 / %.4f = %.2f",
+                            rounded,
+                            max_aps
+                        ),
+                    ]);
+                    if let Some(aps) = self.c.out(actor, "Speed") {
+                        let cur = self.c.inc(list, c, &["Speed"])?;
+                        let add = |m: f64| ((m / aps) * (1.0 + cur / 100.0) - 1.0) * 100.0 - cur;
+                        let section = |b: &mut crate::breakdown::Bd, max: f64| {
+                            if aps > max {
+                                b.push(sf!(
+                                    "^1Current attack rate (%.2f) exceeds max effective rate!",
+                                    aps
+                                ));
+                                b.push(sf!(
+                                    "^1Reduce attack speed by at least^7 %d%% ^1",
+                                    (-add(max)).ceil()
+                                ));
+                                b.push(sf!(
+                                    "^1DPS is reduced by %.1f%%",
+                                    (1.0 - max / aps) * 100.0
+                                ));
+                            } else {
+                                b.push(sf!(
+                                    "^2Current attack rate (%.2f) is within effective limits",
+                                    aps
+                                ));
+                                b.push(sf!(
+                                    "^2You can add up to^7 %d%% ^2increased attack speed",
+                                    add(max).floor()
+                                ));
+                            }
+                        };
+                        section(&mut b, max_aps);
+                        b.push("");
+                        b.push("^6Predictive");
+                        b.push(sf!(
+                            "^8Effective delay:^7 (%.1f + %.2f) x %.4f = %.4fs",
+                            hover,
+                            added,
+                            dm,
+                            delay
+                        ));
+                        b.push(sf!(
+                            "^8Max effective attack rate:^7 1 / %.4f = %.2f",
+                            delay,
+                            max_pred
+                        ));
+                        section(&mut b, max_pred);
+                    }
+                    self.set_bd(actor, "KineticFusilladeMaxEffectiveAPS", b);
+                }
                 if part == Some(1.0)
                     && let Some(aps) = self.c.out(actor, "Speed")
                     && aps > max_aps
@@ -1122,18 +1398,66 @@ impl<'a> Perform<'a> {
                 let pulses = (duration * rate).floor();
                 self.c.set_out(actor, "PulsesPerTrap", pulses);
                 let effective = pulses / rate;
-                let active_traps = if id == "LightningSpireTrapAltX" {
+                let alt_x = id == "LightningSpireTrapAltX";
+                let divisor = if alt_x {
                     let action = 1.0 + self.c.inc(list, c, &["ActionSpeed"])? / 100.0;
                     let base_speed = 1.0 / self.c.base(list, c, &["TrapThrowingTime"])?;
                     let throw = m_min(
                         base_speed * self.c.calc_mod(list, c, &["TrapThrowingSpeed"])? * action,
                         self.misc_data("ServerTickRate"),
                     );
-                    effective / (1.0 / throw)
+                    1.0 / throw
                 } else {
-                    effective / out(self, "TrapCooldown")
+                    out(self, "TrapCooldown")
                 };
+                let active_traps = effective / divisor;
                 self.c.set_out(actor, "AverageActiveTraps", active_traps);
+                let wave = out(self, "AreaOfEffectRadiusSecondary");
+                let er = match self.c.override_num(list, c, &["EnemyRadius"])? {
+                    Some(v) => v,
+                    None => self.c.base(list, c, &["EnemyRadius"])?,
+                };
+                let ov = m_min(
+                    (wave + er - 1.0) * (wave + er - 1.0) / (radius * radius),
+                    1.0,
+                );
+                if self.bd(actor).is_some() {
+                    let base = id == "LightningSpireTrap";
+                    let (inc, more) = if base {
+                        (
+                            1.0 + self.c.inc(list, c, &["TrapThrowingSpeed"])? / 100.0,
+                            self.c.more(list, c, &["TrapThrowingSpeed"])?,
+                        )
+                    } else {
+                        (1.0, 1.0)
+                    };
+                    let p = Pulses {
+                        interval: sd(self, "repeatInterval"),
+                        inc,
+                        more,
+                        rate,
+                        duration,
+                        base_duration: sd(self, "duration"),
+                        dinc,
+                        dmore,
+                        pulses,
+                    };
+                    self.set_bd(
+                        actor,
+                        "OverlapChance",
+                        wave_overlap_bd(wave, er, radius, ov),
+                    );
+                    if base {
+                        self.set_bd(actor, "WavePulseRate", p.rate_bd());
+                    }
+                    self.set_bd(actor, "PulsesPerTrap", p.pulses_bd(base));
+                    let b = if alt_x {
+                        p.traps_bd(false, "throw time", divisor, active_traps)
+                    } else {
+                        p.traps_bd(true, "cooldown", divisor, active_traps)
+                    };
+                    self.set_bd(actor, "AverageActiveTraps", b);
+                }
                 let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
                     Some(v) => v,
                     None => self.c.base(list, c, &["EnemyRadius"])?,
@@ -1150,6 +1474,9 @@ impl<'a> Perform<'a> {
                     Some(6.0) => active_traps * waves,
                     _ => 1.0,
                 };
+                if let Some(b) = waves_dps_bd(part, waves, overlap, active_traps, mult, true) {
+                    self.set_bd(actor, "SkillDPSMultiplier", b);
+                }
                 self.scale_dps(i, actor, mult);
             }
             ("FrozenSweep" | "FrozenSweepAltX", "preDamageFunc") => {
@@ -1218,6 +1545,24 @@ impl<'a> Perform<'a> {
                 let landing = out(self, "AreaOfEffectRadiusTertiary") - inner;
                 let overlap = m_min(1.0, hit / landing);
                 self.c.set_out(actor, "OverlapChance", overlap * 100.0);
+                if self.bd(actor).is_some() {
+                    let b = crate::breakdown::Bd::of([
+                        "Chance for individual balls to land on the enemy:".to_string(),
+                        "^8= (area where a ball can land on enemy) / (total area)".to_string(),
+                        "^8= (enemy radius + ball radius - min travel) / (max travel - min travel)"
+                            .to_string(),
+                        sf!(
+                            "^8= (^7%d^8 + ^7%d^8 - ^7%d) / (^7%d^8 - ^7%d)",
+                            enemy_radius,
+                            out(self, "AreaOfEffectRadius"),
+                            inner,
+                            out(self, "AreaOfEffectRadiusTertiary"),
+                            inner
+                        ),
+                        sf!("^8=^7 %.2f^8%%", overlap * 100.0),
+                    ]);
+                    self.set_bd(actor, "OverlapChance", b);
+                }
                 let n = out(self, "ProjectileCount");
                 let mut mult = 1.0;
                 let alt = id == "MoltenStrikeAltX";
@@ -1225,8 +1570,38 @@ impl<'a> Perform<'a> {
                     mult = overlap * n;
                     if alt && part == Some(6.0) {
                         let fifth = 1.0 + sd(self, "FifthStrikeDamage") / 100.0;
-                        let fifth_all = fifth * overlap * (n + sd(self, "FifthStrikeProjectiles"));
+                        let extra = sd(self, "FifthStrikeProjectiles");
+                        let fifth_all = fifth * overlap * (n + extra);
                         mult = 0.8 * mult + 0.2 * fifth_all;
+                        let b = crate::breakdown::Bd::of([
+                            "Weighted average DPS multiplier for balls".to_string(),
+                            "^8= (0.8 * balls dps) + (0.2 * 5th attack balls dps)".to_string(),
+                            sf!(
+                                "^8= (0.8 * normal ball hit * overlap chance * number of projectiles) + (0.2 * ball hit * 5th attack multiplier * overlap chance * (number of projectiles + %d))",
+                                extra
+                            ),
+                            sf!(
+                                "^8= ball hit * overlap chance * (0.8 * number of projectiles + 0.2 * 5th attack multiplier * (number of projectiles + %d))",
+                                extra
+                            ),
+                            sf!(
+                                "^8= ball hit * ^7%.3f ^8* (0.8 * ^7%d ^8+ 0.2 * ^7%.1f ^8* ^7%d^8)",
+                                overlap,
+                                n,
+                                fifth,
+                                n + extra
+                            ),
+                            sf!("^8= ball hit * ^7 %.3f", mult),
+                        ]);
+                        self.set_bd(actor, "SkillDPSMultiplier", b);
+                    } else {
+                        let b = crate::breakdown::Bd::of([
+                            "DPS multiplier".to_string(),
+                            "^8= number of projectiles * overlap chance".to_string(),
+                            sf!("^8=^7 %d^8 *^7 %.3f^8", n, overlap),
+                            sf!("^8=^7 %.3f", mult),
+                        ]);
+                        self.set_bd(actor, "SkillDPSMultiplier", b);
                     }
                 }
                 self.scale_dps(i, actor, mult);
@@ -1443,6 +1818,13 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
+    /// `breakdown[k] = b` on the actor's breakdown, if it has one
+    fn set_bd(&mut self, actor: usize, k: &str, b: crate::breakdown::Bd) {
+        if let Some(bd) = self.bd(actor) {
+            bd.set(k, b);
+        }
+    }
+
     /// `skillData.dpsMultiplier` and `output.SkillDPSMultiplier` times a
     /// multiplier other than 1
     fn scale_dps(&mut self, i: usize, actor: usize, mult: f64) {
@@ -1452,5 +1834,163 @@ impl<'a> Perform<'a> {
             let o = self.c.out(actor, "SkillDPSMultiplier").unwrap_or(1.0) * mult;
             self.c.set_out(actor, "SkillDPSMultiplier", o);
         }
+    }
+}
+
+/// The `NormalHitsPerCast` breakdown of Ball Lightning's variants
+fn strikes_bd(interval: f64, duration: f64, strikes: f64) -> crate::breakdown::Bd {
+    crate::breakdown::Bd::of([
+        sf!(
+            "^8Lightning bolts strike all nearby enemies every^7 %.2f^8 seconds (^7%.2f^8 strikes/sec).",
+            interval,
+            1.0 / interval
+        ),
+        sf!(
+            "^8Balls lasts for ^7%d^8 seconds for a total of ^7%d^8 strikes.",
+            duration,
+            strikes
+        ),
+    ])
+}
+
+/// The `OverlapChance` breakdown of wave traps
+fn wave_overlap_bd(wave: f64, enemy: f64, full: f64, overlap: f64) -> crate::breakdown::Bd {
+    crate::breakdown::Bd::of([
+        "Chance for individual wave to land within range to damage enemy:".to_string(),
+        "^8= (area where wave can spawn to damage enemy) / (total area)".to_string(),
+        "^8= (^7secondary radius^8 + ^7enemy radius^8 - 1) ^ 2 / ^7radius^8 ^ 2".to_string(),
+        sf!(
+            "^8= (^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2",
+            wave,
+            enemy,
+            full
+        ),
+        sf!("^8=^7 %.3f^8%%", overlap * 100.0),
+    ])
+}
+
+/// The `SkillDPSMultiplier` breakdown of wave traps' parts
+fn waves_dps_bd(
+    part: Option<f64>,
+    waves: f64,
+    overlap: f64,
+    traps: f64,
+    mult: f64,
+    trap_parts: bool,
+) -> Option<crate::breakdown::Bd> {
+    let head = "DPS multiplier".to_string();
+    Some(crate::breakdown::Bd::of(match part {
+        Some(2.0) => vec![
+            head,
+            "^8= ^7maximum waves^8 * ^7overlap chance^8".to_string(),
+            sf!("^8=^7 %d^8 *^7 %.2f^8", waves, overlap),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        Some(3.0) => vec![head, sf!("^8=^7 %d (maximum waves)", mult)],
+        Some(4.0) if trap_parts => vec![head, sf!("^8=^7 %.2f (average active traps)", mult)],
+        Some(5.0) if trap_parts => vec![
+            head,
+            "^8= ^7average active traps^8 * ^7maximum waves^8 * ^7overlap chance^8".to_string(),
+            sf!("^8=^7 %.2f^8 *^7 %d^8 *^7 %.2f", traps, waves, overlap),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        Some(6.0) if trap_parts => vec![
+            head,
+            "^8= ^7average active traps^8 * ^7maximum waves".to_string(),
+            sf!("^8=^7 %.2f^8 *^7 %d", traps, waves),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        _ => return None,
+    }))
+}
+
+/// The pulses of a wave trap, for its breakdowns
+struct Pulses {
+    interval: f64,
+    inc: f64,
+    more: f64,
+    rate: f64,
+    duration: f64,
+    base_duration: f64,
+    dinc: f64,
+    dmore: f64,
+    pulses: f64,
+}
+
+impl Pulses {
+    fn rate_bd(&self) -> crate::breakdown::Bd {
+        crate::breakdown::Bd::of([
+            "Pulse rate:".to_string(),
+            sf!("%.2f ^8(base pulse rate)", 1.0 / self.interval),
+            sf!("* %.2f ^8(increased/reduced pulse frequency)", self.inc),
+            sf!("* %.2f ^8(more/less pulse frequency)", self.more),
+            sf!("= %.2f^8/s", self.rate),
+        ])
+    }
+
+    fn pulses_bd(&self, speed: bool) -> crate::breakdown::Bd {
+        let p = self.pulses;
+        let mut b = crate::breakdown::Bd::of([
+            "Pulses per trap:".to_string(),
+            sf!("%.3f ^8(unrounded skill duration)", self.duration),
+            sf!("* %.2f ^8(pulse rate)", self.rate),
+            sf!("= %.2f ^8pulses", self.duration * self.rate),
+            "^8rounded down".to_string(),
+            sf!("= %d ^8pulses", p),
+        ]);
+        let next_dur = (100.0
+            * ((p + 1.0) / (self.rate * self.base_duration * self.dmore) - self.dinc))
+            .ceil();
+        let prev_dur =
+            -(100.0 * (p / (self.rate * self.base_duration * self.dmore) - self.dinc) - 1.0).ceil();
+        if speed {
+            let next_speed = (100.0
+                * ((p + 1.0) * self.interval / (self.duration * self.more) - self.inc))
+                .ceil();
+            let prev_speed =
+                -(100.0 * (p * self.interval / (self.duration * self.more) - self.inc) - 1.0)
+                    .ceil();
+            b.push(sf!(
+                "^8Next breakpoint: %d%% increased Trap Throwing Speed / %d%% increased Duration",
+                next_speed,
+                next_dur
+            ));
+            b.push(sf!(
+                "^8Previous breakpoint: %d%% reduced Trap Throwing Speed / %d%% reduced Duration",
+                prev_speed,
+                prev_dur
+            ));
+        } else {
+            b.push(sf!("^8Next breakpoint: %d%% increased Duration", next_dur));
+            b.push(sf!(
+                "^8Previous breakpoint: %d%% reduced Duration",
+                prev_dur
+            ));
+        }
+        b
+    }
+
+    fn traps_bd(
+        &self,
+        stored: bool,
+        label: &str,
+        divisor: f64,
+        traps: f64,
+    ) -> crate::breakdown::Bd {
+        crate::breakdown::Bd::of([
+            if stored {
+                "Average active traps, not considering stored cooldown uses:"
+            } else {
+                "Average active traps:"
+            }
+            .to_string(),
+            sf!(
+                "%.2f^8 /^7 %.2f^8 (pulses / pulse rate = effective skill duration)",
+                self.pulses,
+                self.rate
+            ),
+            sf!(&format!("/ %.2f ^8({label})"), divisor),
+            sf!("= %.2f traps", traps),
+        ])
     }
 }

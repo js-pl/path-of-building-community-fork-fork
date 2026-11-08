@@ -55,6 +55,14 @@ and the skill cache (`GlobalCache.cachedData`) run typed in
 compared with the oracle's `MAIN` and `CALCS` outputs in
 `crates/equivalence/tests/typed_calcs.rs`: every corpus build equal (61).
 
+The Calcs tab's breakdowns (`actor.breakdown`, `engine::breakdown`) are
+built in `CALCS` mode by perform, defence, estimations, offence, skill
+functions and triggers; `crates/equivalence/tests/breakdowns.rs` compares
+the player's and the minion's with the translation's
+(`build.calcsTab.calcsEnv`): every corpus build equal (61). Its
+`BREAKDOWN_MISSING=1` lists breakdowns the corpus has that the typed
+engine does not make.
+
 Game data is still read from upstream's processed Lua `data` table
 (`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
 `Data.lua` to the importer comes later.
@@ -79,12 +87,10 @@ a skip:
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis)
-- Breakdowns (the Calcs tab's outputs are ported)
 
 ## Next
 
-The breakdowns, the node and misc calculators, and the engine API on the
-typed engine.
+The node and misc calculators, and the engine API on the typed engine.
 
 ## Upstream quirks met so far
 
