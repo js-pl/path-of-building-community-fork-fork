@@ -40,6 +40,7 @@ pub mod rt;
 pub mod skill_data;
 pub mod skills;
 pub mod spec;
+pub mod spec_cluster;
 pub mod tree;
 pub mod xml;
 

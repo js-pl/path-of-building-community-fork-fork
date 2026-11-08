@@ -186,6 +186,28 @@ impl<'a> Perform<'a> {
                     ..TriggerConfig::default()
                 }
             }
+            "cast on critical strike" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Attack") && p.slot_match(s)),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByCoc") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "cast on melee kill" => {
+                let pdb = self.pdb();
+                if !self.c.flag(pdb, None, &["Condition:KilledRecently"])? {
+                    return Ok(None);
+                }
+                TriggerConfig {
+                    trigger_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Attack") && p.has_type(s, "Melee") && p.slot_match(s)
+                    }),
+                    triggered_skill_cond: Some(|p, s| {
+                        p.sd_truthy(s, "triggeredByMeleeKill") && p.slot_match(s)
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
             "cast when stunned" => {
                 set_global(self);
                 TriggerConfig {
@@ -264,6 +286,31 @@ impl<'a> Perform<'a> {
             }
         }
         Ok((source, rate))
+    }
+
+    /// `slotMatch(env, skill)`: the skill is in the main skill's socket
+    /// group, or in its slot when either comes from an item
+    pub(crate) fn slot_match(&self, i: usize) -> bool {
+        let main = self.main();
+        let gem_from_item = |k: usize| {
+            self.skill(k)
+                .active_effect
+                .src
+                .and_then(|(g, x)| self.env.groups.get(g)?.gem_list.get(x))
+                .is_some_and(|g| g.from_item)
+        };
+        let ge_from_item = |k: usize| self.skill(k).active_effect.granted_effect.from_item;
+        let from_item =
+            ge_from_item(main) || ge_from_item(i) || gem_from_item(main) || gem_from_item(i);
+        let group = |k: usize| self.skill(k).group;
+        let slot = |k: usize| {
+            group(k)
+                .and_then(|g| self.env.groups.get(g))
+                .and_then(|g| g.slot.clone())
+        };
+        let match1 = from_item && group(i).is_some() && slot(i) == slot(main);
+        let match2 = !ge_from_item(main) && group(i) == group(main);
+        match1 || match2
     }
 
     /// `packageSkillDataForSimulation(skill, env)`

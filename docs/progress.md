@@ -10,7 +10,7 @@ The whole of `calcs.initEnv` runs typed from a build file:
 chains the slices in upstream's order. Each slice is compared with the
 translated `initEnv` for every corpus build in
 `crates/equivalence/tests/calc_setup.rs` (`items_setup_matches_upstream`
-covers everything from the items on; 57 builds compared, 4 skipped).
+covers everything from the items on; 61 builds compared).
 
 | Upstream | Typed |
 |---|---|
@@ -18,6 +18,7 @@ covers everything from the items on; 57 builds compared, 4 skipped).
 | `ConfigTab:Load`, config sets, defaults | `config_tab.rs` (options in `config.rs`) |
 | `ItemsTab` slots and sets | `items_tab.rs` |
 | `PassiveSpec:Load` | `spec.rs` |
+| `PassiveSpec:BuildClusterJewelGraphs`, `BuildSubgraph`, legacy cluster ids | `spec_cluster.rs`: the subgraphs' nodes are the spec's own (`SpecNode::synth`) |
 | base mods, bandit, pantheon, config | `calc_setup.rs` (`base_dbs`) |
 | tree before items, `mergeKeystones` | `calc_setup.rs` (`build_mod_list_for_node_list`) |
 | radius jewel functions | `jewel.rs` |
@@ -33,7 +34,7 @@ then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 57 builds compared, 56 of them
+`crates/equivalence/tests/perform.rs`: 60 builds compared, 56 of them
 through the offence; the gaps below are skipped.
 
 | Upstream | Typed |
@@ -62,7 +63,9 @@ Game data is still read from upstream's processed Lua `data` table
 
 ## Not ported yet in `initEnv`
 
-- Cluster jewel subgraphs (the 3.13 corpus builds are skipped for them)
+- Rebuilding cluster jewel subgraphs after an edit (they are built once,
+  when the build loads); `initial_node_mods_match_upstream` skips the builds
+  with subgraphs, as it loads no items
 - Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade` and swaps in
   generated weapons; gen-0031 is skipped)
 - Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
@@ -77,9 +80,8 @@ Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
 - The party tab, and a minion's curses on itself
-- Mirages (`CalcMirages.lua`, with `calcs.copyActiveSkill`); no corpus
-  build reaches the calculations of other skills yet (the 3.13 builds that
-  would wait on cluster jewels)
+- Mirages (`CalcMirages.lua`, with `calcs.copyActiveSkill`): the 3.13
+  builds' Mirage Archer, General's Cry and The Saviour
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`), breakdowns of triggers
 - Skill functions other than those in `calc_skill_funcs.rs`
@@ -90,8 +92,7 @@ a skip:
 
 ## Next
 
-Cluster jewel subgraphs, which the 3.13 builds need, then mirages and the
-rest of the triggers with them, then `Calcs.lua`'s calculators
+Mirages, then `Calcs.lua`'s calculators
 (`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
 Port further skill functions as builds need them.
 

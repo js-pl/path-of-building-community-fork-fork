@@ -481,13 +481,6 @@ fn perform_matches_upstream() {
         host.load_build_xml(xml.as_bytes(), &id)
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let build = host.build().unwrap();
-        if !entries(&get(&get(&build, "spec"), "subGraphs")).is_empty() {
-            *skip_reasons
-                .entry("cluster jewel subgraphs".into())
-                .or_default() += 1;
-            skipped += 1;
-            continue;
-        }
         // The translated perform, up to the defence
         let calcs = get(&get(&build, "calcsTab"), "calcs");
         let env = rt::call(&get(&calcs, "initEnv"), &[build.clone(), s("MAIN")])

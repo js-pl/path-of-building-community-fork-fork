@@ -58,6 +58,8 @@ pub struct Group {
     pub x: f64,
     pub y: f64,
     pub is_proxy: bool,
+    /// The group's nodes (`group.n`)
+    pub nodes: Vec<u32>,
     pub ascendancy_name: Option<Sym>,
     pub is_ascendancy_start: bool,
 }
@@ -169,6 +171,8 @@ pub struct PassiveTree {
     pub class_notables: HashMap<Rc<str>, Vec<Rc<str>>>,
     /// Jewel sockets, in the data's order
     pub sockets: Vec<u32>,
+    /// `skillsPerOrbit`, by orbit from 0
+    pub skills_per_orbit: Vec<f64>,
     pub mastery_effects: HashMap<u64, MasteryEffect>,
     /// `alternate_ascendancies` by index, without the legacy ones; `None`
     /// when the tree has none
@@ -558,6 +562,20 @@ impl PassiveTree {
                     x: number(&get(&g, "x"))?,
                     y: number(&get(&g, "y"))?,
                     is_proxy: truthy(&g, "isProxy"),
+                    nodes: {
+                        let n = get(&g, "nodes");
+                        let n = if n.is_nil() { get(&g, "n") } else { n };
+                        n.as_table()
+                            .map(|t| t.array())
+                            .unwrap_or_default()
+                            .iter()
+                            .filter_map(|v| match v {
+                                Value::Number(x) => Some(*x as u32),
+                                Value::Str(s) => lua::str_to_number(s.as_bytes()).map(|x| x as u32),
+                                _ => None,
+                            })
+                            .collect()
+                    },
                     ascendancy_name: None,
                     is_ascendancy_start: false,
                 },
@@ -573,6 +591,7 @@ impl PassiveTree {
             group_ids,
             nodes: Vec::new(),
             node_index: HashMap::new(),
+            skills_per_orbit: per_orbit.clone(),
             keystone_map: HashMap::new(),
             legion_keystones: HashMap::new(),
             notable_map: HashMap::new(),

@@ -139,6 +139,21 @@ pub struct ClusterJewel {
     pub min_nodes: f64,
     pub max_nodes: f64,
     pub skills: HashSet<String>,
+    /// The skills of the small nodes, by id
+    pub skill_data: HashMap<String, ClusterSkill>,
+    pub small_indicies: Vec<i64>,
+    pub notable_indicies: Vec<i64>,
+    pub socket_indicies: Vec<i64>,
+    pub total_indicies: i64,
+}
+
+/// A cluster jewel's small node skill
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClusterSkill {
+    pub name: String,
+    pub stats: Vec<String>,
+    /// Whether it has a mastery (`masteryIcon`)
+    pub mastery: bool,
 }
 
 /// One value of a line in `data.modScalability`
@@ -158,6 +173,11 @@ pub struct ItemData {
     /// Unique title to its (original mod, Foulborn mod) pairs
     pub foulborn_map: HashMap<String, Vec<(String, String)>>,
     pub cluster_jewels: HashMap<String, ClusterJewel>,
+    /// `data.clusterJewels.notableSortOrder`
+    pub cluster_notable_sort_order: HashMap<String, f64>,
+    /// `data.clusterJewels.orbitOffsets`: by proxy node, the offset of each
+    /// size index
+    pub cluster_orbit_offsets: HashMap<u32, HashMap<i64, i64>>,
     pub mod_scalability: HashMap<String, Vec<Scalability>>,
     pub high_precision_mods: HashMap<(String, String), f64>,
     /// `data.itemTagSpecial` and `data.itemTagSpecialExclusionPattern`:
@@ -394,8 +414,43 @@ impl ItemData {
                         .iter()
                         .map(|(k, _)| key_string(k))
                         .collect::<Result<_>>()?,
+                    skill_data: pairs(&get(&v, "skills"))
+                        .iter()
+                        .map(|(k, sk)| {
+                            Ok((
+                                key_string(k)?,
+                                ClusterSkill {
+                                    name: string(&get(sk, "name"))?,
+                                    stats: array(&get(sk, "stats"))
+                                        .iter()
+                                        .map(string)
+                                        .collect::<Result<_>>()?,
+                                    mastery: !get(sk, "masteryIcon").is_nil(),
+                                },
+                            ))
+                        })
+                        .collect::<Result<_>>()?,
+                    small_indicies: ints(&get(&v, "smallIndicies"))?,
+                    notable_indicies: ints(&get(&v, "notableIndicies"))?,
+                    socket_indicies: ints(&get(&v, "socketIndicies"))?,
+                    total_indicies: number(&get(&v, "totalIndicies"))? as i64,
                 },
             );
+        }
+        let cj = get(data, "clusterJewels");
+        for (k, v) in pairs(&get(&cj, "notableSortOrder")) {
+            d.cluster_notable_sort_order
+                .insert(key_string(&k)?, number(&v)?);
+        }
+        for (k, v) in pairs(&get(&cj, "orbitOffsets")) {
+            let Key::Int(proxy) = k else { continue };
+            let mut offsets = HashMap::new();
+            for (s, o) in pairs(&v) {
+                if let Key::Int(s) = s {
+                    offsets.insert(s, number(&o)? as i64);
+                }
+            }
+            d.cluster_orbit_offsets.insert(proxy as u32, offsets);
         }
         for (k, v) in pairs(&get(data, "modScalability")) {
             let list = array(&v)
@@ -471,4 +526,9 @@ impl crate::mods::list::Precision for ItemData {
     fn default_high_precision(&self) -> f64 {
         self.default_high_precision
     }
+}
+
+/// A Lua array of numbers as integers
+fn ints(v: &Value) -> Result<Vec<i64>> {
+    array(v).iter().map(|x| Ok(number(x)? as i64)).collect()
 }
