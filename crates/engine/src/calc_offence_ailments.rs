@@ -23,7 +23,7 @@ impl<'a> Perform<'a> {
     /// damageType, typeFlags)`: the skill's own conversion table
     fn ailment_source_damage(&self, o: &Off, cfg: &Cfg, t: &str, flags: u32) -> Result<(f64, f64)> {
         let conv = o.conv[0].as_ref().expect("conversion tables");
-        let (min, max) = self.calc_damage(o, cfg, conv, t, flags)?;
+        let (min, max) = self.calc_damage(o, cfg, conv, t, flags, None, None)?;
         let m = conv[crate::calc_offence::dmg_index(t)].mult;
         Ok((min * m, max * m))
     }

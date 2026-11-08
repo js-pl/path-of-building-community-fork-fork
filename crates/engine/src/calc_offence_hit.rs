@@ -1600,6 +1600,18 @@ impl<'a> Perform<'a> {
                 };
                 self.set_po(o, "PreEffectiveCritChance", v);
                 self.set_po(o, "CritChance", v);
+                if mode.as_deref() == Some("AVERAGE")
+                    && let Some(bd) = self.pbd(o)
+                {
+                    bd.set(
+                        "CritChance",
+                        crate::breakdown::Bd::of([
+                            "100%".to_string(),
+                            crate::sf!("/ %d ^8(number of repeats)", repeats),
+                            crate::sf!("= %.2f%% average critical strike chance", v),
+                        ]),
+                    );
+                }
             }
         } else {
             let mut crit_override = self.c.override_num(list, c, &["CritChance"])?;
@@ -1614,7 +1626,8 @@ impl<'a> Perform<'a> {
             let mut base_crit = crit_override
                 .or_else(|| self.src_num(o, "CritChance"))
                 .unwrap_or(0.0);
-            if self.c.flag(list, c, &["BaseCritFromMainHand"])? {
+            let from_main = self.c.flag(list, c, &["BaseCritFromMainHand"])?;
+            if from_main {
                 base_crit = self.weapon_num(actor, 0, "CritChance").unwrap_or(f64::NAN);
             } else if self
                 .c
@@ -1644,6 +1657,7 @@ impl<'a> Perform<'a> {
                     more = self.c.more(list, c, &["CritChance"])?;
                 }
                 let mut crit = (base_crit + base) * (1.0 + inc / 100.0) * more;
+                let pre_cap = crit;
                 let cap = match self.c.override_num(list, None, &["CritChanceCap"])? {
                     Some(v) => v,
                     None => self.c.base(list, c, &["CritChanceCap"])?,
@@ -1653,6 +1667,8 @@ impl<'a> Perform<'a> {
                     crit = m_max(crit, 0.0);
                 }
                 self.set_po(o, "PreEffectiveCritChance", crit);
+                let pre_effective = crit;
+                let pre_lucky = crit;
                 let mut rolls = 0.0;
                 if effective && self.c.flag(list, c, &["CritChanceLucky"])? {
                     rolls += 1.0;
@@ -1668,9 +1684,16 @@ impl<'a> Perform<'a> {
                     };
                 }
                 self.set_po(o, "PreBifurcateCritChance", crit);
-                if effective && self.c.flag(list, c, &["BifurcateCrit"])? {
+                let pre_bifurcate = crit;
+                let bifurcate = self.c.flag(list, c, &["BifurcateCrit"])?;
+                if effective && bifurcate {
                     crit = (1.0 - (1.0 - crit / 100.0).powf(2.0)) * 100.0;
                 }
+                let pre_skill_use = crit;
+                let mut pre_hit_check = crit;
+                let every3 = self.c.flag(list, sc, &["Every3UseCrit"])?;
+                let every5 = self.c.flag(list, sc, &["Every5UseCrit"])?;
+                let acc_hit = self.po(o, "AccuracyHitChance").unwrap_or(f64::NAN);
                 if effective {
                     if self.c.flag(list, sc, &["Every3UseCrit"])? {
                         crit = (2.0 * crit + 100.0) / 3.0;
@@ -1678,9 +1701,86 @@ impl<'a> Perform<'a> {
                     if self.c.flag(list, sc, &["Every5UseCrit"])? {
                         crit = (4.0 * crit + 100.0) / 5.0;
                     }
+                    pre_hit_check = crit;
                     crit = crit * self.po(o, "AccuracyHitChance").unwrap_or(f64::NAN) / 100.0;
                 }
                 self.set_po(o, "CritChance", crit);
+                if crit != base_crit && self.pbd(o).is_some() {
+                    use crate::sf;
+                    let unexciting = self.c.flag(list, sc, &["Unexciting"])?;
+                    let from = if from_main { " from main weapon" } else { "" };
+                    let mut b = crate::breakdown::Bd::new();
+                    if base != 0.0 {
+                        b.push(sf!("(%g + %g) ^8(base%s)", base_crit, base, from));
+                    } else {
+                        b.push(sf!("%g ^8(base%s)", base_crit + base, from));
+                    }
+                    if inc != 0.0 {
+                        b.push(format!(
+                            "{} ^8(increased/reduced)",
+                            sf!("x %.2f", 1.0 + inc / 100.0)
+                        ));
+                    }
+                    if more != 1.0 {
+                        b.push(format!("{} ^8(more/less)", sf!("x %.2f", more)));
+                    }
+                    b.push(sf!("= %.2f%% ^8(crit chance)", pre_effective));
+                    if pre_cap > 100.0 {
+                        let over = pre_cap - 100.0;
+                        b.push(sf!(
+                            "Crit is overcapped by %.2f%% (%d%% increased Critical Strike Chance)",
+                            over,
+                            over / more / (base_crit + base) * 100.0
+                        ));
+                    }
+                    if effective {
+                        if rolls != 0.0 {
+                            if unexciting {
+                                b.push("Crit Chance is Unexciting:");
+                                b.push(sf!(
+                                    "(3 x %.4f^ 2) - (2 x %.4f^ 3)",
+                                    pre_lucky / 100.0,
+                                    pre_lucky / 100.0
+                                ));
+                            } else {
+                                b.push("Crit Chance is Lucky:");
+                                b.push(sf!("1 - (1 - %.4f)^ %d", pre_lucky / 100.0, rolls + 1.0));
+                            }
+                            b.push(sf!("= %.2f%%", pre_bifurcate));
+                        }
+                        if bifurcate {
+                            b.push("Critical Strike Bifurcates:");
+                            b.push(sf!(
+                                "1 - (1 - %.4f) x (1 - %.4f)",
+                                pre_bifurcate / 100.0,
+                                pre_bifurcate / 100.0
+                            ));
+                            b.push(sf!("= %.2f%%", pre_skill_use));
+                        }
+                        if every3 {
+                            b.push(sf!(
+                                "+ %.2f%% ^8(crit every 3rd use)",
+                                (2.0 * pre_skill_use + 100.0) / 3.0 - pre_skill_use
+                            ));
+                        }
+                        if every5 {
+                            b.push(sf!(
+                                "+ %.2f%% ^8(crit every 5th use)",
+                                (4.0 * pre_skill_use + 100.0) / 5.0 - pre_skill_use
+                            ));
+                        }
+                        if every3 || every5 {
+                            b.push(sf!("= %.2f%%", pre_hit_check));
+                        }
+                    }
+                    if effective && acc_hit < 100.0 {
+                        b.push("Crit confirmation roll:");
+                        b.push(sf!("%.2f%%", pre_hit_check));
+                        b.push(sf!("x %.2f ^8(chance to hit)", acc_hit / 100.0));
+                        b.push(sf!("= %.2f%%", crit));
+                    }
+                    self.pbd(o).unwrap().set("CritChance", b);
+                }
             }
         }
         if self.po_val(o, "CritEffect").is_none() {
@@ -1693,8 +1793,27 @@ impl<'a> Perform<'a> {
                 }
                 if effective {
                     let enemy_inc = 1.0 + self.c.inc(edb, None, &["SelfCritMultiplier"])? / 100.0;
-                    extra += self.c.base(edb, None, &["SelfCritMultiplier"])? / 100.0;
+                    let self_base = self.c.base(edb, None, &["SelfCritMultiplier"])?;
+                    extra += self_base / 100.0;
                     extra = round(extra * enemy_inc, 2.0);
+                    if enemy_inc != 1.0 && self.pbd(o).is_some() {
+                        use crate::sf;
+                        let own = self.c.base(list, c, &["CritMultiplier"])?;
+                        self.pbd(o).unwrap().set(
+                            "CritMultiplier",
+                            crate::breakdown::Bd::of([
+                                sf!(
+                                    "%d%% ^8(additional extra damage)",
+                                    (self_base + own) / 100.0
+                                ),
+                                sf!(
+                                    "x %.2f ^8(increased/reduced extra crit damage taken by enemy)",
+                                    enemy_inc
+                                ),
+                                sf!("= %d%% ^8(extra crit damage)", extra * 100.0),
+                            ]),
+                        );
+                    }
                 }
                 let crit_override = self.c.override_num(list, c, &["CritChance"])?;
                 if effective
@@ -1718,6 +1837,26 @@ impl<'a> Perform<'a> {
                         0.0
                     };
                     self.set_po(o, "CritBifurcates", 1.0 + conditional);
+                    if let Some(bd) = self.pbd(o) {
+                        use crate::sf;
+                        let mut b = crate::breakdown::Bd::of([
+                            sf!("%.2f%% ^8(pre-bifurcate crit chance)", pre),
+                            sf!("x %.2f%%", pre),
+                        ]);
+                        if use_chance < 1.0 {
+                            b.push(sf!(
+                                "x %.2f%% ^8(uses that can bifurcate)",
+                                use_chance * 100.0
+                            ));
+                        }
+                        b.push(sf!(
+                            "= %.2f%% ^8(chance both crit rolls succeed)",
+                            multi_chance
+                        ));
+                        b.push(sf!("/ %.2f%% ^8(effective crit chance)", effective_crit));
+                        b.push(sf!("= %.2f ^8(crit Bifurcates effect)", 1.0 + conditional));
+                        bd.set("CritBifurcates", b);
+                    }
                     extra += conditional * extra;
                     let hit = self.mf("Hit");
                     self.c.add(
@@ -1737,7 +1876,25 @@ impl<'a> Perform<'a> {
             }
             let pct = self.po(o, "CritChance").unwrap_or(f64::NAN) / 100.0;
             let multi = self.po(o, "CritMultiplier").unwrap_or(f64::NAN);
-            self.set_po(o, "CritEffect", 1.0 - pct + pct * multi);
+            let effect = 1.0 - pct + pct * multi;
+            self.set_po(o, "CritEffect", effect);
+            if effect != 1.0
+                && let Some(bd) = self.pbd(o)
+            {
+                use crate::sf;
+                bd.set(
+                    "CritEffect",
+                    crate::breakdown::Bd::of([
+                        sf!("(1 - %.4f) ^8(portion of damage from non-crits)", pct),
+                        sf!(
+                            "+ [ (%.4f x %g) ^8(portion of damage from crits)",
+                            pct,
+                            multi
+                        ),
+                        sf!("= %.3f", effect),
+                    ]),
+                );
+            }
             let v = (self.c.base(list, c, &["CritMultiplier"])? - 50.0)
                 * self.c.base(list, c, &["CritMultiplierAppliesToDegen"])?
                 / 10000.0;
@@ -1789,6 +1946,7 @@ impl<'a> Perform<'a> {
     /// `calcDamage(activeSkill, output, cfg, breakdown, damageType,
     /// typeFlags)` with the current pass's output and the given cfg and
     /// conversion table
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn calc_damage(
         &self,
         o: &Off,
@@ -1796,7 +1954,11 @@ impl<'a> Perform<'a> {
         conv: &crate::calc_offence::ConversionTable,
         t: &str,
         type_flags: u32,
+        mut bd: Option<&mut crate::breakdown::Bd>,
+        conv_dst: Option<&str>,
     ) -> Result<(f64, f64)> {
+        use crate::breakdown::BdVal;
+        let n = crate::pat::num;
         let list = o.list;
         let flags = type_flags | type_flag(t);
         let ti = dmg_index(t);
@@ -1807,7 +1969,8 @@ impl<'a> Perform<'a> {
             }
             let conv_mult = conv[oi].total[ti];
             if conv_mult > 0.0 {
-                let (min, max) = self.calc_damage(o, cfg, conv, other, flags)?;
+                let (min, max) =
+                    self.calc_damage(o, cfg, conv, other, flags, bd.as_deref_mut(), Some(t))?;
                 add_min += min * conv_mult;
                 add_max += max * conv_mult;
             }
@@ -1818,7 +1981,44 @@ impl<'a> Perform<'a> {
         }
         let base_min = self.po(o, &format!("{t}MinBase")).unwrap_or(f64::NAN);
         let base_max = self.po(o, &format!("{t}MaxBase")).unwrap_or(f64::NAN);
+        let has_add = add_min != 0.0 || add_max != 0.0;
+        let conv_src = || -> BdVal {
+            if has_add {
+                format!("{} to {}", n(add_min), n(add_max)).into()
+            } else {
+                false.into()
+            }
+        };
+        let dst = |check: bool| -> Option<(BdVal, BdVal)> {
+            let d = conv_dst?;
+            let di = dmg_index(d);
+            let (c, g) = (conv[ti].conversion[di], conv[ti].gain[di]);
+            let f = |v: f64, s: String| -> BdVal {
+                if !check || v > 0.0 {
+                    s.into()
+                } else {
+                    false.into()
+                }
+            };
+            Some((
+                f(c, crate::sf!("%d%% to %s", c * 100.0, d)),
+                f(g, crate::sf!("%d%% gained as %s", g * 100.0, d)),
+            ))
+        };
         if base_min == 0.0 && base_max == 0.0 {
+            if let Some(b) = bd.as_deref_mut()
+                && has_add
+            {
+                let mut r = crate::breakdown::Bd::new();
+                r.set("source", t);
+                r.set("convSrc", conv_src());
+                r.set("total", format!("{} to {}", n(add_min), n(add_max)));
+                if let Some((c, g)) = dst(false) {
+                    r.set("convDst", c);
+                    r.set("gainDst", g);
+                }
+                b.table("damageTypes").push(r);
+            }
             return Ok((add_min, add_max));
         }
         let c = Some(cfg);
@@ -1833,6 +2033,34 @@ impl<'a> Perform<'a> {
         let more_max = self.c.more(list, c, &[&max_name])?;
         let inc_min = 1.0 + self.c.inc(list, c, &[&min_name])? / 100.0;
         let inc_max = 1.0 + self.c.inc(list, c, &[&max_name])? / 100.0;
+        if let Some(b) = bd {
+            let opt = |cnd: bool, v: f64| -> BdVal {
+                if cnd {
+                    format!("x {}", n(v)).into()
+                } else {
+                    false.into()
+                }
+            };
+            let mut r = crate::breakdown::Bd::new();
+            r.set("source", t);
+            r.set("base", format!("{} to {}", n(base_min), n(base_max)));
+            r.set("inc", opt(inc != 1.0, inc));
+            r.set("more", opt(more != 1.0, more));
+            r.set("convSrc", conv_src());
+            r.set(
+                "total",
+                format!(
+                    "{} to {}",
+                    n(round(base_min * inc * more, 0.0) + add_min),
+                    n(round(base_max * inc * more, 0.0) + add_max)
+                ),
+            );
+            if let Some((cv, g)) = dst(true) {
+                r.set("convDst", cv);
+                r.set("gainDst", g);
+            }
+            b.table("damageTypes").push(r);
+        }
         Ok((
             round(
                 ((base_min * inc * more) * generic_min + add_min) * more_min * inc_min,
@@ -1971,6 +2199,47 @@ impl<'a> Perform<'a> {
                     + added_max * effectiveness * added_mult;
                 self.set_po(o, &format!("{min_n}Base"), base_min);
                 self.set_po(o, &format!("{max_n}Base"), base_max);
+                if self.pbd(o).is_some() {
+                    use crate::sf;
+                    let (smin, smax) = (
+                        self.src_num(o, &min_n).unwrap_or(0.0),
+                        self.src_num(o, &max_n).unwrap_or(0.0),
+                    );
+                    let from = if self.src_val(o, "type").is_some() {
+                        "weapon"
+                    } else {
+                        "skill"
+                    };
+                    let mut b = crate::breakdown::Bd::new();
+                    b.set("damageTypes", crate::breakdown::Bd::new());
+                    if base_min != 0.0 && base_max != 0.0 {
+                        b.push("Base damage:");
+                        let mut plus = "";
+                        if smin != 0.0 || smax != 0.0 {
+                            b.push(sf!("%d to %d ^8(base damage from %s)", smin, smax, from));
+                            if base_mult != 1.0 {
+                                b.push(sf!("x %.2f ^8(base damage multiplier)", base_mult));
+                            }
+                            plus = "+ ";
+                        }
+                        if added_min != 0.0 || added_max != 0.0 {
+                            b.push(sf!(
+                                "%s%d to %d ^8(added damage)",
+                                plus,
+                                added_min,
+                                added_max
+                            ));
+                            if effectiveness != 1.0 {
+                                b.push(sf!("x %.2f ^8(damage effectiveness)", effectiveness));
+                            }
+                            if added_mult != 1.0 {
+                                b.push(sf!("x %.2f ^8(added damage multiplier)", added_mult));
+                            }
+                        }
+                        b.push(sf!("= %.1f to %.1f", base_min, base_max));
+                    }
+                    self.pbd(o).unwrap().set(t, b);
+                }
             }
             self.hit_damage(o, hit_rate)?;
             let _ = (calcs_mode, actor, db);
@@ -1987,6 +2256,7 @@ impl<'a> Perform<'a> {
         let pdb = self.pdb();
         let (mut total_hit_min, mut total_hit_max, mut total_hit_avg) = (0.0, 0.0, 0.0);
         let mut total_crit_avg = 0.0;
+        let (mut total_crit_min, mut total_crit_max) = (0.0, 0.0);
         let ghost_reaver = self.c.flag(list, None, &["GhostReaver"])?;
         let mut ghost_reaver_leech = 0.0;
         for k in [
@@ -2022,10 +2292,80 @@ impl<'a> Perform<'a> {
                 let t = *t;
                 let (mut hit_min, mut hit_max, mut hit_avg) = (0.0, 0.0, 0.0);
                 if self.has_flag(i, "hit") && o.can_deal[ti] {
-                    let (mn, mx) = self.calc_damage(o, &cfg, &conv, t, 0)?;
+                    let mut tbl = if pass == 2 {
+                        self.pbd(o).and_then(|b| b.table_mut(t)).map(std::mem::take)
+                    } else {
+                        None
+                    };
+                    let (mn, mx) = self.calc_damage(o, &cfg, &conv, t, 0, tbl.as_mut(), None)?;
                     hit_min = mn;
                     hit_max = mx;
                     let conv_mult = conv[ti].mult;
+                    if let Some(mut b) = tbl {
+                        use crate::sf;
+                        let po = |k: &str| self.po(o, k).unwrap_or(f64::NAN);
+                        let g = |k: &str| self.go(o, k).unwrap_or(f64::NAN);
+                        let max_hit = self.c.flag(list, None, &["Condition:WarcryMaxHit"])?;
+                        b.push("Hit damage:");
+                        b.push(sf!("%d to %d ^8(total damage)", hit_min, hit_max));
+                        if conv_mult != 1.0 {
+                            b.push(sf!(
+                                "x %g ^8(%g%% converted to other damage types)",
+                                conv_mult,
+                                (1.0 - conv_mult) * 100.0
+                            ));
+                        }
+                        let (dd, td) = (po("DoubleDamageEffect"), po("TripleDamageEffect"));
+                        if dd != 0.0 {
+                            if td != 0.0 {
+                                b.push(sf!(
+                                    "x %.2f ^8(1 + %.2f + %.2f multiplier from %.1f%% chance to deal double damage and %d%% chance to deal triple damage)",
+                                    1.0 + dd + td,
+                                    dd,
+                                    td,
+                                    po("DoubleDamageChance"),
+                                    po("TripleDamageChance")
+                                ));
+                            } else {
+                                b.push(sf!(
+                                    "x %.2f ^8(multiplier from %d%% chance to deal double damage)",
+                                    1.0 + dd,
+                                    po("DoubleDamageChance")
+                                ));
+                            }
+                        } else if td != 0.0 {
+                            b.push(sf!(
+                                "x %.2f ^8(multiplier from %d%% chance to deal triple damage)",
+                                1.0 + td,
+                                po("TripleDamageChance")
+                            ));
+                        }
+                        let rb = po("RuthlessBlowHitEffect");
+                        if rb != 1.0 {
+                            b.push(sf!("x %.2f ^8(ruthless blow effect modifier)", rb));
+                        }
+                        let fw = po("FistOfWarDamageEffect");
+                        if fw != 1.0 {
+                            b.push(sf!("x %.2f ^8(fist of war effect modifier)", fw));
+                        }
+                        let ow = g("OffensiveWarcryEffect");
+                        if ow != 1.0 && !max_hit {
+                            b.push(sf!(
+                                "x %.2f ^8(aggregated warcry exerted effect modifier)",
+                                ow
+                            ));
+                        }
+                        let mw = g("MaxOffensiveWarcryEffect");
+                        if mw != 1.0 && max_hit {
+                            b.push(sf!(
+                                "x %.2f ^8(aggregated max warcry exerted effect modifier)",
+                                mw
+                            ));
+                        }
+                        if let Some(bd) = self.pbd(o) {
+                            bd.set(t, b);
+                        }
+                    }
                     let warcry = if self.c.flag(list, None, &["Condition:WarcryMaxHit"])? {
                         self.go(o, "MaxOffensiveWarcryEffect")
                     } else {
@@ -2091,6 +2431,11 @@ impl<'a> Perform<'a> {
                             self.set_po(o, &format!("{t}EffMult"), eff_mult);
                         }
                     }
+                    if pass == 2
+                        && let Some(b) = self.pbd(o).and_then(|b| b.table_mut(t))
+                    {
+                        b.push(crate::sf!("= %d to %d", hit_min, hit_max));
+                    }
                     // Leech for this damage type
                     let (mut life, mut es, mut mana) = (0.0, 0.0, 0.0);
                     if self.has_flag(i, "mine")
@@ -2149,10 +2494,17 @@ impl<'a> Perform<'a> {
                     if es > 0.0 && !no_es {
                         es_total += hit_avg * es / 100.0;
                     }
+                } else if let Some(bd) = self.pbd(o) {
+                    bd.set(
+                        t,
+                        crate::breakdown::Bd::of([format!("You can't deal {t} damage")]),
+                    );
                 }
                 if pass == 1 {
                     self.set_po(o, &format!("{t}CritAverage"), hit_avg);
                     total_crit_avg += hit_avg;
+                    total_crit_min += hit_min;
+                    total_crit_max += hit_max;
                 } else {
                     if self.input.breakdown {
                         self.set_po(o, &format!("{t}Min"), hit_min);
@@ -2232,6 +2584,10 @@ impl<'a> Perform<'a> {
                 );
                 if avg > pv(self, o, &format!("{highest}HitAverage")) {
                     highest = t;
+                }
+                let portion = avg / total_hit_avg * 100.0;
+                if let Some(b) = self.pbd(o).and_then(|b| b.table_mut(t)) {
+                    b.push(crate::sf!("Portion of total damage: %d%%", portion));
                 }
             }
         }
@@ -2392,6 +2748,113 @@ impl<'a> Perform<'a> {
         );
         self.c
             .set_out_val(actor, "ShowBurst", OutVal::Bool(burst_hits > 1.0));
+        if self.bd(actor).is_some() {
+            use crate::breakdown::Bd;
+            use crate::sf;
+            let effect = pv(self, o, "CritEffect");
+            let hc = pv(self, o, "HitChance");
+            let crit_lucky = self.c.flag(list, sc, &["CritLucky"])?;
+            if effect != 1.0 {
+                let dr = self.po(o, "DamageRolls").unwrap_or(0.0);
+                let cr = self.po(o, "CritDamageRolls").unwrap_or(0.0);
+                let rolls = dr.abs() + 2.0;
+                let rc = cr.abs() + 2.0;
+                let mut b = Bd::new();
+                if dr > 0.0 {
+                    b.push(sf!(
+                        "(1/%d) x %d + (%d/%d) x %d = %.1f ^8(average from non-crits)",
+                        rolls,
+                        total_hit_min,
+                        rolls - 1.0,
+                        rolls,
+                        total_hit_max,
+                        total_hit_avg
+                    ));
+                }
+                if dr < 0.0 {
+                    b.push(sf!(
+                        "(%d/%d) x %d + (1/%d) x %d = %.1f ^8(average from non-crits)",
+                        rolls - 1.0,
+                        rolls,
+                        total_hit_min,
+                        rolls,
+                        total_hit_max,
+                        total_hit_avg
+                    ));
+                }
+                if dr > 0.0 || cr > 0.0 || crit_lucky {
+                    b.push(sf!(
+                        "(1/%d) x %d + (%d/%d) x %d = %.1f ^8(average from crits)",
+                        rc,
+                        total_crit_min,
+                        rc - 1.0,
+                        rc,
+                        total_crit_max,
+                        total_crit_avg
+                    ));
+                    b.push("");
+                }
+                if dr < 0.0 && !crit_lucky {
+                    b.push(sf!(
+                        "(%d/%d) x %d + (1/%d) x %d = %.1f ^8(average from crits)",
+                        rolls - 1.0,
+                        rolls,
+                        total_crit_min,
+                        rolls,
+                        total_crit_max,
+                        total_crit_avg
+                    ));
+                    b.push("");
+                }
+                b.push(sf!(
+                    "%.1f x (1 - %.4f) ^8(damage from non-crits)",
+                    total_hit_avg,
+                    crit / 100.0
+                ));
+                b.push(sf!(
+                    "+ %.1f x %.4f ^8(damage from crits)",
+                    total_crit_avg,
+                    crit / 100.0
+                ));
+                b.push(sf!("= %.1f", avg_hit));
+                if let Some(bd) = self.pbd(o) {
+                    bd.set("AverageHit", b);
+                }
+            }
+            if hc < 100.0 {
+                let label = o.passes[o.pass].label;
+                let b = Bd::of([
+                    sf!("%s:", label),
+                    sf!("%.1f ^8(average hit)", avg_hit),
+                    sf!("x %.2f ^8(chance to hit)", hc / 100.0),
+                    sf!("= %.1f", avg_damage),
+                ]);
+                if let Some(bd) = self.pbd(o) {
+                    bd.set("AverageDamage", b);
+                }
+            }
+            let burst = self.go(o, "AverageBurstDamage").unwrap_or(f64::NAN);
+            if burst > 0.0 {
+                let mut b = Bd::of([sf!("%.1f ^8(average hit)", avg_hit)]);
+                if hc < 100.0 {
+                    b.push(sf!("x %.2f ^8(chance to hit)", hc / 100.0));
+                }
+                if repeat_penalty < 1.0 {
+                    b.push(sf!("x %.2f ^8(number of repeats)", burst_hits - 1.0));
+                    b.push(sf!("x %.2f ^8(repeat penalty)", repeat_penalty));
+                    b.push(sf!("= %.1f ^8(repeat damage total)", burst - avg_damage));
+                    b.push("");
+                    b.push(sf!("+ %.1f ^8(first hit)", avg_hit));
+                    if hc < 100.0 {
+                        b.push(sf!("x %.2f ^8(chance to hit)", hc / 100.0));
+                    }
+                } else {
+                    b.push(sf!("x %.2f ^8(number of hits)", burst_hits));
+                }
+                b.push(sf!("= %.1f ^8(total burst damage)", burst));
+                self.bd(actor).unwrap().set("AverageBurstDamage", b);
+            }
+        }
         let speed = self
             .go(o, "HitSpeed")
             .or_else(|| self.go(o, "Speed"))
@@ -2435,6 +2898,7 @@ impl<'a> Perform<'a> {
         let c = Some(cfg);
         let mut resist;
         let mut pen = 0.0;
+        let mut source_res = t.to_string();
         let tn = format!("{t}DamageTaken");
         let mut taken_inc = self.c.inc(edb, c, &["DamageTaken", &tn])?;
         let taken_more = self.c.more(edb, c, &["DamageTaken", &tn])?;
@@ -2542,6 +3006,7 @@ impl<'a> Perform<'a> {
                         }
                     }
                 }
+                source_res = used.to_string();
                 if is_elemental(used) {
                     pen = self.c.base(
                         list,
@@ -2593,15 +3058,25 @@ impl<'a> Perform<'a> {
         if self.has_flag(i, "trap") || self.has_flag(i, "mine") {
             taken_inc += self.c.inc(edb, None, &["TrapMineDamageTaken"])?;
         }
+        let pdb = self.pdb();
+        if self.c.flag(
+            pdb,
+            None,
+            &[&format!("Enemy{source_res}ResistEqualToYours")],
+        )? {
+            source_res = format!("Your {source_res} Resistance");
+        }
         let mut eff = (1.0 + taken_inc / 100.0) * taken_more;
         let use_chance = use_resist(self, t)?;
         let cannot = is_elemental(t) && self.c.flag(list, c, &["CannotElePenIgnore"])?;
+        let mut effective_resist = resist;
         if cannot {
             let r = if invert > 0.0 {
                 resist - 2.0 * invert * resist
             } else {
                 resist
             };
+            effective_resist = r;
             eff *= 1.0 - r / 100.0;
         } else if use_chance > 0.0 {
             let r = if invert > 0.0 {
@@ -2609,7 +3084,27 @@ impl<'a> Perform<'a> {
             } else {
                 (resist - pen) * use_chance
             };
+            effective_resist = r;
             eff *= 1.0 - r / 100.0;
+        }
+        if pass == 2 && (eff != 1.0 || source_res != t || invert > 0.0) && self.pbd(o).is_some() {
+            let b = crate::breakdown::eff_mult(
+                t,
+                resist,
+                if cannot { 0.0 } else { pen },
+                taken_inc,
+                eff,
+                taken_more,
+                Some(&source_res),
+                use_chance > 0.0,
+                Some(invert),
+                Some(effective_resist),
+            );
+            let bd = self.pbd(o).unwrap();
+            if let Some(tb) = bd.table_mut(t) {
+                tb.push(crate::sf!("x %.3f ^8(effective DPS modifier)", eff));
+            }
+            bd.set(&format!("{t}EffMult"), b);
         }
         Ok(eff)
     }
