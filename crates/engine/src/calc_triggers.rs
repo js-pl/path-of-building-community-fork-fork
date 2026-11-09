@@ -48,6 +48,10 @@ pub(crate) struct TriggerConfig {
     pub source_weapon: bool,
     pub stages_are_overlaps: Option<f64>,
     pub overlaps: Option<f64>,
+    /// Arcanist Brand as the trigger: the brand skill, its activation
+    /// frequency's increase and more multipliers
+    /// (`triggeredBy.mainSkill`, `activationFreqInc`, `activationFreqMore`)
+    pub brand: Option<(usize, f64, f64)>,
 }
 
 /// `ceil_b(x, base)` and `floor_b(x, base)` of `Modules/Common.lua`
@@ -205,6 +209,33 @@ impl<'a> Perform<'a> {
                     triggered_skill_cond: Some(|p, s| {
                         p.sd_truthy(s, "triggeredByMeleeKill") && p.slot_match(s)
                     }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "arcanist brand" => {
+                if self.skill_name(main) == "Arcanist Brand" {
+                    return Ok(None);
+                }
+                self.sd_set(main, "sourceRateIsFinal", true);
+                let brand = (0..self.n_player)
+                    .find(|&k| self.skill_name(k) == "Arcanist Brand")
+                    .ok_or("attempt to index a nil value (field 'mainSkill')")?;
+                let (bl, bc) = (self.lists[brand].list, self.cfg(brand));
+                let inc = (100.0
+                    + self
+                        .c
+                        .inc(bl, Some(&bc), &["Speed", "BrandActivationFrequency"])?)
+                    / 100.0;
+                let more = self.c.more(bl, Some(&bc), &["BrandActivationFrequency"])?;
+                let attached = self.sd_num(brand, "attachedBrandCount").unwrap_or(f64::NAN);
+                let freq = self.sd_num(brand, "repeatFrequency").unwrap_or(f64::NAN);
+                TriggerConfig {
+                    trig_rate: Some(freq * inc * more * attached),
+                    source: Some(brand),
+                    triggered_skill_cond: Some(|p, s| {
+                        p.sd_truthy(s, "triggeredByBrand") && p.slot_match(s)
+                    }),
+                    brand: Some((brand, inc, more)),
                     ..TriggerConfig::default()
                 }
             }
@@ -528,8 +559,9 @@ impl<'a> Perform<'a> {
         if self.sd_truthy(main, "triggeredByManaforged") && trig_rate.is_some_and(|r| r > 0.0) {
             return Err("not ported: Manaforged Arrows".into());
         }
-        if self.sd_truthy(main, "triggeredByBrand") {
-            return Err("not ported: Arcanist Brand".into());
+        let by_brand = self.sd_truthy(main, "triggeredByBrand");
+        if by_brand && config.brand.is_none() {
+            return Err("attempt to index a nil value (field 'mainSkill')".into());
         }
 
         // Cooldowns
@@ -560,6 +592,11 @@ impl<'a> Perform<'a> {
             trigger_cd = effect_cd(self, s)?;
         }
         let triggered_cd = self.sd_num(main, "cooldown");
+        // Brand activation is not affected by cooldown recovery
+        if by_brand && let Some((brand, inc, more)) = config.brand {
+            let freq = self.sd_num(brand, "repeatFrequency").unwrap_or(f64::NAN);
+            trigger_cd = Some(freq / more / inc * icdr);
+        }
         let adds_cast_time = self.added_cast_time(player_main)?.map(|(t, _)| t);
         match adds_cast_time {
             Some(t) => {
@@ -576,7 +613,12 @@ impl<'a> Perform<'a> {
         } else {
             (triggered_adj * tick_rate).ceil() / tick_rate
         };
-        let trigger_tick = (trigger_adj * tick_rate).ceil() / tick_rate;
+        // `triggeredBy.ignoresTickRate`, which only Arcanist Brand sets
+        let trigger_tick = if config.brand.is_some() && self.mods(main).triggered_by.is_some() {
+            trigger_adj
+        } else {
+            (trigger_adj * tick_rate).ceil() / tick_rate
+        };
         let action_tick = match cd_override {
             Some(o) => (o * tick_rate).ceil() / tick_rate,
             None => m_max(trigger_tick, triggered_tick),
@@ -681,7 +723,11 @@ impl<'a> Perform<'a> {
                 } else {
                     vec![self.package_skill(main)?]
                 };
-                let cd = trigger_cd.or(triggered_cd).unwrap_or(0.0);
+                let cd = if by_brand {
+                    0.0
+                } else {
+                    trigger_cd.or(triggered_cd).unwrap_or(0.0)
+                };
                 let mut r = self.rotation_impact(rotation, esr, cd, chance, actor)?;
                 let db = self.c.db(actor);
                 if self.c.flag(db, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell") {

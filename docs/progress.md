@@ -34,8 +34,11 @@ then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 60 builds compared, 56 of them
-through the offence; the gaps below are skipped.
+`crates/equivalence/tests/perform.rs`: 60 builds compared, 58 of them
+through the offence; the gaps below are skipped. `skill_functions_match_upstream`
+does the same for every gem with skill functions, in each of its parts, as
+the main skill of a corpus build with fitting weapons (238 variants, about
+13 minutes).
 
 | Upstream | Typed |
 |---|---|
@@ -43,7 +46,7 @@ through the offence; the gaps below are skipped.
 | `calcs.defence` | `calc_defence.rs` |
 | `calcs.buildDefenceEstimations` | `calc_ehp.rs` |
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
-| skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id |
+| skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id: all of them, the minions' tested only through the corpus |
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
@@ -80,11 +83,11 @@ Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
 - The party tab, and a minion's curses on itself
-- Mirages (`CalcMirages.lua`, with `calcs.copyActiveSkill`): the 3.13
-  builds' Mirage Archer, General's Cry and The Saviour
+- Mirages with a copy of the skill (`calcs.copyActiveSkill`): Mirage
+  Archer, The Saviour, Tawhoa's Chosen and Sacred Wisps; General's Cry is
+  ported
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`), breakdowns of triggers
-- Skill functions other than those in `calc_skill_funcs.rs`
 - Skills whose stages come from a cached calculation (Blight, Penance
   Brand's, Earthquake of Amplification), overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade

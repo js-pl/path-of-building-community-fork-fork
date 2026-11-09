@@ -76,7 +76,7 @@ impl Mod {
 }
 
 impl Tag {
-    fn kind(kind: TagKind) -> Tag {
+    pub(crate) fn kind(kind: TagKind) -> Tag {
         Tag {
             kind,
             global_limit: None,

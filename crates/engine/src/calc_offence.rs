@@ -2565,9 +2565,11 @@ impl<'a> Perform<'a> {
                 || name == "Reflection"
                 || name == "Tawhoa's Chosen"
                 || self.sd_truthy(main, "triggeredBySacredWisps")
-                || self.sd_truthy(main, "triggeredByGeneralsCry")
             {
                 return Err(format!("not ported: the mirage of {name}"));
+            }
+            if self.sd_truthy(main, "triggeredByGeneralsCry") && !self.is_limited(main) {
+                self.generals_cry(main)?;
             }
         }
         self.offence(crate::calc::PLAYER, main)?;
@@ -2591,6 +2593,87 @@ impl<'a> Perform<'a> {
             self.c
                 .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
             self.c.set_out(actor, "GemQuality", v);
+        }
+        Ok(())
+    }
+}
+
+impl<'a> Perform<'a> {
+    /// General's Cry in `calcs.mirages`: the main skill used by its mirage
+    /// warriors, scaled by their count and the cry's cooldown
+    fn generals_cry(&mut self, main: usize) -> Result<()> {
+        for t in ["Triggered", "OtherThingUsesSkill"] {
+            let t = self.st(t);
+            match main.checked_sub(self.n_player) {
+                None => self.env.skills.active_skills[main].skill_types.insert(t),
+                Some(k) => self.minion_skills[k].skill_types.insert(t),
+            };
+        }
+        self.set_skill_cond(main, "usedByMirage", true);
+        let cached = self
+            .cached_calc(main, true)?
+            .ok_or("attempt to index a nil value (the cached calculation of the main skill)")?;
+        let slot_of = |p: &Self, k: usize| {
+            p.skill(k)
+                .group
+                .and_then(|g| p.env.groups.get(g))
+                .and_then(|g| g.slot.clone())
+        };
+        let main_slot = slot_of(self, main);
+        let cry = (0..self.n_player)
+            .find(|&k| self.skill_name(k) == "General's Cry" && slot_of(self, k) == main_slot)
+            .ok_or("attempt to index a nil value (local 'generalsCryActiveSkill')")?;
+        let (cl, cc) = (self.lists[cry].list, self.cfg(cry));
+        let (mut cooldown, _, _) = self.skill_cooldown(cl, &cc, cry)?;
+        let list = self.lists[main].list;
+        let cfg = self.cfg(main);
+        let copy = |m: &Mod, name: &str| {
+            let mut d = Mod::new(name, m.typ, m.value.clone(), m.source.as_deref());
+            d.flags = m.flags;
+            d.keyword_flags = m.keyword_flags;
+            d
+        };
+        let mut warriors = 0.0;
+        for (_, m) in self
+            .c
+            .tabulate(cl, Some(Base), Some(&cc), &["GeneralsCryDoubleMaxCount"])?
+        {
+            self.c.add(list, copy(&m, "QuantityMultiplier"));
+            warriors += number(&m.value)?;
+        }
+        // The mirages' spawn time only shows in upstream's info message
+        let _ = warriors;
+        if !self.has_type(main, "Channel") {
+            self.sd_set(main, "hitTimeOverride", 1.0);
+        }
+        let time = cached
+            .out("HitTime")
+            .or_else(|| cached.out("Time"))
+            .unwrap_or(f64::NAN);
+        cooldown = m_max(cooldown, time);
+        self.c.add(
+            list,
+            Mod::new(
+                "DPS",
+                More,
+                (1.0 / cooldown - 1.0) * 100.0,
+                Some("General's Cry Cooldown"),
+            ),
+        );
+        self.c.add(
+            list,
+            Mod::new("HasNoCost", ModType::Flag, true, Some("Used by mirage")),
+        );
+        for (typ, name, to) in [
+            (Inc, "ExertIncrease", "Damage"),
+            (More, "ExertIncrease", "Damage"),
+            (More, "ExertAttackIncrease", "Damage"),
+            (More, "OverexertionExertAverageIncrease", "Damage"),
+            (Base, "ExertDoubleDamageChance", "DoubleDamageChance"),
+        ] {
+            for (_, m) in self.c.tabulate(list, Some(typ), Some(&cfg), &[name])? {
+                self.c.add(list, copy(&m, to));
+            }
         }
         Ok(())
     }

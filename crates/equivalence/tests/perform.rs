@@ -406,8 +406,101 @@ fn compare_stage(
     }
 }
 
+/// The corpus builds as (id, XML)
+fn corpus_builds() -> Vec<(String, String)> {
+    corpus()
+        .into_iter()
+        .filter(|(_, p)| !p.extension().is_some_and(|e| e == "json"))
+        .map(|(id, p)| (id, std::fs::read_to_string(&p).unwrap()))
+        .collect()
+}
+
 #[test]
 fn perform_matches_upstream() {
+    run_builds(&|_| corpus_builds());
+}
+
+/// Every gem whose skill has functions of its own (`preDamageFunc`, ...),
+/// in each of its parts, as the main skill of a corpus build whose main
+/// skill uses the same weapons or is a spell like it
+#[test]
+fn skill_functions_match_upstream() {
+    run_builds(&skill_variants);
+}
+
+/// The main skill of a build's XML, by its first gem's skill id
+fn main_skill_id(xml: &str) -> Option<String> {
+    let root = engine::xml::parse(xml).ok()?;
+    let pob = root.child("PathOfBuilding")?;
+    let main: usize = pob.child("Build")?.attr("mainSocketGroup")?.parse().ok()?;
+    let skills = pob.child("Skills")?;
+    let active = skills.attr("activeSkillSet").unwrap_or("1");
+    let set = skills
+        .elements()
+        .find(|e| e.elem == "SkillSet" && e.attr("id") == Some(active))?;
+    let group = set.elements().filter(|e| e.elem == "Skill").nth(main - 1)?;
+    group
+        .elements()
+        .filter(|e| e.elem == "Gem")
+        .find_map(|g| g.attr("skillId").map(String::from))
+}
+
+fn skill_variants(data: &SkillData) -> Vec<(String, String)> {
+    let builds: Vec<(
+        String,
+        String,
+        Option<Rc<engine::skill_data::GrantedEffect>>,
+    )> = corpus_builds()
+        .into_iter()
+        .filter(|(id, _)| id.starts_with("gen-"))
+        .map(|(id, xml)| {
+            let ge = main_skill_id(&xml).and_then(|s| data.skills.get(&s).cloned());
+            (id, xml, ge)
+        })
+        .collect();
+    let spell = |ge: &engine::skill_data::GrantedEffect| {
+        ge.weapon_types.is_none() && ge.base_flags.iter().any(|f| f == "spell")
+    };
+    let mut out = Vec::new();
+    for gem in data.gems() {
+        let ge = &gem.granted_effect;
+        if ge.funcs.is_empty() || ge.support || gem.name.contains("Unknown") {
+            continue;
+        }
+        let template = builds.iter().find(|(_, _, t)| {
+            t.as_ref()
+                .is_some_and(|t| match (&ge.weapon_types, &t.weapon_types) {
+                    (Some(w), Some(tw)) => w.first().is_some_and(|f| tw.contains(f)),
+                    (None, None) => spell(ge) == spell(t),
+                    _ => false,
+                })
+        });
+        let Some((tid, xml, _)) = template else {
+            continue;
+        };
+        let parts = ge.parts.as_ref().map_or(1, |p| p.len().max(1));
+        for part in 1..=parts {
+            let gem_xml = format!(
+                "<Skill enabled=\"true\" label=\"Variant\" mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\">\n<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\" skillPart=\"{part}\"/>\n</Skill>\n",
+                gem.game_id, gem.natural_max_level, gem.name, gem.id, gem.variant_id
+            );
+            let Some(set) = xml.find("<SkillSet id=\"1\">") else {
+                continue;
+            };
+            let at = set + "<SkillSet id=\"1\">".len();
+            let mut v = String::new();
+            v.push_str(&xml[..at]);
+            v.push('\n');
+            v.push_str(&gem_xml);
+            v.push_str(&xml[at..]);
+            let v = engine::pat::gsub(&v, "mainSocketGroup=\"%d+\"", "mainSocketGroup=\"1\"");
+            out.push((format!("fn-{}-{part}-{tid}", gem.id), v));
+        }
+    }
+    out
+}
+
+fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
@@ -473,11 +566,10 @@ fn perform_matches_upstream() {
     let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
     let stage_name = |k: usize| ["defence", "buildDefenceEstimations", "triggers", "offence"][k];
     let mut skip_reasons: BTreeMap<String, usize> = BTreeMap::new();
-    for (id, path) in corpus() {
-        if !id.contains(&filter) || path.extension().is_some_and(|e| e == "json") {
+    for (id, xml) in make(&skill_data) {
+        if !id.contains(&filter) {
             continue;
         }
-        let xml = std::fs::read_to_string(&path).unwrap();
         host.load_build_xml(xml.as_bytes(), &id)
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let build = host.build().unwrap();
