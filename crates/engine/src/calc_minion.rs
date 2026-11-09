@@ -187,6 +187,7 @@ impl<'a> Perform<'a> {
                 actor: owner_actor,
                 summon: Some(&summon_name),
                 minion: Some((&data, minion.level)),
+                env_db: None,
             };
             for id in &ids {
                 let ge = skill_data

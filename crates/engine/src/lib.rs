@@ -12,6 +12,7 @@ pub mod calc_ehp;
 pub mod calc_env;
 pub mod calc_items;
 pub mod calc_minion;
+pub mod calc_mirage;
 pub mod calc_offence;
 pub mod calc_offence_ailments;
 pub mod calc_offence_dot;

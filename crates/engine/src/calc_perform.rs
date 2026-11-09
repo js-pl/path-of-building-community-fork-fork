@@ -54,6 +54,8 @@ pub struct PerformInput<'a> {
     pub limited: Vec<String>,
     /// `skipEHP`: no defence estimations and allies' life pools
     pub skip_ehp: bool,
+    /// A mirage's copy of a skill, the main skill of this calculation
+    pub external: Option<crate::calc_mirage::External>,
 }
 
 /// An active skill's mod lists during the calculation
@@ -252,6 +254,8 @@ pub struct Perform<'a> {
     /// `buffs` and `minionBuffs` of the buffs' merge, which the allies'
     /// life pools read again
     pub(crate) merged_buffs: (BuffMap, BuffMap),
+    /// `env.player.mainSkill.mirage`
+    pub mirage: Option<crate::calc_mirage::Mirage>,
 }
 
 impl<'a> Perform<'a> {
@@ -512,6 +516,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         env_minion: None,
         flasks_to_minion: [false; 3],
         merged_buffs: (Vec::new(), Vec::new()),
+        mirage: None,
     };
     p.run()?;
     Ok(p)
@@ -541,6 +546,9 @@ impl<'a> Perform<'a> {
         // The minions' skills, and `env.minion`'s database
         for (k, v) in self.env.enemy_multipliers.clone() {
             self.c.store_mut(edb).multipliers.insert(k, v);
+        }
+        if let Some(ext) = self.input.external.take() {
+            self.add_external(ext)?;
         }
         self.create_minions()?;
         if let Some(m) = self.env_minion {
@@ -5976,6 +5984,7 @@ impl<'a> PerformInput<'a> {
             recalc: None,
             limited: Vec::new(),
             skip_ehp: false,
+            external: None,
         })
     }
 }

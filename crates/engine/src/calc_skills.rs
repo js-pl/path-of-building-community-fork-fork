@@ -545,6 +545,35 @@ pub fn create_minion_skill(
     skill
 }
 
+/// `calcs.copyActiveSkill(env, mode, skill)` before its mod list: a new
+/// skill of the same effect at its gem's level and quality, with the same
+/// supports matched again
+pub fn copy_active_skill(
+    skill: &ActiveSkill,
+    groups: &[SocketGroup],
+    from_item: &HashSet<String>,
+    all_one_hand: bool,
+    data: &SkillData,
+) -> ActiveSkill {
+    let e = &skill.active_effect;
+    let mut active = SkillEffect::new(e.granted_effect.clone(), e.level, e.quality);
+    if let Some((g, k)) = e.src
+        && let Some(gem) = groups.get(g).and_then(|g| g.gem_list.get(k))
+    {
+        active.level = gem.level;
+        active.quality = gem.quality.unwrap_or(f64::NAN);
+        active.src = e.src;
+        active.gem = gem.gem.clone();
+    }
+    let ctx = SupportContext {
+        from_item: from_item.clone(),
+        groups,
+        all_one_hand,
+        data,
+    };
+    create_active_skill(active, skill.support_list.clone(), skill.group, &ctx)
+}
+
 /// What the support checks read
 struct SupportContext<'a> {
     from_item: HashSet<String>,

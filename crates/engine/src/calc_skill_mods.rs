@@ -376,6 +376,9 @@ pub struct Owner<'s> {
     pub summon: Option<&'s str>,
     /// The minion's data and level, for a minion's skills
     pub minion: Option<(&'s crate::calc_setup::MinionData, f64)>,
+    /// `env.modDB` when it is not the owner's database (a mirage's copy of
+    /// a skill stands on the player's database of another calculation)
+    pub env_db: Option<StoreId>,
 }
 
 impl Owner<'_> {
@@ -383,12 +386,25 @@ impl Owner<'_> {
         actor: 0,
         summon: None,
         minion: None,
+        env_db: None,
     };
 }
 
 /// Builds a minion's skill's mod list (`calcs.buildActiveSkillModList` in
 /// `calcs.createMinionSkills`): `db` holds the player's and the enemy's
 /// databases and the minion as `owner.actor`.
+/// Builds the mod list of a mirage's copy of a skill (`calcs.copyActiveSkill`)
+pub(crate) fn build_copied_skill_mod_list(
+    skill: &mut ActiveSkill,
+    groups: &mut [SocketGroup],
+    db: &mut PlayerDb,
+    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    input: &ModsInput,
+    owner: &Owner,
+) -> Result<()> {
+    build_skill_mod_list(skill, groups, db, enemy_multipliers, input, owner)
+}
+
 pub(crate) fn build_minion_skill_mod_list(
     skill: &mut ActiveSkill,
     db: &mut PlayerDb,
@@ -1119,7 +1135,11 @@ fn build_skill_mod_list(
     set_mods(db, &mods);
     let skill_data_values = {
         let q = db.query();
-        let mut v = q.list(db.id, Some(&cfg), &[Sym::new("SkillData")])?;
+        let mut v = q.list(
+            owner.env_db.unwrap_or(db.id),
+            Some(&cfg),
+            &[Sym::new("SkillData")],
+        )?;
         v.extend(q.list(list_id, Some(&cfg), &[Sym::new("SkillData")])?);
         v
     };

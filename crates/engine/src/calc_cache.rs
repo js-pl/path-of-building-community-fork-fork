@@ -31,6 +31,12 @@ pub struct CachedCalc {
     pub skill: ActiveSkill,
     /// `Env.minion.output`
     pub minion_output: Option<HashMap<Sym, OutVal>>,
+    /// The calculation's player and enemy as they are at its end: the
+    /// cached skill's actor, which a mirage's copy keeps
+    pub player_store: crate::mods::Store,
+    pub enemy_store: crate::mods::Store,
+    pub player_actor: crate::actor::Actor,
+    pub enemy_actor: crate::actor::Actor,
 }
 
 impl CachedCalc {
@@ -50,6 +56,13 @@ pub trait Recalc {
     /// results it caches. `limited` are the skills whose own calculations
     /// it skips.
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()>;
+    /// A mirage's calculation of its copy of a skill (`calcs.copyActiveSkill`
+    /// and `calcs.perform` of `calculateMirage`): the player's output
+    fn mirage(
+        &self,
+        ext: crate::calc_mirage::External,
+        limited: &[String],
+    ) -> Result<HashMap<Sym, OutVal>>;
 }
 
 /// `cacheSkillUUID(skill, env)` of a skill of the setup
@@ -121,6 +134,113 @@ impl Recalc for Recalculator<'_, '_> {
         let mut p = crate::calc_perform::perform(env, input)?;
         p.finish()
     }
+
+    fn mirage(
+        &self,
+        mut ext: crate::calc_mirage::External,
+        limited: &[String],
+    ) -> Result<HashMap<Sym, OutVal>> {
+        use crate::calc_skill_mods::{ModsInput, Owner};
+        let mut build = self.build.clone();
+        let mut env = crate::calc_env::init_env(&mut build, self.data, self.mode)?;
+        let data = self.data;
+        let weapons = [
+            ext.player_actor.weapon_data[0].clone().unwrap_or_default(),
+            ext.player_actor.weapon_data[1].clone().unwrap_or_default(),
+        ];
+        let all_one_hand = weapons.iter().any(|w| {
+            w.get("countsAsAll1H")
+                .is_some_and(crate::mods::ModValue::truthy)
+        });
+        let mut copy = crate::calc_skills::copy_active_skill(
+            &ext.skill,
+            &env.groups,
+            &env.skills.from_item,
+            all_one_hand,
+            data.skills,
+        );
+        let mut db = crate::calc_skills::PlayerDb::new(
+            ext.player_store.clone(),
+            &ext.enemy_store,
+            &ext.player_actor.item_list,
+            &weapons,
+            &build.items,
+            data.items,
+            data.skills,
+        );
+        let env_db = db.stores.push(env.player_db.clone());
+        let config = build.config.active().input.clone();
+        let placeholders = build.config.active().placeholder.clone();
+        let input = ModsInput {
+            setup: data.setup,
+            skill_data: data.skills,
+            tab: &build.items,
+            item_data: data.items,
+            item_list: &ext.player_actor.item_list,
+            weapon_data: &weapons,
+            mode: self.mode,
+            config: &config,
+            placeholders: &placeholders,
+            spectre_list: &build.info.spectre_list,
+            character_level: build.info.character_level,
+            enemy_level: env.enemy_level,
+            iron_mass: env.setup.items.iron_mass_mods.is_some(),
+            enemy_db: &ext.enemy_store,
+        };
+        let owner = Owner {
+            env_db: Some(env_db),
+            ..Owner::PLAYER
+        };
+        crate::calc_skill_mods::build_copied_skill_mod_list(
+            &mut copy,
+            &mut env.groups,
+            &mut db,
+            &mut HashMap::new(),
+            &input,
+            &owner,
+        )?;
+        // The mirage's mods, queried on the copy's mod list
+        let mods = copy.mods.as_ref().ok_or("a copy without its mod list")?;
+        let mut list = crate::mods::Store::list();
+        list.parent = Some(db.id);
+        for m in &mods.mods {
+            list.add(m.clone());
+        }
+        let list = db.stores.push(list);
+        db.actors.store_actor.insert(list, 0);
+        let skill_cfg = mods.skill_cfg.clone();
+        let sum = |cfg: Option<&crate::mods::Cfg>, name: &str| -> Result<f64> {
+            db.query().sum(
+                list,
+                crate::mods::ModType::Base,
+                Some(cfg.unwrap_or(&skill_cfg)),
+                &[Sym::new(name)],
+            )
+        };
+        ext.list_mods = ext.kind.mods(&sum)?;
+        // `usedByMirage`, no parts or minions shown, used by another thing
+        let other = data.skills.skill_type("OtherThingUsesSkill").unwrap_or(-1);
+        copy.skill_types.insert(other);
+        let mods = copy.mods.as_mut().ok_or("a copy without its mod list")?;
+        let cond = Sym::new("usedByMirage");
+        for c in std::iter::once(&mut mods.skill_cfg).chain(mods.weapon_cfgs.iter_mut().flatten()) {
+            c.skill_cond
+                .get_or_insert_with(Default::default)
+                .insert(cond);
+        }
+        mods.skill_flags.remove("multiPart");
+        mods.skill_flags.remove("haveMinion");
+        let mut limited = limited.to_vec();
+        limited.push(skill_uuid(&copy, &env.groups));
+        ext.skill = copy;
+        let mut input = PerformInput::new(&build, self.data, false)?;
+        input.recalc = Some(self);
+        input.limited = limited;
+        input.external = Some(ext);
+        let mut p = crate::calc_perform::perform(env, input)?;
+        p.finish()?;
+        Ok(p.c.actors.actors[crate::calc::PLAYER].output.clone())
+    }
 }
 
 impl<'a> Perform<'a> {
@@ -161,6 +281,10 @@ impl<'a> Perform<'a> {
                 minion_output: self
                     .minion_actor()
                     .map(|a| self.c.actors.actors[a].output.clone()),
+                player_store: self.c.store(self.pdb()).clone(),
+                enemy_store: self.c.store(self.edb()).clone(),
+                player_actor: self.c.actors.actors[crate::calc::PLAYER].clone(),
+                enemy_actor: self.c.actors.actors[crate::calc::ENEMY].clone(),
             },
         );
     }

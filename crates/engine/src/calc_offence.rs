@@ -2554,23 +2554,18 @@ impl<'a> Perform<'a> {
         let main = self.main();
         self.triggers(crate::calc::PLAYER)?;
         // Mirages
-        let used_by_mirage = self
-            .cfg(main)
-            .skill_cond
-            .as_ref()
-            .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
-        if !used_by_mirage && !self.has_flag(main, "disable") {
-            let name = self.skill_name(main).to_string();
-            if self.sd_truthy(main, "triggeredByMirageArcher")
-                || name == "Reflection"
-                || name == "Tawhoa's Chosen"
-                || self.sd_truthy(main, "triggeredBySacredWisps")
-            {
-                return Err(format!("not ported: the mirage of {name}"));
-            }
-            if self.sd_truthy(main, "triggeredByGeneralsCry") && !self.is_limited(main) {
-                self.generals_cry(main)?;
-            }
+        let generals_cry = self.sd_truthy(main, "triggeredByGeneralsCry")
+            && !self.has_flag(main, "disable")
+            && !self
+                .cfg(main)
+                .skill_cond
+                .as_ref()
+                .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
+        if generals_cry && !self.is_limited(main) {
+            self.generals_cry(main)?;
+        }
+        if !generals_cry && self.mirages()? {
+            return Ok(());
         }
         self.offence(crate::calc::PLAYER, main)?;
         // The main skill's gem level and quality

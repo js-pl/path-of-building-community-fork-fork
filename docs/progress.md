@@ -3,6 +3,54 @@
 Where the typed engine stands and what comes next, for picking the work up
 again. The design is in `docs/design.md` (phase 7); this file is the state.
 
+## Handoff
+
+Last session's branch: `claude/fervent-bell-1kek7v` (one commit per step,
+all pushed; no PR opened yet). To pick it up:
+
+1. `git submodule update --init --depth 50` (the upstream submodule).
+2. Build the tests once: `cargo test --release -p equivalence --test
+   perform --no-run` (the translated crate takes about 15 minutes the
+   first time).
+3. Check the state: `cargo test --release -p equivalence --test perform`
+   (both tests in parallel, about 14 minutes) and `--test calc_setup`
+   (about 4 minutes).
+
+State at the handoff:
+
+- The last commit adds mirages (`calc_mirage.rs`). The 3.13 builds
+  (`CALCS_FILTER=3.13`) were verified with it: all 5 equal through the
+  offence, Mirage Archer and The Saviour included. The full perform
+  suite and the skill variants were last run green one commit earlier;
+  run them again first.
+- Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
+  test has none.
+- Not yet run in CI: `skill_functions_match_upstream` adds about 13
+  minutes to `cargo test --release`; split it or filter it if CI time
+  matters.
+
+What remains for the full migration, in order:
+
+1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`), Tawhoa's
+   Chosen, the rest of `configTable` in `CalcTriggers.lua` (only the
+   configurations the corpus and variants reach are ported; a variants
+   test per trigger support would cover them), overcapped lightning
+   resistance's mana, PvP, Cryogenesis' added damage redirection, the
+   party tab.
+2. `Calcs.lua`: `buildOutput`, `calcFullDPS` (with `Recalculator`, mode
+   `CALCULATOR`), and a test of the typed outputs against
+   `tests/oracle/<id>.json` (the oracle's own values, not the
+   translation's).
+3. The Calcs tab's mode (`env.mode == "CALCS"`) and breakdowns
+   (`CalcBreakdown.lua`, `CalcSections.lua`).
+4. Calculation overrides and the power calculators (node power, item
+   comparisons).
+5. `Data.lua` into the importer, so no Lua runs at load.
+6. The engine API (`crates/session`): replace `session.lua`'s commands,
+   which drive upstream's UI classes (controls, tooltips, item crafting,
+   tree, Calcs tab cells), with Rust on the typed engine; then drop the
+   translation, `luagen` and the Lua runtime (`docs/design.md`, phase 7).
+
 ## Done
 
 The whole of `calcs.initEnv` runs typed from a build file:
@@ -50,7 +98,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
-| `calcs.mirages` | `calc_offence.rs` (`player_offence`): detects them only |
+| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
 
 Every skill with a minion has an actor of its own after the player and the
 enemy (`Perform::minions`); its skills follow the player's in
@@ -83,21 +131,16 @@ Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
 - The party tab, and a minion's curses on itself
-- Mirages with a copy of the skill (`calcs.copyActiveSkill`): Mirage
-  Archer, The Saviour, Tawhoa's Chosen and Sacred Wisps; General's Cry is
-  ported
+- Tawhoa's Chosen, mirages of skills with minions
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`), breakdowns of triggers
-- Skills whose stages come from a cached calculation (Blight, Penance
-  Brand's, Earthquake of Amplification), overcapped lightning resistance's
+- Overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
 - Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`)
 
 ## Next
 
-Mirages, then `Calcs.lua`'s calculators
-(`buildOutput`, `calcFullDPS`) and the comparison with the oracle's JSON.
-Port further skill functions as builds need them.
+See the handoff above.
 
 ## Upstream quirks met so far
 
@@ -124,6 +167,9 @@ the tests align these:
 
 - Equivalence tests take about 5 minutes each (`cargo test --release -p
   equivalence --test <name>`); `CALCS_FILTER=<substring>` limits the builds
+  (`fn-` for the skill variants, whose ids are `fn-<skill>-<part>-<template>`)
+- Missing ports return errors starting with `not ported`; the tests count
+  them as skips and print the reasons, the quickest list of what to do next
 - Run `cargo fmt --all` last, then `cargo clippy --all-targets -- -D
   warnings` and `sync/check.py`, as CI does
 - Never write into `upstream/PathOfBuilding/src`: it rebuilds the
