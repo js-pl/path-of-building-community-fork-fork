@@ -80,6 +80,9 @@ pub struct SkillMods {
     pub minion_list: Vec<String>,
     pub minion: Option<Minion>,
     pub buff_list: Vec<Buff>,
+    /// `infoTrigger` and `infoMessage2`, which the calculation sets
+    pub info_trigger: Option<String>,
+    pub info_message2: Option<String>,
 }
 
 /// What building the mod lists needs

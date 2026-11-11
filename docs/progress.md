@@ -5,48 +5,42 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
-Last session's branch: `claude/fervent-bell-1kek7v` (one commit per step,
-all pushed; no PR opened yet). To pick it up:
+Last session's branch: `claude/typed-build-output`, merged as one PR. To
+pick the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule).
 2. Build the tests once: `cargo test --release -p equivalence --test
    perform --no-run` (the translated crate takes about 15 minutes the
    first time).
-3. Check the state: `cargo test --release -p equivalence --test perform`
-   (both tests in parallel, about 14 minutes) and `--test calc_setup`
-   (about 4 minutes).
+3. Check the state: `cargo test --release -p equivalence --test
+   build_output` (the typed engine against the oracle, under a minute),
+   `--test perform` (both tests in parallel, about 14 minutes) and `--test
+   calc_setup` (about 4 minutes).
 
 State at the handoff:
 
-- The last commit adds mirages (`calc_mirage.rs`). The 3.13 builds
-  (`CALCS_FILTER=3.13`) were verified with it: all 5 equal through the
-  offence, Mirage Archer and The Saviour included. The full perform
-  suite and the skill variants were last run green one commit earlier;
-  run them again first.
+- `engine::calcs::build_output` is `calcs.buildOutput(build, "MAIN")`
+  with `calcs.calcFullDPS`: 58 of the 61 corpus builds equal the oracle's
+  `MAIN` outputs (`tests/build_output.rs`); skipped are Energy Blade
+  (gen-0031) and Doom Blast's trigger (gen-0002, gen-0036).
 - Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
   test has none.
-- Not yet run in CI: `skill_functions_match_upstream` adds about 13
-  minutes to `cargo test --release`; split it or filter it if CI time
-  matters.
 
 What remains for the full migration, in order:
 
-1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`), Tawhoa's
-   Chosen, the rest of `configTable` in `CalcTriggers.lua` (only the
-   configurations the corpus and variants reach are ported; a variants
-   test per trigger support would cover them), overcapped lightning
+1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`), Doom
+   Blast's trigger sources, Tawhoa's Chosen, the rest of `configTable` in
+   `CalcTriggers.lua` (only the configurations the corpus and variants
+   reach are ported; a variants test per trigger support would cover
+   them), overcapped lightning
    resistance's mana, PvP, Cryogenesis' added damage redirection, the
    party tab.
-2. `Calcs.lua`: `buildOutput`, `calcFullDPS` (with `Recalculator`, mode
-   `CALCULATOR`), and a test of the typed outputs against
-   `tests/oracle/<id>.json` (the oracle's own values, not the
-   translation's).
-3. The Calcs tab's mode (`env.mode == "CALCS"`) and breakdowns
+2. The Calcs tab's mode (`env.mode == "CALCS"`) and breakdowns
    (`CalcBreakdown.lua`, `CalcSections.lua`).
-4. Calculation overrides and the power calculators (node power, item
+3. Calculation overrides and the power calculators (node power, item
    comparisons).
-5. `Data.lua` into the importer, so no Lua runs at load.
-6. The engine API (`crates/session`): replace `session.lua`'s commands,
+4. `Data.lua` into the importer, so no Lua runs at load.
+5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
    translation, `luagen` and the Lua runtime (`docs/design.md`, phase 7).
@@ -77,6 +71,12 @@ covers everything from the items on; 61 builds compared).
 | `buildActiveSkillModList`, `mergeSkillInstanceMods`, `buildSkillInstanceStats` | `calc_skill_mods.rs` |
 | `SkillsTab:UpdateSocketGroups` (`matchesSocket`) | `skills.rs` |
 
+`engine::calcs::build_output` gives a build's player and minion outputs
+with the Full DPS table and the cost warnings, compared with the oracle's
+own `MAIN` outputs (`tests/oracle/<id>.json`) in
+`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 58 of
+61 builds equal, the rest skipped (see the handoff).
+
 `calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
 then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
@@ -99,6 +99,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
+| `calcs.buildOutput` (`MAIN`), `calcs.calcFullDPS` | `calcs.rs`: `build_output` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does |
 
 Every skill with a minion has an actor of its own after the player and the
 enemy (`Perform::minions`); its skills follow the player's in
@@ -136,7 +137,10 @@ a skip:
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
-- Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`)
+- Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`), and
+  what `buildOutput` collects for the Configuration tab
+  (`env.conditionsUsed`, `env.modsUsed`, ...)
+- Doom Blast's trigger sources
 
 ## Next
 
@@ -159,12 +163,21 @@ the tests align these:
   translation, so tests accept the typed function there
 - `skillModList:More("MORE", cfg, "Accuracy")` in `calcs.offence` passes
   the string as the cfg: the typed offence queries with an empty cfg
+- the sidebar (`buildMode:AddDisplayStatList`) sorts `output.SkillDPS` in
+  place with `table.sort`, so the oracle has the rows in that order:
+  `calcs::lua_sort` is Lua 5.1's `auxsort`, for the order of equal rows
+- `calcFullDPS` reuses its first setup for each skill (`accelerate`); the
+  typed one sets each skill up afresh, with equal results on the corpus
+- a weapon pass's cfg sees the pass's output live as `skillStats`: take
+  the cfg again (`pcfg`) after setting outputs a later query reads
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
 
 ## Working notes
 
+- `build_output` checks the typed engine alone against the oracle in
+  under a minute: run it first
 - Equivalence tests take about 5 minutes each (`cargo test --release -p
   equivalence --test <name>`); `CALCS_FILTER=<substring>` limits the builds
   (`fn-` for the skill variants, whose ids are `fn-<skill>-<part>-<template>`)

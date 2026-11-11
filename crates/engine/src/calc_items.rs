@@ -645,7 +645,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             }
             out.aegis_mods = Some(aegis_mods);
         } else if weapon && input.energy_blade {
-            return Err("Energy Blade is not ported".into());
+            return Err("not ported: Energy Blade".into());
         } else if slot_name == "Weapon 1" && item.name == "The Iron Mass, Gladius" {
             let mut iron_mass = Vec::new();
             for m in src {

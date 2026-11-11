@@ -53,6 +53,9 @@ pub enum MirageKind {
 /// A mirage's results (`activeSkill.mirage`)
 #[derive(Clone, Debug)]
 pub struct Mirage {
+    /// The copied skill's name and part
+    pub name: String,
+    pub skill_part_name: Option<String>,
     pub output: HashMap<Sym, OutVal>,
     pub count: Option<f64>,
 }
@@ -215,6 +218,8 @@ impl<'a> Perform<'a> {
             let ext = self.external_from_here(main, MirageKind::Archer);
             let output = recalc()?.mirage(ext, &self.input.limited)?;
             self.mirage = Some(Mirage {
+                name: name.clone(),
+                skill_part_name: self.mods(main).skill_part_name.clone(),
                 output,
                 count: Some(count),
             });
@@ -244,7 +249,7 @@ impl<'a> Perform<'a> {
                 {
                     continue;
                 }
-                let Some(c) = self.cached_calc(k, false)? else {
+                let Some(c) = self.cached_calc(k, false, false)? else {
                     continue;
                 };
                 if c.out("CritChance").is_some_and(|x| x > 0.0) {
@@ -305,7 +310,12 @@ impl<'a> Perform<'a> {
                 },
             );
             let output = recalc()?.mirage(ext, &self.input.limited)?;
-            self.mirage = Some(Mirage { output, count });
+            self.mirage = Some(Mirage {
+                name: name.clone(),
+                skill_part_name: self.mods(main).skill_part_name.clone(),
+                output,
+                count,
+            });
             self.set_flag(main, "wisp", true);
             return Ok(false);
         }

@@ -1275,6 +1275,9 @@ impl<'a> Perform<'a> {
                     .skill_data
                     .insert("triggerTime".into(), ModValue::Number(60.0 * 1000.0));
             }
+            if self.skill_name(i) == "Reflection" || self.sd_truthy(i, "triggeredBySaviour") {
+                self.mods_mut(i).info_trigger = Some("Saviour".into());
+            }
         }
 
         let mut summoned = 0.0;
@@ -4362,7 +4365,7 @@ impl<'a> Perform<'a> {
             let list = self.lists[i].list;
             let n = nospace(&name);
             let cached_out = |p: &Self, k: &str| -> Result<f64> {
-                let c = p.cached_calc(i, true)?.ok_or_else(|| {
+                let c = p.cached_calc(i, true, true)?.ok_or_else(|| {
                     format!("attempt to index a nil value (the cached calculation of {name})")
                 })?;
                 c.out(k)
@@ -4386,7 +4389,7 @@ impl<'a> Perform<'a> {
                     );
                 }
                 "Penance Brand of Dissipation" => {
-                    let c = self.cached_calc(i, true)?.ok_or(
+                    let c = self.cached_calc(i, true, true)?.ok_or(
                         "attempt to index a nil value (the cached calculation of Penance Brand)",
                     )?;
                     let freq = c.out("HitSpeed").unwrap_or(0.0);
