@@ -5,7 +5,7 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
-Last session's branch: `claude/typed-build-output`, merged as one PR. To
+Last session's branch: `claude/eager-wright-q0ev3s`. To
 pick the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule).
@@ -21,15 +21,16 @@ State at the handoff:
 
 - `engine::calcs::build_output` is `calcs.buildOutput(build, "MAIN")`
   with `calcs.calcFullDPS`: 58 of the 61 corpus builds equal the oracle's
-  `MAIN` outputs (`tests/build_output.rs`); skipped are Energy Blade
-  (gen-0031) and Doom Blast's trigger (gen-0002, gen-0036).
+  `MAIN` outputs (`tests/build_output.rs`); skipped is Energy Blade
+  (gen-0031). Doom Blast's trigger sources are ported (all four
+  `doomBlastSource` modes); the corpus reaches only the default, Vixen's.
 - Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
   test has none.
 
 What remains for the full migration, in order:
 
-1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`), Doom
-   Blast's trigger sources, Tawhoa's Chosen, the rest of `configTable` in
+1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`),
+   Tawhoa's Chosen, the rest of `configTable` in
    `CalcTriggers.lua` (only the configurations the corpus and variants
    reach are ported; a variants test per trigger support would cover
    them), overcapped lightning
@@ -74,7 +75,7 @@ covers everything from the items on; 61 builds compared).
 `engine::calcs::build_output` gives a build's player and minion outputs
 with the Full DPS table and the cost warnings, compared with the oracle's
 own `MAIN` outputs (`tests/oracle/<id>.json`) in
-`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 58 of
+`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 60 of
 61 builds equal, the rest skipped (see the handoff).
 
 `calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
@@ -140,7 +141,6 @@ a skip:
 - Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`), and
   what `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...)
-- Doom Blast's trigger sources
 
 ## Next
 
