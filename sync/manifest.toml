@@ -16,7 +16,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Classes/ButtonControl.lua" = { status = "todo" }
 "Classes/CalcBreakdownControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/CalcSectionControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx crates/engine/src/build.rs crates/engine/src/calcs.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/CheckBoxControl.lua" = { status = "partial", port = "web/src/ui/Control.tsx", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Classes/CompareBuySimilar.lua" = { status = "todo" }
 "Classes/CompareCalcsHelpers.lua" = { status = "todo" }
@@ -307,7 +307,7 @@ upstream = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478"
 "Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs crates/engine/src/skill_data.rs crates/engine/src/calc_skills.rs crates/engine/src/calc_skill_mods.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/CalcTriggers.lua" = { status = "partial", port = "crates/engine/src/calc_triggers.rs crates/engine/src/calc_offence.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/Calcs.lua" = { status = "partial", port = "crates/engine/src/calcs.rs crates/engine/src/calc_cache.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
-"Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
+"Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs crates/engine/src/pat.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }
 "Modules/ConfigVisibility.lua" = { status = "todo" }
 "Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs", sync = "b32759ab0f31a1c8499a0d420cb0f0633d4fe478" }

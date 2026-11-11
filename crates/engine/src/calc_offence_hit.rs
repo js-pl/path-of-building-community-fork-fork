@@ -2341,7 +2341,21 @@ impl<'a> Perform<'a> {
             }
         }
         if self.input.breakdown {
-            return Err("not ported: the Calcs tab's offence".into());
+            let (k, unit) = if self.sd_truthy(i, "showAverage") {
+                ("AverageDamage", "average damage")
+            } else {
+                ("TotalDPS", "DPS")
+            };
+            let v = self
+                .c
+                .out(actor, k)
+                .ok_or_else(|| format!("no {k} to display"))?;
+            let shown = crate::pat::format_num_sep(&crate::pat::format_f(v, 1));
+            self.c.set_out_val(
+                actor,
+                "DisplayDamage",
+                OutVal::Str(format!("{shown} {unit}").into()),
+            );
         }
         let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
         if self.mods(i).minion.is_some() {

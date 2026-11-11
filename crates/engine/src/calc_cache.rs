@@ -12,9 +12,8 @@
 
 use crate::actor::OutVal;
 use crate::build::Build;
-use crate::calc_env::CalcData;
+use crate::calc_env::{CalcData, CalcMode};
 use crate::calc_perform::{Perform, PerformInput, Result};
-use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
 use crate::mods::Sym;
 use crate::skills::SocketGroup;
@@ -91,29 +90,18 @@ pub struct Recalculator<'a, 't> {
     /// The build after its main calculation's setup
     pub build: &'a Build<'t>,
     pub data: &'a CalcData<'a>,
-    pub mode: BuffMode,
-    /// A calculator's calculations (`mode == "CALCULATOR"`), with a cache
-    /// of their own
-    pub calculator: bool,
+    /// The mode of the calculations, each with a cache of its own
+    pub mode: CalcMode,
     cache: RefCell<HashMap<String, Rc<CachedCalc>>>,
 }
 
 impl<'a, 't> Recalculator<'a, 't> {
-    pub fn new(build: &'a Build<'t>, data: &'a CalcData<'a>, mode: BuffMode) -> Self {
+    pub fn new(build: &'a Build<'t>, data: &'a CalcData<'a>, mode: CalcMode) -> Self {
         Recalculator {
             build,
             data,
             mode,
-            calculator: false,
             cache: RefCell::new(HashMap::new()),
-        }
-    }
-
-    /// The calculations of a calculator (`mode == "CALCULATOR"`)
-    pub fn calculator(build: &'a Build<'t>, data: &'a CalcData<'a>, mode: BuffMode) -> Self {
-        Recalculator {
-            calculator: true,
-            ..Recalculator::new(build, data, mode)
         }
     }
 }
@@ -124,7 +112,7 @@ impl Recalc for Recalculator<'_, '_> {
     }
 
     fn calculator(&self) -> bool {
-        self.calculator
+        self.mode == CalcMode::Calculator
     }
 
     fn store(&self, uuid: &str, calc: CachedCalc) {
@@ -136,6 +124,7 @@ impl Recalc for Recalculator<'_, '_> {
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
         let mut build = self.build.clone();
         let mut env = crate::calc_env::init_env(&mut build, self.data, self.mode)?;
+        let calcs = env.calc_mode == CalcMode::Calcs;
         let Some(main) = env
             .skills
             .active_skills
@@ -146,7 +135,7 @@ impl Recalc for Recalculator<'_, '_> {
             return Ok(());
         };
         env.skills.main_skill = main;
-        let mut input = PerformInput::new(&build, self.data, false)?;
+        let mut input = PerformInput::new(&build, self.data, calcs)?;
         input.recalc = Some(self);
         input.limited = limited.to_vec();
         input.skip_ehp = true;
@@ -197,7 +186,8 @@ impl Recalc for Recalculator<'_, '_> {
             item_data: data.items,
             item_list: &ext.player_actor.item_list,
             weapon_data: &weapons,
-            mode: self.mode,
+            mode: env.mode,
+            calcs: env.calc_mode == CalcMode::Calcs,
             config: &config,
             placeholders: &placeholders,
             spectre_list: &build.info.spectre_list,
@@ -252,7 +242,8 @@ impl Recalc for Recalculator<'_, '_> {
         let mut limited = limited.to_vec();
         limited.push(skill_uuid(&copy, &env.groups));
         ext.skill = copy;
-        let mut input = PerformInput::new(&build, self.data, false)?;
+        let calcs = env.calc_mode == CalcMode::Calcs;
+        let mut input = PerformInput::new(&build, self.data, calcs)?;
         input.recalc = Some(self);
         input.limited = limited;
         input.external = Some(ext);

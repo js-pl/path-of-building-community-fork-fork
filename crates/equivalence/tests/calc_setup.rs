@@ -7,6 +7,7 @@
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
+use engine::calc_env::CalcMode;
 use engine::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
@@ -980,6 +981,7 @@ fn items_setup_matches_upstream() {
                 .child("Build")
                 .and_then(|b| b.attr("mainSocketGroup"))
                 .and_then(|v| v.parse::<f64>().ok()),
+            calcs: false,
             imbued_support_by_slot: &imbued,
             matching_socket_quality_bonus: setup_data.misc["MatchingSocketQualityBonus"],
             enemy_db: &enemy_base,
@@ -1103,6 +1105,7 @@ fn items_setup_matches_upstream() {
             item_list: &out.item_list,
             weapon_data: &weapon_data,
             mode: BuffMode::new(Some("EFFECTIVE")),
+            calcs: false,
             config: &config,
             placeholders: &placeholders,
             spectre_list: &spectres,
@@ -1115,6 +1118,7 @@ fn items_setup_matches_upstream() {
         let mut mgroups = tgroups.clone();
         if let Err(e) = engine::calc_skill_mods::build_skill_mod_lists(
             &mut setup.active_skills,
+            setup.main_skill,
             &mut mgroups,
             &mut player_db,
             &mut enemy_multipliers,
@@ -1341,11 +1345,7 @@ fn items_setup_matches_upstream() {
             parser: &parser,
             jewel_radius: &radius,
         };
-        match engine::calc_env::init_env(
-            &mut typed_build,
-            &calc_data,
-            BuffMode::new(Some("EFFECTIVE")),
-        ) {
+        match engine::calc_env::init_env(&mut typed_build, &calc_data, CalcMode::Main) {
             Ok(typed_env) => {
                 let same_db = |a: &Store, b: &Store| {
                     typed_mods(a) == typed_mods(b)

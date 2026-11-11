@@ -587,6 +587,7 @@ impl<'a> Perform<'a> {
             self.set_po(o, "BleedDPS", m_min(base, self.misc_data("DotDpsCap")));
             self.set_go(o, "BleedStacks", stacks);
             self.set_go(o, "BleedDamage", base * duration);
+            self.weigh_dot_multi(o, "Bleed", ailment_crit);
         }
         let _ = db;
         Ok(())
@@ -786,6 +787,8 @@ impl<'a> Perform<'a> {
             } else {
                 self.set_po(o, "TotalPoisonDPS", m_min(single * stacks, cap));
             }
+            let crit = self.go(o, "CritChance").unwrap_or(f64::NAN);
+            self.weigh_dot_multi(o, "Poison", crit);
         }
         Ok(())
     }
@@ -959,8 +962,31 @@ impl<'a> Perform<'a> {
                 self.set_po(o, "IgniteStacksMax", max_stacks);
                 self.set_po(o, "TotalIgniteDPS", dps);
             }
+            self.weigh_dot_multi(o, "Ignite", ailment_crit);
         }
         Ok(())
+    }
+
+    /// The Calcs tab's ailment DoT multiplier: the hits' and crits'
+    /// multipliers weighted by their chances to inflict the ailment
+    fn weigh_dot_multi(&mut self, o: &mut Off, ailment: &str, crit_chance: f64) {
+        if !self.input.breakdown {
+            return;
+        }
+        let k = format!("{ailment}DotMulti");
+        let (Some(hit), Some(crit)) = (self.po(o, &k), self.po(o, &format!("Crit{k}"))) else {
+            return;
+        };
+        if crit == hit {
+            return;
+        }
+        let pv = |k: String| self.po(o, &k).unwrap_or(f64::NAN);
+        let global_crit = self.go(o, "CritChance").unwrap_or(f64::NAN);
+        let from_hit = pv(format!("{ailment}ChanceOnHit")) / 100.0 * (1.0 - global_crit / 100.0);
+        let from_crit = pv(format!("{ailment}ChanceOnCrit")) / 100.0 * crit_chance / 100.0;
+        let total_hit = from_hit / (from_hit + from_crit);
+        let total_crit = from_crit / (from_hit + from_crit);
+        self.set_po(o, &k, hit * total_hit + crit * total_crit);
     }
 
     /// Chill, freeze, shock, scorch, brittle and sap

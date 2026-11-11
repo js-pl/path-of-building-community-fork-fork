@@ -14,7 +14,7 @@
 
 use crate::calc::{PLAYER, m_max, m_min, round};
 use crate::calc_cache::CachedCalc;
-use crate::calc_perform::{Perform, Result};
+use crate::calc_perform::{Perform, Result, src};
 use crate::mods::{ModType, ModValue};
 
 /// A skill as the rotation simulation sees it
@@ -410,6 +410,34 @@ impl<'a> Perform<'a> {
                 TriggerConfig {
                     trigger_on_use: true,
                     source: Some(main),
+                    ..TriggerConfig::default()
+                }
+            }
+            "doom blast" => {
+                let pdb = self.pdb();
+                if self
+                    .input
+                    .config
+                    .get("doomBlastSource")
+                    .is_some_and(|v| v.is_str("replacement"))
+                {
+                    self.c
+                        .add(pdb, src("UsesCurseOverlaps", ModType::Flag, true, "Config"));
+                }
+                self.sd_set(main, "ignoresTickRate", true);
+                let overlaps = "Multiplier:CurseOverlaps";
+                let overlaps = if self
+                    .c
+                    .tabulate(pdb, Some(ModType::Base), None, &[overlaps])?
+                    .is_empty()
+                {
+                    None
+                } else {
+                    Some(m_max(self.c.base(pdb, None, &[overlaps])?, 1.0))
+                };
+                TriggerConfig {
+                    overlaps,
+                    trigger_skill_cond: Some(|p, s| p.has_type(s, "Hex") && p.slot_match(s)),
                     ..TriggerConfig::default()
                 }
             }

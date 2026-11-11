@@ -175,6 +175,7 @@ impl<'a> Perform<'a> {
                 item_list: &self.env.setup.items.item_list,
                 weapon_data: &self.env.skills.weapon_data,
                 mode: self.env.mode,
+                calcs: self.input.breakdown,
                 config: self.input.config,
                 placeholders: self.input.placeholder,
                 spectre_list: self.input.spectre_list,

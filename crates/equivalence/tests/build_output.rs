@@ -1,13 +1,14 @@
-//! The typed engine alone (`engine::calcs::build_output`) gives every
-//! corpus build the oracle's own outputs (`tests/oracle/<id>.json`,
-//! `MAIN`): the player's output with the Full DPS table and the main
-//! skill's minion's. Numbers compare bitwise; a missing or extra key fails.
+//! The typed engine alone (`engine::calcs::build_outputs`) gives every
+//! corpus build the oracle's own outputs (`tests/oracle/<id>.json`), of
+//! the sidebar's calculation (`MAIN`) and the Calcs tab's (`CALCS`): the
+//! player's output with the Full DPS table and the main skill's minion's. Numbers compare bitwise; a missing or extra key fails.
 //! Builds that reach a part not ported yet are skipped and listed. The game
 //! data still comes from a started upstream host.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::actor::OutVal;
+use engine::calcs::BuildOutput;
 use equivalence::typed_build::TypedData;
 use equivalence::{corpus, oracle_dir, upstream_src};
 use std::collections::BTreeMap;
@@ -205,38 +206,26 @@ fn diff(got: &J, want: &J, path: &str, out: &mut Vec<String>) {
     }
 }
 
-/// What became of a build
+/// What became of a build's calculation
 enum Outcome {
     Equal,
     Skipped(String),
     Failed(String),
 }
 
-fn check(data: &mut TypedData, id: &str, path: &PathBuf) -> Outcome {
-    let text = std::fs::read_to_string(path).unwrap();
-    let root = engine::xml::parse(&text).unwrap_or_else(|e| panic!("{id}: {e}"));
-    data.load_tree(&root);
-    let mut build = match data.load_build(&root) {
-        Ok(b) => b,
-        Err(e) => return Outcome::Failed(format!("build: {e}")),
-    };
-    let got = match engine::calcs::build_output(&mut build, &data.calc_data()) {
+fn compare(got: Result<BuildOutput, String>, want: J) -> Outcome {
+    let got = match got {
         Ok(o) => o,
         Err(e) if e.starts_with("not ported") => return Outcome::Skipped(e),
         Err(e) => return Outcome::Failed(e),
     };
-    let mut got_main = BTreeMap::new();
-    got_main.insert("player".to_string(), output_json(&got.player));
+    let mut obj = BTreeMap::new();
+    obj.insert("player".to_string(), output_json(&got.player));
     if let Some(m) = &got.minion {
-        got_main.insert("minion".to_string(), output_json(m));
+        obj.insert("minion".to_string(), output_json(m));
     }
-    let oracle = std::fs::read(oracle_dir().join(format!("{id}.json"))).unwrap();
-    let J::Obj(mut want) = parse(&oracle, &mut 0) else {
-        panic!("{id}: the oracle's output is not an object")
-    };
-    let want = want.remove("MAIN").expect("the oracle's MAIN outputs");
     let mut d = Vec::new();
-    diff(&J::Obj(got_main), &want, "", &mut d);
+    diff(&J::Obj(obj), &want, "", &mut d);
     if d.is_empty() {
         Outcome::Equal
     } else {
@@ -244,6 +233,36 @@ fn check(data: &mut TypedData, id: &str, path: &PathBuf) -> Outcome {
         d.truncate(25);
         Outcome::Failed(format!("{n} differences:\n    {}", d.join("\n    ")))
     }
+}
+
+/// The outcomes of a build's `MAIN` and `CALCS` calculations
+fn check(data: &mut TypedData, id: &str, path: &PathBuf) -> [Outcome; 2] {
+    let text = std::fs::read_to_string(path).unwrap();
+    let root = engine::xml::parse(&text).unwrap_or_else(|e| panic!("{id}: {e}"));
+    data.load_tree(&root);
+    let mut build = match data.load_build(&root) {
+        Ok(b) => b,
+        Err(e) => return [0, 1].map(|_| Outcome::Failed(format!("build: {e}"))),
+    };
+    let got = match engine::calcs::build_outputs(&mut build, &data.calc_data()) {
+        Ok(o) => o,
+        Err(e) if e.starts_with("not ported") => {
+            return [0, 1].map(|_| Outcome::Skipped(e.clone()));
+        }
+        Err(e) => return [0, 1].map(|_| Outcome::Failed(e.clone())),
+    };
+    let oracle = std::fs::read(oracle_dir().join(format!("{id}.json"))).unwrap();
+    let J::Obj(mut want) = parse(&oracle, &mut 0) else {
+        panic!("{id}: the oracle's output is not an object")
+    };
+    let mut want = |k: &str| {
+        want.remove(k)
+            .unwrap_or_else(|| panic!("the oracle's {k} outputs"))
+    };
+    [
+        compare(Ok(got.main), want("MAIN")),
+        compare(got.calcs, want("CALCS")),
+    ]
 }
 
 #[test]
@@ -258,26 +277,31 @@ fn build_output_matches_oracle() {
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", lua::to_string(e.value())));
     let mut data = TypedData::load(&host);
-    let results = builds
-        .iter()
-        .map(|(id, path)| (id.clone(), check(&mut data, id, path)));
-    let mut equal = 0;
-    let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut failures = Vec::new();
-    for (id, outcome) in results {
-        match outcome {
-            Outcome::Equal => equal += 1,
-            Outcome::Skipped(reason) => skips.entry(reason).or_default().push(id),
-            Outcome::Failed(e) => failures.push(format!("{id}: {e}")),
+    let mut summary = Vec::new();
+    let mut results: Vec<_> = builds
+        .iter()
+        .map(|(id, path)| (id, check(&mut data, id, path)))
+        .collect();
+    for (k, mode) in ["MAIN", "CALCS"].into_iter().enumerate() {
+        let mut equal = 0;
+        let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (id, outcomes) in &mut results {
+            match std::mem::replace(&mut outcomes[k], Outcome::Equal) {
+                Outcome::Equal => equal += 1,
+                Outcome::Skipped(reason) => skips.entry(reason).or_default().push(id.to_string()),
+                Outcome::Failed(e) => failures.push(format!("{id} ({mode}): {e}")),
+            }
         }
+        summary.push(format!(
+            "{mode}: {equal} builds equal to the oracle, {} skipped: {skips:?}",
+            skips.values().map(Vec::len).sum::<usize>()
+        ));
     }
-    eprintln!(
-        "{equal} builds equal to the oracle, {} skipped: {skips:?}",
-        skips.values().map(Vec::len).sum::<usize>()
-    );
+    eprintln!("{}", summary.join("\n"));
     assert!(
         failures.is_empty(),
-        "{} builds differ from the oracle:\n{}",
+        "{} calculations differ from the oracle:\n{}",
         failures.len(),
         failures.join("\n")
     );
