@@ -290,8 +290,10 @@ pub struct SkillsInput<'a> {
     pub item_list: &'a BTreeMap<String, f64>,
     /// `data.unarmedWeaponData[classId]`
     pub unarmed: &'a Fields,
-    /// `build.mainSocketGroup`
+    /// `build.mainSocketGroup`, or the Calcs tab's `skill_number`
     pub main_socket_group: Option<f64>,
+    /// A calculation of the Calcs tab (`env.mode == "CALCS"`)
+    pub calcs: bool,
     /// `build.skillsTab.imbuedSupportBySlot`
     pub imbued_support_by_slot: &'a HashMap<String, String>,
     /// `data.misc.MatchingSocketQualityBonus`
@@ -1161,7 +1163,11 @@ fn active_skills(
             }
             if gi + 1 == main_index && !group_skills[gi].is_empty() {
                 let n = group_skills[gi].len() as f64;
-                let i = n.min(group.main_active_skill) as usize;
+                let i = n.min(if input.calcs {
+                    group.main_active_skill_calcs
+                } else {
+                    group.main_active_skill
+                }) as usize;
                 main_skill = group_skills[gi].get(i.saturating_sub(1)).copied();
             }
         }

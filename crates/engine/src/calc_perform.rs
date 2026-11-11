@@ -254,6 +254,8 @@ pub struct Perform<'a> {
     /// `buffs` and `minionBuffs` of the buffs' merge, which the allies'
     /// life pools read again
     pub(crate) merged_buffs: (BuffMap, BuffMap),
+    /// `env.debuffs`
+    pub(crate) debuffs: BuffMap,
     /// `env.player.mainSkill.mirage`
     pub mirage: Option<crate::calc_mirage::Mirage>,
 }
@@ -516,6 +518,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         env_minion: None,
         flasks_to_minion: [false; 3],
         merged_buffs: (Vec::new(), Vec::new()),
+        debuffs: Vec::new(),
         mirage: None,
     };
     p.run()?;
@@ -5328,6 +5331,7 @@ impl<'a> Perform<'a> {
         for (_, l, _) in &debuffs {
             self.c.add_list(edb, l);
         }
+        self.debuffs = debuffs;
         self.c.set_mult(pdb, "CurseOnEnemy", slots.len() as f64);
         for s in &slots {
             self.c.set_cond(edb, "Cursed", true);

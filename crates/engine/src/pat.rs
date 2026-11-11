@@ -145,3 +145,33 @@ pub fn to_number(s: &str) -> Option<f64> {
 pub fn lower(s: &str) -> String {
     s.to_ascii_lowercase()
 }
+
+/// `string.format("%.{precision}f", n)`
+pub fn format_f(n: f64, precision: usize) -> String {
+    lua::format::format_f(n, precision)
+}
+
+/// `formatNumSep(str)` with upstream's default separators: thousands
+/// grouped with `,` in each number, colour codes kept
+pub fn format_num_sep(s: &str) -> String {
+    gsub_fn(s, "(%^?x?%x?%x?%x?%x?%x?%x?-?%d+%.?%d+)", |c| {
+        let m = &c[0];
+        let colour = capture(m, "(^x%x%x%x%x%x%x)")
+            .or_else(|| capture(m, "(%^%d)"))
+            .unwrap_or_default();
+        let bare = gsub(&gsub(m, "(^x%x%x%x%x%x%x)", ""), "(%^%d)", "");
+        if bare.is_empty() || (colour.is_empty() && m.contains('^')) {
+            return None;
+        }
+        let parts = captures(&bare, "(-?)(%d+)(%.?%d*)")?;
+        let int = parts[1].as_bytes();
+        let mut grouped = String::new();
+        for (i, d) in int.iter().enumerate() {
+            if i > 0 && (int.len() - i) % 3 == 0 {
+                grouped.push(',');
+            }
+            grouped.push(*d as char);
+        }
+        Some(format!("{colour}{}{grouped}{}", parts[0], parts[2]))
+    })
+}

@@ -94,6 +94,8 @@ pub struct ModsInput<'a> {
     pub item_list: &'a BTreeMap<String, f64>,
     pub weapon_data: &'a [Fields; 2],
     pub mode: BuffMode,
+    /// A calculation of the Calcs tab (`env.mode == "CALCS"`)
+    pub calcs: bool,
     /// `env.configInput` and `env.configPlaceholder`
     pub config: &'a Inputs,
     pub placeholders: &'a Inputs,
@@ -338,6 +340,7 @@ fn record_str(r: &Record, k: &str) -> Option<String> {
 /// `skillMinion`, ...) as upstream writes them back.
 pub fn build_skill_mod_lists(
     skills: &mut [ActiveSkill],
+    main_skill: usize,
     groups: &mut [SocketGroup],
     mod_db: &mut Store,
     enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
@@ -353,7 +356,7 @@ pub fn build_skill_mod_lists(
         input.skill_data,
     );
     let mut result = Ok(());
-    for skill in skills.iter_mut() {
+    for (i, skill) in skills.iter_mut().enumerate() {
         if let Err(e) = build_skill_mod_list(
             skill,
             groups,
@@ -361,6 +364,7 @@ pub fn build_skill_mod_lists(
             enemy_multipliers,
             input,
             &Owner::PLAYER,
+            i == main_skill,
         ) {
             result = Err(e);
             break;
@@ -405,7 +409,7 @@ pub(crate) fn build_copied_skill_mod_list(
     input: &ModsInput,
     owner: &Owner,
 ) -> Result<()> {
-    build_skill_mod_list(skill, groups, db, enemy_multipliers, input, owner)
+    build_skill_mod_list(skill, groups, db, enemy_multipliers, input, owner, false)
 }
 
 pub(crate) fn build_minion_skill_mod_list(
@@ -415,9 +419,11 @@ pub(crate) fn build_minion_skill_mod_list(
     input: &ModsInput,
     owner: &Owner,
 ) -> Result<()> {
-    build_skill_mod_list(skill, &mut [], db, enemy_multipliers, input, owner)
+    build_skill_mod_list(skill, &mut [], db, enemy_multipliers, input, owner, false)
 }
 
+/// `main`: the skill is the calculation's main skill, whose selections
+/// the Calcs tab keeps apart
 fn build_skill_mod_list(
     skill: &mut ActiveSkill,
     groups: &mut [SocketGroup],
@@ -425,7 +431,9 @@ fn build_skill_mod_list(
     enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
     input: &ModsInput,
     owner: &Owner,
+    main: bool,
 ) -> Result<()> {
+    let calcs_main = input.calcs && main;
     let actor = &db.actors.actors[owner.actor];
     let actor_items = actor.item_list.clone();
     let actor_weapons: [Fields; 2] = [
@@ -460,8 +468,13 @@ fn build_skill_mod_list(
     match &ge.parts {
         Some(parts) if parts.len() > 1 => {
             let gem = src_gem(groups, src).ok_or("a multipart skill without a gem")?;
-            let part_index = (parts.len() as f64).min(gem.skill_part.unwrap_or(1.0));
-            gem.skill_part = Some(part_index);
+            let part = if calcs_main {
+                &mut gem.skill_part_calcs
+            } else {
+                &mut gem.skill_part
+            };
+            let part_index = (parts.len() as f64).min(part.unwrap_or(1.0));
+            *part = Some(part_index);
             out.skill_part = Some(part_index);
             let part = parts.get(part_index as usize - 1).ok_or("no skill part")?;
             for (k, v) in part {
@@ -1068,7 +1081,13 @@ fn build_skill_mod_list(
     }
     // Mines and stages
     if has(&flags, "mine") {
-        let count = src_gem(groups, src).and_then(|g| g.skill_mine_count);
+        let count = src_gem(groups, src).and_then(|g| {
+            if input.calcs {
+                g.skill_mine_count_calcs
+            } else {
+                g.skill_mine_count
+            }
+        });
         out.active_mine_count = count;
         if let Some(c) = count.filter(|c| *c > 0.0) {
             mods.push(new_mod(
@@ -1104,7 +1123,13 @@ fn build_skill_mod_list(
         out.skill_data
             .insert("stagesMax".into(), ModValue::Number(limit));
         flags.insert("multiStage".into());
-        let chosen = src_gem(groups, src).and_then(|g| g.skill_stage_count);
+        let chosen = src_gem(groups, src).and_then(|g| {
+            if input.calcs {
+                g.skill_stage_count_calcs
+            } else {
+                g.skill_stage_count
+            }
+        });
         let min = 1.0 + sum(db, &format!("Multiplier:{stage_name}MinimumStage"))?;
         let mut count = chosen.unwrap_or(limit).max(min);
         if count > 0.0 {
@@ -1159,7 +1184,7 @@ fn build_skill_mod_list(
     // The minion
     if owner.minion.is_none() {
         make_minion(
-            &mut out, skill, groups, &mut flags, &level, &cfg, db, list_id, input,
+            &mut out, skill, groups, &mut flags, &level, &cfg, db, list_id, input, calcs_main,
         )?;
     }
     // Global effects become buffs
@@ -1262,6 +1287,7 @@ fn make_minion(
     db: &PlayerDb,
     list_id: StoreId,
     input: &ModsInput,
+    calcs_main: bool,
 ) -> Result<()> {
     let ge = &skill.active_effect.granted_effect;
     let secondary = skill
@@ -1314,13 +1340,17 @@ fn make_minion(
         }
         return Ok(());
     }
-    let index = gem
-        .skill_minion
+    let chosen = if calcs_main {
+        &mut gem.skill_minion_calcs
+    } else {
+        &mut gem.skill_minion
+    };
+    let index = chosen
         .as_ref()
         .and_then(|m| list.iter().position(|x| x == m))
         .unwrap_or(0);
     let typ = list[index].clone();
-    gem.skill_minion = Some(typ.clone());
+    *chosen = Some(typ.clone());
     flags.insert("haveMinion".into());
     let md = input
         .setup
@@ -1371,13 +1401,17 @@ fn make_minion(
     let mut item_set = None;
     if ge.minion_has_item_set {
         let tab = input.tab;
-        let valid = gem
-            .skill_minion_item_set
-            .is_some_and(|id| id.fract() == 0.0 && tab.item_sets.contains_key(&(id as i64)));
+        let set = if calcs_main {
+            &mut gem.skill_minion_item_set_calcs
+        } else {
+            &mut gem.skill_minion_item_set
+        };
+        let valid =
+            set.is_some_and(|id| id.fract() == 0.0 && tab.item_sets.contains_key(&(id as i64)));
         if !valid {
-            gem.skill_minion_item_set = tab.item_set_order_list.first().copied();
+            *set = tab.item_set_order_list.first().copied();
         }
-        item_set = gem.skill_minion_item_set;
+        item_set = *set;
     } else if !secondary {
         gem.skill_minion_item_set_calcs = None;
         gem.skill_minion_item_set = None;
