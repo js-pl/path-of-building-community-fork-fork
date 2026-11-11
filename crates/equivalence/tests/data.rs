@@ -5,7 +5,7 @@
 //! `DATA_JSON_DIR=<dir> cargo test --release -p equivalence --test data`.
 
 use equivalence::{oracle_dir, to_json_with_funcs, upstream_src};
-use lua::{TableRef, Value};
+use lua::Value;
 
 fn path(raw: &importer::Raw, path: &[&str]) -> Value {
     let mut v = Value::Table(raw.data.clone());
@@ -23,10 +23,8 @@ fn every_table_matches_upstream() {
     let raw = importer::import(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
     let mut im = importer::Importer::new(&upstream_src());
     let mut fresh = |file: &str| {
-        let t = TableRef::new();
-        im.load(&format!("Data/{file}"), vec![Value::Table(t.clone())])
-            .unwrap_or_else(|e| panic!("{e}"));
-        Value::Table(t)
+        im.load1(&format!("Data/{file}"), vec![])
+            .unwrap_or_else(|e| panic!("{e}"))
     };
     let misc = fresh("Misc");
     let mod_cache = fresh("ModCache");

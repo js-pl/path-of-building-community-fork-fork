@@ -36,7 +36,7 @@
 		<PlayerStat stat="Str" value="114"/>
 		<PlayerStat stat="ReqStr" value="156"/>
 		<PlayerStat stat="Dex" value="124"/>
-		<PlayerStat stat="ReqDex" value="155"/>
+		<PlayerStat stat="ReqDex" value="98"/>
 		<PlayerStat stat="Int" value="322"/>
 		<PlayerStat stat="ReqInt" value="126"/>
 		<PlayerStat stat="Devotion" value="0"/>
@@ -669,7 +669,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemGreaterAncestralCall" level="3" nameSpec="Greater Ancestral Call" quality="20" skillId="SupportGreaterAncestralCall" variantId="SupportGreaterAncestralCall"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemLightningArrow" level="20" nameSpec="Lightning Arrow" quality="0" skillId="LightningArrow" variantId="LightningArrow"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemLeapSlam" level="20" nameSpec="Leap Slam of Groundbreaking" quality="0" skillId="LeapSlamAltX" variantId="LeapSlamAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemIncreasedAreaOfEffect" level="20" nameSpec="Increased Area of Effect" quality="0" skillId="SupportIncreasedAreaOfEffect" variantId="SupportIncreasedAreaofEffect"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" source="Tree:4917">

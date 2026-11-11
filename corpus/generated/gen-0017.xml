@@ -32,7 +32,7 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
 		<PlayerStat stat="Str" value="293"/>
-		<PlayerStat stat="ReqStr" value="138"/>
+		<PlayerStat stat="ReqStr" value="170"/>
 		<PlayerStat stat="Dex" value="158"/>
 		<PlayerStat stat="ReqDex" value="122"/>
 		<PlayerStat stat="Int" value="84"/>
@@ -693,7 +693,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemMeleePhysicalDamagePlus" level="5" nameSpec="Awakened Melee Physical Damage" quality="20" skillId="SupportAwakenedMeleePhysicalDamage" variantId="SupportAwakenedMeleePhysicalDamage"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCracklingLance" level="20" nameSpec="Crackling Lance" quality="0" skillId="CracklingLance" variantId="CracklingLance"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCorruptingFever" level="20" nameSpec="Corrupting Fever" quality="0" skillId="CorruptingFever" variantId="CorruptingFever"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemCursedGround" level="20" nameSpec="Cursed Ground" quality="0" skillId="SupportCursedGround" variantId="SupportCursedGround"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemFork" level="20" nameSpec="Fork" quality="0" skillId="SupportFork" variantId="SupportFork"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemItemRarity" level="21" nameSpec="Item Rarity" quality="20" skillId="SupportItemRarity" variantId="SupportItemRarity"/>

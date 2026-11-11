@@ -3,7 +3,7 @@
 //! number of hits to die (effective hit pool), recoup, the maximum hit
 //! taken and degens.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1027,14 +1027,18 @@ impl<'a> Perform<'a> {
                             self.c.base(edb, ec, &[&format!("{t}DamageGainAs{to}")])? / 100.0;
                         let mut cp = conv[k] / 100.0;
                         let sp = skill[k] / 100.0;
-                        if sp > 0.0 && *to != "Chaos" {
-                            let lvl = self.env.enemy_level;
-                            let table = &self.data().monster_phys_conversion_multi;
-                            let m = (lvl.fract() == 0.0 && lvl >= 1.0)
-                                .then(|| table.get(lvl as usize - 1).copied())
-                                .flatten()
-                                .ok_or("attempt to perform arithmetic on a nil value")?;
-                            cp += sp * (1.0 + m / 100.0);
+                        if sp > 0.0 {
+                            let mut sp = sp;
+                            if *to != "Chaos" {
+                                let lvl = self.env.enemy_level;
+                                let table = &self.data().monster_phys_conversion_multi;
+                                let m = (lvl.fract() == 0.0 && lvl >= 1.0)
+                                    .then(|| table.get(lvl as usize - 1).copied())
+                                    .flatten()
+                                    .ok_or("attempt to perform arithmetic on a nil value")?;
+                                sp *= 1.0 + m / 100.0;
+                            }
+                            cp += sp;
                         }
                         if gain > 0.0 || cp > 0.0 {
                             let v = damage * gain + damage * cp;
@@ -2147,7 +2151,7 @@ impl<'a> Perform<'a> {
             return Ok(());
         }
         let o = |p: &Self, k: &str| p.o(actor, k);
-        let t = o(self, "enemySkillTime");
+        let t = self.o_or(actor, "enemySkillTime", 1.0);
         let mult = self.input_num("enemyMultiplierPvpDamage").unwrap_or(100.0) / 100.0;
         let (ne1, ne2, e1, e2) = (
             self.misc_data("PvpNonElemental1"),

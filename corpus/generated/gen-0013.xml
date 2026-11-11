@@ -18,9 +18,9 @@
 		<PlayerStat stat="CombinedDPS" value="0"/>
 		<PlayerStat stat="Cooldown" value="4.026"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="6.8"/>
-		<PlayerStat stat="ManaCost" value="31.818181818182"/>
+		<PlayerStat stat="ManaCost" value="32"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="53.030303030303"/>
+		<PlayerStat stat="ManaPerSecondCost" value="53.333333333333"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>

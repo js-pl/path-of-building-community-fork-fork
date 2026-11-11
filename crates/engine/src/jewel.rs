@@ -6,7 +6,7 @@
 //! it); [`RadiusFunc::new`] makes it a typed function the setup runs on each
 //! node in the radius, then once without a node to finish.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 use crate::mods::list::{merge_mod, sum};
 use crate::mods::tag::{Names, TagKind};

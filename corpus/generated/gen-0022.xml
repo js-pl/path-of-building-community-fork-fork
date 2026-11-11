@@ -16,9 +16,9 @@
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="0"/>
-		<PlayerStat stat="ManaCost" value="23.076923076923"/>
+		<PlayerStat stat="ManaCost" value="23"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="46.153846153846"/>
+		<PlayerStat stat="ManaPerSecondCost" value="46"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -32,7 +32,7 @@
 		<PlayerStat stat="Str" value="356"/>
 		<PlayerStat stat="ReqStr" value="158"/>
 		<PlayerStat stat="Dex" value="217"/>
-		<PlayerStat stat="ReqDex" value="98"/>
+		<PlayerStat stat="ReqDex" value="97"/>
 		<PlayerStat stat="Int" value="421"/>
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
@@ -616,7 +616,7 @@ Energy Shield Recharge is not delayed by Damage during Effect
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemFrostmage" level="4" nameSpec="Frostmage" quality="0" skillId="SupportFrostmage" variantId="SupportFrostmage"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemLightningStrike" level="20" nameSpec="Lightning Strike" quality="20" skillId="LightningStrike" skillPart="1" variantId="LightningStrike"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemLightningTowerTrap" level="20" nameSpec="Lightning Spire Trap of Overloading" quality="20" skillId="LightningSpireTrapAltY" skillPart="1" variantId="LightningSpireTrapAltY"/>
 			</Skill>
 		</SkillSet>
 	</Skills>

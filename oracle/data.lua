@@ -66,9 +66,7 @@ for _, key in ipairs({ "keystones", "ailmentTypeList", "elementalAilmentTypeList
 		"nonElementalAilmentTypeList", "nonDamagingAilment" }) do
 	add("data." .. key, data[key])
 end
-local misc = { }
-load("Misc", misc)
-add("Misc", misc)
+add("Misc", load("Misc"))
 add("data.modScalability", load("ModScalability"))
 for _, file in ipairs({ "ModExplicit", "ModItemExclusive", "ModCorrupted", "ModDelve", "ModSynthesis", "ModScourge",
 		"ModEldritch", "ModFlask", "ModTincture", "ModGraft", "ModJewel", "ModJewelAbyss", "ModJewelCluster",
@@ -79,30 +77,24 @@ for _, file in ipairs({ "ModExplicit", "ModItemExclusive", "ModCorrupted", "ModD
 		"TimelessJewelData/AbyssNotableNames", "Rares", "FlavourText" }) do
 	add(file, load(file))
 end
-local bosses = { }
-load("Bosses", bosses)
-add("Bosses", bosses)
-local bossSkills, bossSkillsList = load("BossSkills")
-add("BossSkills.1", bossSkills)
-add("BossSkills.2", bossSkillsList)
-add("SkillStatMap", load("SkillStatMap", makeSkillMod, makeFlagMod, makeSkillDataMod))
+add("Bosses", load("Bosses"))
+local bossSkills = load("BossSkills")
+add("BossSkills.1", bossSkills.bossSkills)
+add("BossSkills.2", bossSkills.bossSkillsList)
+add("SkillStatMap", load("SkillStatMap")(makeSkillMod, makeFlagMod, makeSkillDataMod))
 local skills = { }
 for _, t in ipairs({ "act_str", "act_dex", "act_int", "other", "glove", "minion", "spectre", "sup_str", "sup_dex", "sup_int" }) do
-	load("Skills/" .. t, skills, makeSkillMod, makeFlagMod, makeSkillDataMod)
+	load("Skills/" .. t)(skills, makeSkillMod, makeFlagMod, makeSkillDataMod)
 end
 add("Skills", skills)
 add("Gems", load("Gems"))
-local minions = { }
-load("Minions", minions, makeSkillMod, makeFlagMod)
-add("Minions", minions)
-local spectres = { }
-load("Spectres", spectres, makeSkillMod, makeFlagMod)
-add("Spectres", spectres)
+add("Minions", load("Minions")(makeSkillMod, makeFlagMod))
+add("Spectres", load("Spectres")(makeSkillMod, makeFlagMod))
 local itemTypes = { "axe", "bow", "claw", "dagger", "fishing", "mace", "staff", "sword", "wand", "helmet", "body",
 	"gloves", "boots", "shield", "quiver", "amulet", "ring", "belt", "jewel", "flask", "tincture", "graft" }
 local bases = { }
 for _, t in ipairs(itemTypes) do
-	load("Bases/" .. t, bases)
+	load("Bases/" .. t)(bases)
 end
 add("Bases", bases)
 for _, t in ipairs(itemTypes) do
@@ -110,7 +102,7 @@ for _, t in ipairs(itemTypes) do
 end
 add("Uniques/Special/race", load("Uniques/Special/race"))
 add("Uniques/Special/WatchersEye", load("Uniques/Special/WatchersEye"))
-add("ModCache", (function() local c = { } load("ModCache", c) return c end)())
+add("ModCache", load("ModCache"))
 for _, g in ipairs({ "ModFlag", "KeywordFlag", "SkillType" }) do
 	add("global." .. g, _G[g])
 end

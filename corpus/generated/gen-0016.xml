@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="None" bandit="None" characterLevelAutoMode="false" className="Duelist" level="96" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="2049.010394016"/>
-		<PlayerStat stat="AverageBurstDamage" value="2049.010394016"/>
+		<PlayerStat stat="AverageHit" value="2048.869079056"/>
+		<PlayerStat stat="AverageBurstDamage" value="2048.869079056"/>
 		<PlayerStat stat="Speed" value="0.53866666666667"/>
 		<PlayerStat stat="HitSpeed" value="0.505"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="8.64"/>
 		<PlayerStat stat="CritChance" value="8.64"/>
 		<PlayerStat stat="CritMultiplier" value="1.77"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="1034.7502489781"/>
+		<PlayerStat stat="TotalDPS" value="1034.6788849233"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="1034.7502489781"/>
-		<PlayerStat stat="WithIgniteDPS" value="1034.7502489781"/>
-		<PlayerStat stat="WithPoisonDPS" value="1034.7502489781"/>
+		<PlayerStat stat="WithBleedDPS" value="1034.6788849233"/>
+		<PlayerStat stat="WithIgniteDPS" value="1034.6788849233"/>
+		<PlayerStat stat="WithPoisonDPS" value="1034.6788849233"/>
 		<PlayerStat stat="TotalDotDPS" value="0"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="1034.7502489781"/>
+		<PlayerStat stat="CombinedDPS" value="1034.6788849233"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="2.8"/>
 		<PlayerStat stat="BrandAttachmentRangeMetre" value="3"/>
 		<PlayerStat stat="ManaCost" value="35"/>
@@ -34,7 +34,7 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
 		<PlayerStat stat="Str" value="303"/>
-		<PlayerStat stat="ReqStr" value="155"/>
+		<PlayerStat stat="ReqStr" value="114"/>
 		<PlayerStat stat="Dex" value="123"/>
 		<PlayerStat stat="ReqDex" value="173"/>
 		<PlayerStat stat="Int" value="54"/>
@@ -726,7 +726,7 @@ Converted to Cold Damage
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemBehead" level="21" nameSpec="Behead" quality="20" skillId="SupportBehead" variantId="SupportBehead"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemVengeance" level="20" nameSpec="Crushing Fist" quality="20" skillId="CrushingFist" variantId="CrushingFist"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCorpseEruption" level="20" nameSpec="Cremation of the Volcano" quality="20" skillId="CremationAltY" variantId="CremationAltY"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemDarkPact" level="20" nameSpec="Dark Bargain of Trarthus" quality="23" skillId="DarkPactAltX" skillPart="1" variantId="DarkPactAltX"/>

@@ -696,7 +696,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemProjectileWeakness" level="21" nameSpec="Sniper&apos;s Mark" quality="20" skillId="SnipersMark" variantId="SnipersMark"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemStormRain" level="20" nameSpec="Storm Rain of the Fence" quality="23" skillId="StormRainAltY" skillPart="1" variantId="StormRainAltY"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemStormRain" level="20" nameSpec="Storm Rain of the Conduit" quality="23" skillId="StormRainAltX" skillPart="1" variantId="StormRainAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemMultiTrap" level="20" nameSpec="Multiple Traps" quality="0" skillId="SupportMultipleTraps" variantId="SupportMultipleTraps"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemElementalFocusPlus" level="5" nameSpec="Awakened Elemental Focus" quality="0" skillId="SupportAwakenedElementalFocus" variantId="SupportAwakenedElementalFocus"/>
 			</Skill>

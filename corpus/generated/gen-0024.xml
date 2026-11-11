@@ -54,8 +54,8 @@
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1194"/>
 		<PlayerStat stat="Spec:ManaInc" value="62"/>
-		<PlayerStat stat="ManaUnreserved" value="23"/>
-		<PlayerStat stat="ManaUnreservedPercent" value="1.9262981574539"/>
+		<PlayerStat stat="ManaUnreserved" value="24"/>
+		<PlayerStat stat="ManaUnreservedPercent" value="2.0100502512563"/>
 		<PlayerStat stat="ManaRegenRecovery" value="0"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
 		<PlayerStat stat="EnergyShield" value="1921"/>

@@ -85,22 +85,37 @@ impl Env {
     }
 
     /// Evaluates a file (path relative to upstream's `src/`, used in function
-    /// references) with the given `...` arguments; returns what it returns.
+    /// references) with the given `...` arguments, or for a file returning a
+    /// function, calls it with them; returns what it returns.
     pub fn eval_file(&mut self, file: &str, src: &[u8], args: Vec<Value>) -> Result<Vec<Value>> {
         let block = lua::parser::parse(src).map_err(|e| EvalError {
             file: file.into(),
             line: e.line,
             msg: e.msg,
         })?;
+        // `return function(params) ... end` runs its body with `args` as the
+        // call's arguments
+        let (body, scope, varargs) = match lua::ast::data_wrapper(&block) {
+            Some(f) => {
+                let mut args = args.into_iter();
+                let scope = f
+                    .params
+                    .iter()
+                    .map(|p| (p.clone(), args.next().unwrap_or_default()))
+                    .collect();
+                (&f.body, scope, args.collect())
+            }
+            None => (&block, HashMap::new(), args),
+        };
         let mut ev = Evaluator {
             env: self,
             file: Rc::from(file),
             src,
-            scopes: vec![HashMap::new()],
-            varargs: args,
+            scopes: vec![scope],
+            varargs,
             line: 0,
         };
-        ev.block(&block)
+        ev.block(body)
     }
 
     /// Evaluates only the `local name = <expr>` statements named in `names`,

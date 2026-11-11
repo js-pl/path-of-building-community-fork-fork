@@ -17,9 +17,9 @@
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="0"/>
 		<PlayerStat stat="Cooldown" value="1.617"/>
-		<PlayerStat stat="ManaCost" value="78.260869565217"/>
+		<PlayerStat stat="ManaCost" value="78"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="48.398806162781"/>
+		<PlayerStat stat="ManaPerSecondCost" value="48.237476808905"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -678,7 +678,7 @@ Primordial
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemBehead" level="21" nameSpec="Behead" quality="0" skillId="SupportBehead" variantId="SupportBehead"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemIceTrap" level="20" nameSpec="Ice Trap of Hollowness" quality="0" skillId="IceTrapAltX" variantId="IceTrapAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemIceTrap" level="20" nameSpec="Ice Trap" quality="0" skillId="IceTrap" variantId="IceTrap"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemCullTheWeak" level="3" nameSpec="Cull the Weak" quality="20" skillId="SupportCullTheWeak" variantId="SupportCullTheWeak"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">

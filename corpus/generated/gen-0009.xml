@@ -29,11 +29,11 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="50"/>
 		<PlayerStat stat="Str" value="104"/>
-		<PlayerStat stat="ReqStr" value="155"/>
+		<PlayerStat stat="ReqStr" value="159"/>
 		<PlayerStat stat="Dex" value="222"/>
 		<PlayerStat stat="ReqDex" value="183"/>
 		<PlayerStat stat="Int" value="94"/>
-		<PlayerStat stat="ReqInt" value="159"/>
+		<PlayerStat stat="ReqInt" value="123"/>
 		<PlayerStat stat="Devotion" value="0"/>
 		<PlayerStat stat="TotalEHP" value="3155.7555154441"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="3061"/>
@@ -50,8 +50,8 @@
 		<PlayerStat stat="LifeLeechGainPerHit" value="0"/>
 		<PlayerStat stat="Mana" value="1058"/>
 		<PlayerStat stat="Spec:ManaInc" value="64"/>
-		<PlayerStat stat="ManaUnreserved" value="1048"/>
-		<PlayerStat stat="ManaUnreservedPercent" value="99.054820415879"/>
+		<PlayerStat stat="ManaUnreserved" value="1049"/>
+		<PlayerStat stat="ManaUnreservedPercent" value="99.149338374291"/>
 		<PlayerStat stat="ManaRegenRecovery" value="35.8"/>
 		<PlayerStat stat="ManaLeechGainPerHit" value="0"/>
 		<PlayerStat stat="EnergyShield" value="96"/>
@@ -674,7 +674,7 @@ Grants Level 21 Vulnerability Curse Aura during Effect
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemPointBlank" level="21" nameSpec="Point Blank" quality="20" skillId="SupportPointBlank" variantId="SupportPointBlank"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="false" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemIncinerate" level="21" nameSpec="Incinerate" quality="0" skillId="Incinerate" skillPart="1" variantId="Incinerate"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemImmortalCall" level="21" nameSpec="Immortal Call" quality="0" skillId="ImmortalCall" variantId="ImmortalCall"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemArcaneSurge" level="20" nameSpec="Arcane Surge" quality="20" skillId="SupportArcaneSurge" variantId="SupportArcaneSurge"/>
 			</Skill>
 		</SkillSet>

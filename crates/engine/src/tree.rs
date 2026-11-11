@@ -2,7 +2,7 @@
 //! without its art, as typed data. Built from a tree version's `tree.lua`, as
 //! the importer reads it; node stats are parsed into typed mods.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 //!
 //! Upstream visits the tree's tables with `pairs`, and some results depend
 //! on the order (which of two notables with one name is kept, the order of

@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Luminary" bandit="None" characterLevelAutoMode="false" className="Scion" level="94" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="1611.3535"/>
-		<PlayerStat stat="AverageBurstDamage" value="1611.3535"/>
+		<PlayerStat stat="AverageHit" value="1655.25955"/>
+		<PlayerStat stat="AverageBurstDamage" value="1655.25955"/>
 		<PlayerStat stat="Speed" value="1.75"/>
 		<PlayerStat stat="HitSpeed" value="2.5"/>
 		<PlayerStat stat="TrapThrowingTime" value="0.57142857142857"/>
 		<PlayerStat stat="TrapThrowCount" value="1"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="11.1"/>
 		<PlayerStat stat="CritChance" value="11.1"/>
-		<PlayerStat stat="CritMultiplier" value="1.9"/>
+		<PlayerStat stat="CritMultiplier" value="2.17"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="4028.38375"/>
+		<PlayerStat stat="TotalDPS" value="4138.148875"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="4028.38375"/>
-		<PlayerStat stat="WithIgniteDPS" value="4028.38375"/>
-		<PlayerStat stat="WithPoisonDPS" value="4028.38375"/>
+		<PlayerStat stat="WithBleedDPS" value="4138.148875"/>
+		<PlayerStat stat="WithIgniteDPS" value="4138.148875"/>
+		<PlayerStat stat="WithPoisonDPS" value="4138.148875"/>
 		<PlayerStat stat="TotalDotDPS" value="0"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="4028.38375"/>
+		<PlayerStat stat="CombinedDPS" value="4138.148875"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="2.7"/>
 		<PlayerStat stat="ManaCost" value="22"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -41,18 +41,18 @@
 		<PlayerStat stat="Int" value="148"/>
 		<PlayerStat stat="ReqInt" value="342"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4625.5926920817"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3774"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="7009"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2621"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2870"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1884"/>
+		<PlayerStat stat="TotalEHP" value="4765.3848902024"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3869"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="7221"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="2700"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2957"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1941"/>
 		<PlayerStat stat="Life" value="2725"/>
 		<PlayerStat stat="Spec:LifeInc" value="73"/>
 		<PlayerStat stat="LifeUnreserved" value="2725"/>
 		<PlayerStat stat="LifeRecoverable" value="2725"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="54.5"/>
+		<PlayerStat stat="LifeRegenRecovery" value="182.8"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1253"/>
 		<PlayerStat stat="Spec:ManaInc" value="81"/>
@@ -60,8 +60,8 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="64.964086193136"/>
 		<PlayerStat stat="ManaRegenRecovery" value="43.1"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="92"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="92"/>
+		<PlayerStat stat="EnergyShield" value="183"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="183"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="44"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
@@ -1890,7 +1890,7 @@ also grant an equal chance to gain a Frenzy Charge on Kill
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemConductivity" level="20" nameSpec="Conductivity" quality="20" skillId="Conductivity" variantId="Conductivity"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemEnergyBlade" level="20" nameSpec="Energy Blade" quality="23" skillId="EnergyBlade" variantId="EnergyBlade"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemEnduringCry" level="20" nameSpec="Enduring Cry" quality="23" skillId="EnduringCry" variantId="EnduringCry"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemArrowNova" level="20" nameSpec="Arrow Nova" quality="23" skillId="SupportArrowNova" variantId="SupportArrowNova"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemAddedFireDamage" level="20" nameSpec="Added Fire Damage" quality="23" skillId="SupportAddedFireDamage" variantId="SupportAddedFireDamage"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemBehead" level="20" nameSpec="Behead" quality="0" skillId="SupportBehead" variantId="SupportBehead"/>
