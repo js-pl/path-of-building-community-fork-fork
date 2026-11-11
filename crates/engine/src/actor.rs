@@ -23,6 +23,8 @@ pub enum OutVal {
     Str(Rc<str>),
     /// A table: a weapon's output, a requirement's source, ...
     Table(Rc<BTreeMap<String, OutVal>>),
+    /// A list: the Full DPS skills, the skills a cost warning names
+    List(Rc<Vec<OutVal>>),
     /// A gem or an item in a table, by name (`oracle/json.lua` writes them
     /// as `{"$gem": name}` and `{"$item": name}`)
     Gem(Rc<str>),

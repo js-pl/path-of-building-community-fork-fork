@@ -49,6 +49,9 @@ impl CachedCalc {
 pub trait Recalc {
     /// The cached results of a skill's calculation
     fn cached(&self, uuid: &str) -> Option<Rc<CachedCalc>>;
+    /// Whether this is a calculator's calculation (`env.mode ==
+    /// "CALCULATOR"`), which most lookups recalculate even when cached
+    fn calculator(&self) -> bool;
     /// Caches a calculation's results (`cacheData`)
     fn store(&self, uuid: &str, calc: CachedCalc);
     /// `calcs.buildActiveSkill(env, mode, skill, uuid, limited)`: a
@@ -89,6 +92,9 @@ pub struct Recalculator<'a, 't> {
     pub build: &'a Build<'t>,
     pub data: &'a CalcData<'a>,
     pub mode: BuffMode,
+    /// A calculator's calculations (`mode == "CALCULATOR"`), with a cache
+    /// of their own
+    pub calculator: bool,
     cache: RefCell<HashMap<String, Rc<CachedCalc>>>,
 }
 
@@ -98,7 +104,16 @@ impl<'a, 't> Recalculator<'a, 't> {
             build,
             data,
             mode,
+            calculator: false,
             cache: RefCell::new(HashMap::new()),
+        }
+    }
+
+    /// The calculations of a calculator (`mode == "CALCULATOR"`)
+    pub fn calculator(build: &'a Build<'t>, data: &'a CalcData<'a>, mode: BuffMode) -> Self {
+        Recalculator {
+            calculator: true,
+            ..Recalculator::new(build, data, mode)
         }
     }
 }
@@ -106,6 +121,10 @@ impl<'a, 't> Recalculator<'a, 't> {
 impl Recalc for Recalculator<'_, '_> {
     fn cached(&self, uuid: &str) -> Option<Rc<CachedCalc>> {
         self.cache.borrow().get(uuid).cloned()
+    }
+
+    fn calculator(&self) -> bool {
+        self.calculator
     }
 
     fn store(&self, uuid: &str, calc: CachedCalc) {
@@ -292,14 +311,20 @@ impl<'a> Perform<'a> {
     /// The cached calculation of skill `i`, calculating it unless it is
     /// cached (`GlobalCache.cachedData[env.mode][uuid]` after
     /// `calcs.buildActiveSkill`); `limit_self` adds the skill to the
-    /// limited ones, as `getCachedOutputValue` does
-    pub(crate) fn cached_calc(&self, i: usize, limit_self: bool) -> Result<Option<Rc<CachedCalc>>> {
+    /// limited ones, as `getCachedOutputValue` does. With `refresh`, a
+    /// calculator recalculates it anyway (`or env.mode == "CALCULATOR"`).
+    pub(crate) fn cached_calc(
+        &self,
+        i: usize,
+        limit_self: bool,
+        refresh: bool,
+    ) -> Result<Option<Rc<CachedCalc>>> {
         let recalc = self
             .input
             .recalc
             .ok_or("not ported: calculations of other skills without a recalculator")?;
         let uuid = self.skill_uuid(i);
-        if recalc.cached(&uuid).is_none() {
+        if recalc.cached(&uuid).is_none() || (refresh && recalc.calculator()) {
             let mut limited = self.input.limited.clone();
             if limit_self {
                 limited.push(uuid.clone());

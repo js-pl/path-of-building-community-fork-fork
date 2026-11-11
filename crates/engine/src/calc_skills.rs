@@ -350,7 +350,7 @@ pub fn type_expression_matches(
 }
 
 /// `calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill)`
-fn can_support(
+pub(crate) fn can_support(
     support: &GrantedEffect,
     skill: &ActiveSkill,
     from_item: &HashSet<String>,
@@ -1173,7 +1173,7 @@ fn active_skills(
                         .is_some_and(|e| !e.support && e.name == "Energy Blade")
             })
         {
-            return Err("Energy Blade is not ported".into());
+            return Err("not ported: Energy Blade".into());
         }
     }
     let main_skill = match main_skill {

@@ -392,8 +392,12 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    its own whose skills' mod lists stand on its database, set up and
    calculated after the player (`calc_minion.rs`). `tests/perform.rs`
    compares the outputs and databases, the minion's with them, with the
-   translation at each stage and after `calcs.perform`. What is not ported yet is listed in
-   `docs/progress.md`.
+   translation at each stage and after `calcs.perform`. `calcs.rs` ports
+   `calcs.buildOutput` with the Full DPS table: one entry point from a
+   loaded build to the player's and minion's outputs, which
+   `tests/build_output.rs` compares with the oracle's own values, so the
+   typed engine stands without the translation there. What is not ported
+   yet is listed in `docs/progress.md`.
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is

@@ -364,6 +364,9 @@ impl<'a> Perform<'a> {
             let cond = format!("{}AccRatingHigherThanMaxLife", label.replace(' ', ""));
             let life = self.c.out(PLAYER, "Life").unwrap_or(f64::NAN);
             self.c.set_cond(list, &cond, accuracy > life);
+            // The pass's output so far, as the queries' `skillStats`
+            let cfg = self.pcfg(o);
+            let c = Some(&cfg);
             // Calculate attack/cast speed
             let ge = self.skill(i).active_effect.granted_effect.clone();
             let triggered = self.sd_truthy(i, "triggered");

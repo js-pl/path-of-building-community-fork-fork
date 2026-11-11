@@ -2606,7 +2606,7 @@ impl<'a> Perform<'a> {
         }
         self.set_skill_cond(main, "usedByMirage", true);
         let cached = self
-            .cached_calc(main, true)?
+            .cached_calc(main, true, true)?
             .ok_or("attempt to index a nil value (the cached calculation of the main skill)")?;
         let slot_of = |p: &Self, k: usize| {
             p.skill(k)

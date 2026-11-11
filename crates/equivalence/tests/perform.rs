@@ -9,21 +9,18 @@
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::actor::OutVal;
-use engine::calc_setup::{BuffMode, SetupData};
-use engine::item::ItemContext;
-use engine::item_data::ItemData;
+use engine::calc_setup::BuffMode;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use engine::mods::{Mod, ModValue, Mods, Store};
 use engine::skill_data::SkillData;
-use engine::tree::NodeType;
-use equivalence::typed_build::Trees;
-use equivalence::{corpus, mod_parser, typed_json, upstream_src};
+use equivalence::typed_build::TypedData;
+use equivalence::{corpus, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use serde_json::{Map, Value as J, json};
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use upstream::host::Host;
 use upstream::imported::Imported;
@@ -93,6 +90,7 @@ fn typed_json(v: &OutVal) -> J {
         OutVal::Table(t) => J::Object(t.iter().map(|(k, v)| (k.clone(), typed_json(v))).collect()),
         OutVal::Gem(n) => json!({"$gem": &**n}),
         OutVal::Item(n) => json!({"$item": &**n}),
+        OutVal::List(l) => J::Array(l.iter().map(typed_json).collect()),
     }
 }
 
@@ -505,60 +503,7 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
-    let ldata = host.global("data");
-    let config_data = engine::config::ConfigData::from_lua(&ldata, &host.global("SkillType"))
-        .unwrap_or_else(|e| panic!("config data: {e}"));
-    let var_list = rt::call(&host.global("LoadModule"), &[s("Modules/ConfigOptions")])
-        .unwrap_or_else(|e| panic!("{}", describe(&e)))
-        .into_iter()
-        .next()
-        .unwrap();
-    let option_defaults = engine::config_tab::option_defaults(&var_list);
-    let setup_data =
-        SetupData::from_lua(&ldata, &host.global("ModFlag"), &host.global("KeywordFlag"))
-            .unwrap_or_else(|e| panic!("setup data: {e}"));
-    let item_data = ItemData::from_lua(&ldata, &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("item data: {e}"));
-    let skill_data = SkillData::from_lua(
-        &ldata,
-        &host.global("colorCodes"),
-        &host.global("SkillType"),
-    )
-    .unwrap_or_else(|e| panic!("skill data: {e}"));
-    let radius: Vec<String> = entries(&get(&ldata, "jewelRadius"))
-        .into_iter()
-        .map(|(_, r)| {
-            lua::to_string(&get(&r, "label"))
-                .to_str_lossy()
-                .into_owned()
-        })
-        .collect();
-    let one_hand_map: HashMap<String, bool> = setup_data
-        .weapon_type_info
-        .iter()
-        .map(|(k, v)| (k.clone(), v.one_hand))
-        .collect();
-    let one_hand = |t: &str| one_hand_map.get(t).copied();
-    let mut trees = Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
-    let latest = trees.latest().to_string();
-    let socket_ids: Vec<u32> = trees
-        .get(&latest, &parser)
-        .nodes
-        .iter()
-        .filter(|n| n.kind == NodeType::Socket)
-        .map(|n| n.id)
-        .collect();
-    let calc_data = engine::calc_env::CalcData {
-        setup: &setup_data,
-        items: &item_data,
-        skills: &skill_data,
-        parser: &parser,
-        jewel_radius: &radius,
-    };
+    let mut data = TypedData::load(&host);
     let mut failures = Vec::new();
     let (mut compared, mut skipped, mut offence_skipped) = (0, 0, 0);
     // `OFFENCE_PARTIAL=1`: after the offence, only the outputs the typed
@@ -566,7 +511,7 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
     let stage_name = |k: usize| ["defence", "buildDefenceEstimations", "triggers", "offence"][k];
     let mut skip_reasons: BTreeMap<String, usize> = BTreeMap::new();
-    for (id, xml) in make(&skill_data) {
+    for (id, xml) in make(&data.skills) {
         if !id.contains(&filter) {
             continue;
         }
@@ -632,24 +577,10 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
 
         // The typed perform
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
-        let version = engine::build::tree_version(&root);
-        let tree = trees.get(&version, &parser);
-        let load_ctx = engine::build::LoadContext {
-            items: ItemContext {
-                data: &item_data,
-                parser: &parser,
-                jewel_radius: &radius,
-                default_affix_quality: 0.5,
-            },
-            skill_data: &skill_data,
-            config_data: &config_data,
-            option_defaults: &option_defaults,
-            parser: &parser,
-            socket_ids: &socket_ids,
-            one_hand: &one_hand,
-            minions: &|m: &str| setup_data.minions.contains_key(m),
-        };
-        let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
+        data.load_tree(&root);
+        let data = &data;
+        let calc_data = data.calc_data();
+        let mut typed_build = match data.load_build(&root) {
             Ok(b) => b,
             Err(e) => {
                 failures.push(format!("{id}: build: {e}"));
