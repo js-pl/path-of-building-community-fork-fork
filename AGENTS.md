@@ -34,4 +34,11 @@ See `docs/design.md` before making architectural decisions.
 - each feature gets its own feature branch
 - never push directly to main, work via PRs
 - always squash merge PRs; only the owner merges
+- merge continually: once a step works (its tests and CI's checks pass),
+  open a PR for it right away and ask the owner to merge it; don't let
+  finished work pile up on an unmerged branch
+- keep PRs small, one working step each; start the next step from the
+  latest `main` once the previous PR is merged
+- before ending a session, open a PR for any finished, pushed work that
+  has none, and say in the handoff which PRs are waiting for a merge
 - be brief in commit messages
