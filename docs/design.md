@@ -266,7 +266,8 @@ each step small.
   the comparison rules by hand. Oracle outputs and the generated corpus are
   only regenerated with their tools, in the PR that bumps the submodule, and
   CI fails if they differ from what upstream produces.
-- Every PR needs green CI and is merged by the owner.
+- Every PR needs green CI before it is squash merged, by the owner or by
+  the agent that opened it once it is happy with the change.
 - Commit messages and port headers reference the upstream commit.
 
 ## Performance targets
