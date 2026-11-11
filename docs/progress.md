@@ -20,17 +20,17 @@ pick the work up:
 State at the handoff:
 
 - `engine::calcs::build_output` is `calcs.buildOutput(build, "MAIN")`
-  with `calcs.calcFullDPS`: 58 of the 61 corpus builds equal the oracle's
-  `MAIN` outputs (`tests/build_output.rs`); skipped is Energy Blade
-  (gen-0031). Doom Blast's trigger sources are ported (all four
+  with `calcs.calcFullDPS`: all 61 corpus builds equal the oracle's
+  `MAIN` outputs (`tests/build_output.rs`). Energy Blade (gen-0031) reruns
+  the setup with `AffectedByEnergyBlade` and swaps in generated weapons,
+  which the items tab holds under reserved negative ids
+  (`ItemsTab::generated`). Doom Blast's trigger sources are ported (all four
   `doomBlastSource` modes); the corpus reaches only the default, Vixen's.
-- Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
-  test has none.
+- `perform.rs` and its variants test skip no build.
 
 What remains for the full migration, in order:
 
-1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`),
-   Tawhoa's Chosen, the rest of `configTable` in
+1. Tawhoa's Chosen, the rest of `configTable` in
    `CalcTriggers.lua` (only the configurations the corpus and variants
    reach are ported; a variants test per trigger support would cover
    them), overcapped lightning
@@ -75,7 +75,7 @@ covers everything from the items on; 61 builds compared).
 `engine::calcs::build_output` gives a build's player and minion outputs
 with the Full DPS table and the cost warnings, compared with the oracle's
 own `MAIN` outputs (`tests/oracle/<id>.json`) in
-`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 60 of
+`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 61 of
 61 builds equal, the rest skipped (see the handoff).
 
 `calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
@@ -83,8 +83,8 @@ then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 60 builds compared, 58 of them
-through the offence; the gaps below are skipped. `skill_functions_match_upstream`
+`crates/equivalence/tests/perform.rs`: all 61 builds compared through
+the offence; the gaps below would be skipped. `skill_functions_match_upstream`
 does the same for every gem with skill functions, in each of its parts, as
 the main skill of a corpus build with fitting weapons (238 variants, about
 13 minutes).
@@ -119,8 +119,6 @@ Game data is still read from upstream's processed Lua `data` table
 - Rebuilding cluster jewel subgraphs after an edit (they are built once,
   when the build loads); `initial_node_mods_match_upstream` skips the builds
   with subgraphs, as it loads no items
-- Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade` and swaps in
-  generated weapons; gen-0031 is skipped)
 - Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
   node and item power calculators
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
@@ -137,7 +135,7 @@ a skip:
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
-  mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
+  mana, PvP scaling, added damage redirection (Cryogenesis)
 - Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`), and
   what `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...)

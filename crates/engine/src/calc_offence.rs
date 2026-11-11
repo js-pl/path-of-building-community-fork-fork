@@ -393,7 +393,47 @@ impl<'a> Perform<'a> {
             }
         }
         if self.c.cond(db, "AffectedByEnergyBlade") {
-            return Err("not ported: Energy Blade".into());
+            let dmg_mod = self.c.calc_mod(list, Some(&cfg), &["EnergyBladeDamage"])?;
+            let speed_mod = self
+                .c
+                .calc_mod(list, Some(&cfg), &["EnergyBladeAttackSpeed"])?;
+            for (n, slot) in ["Weapon 1", "Weapon 2"].into_iter().enumerate() {
+                if !self.slot_has_weapon(actor, slot) {
+                    continue;
+                }
+                let Some(base) = self
+                    .weapon_str(actor, n, "name")
+                    .and_then(|name| self.input.data.items.base(&name).cloned())
+                else {
+                    continue;
+                };
+                let b = |k: &str| base.weapon.as_ref().and_then(|w| w.get(k).copied());
+                let nan = f64::NAN;
+                let mut set = vec![
+                    ("CritChance".to_string(), b("CritChanceBase").unwrap_or(nan)),
+                    (
+                        "AttackRate".to_string(),
+                        b("AttackRateBase").unwrap_or(nan) * speed_mod,
+                    ),
+                    ("Range".to_string(), b("Range").unwrap_or(nan)),
+                ];
+                for t in DMG_TYPES {
+                    for mm in ["Min", "Max"] {
+                        let added =
+                            self.c
+                                .base(list, Some(&cfg), &[&format!("EnergyBlade{mm}{t}")])?;
+                        set.push((
+                            format!("{t}{mm}"),
+                            b(&format!("{t}{mm}")).unwrap_or(0.0) + (added * dmg_mod).floor(),
+                        ));
+                    }
+                }
+                if let Some(w) = self.c.actors.actors[actor].weapon_data[n].as_mut() {
+                    for (k, v) in set {
+                        w.insert(k, ModValue::Number(v));
+                    }
+                }
+            }
         }
         // account for Battlemage
         if self.c.flag(list, None, &["Battlemage"])? && self.slot_has_weapon(actor, "Weapon 1") {

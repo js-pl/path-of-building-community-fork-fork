@@ -566,16 +566,12 @@ fn items_setup_matches_upstream() {
             .into_iter()
             .next()
             .unwrap();
-        if get(
+        // `initEnv` reran with Energy Blade's condition
+        let energy_blade = get(
             &get(&get(&env, "modDB"), "conditions"),
             "AffectedByEnergyBlade",
         )
-        .truthy()
-        {
-            eprintln!("{id}: skipped: Energy Blade is not ported");
-            skipped += 1;
-            continue;
-        }
+        .truthy();
         let config = inputs(&get(&env, "configInput"));
         let input = ItemsInput {
             spec: &spec,
@@ -584,7 +580,10 @@ fn items_setup_matches_upstream() {
             node_mods: &node_mods,
             config: &config,
             precision: &item_data,
-            energy_blade: false,
+            energy_blade: energy_blade.then_some(engine::calc_items::EnergyBlade {
+                ctx: &ctx,
+                weapon_types: &setup_data.weapon_type_info,
+            }),
             jewel_radius: &radius,
             extra_jewel_funcs: &[],
         };
@@ -610,6 +609,10 @@ fn items_setup_matches_upstream() {
         };
         let (mut base, enemy_base) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
         calc_setup::allocation_mods(&spec, &mut base);
+        if energy_blade {
+            base.conditions
+                .insert(engine::mods::Sym::new("AffectedByEnergyBlade"), true);
+        }
         let env_setup = match calc_tree::setup(&base, &input, &item_data) {
             Ok(o) => o,
             Err(e) => {
@@ -619,6 +622,10 @@ fn items_setup_matches_upstream() {
         };
         let out = &env_setup.items;
         compared += 1;
+        // Energy Blade's weapons, where the later stages look items up
+        let mut generated_tab = tab.clone();
+        generated_tab.generated = out.generated.clone();
+        let tab = generated_tab;
         let mut fail = |what: String| {
             if failures.len() < 80 {
                 failures.push(format!("{id}: {what}"));
@@ -696,15 +703,33 @@ fn items_setup_matches_upstream() {
             fail(format!("multipliers {tmult:?} != {lm:?}"));
         }
         // The equipped items, flasks and radius jewels
-        let litems: BTreeMap<String, f64> = entries(&get(&get(&env, "player"), "itemList"))
+        // Energy Blade's weapons have no id: compare them by name
+        let litems: BTreeMap<String, String> = entries(&get(&get(&env, "player"), "itemList"))
             .into_iter()
             .filter_map(|(k, v)| match k {
-                Key::Str(k) => Some((k.to_str_lossy().into_owned(), get(&v, "id").as_number()?)),
+                Key::Str(k) => Some((
+                    k.to_str_lossy().into_owned(),
+                    match get(&v, "id").as_number() {
+                        Some(n) => n.to_string(),
+                        None => lua::to_string(&get(&v, "name")).to_str_lossy().into_owned(),
+                    },
+                )),
                 _ => None,
             })
             .collect();
-        if litems != out.item_list {
-            fail(format!("itemList {:?} != {litems:?}", out.item_list));
+        let titems: BTreeMap<String, String> = out
+            .item_list
+            .iter()
+            .map(|(k, &id)| {
+                let v = match out.generated.get(&(id as i64)) {
+                    Some(item) => item.name.clone(),
+                    None => id.to_string(),
+                };
+                (k.clone(), v)
+            })
+            .collect();
+        if litems != titems {
+            fail(format!("itemList {titems:?} != {litems:?}"));
         }
         if ids(&get(&env, "flasks")) != out.flasks.iter().copied().collect::<BTreeSet<_>>() {
             fail(format!(
@@ -986,7 +1011,11 @@ fn items_setup_matches_upstream() {
         };
         let mut player_db = env_setup.mod_db.clone();
         let setup = match calc_skills::create_active_skills(&skills_input, &mut player_db) {
-            Ok(s) => s,
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                fail("active skills: Energy Blade asked for another rerun".into());
+                continue;
+            }
             Err(e) => {
                 fail(format!("active skills: {e}"));
                 continue;

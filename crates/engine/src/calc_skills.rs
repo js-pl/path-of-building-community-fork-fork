@@ -852,11 +852,19 @@ fn weapon_data(input: &SkillsInput, mod_db: &Store) -> [Fields; 2] {
 /// weapon data to the main skill. The socket groups are the Skills tab's
 /// with the granted ones; `mod_db` is the player's database, which socket
 /// and group properties add to.
+///
+/// `None` when an enabled Energy Blade asks for the setup to rerun with
+/// `AffectedByEnergyBlade` (`calcs.initEnv` calls itself again).
 pub fn create_active_skills(
     input: &SkillsInput,
     mod_db: &mut Store,
-) -> Result<SkillsSetup, String> {
+) -> Result<Option<SkillsSetup>, String> {
     let data = input.skill_data;
+    let energy_blade = mod_db
+        .conditions
+        .get(&crate::mods::Sym::new("AffectedByEnergyBlade"))
+        .copied()
+        .unwrap_or(false);
     let weapon_data = weapon_data(input, mod_db);
     let all_one_hand = weapon_data
         .iter()
@@ -870,7 +878,7 @@ pub fn create_active_skills(
         input.item_data,
         data,
     );
-    let result = active_skills(input, &mut db, weapon_data, all_one_hand);
+    let result = active_skills(input, &mut db, weapon_data, all_one_hand, energy_blade);
     *mod_db = db.finish();
     result
 }
@@ -880,7 +888,8 @@ fn active_skills(
     db: &mut PlayerDb,
     weapon_data: [Fields; 2],
     all_one_hand: bool,
-) -> Result<SkillsSetup, String> {
+    energy_blade: bool,
+) -> Result<Option<SkillsSetup>, String> {
     let groups = input.groups;
     let data = input.skill_data;
     let main_group = (groups.len() as f64)
@@ -1165,7 +1174,9 @@ fn active_skills(
                 main_skill = group_skills[gi].get(i.saturating_sub(1)).copied();
             }
         }
-        if group.enabled
+        // An enabled Energy Blade regenerates everything
+        if !energy_blade
+            && group.enabled
             && slot_enabled[gi]
             && group.gem_list.iter().any(|g| {
                 g.enabled
@@ -1173,7 +1184,7 @@ fn active_skills(
                         .is_some_and(|e| !e.support && e.name == "Energy Blade")
             })
         {
-            return Err("not ported: Energy Blade".into());
+            return Ok(None);
         }
     }
     let main_skill = match main_skill {
@@ -1186,12 +1197,12 @@ fn active_skills(
             active_skills.len() - 1
         }
     };
-    Ok(SkillsSetup {
+    Ok(Some(SkillsSetup {
         active_skills,
         main_skill,
         main_socket_group: main_index,
         weapon_data,
         slot_enabled,
         from_item: ctx.from_item,
-    })
+    }))
 }

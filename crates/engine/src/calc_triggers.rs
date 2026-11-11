@@ -443,6 +443,11 @@ impl<'a> Perform<'a> {
                     ..TriggerConfig::default()
                 }
             }
+            "FieryImpactHeistMaceImplicit" => TriggerConfig {
+                source_weapon: true,
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee") || p.has_type(s, "Attack")),
+                ..TriggerConfig::default()
+            },
             k => return Err(format!("not ported: the trigger {k}")),
         }))
     }
