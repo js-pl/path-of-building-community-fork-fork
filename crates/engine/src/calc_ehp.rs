@@ -1799,7 +1799,24 @@ impl<'a> Perform<'a> {
                 .c
                 .flag(db, None, &[&format!("MinionLifeShares{}", a.life)])?
             {
-                return Err("not ported: shared minion life pools".into());
+                let specific = self.c.override_num(db, None, &[a.life])?;
+                if self
+                    .c
+                    .override_value(db, None, &["TotalMinionLife"])?
+                    .is_none()
+                    && let Some(v) = specific
+                {
+                    set(self, "TotalMinionLife", v);
+                } else if self.o_or(actor, "TotalMinionLife", 0.0) == 0.0 {
+                    match self.c.out(actor, a.life) {
+                        Some(v) => set(self, "TotalMinionLife", v),
+                        None => self.c.clear_out(actor, "TotalMinionLife"),
+                    }
+                }
+                let v = o(self, "MinionAllyDamageMitigation") + self.o_or(actor, a.mitigation, 0.0);
+                set(self, "MinionAllyDamageMitigation", v);
+                set(self, a.mitigation, 0.0);
+                self.c.clear_out(actor, a.life);
             }
         }
         if self.o_or(actor, "TotemAllyDamageMitigation", 0.0) > 0.0

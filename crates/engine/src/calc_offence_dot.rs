@@ -8,12 +8,12 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
-use crate::calc::{m_max, m_min};
+use crate::calc::{m_max, m_min, round};
 use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_offence::Off;
 use crate::calc_offence_hit::Combine;
 use crate::calc_perform::Perform;
-use crate::mods::Cfg;
+use crate::mods::{Cfg, ModValue};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -455,23 +455,229 @@ impl<'a> Perform<'a> {
     fn self_hit(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
         let name = self.skill_name(i).to_string();
-        let any =
-            |p: &Self, n: &str| -> Result<bool> { Ok(!p.c.list(list, None, &[n])?.is_empty()) };
+        let records = |p: &Self, n: &str| -> Result<Vec<crate::mods::Record>> {
+            Ok(p.c
+                .list(list, None, &[n])?
+                .into_iter()
+                .filter_map(|v| match v {
+                    ModValue::Record(r) => Some(r),
+                    _ => None,
+                })
+                .collect())
+        };
+        let num = |r: &crate::mods::Record, k: &str| -> Result<f64> {
+            r.get(k)
+                .and_then(ModValue::as_number)
+                .ok_or_else(|| format!("attempt to perform arithmetic on a nil value ({k})"))
+        };
+        let typ = |r: &crate::mods::Record| -> Option<String> {
+            match r.get("damageType") {
+                Some(ModValue::Str(t)) => Some(title_case(t)),
+                _ => None,
+            }
+        };
+        let out = |p: &Self, k: &str| p.c.out(actor, k);
+        // Each source's damage type and base damage, in a fixed order
+        let mut sources: Vec<(String, f64)> = Vec::new();
+        // Heartbound Loop, Storm Secret, Enmity's Embrace: the rings' sum
+        let summed = |p: &Self, n: &str| -> Result<Option<(String, f64)>> {
+            let mut t = None;
+            let mut v: Option<f64> = None;
+            for r in records(p, n)? {
+                v = Some(v.unwrap_or(0.0) + num(&r, "baseDamage")?);
+                t = typ(&r);
+            }
+            Ok(t.zip(v))
+        };
+        if name == "Summon Skeletons"
+            && let Some((t, v)) = summed(self, "HeartboundLoopSelfDamage")?
+        {
+            let taken = self.dmg_taken_conversion(o, &t, v)?;
+            let per_cast = out(self, "SummonedMinionsPerCast").unwrap_or(f64::NAN);
+            sources.push((t, taken * per_cast));
+        }
+        if name == "Herald of Thunder"
+            && let Some((t, v)) = summed(self, "StormSecretSelfDamage")?
+        {
+            let taken = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push((t, taken));
+        }
+        if let Some(r) = records(self, "EyeOfInnocenceSelfDamage")?
+            .into_iter()
+            .next()
+            && self.has_flag(i, "ignite")
+            && let Some(t) = typ(&r)
+        {
+            let v = num(&r, "baseDamage")?;
+            let taken = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push((t, taken));
+        }
+        if let Some(r) = records(self, "EchoesOfCreationSelfDamage")?
+            .into_iter()
+            .next()
+            && let Some(t) = typ(&r)
+        {
+            let mult = num(&r, "dmgMult")?;
+            let mut count = out(self, "GlobalWarcryUptimeRatio")
+                .ok_or("attempt to perform arithmetic on a nil value (GlobalWarcryUptimeRatio)")?
+                / 100.0;
+            if self.c.flag(list, None, &["Condition:WarcryMaxHit"])? {
+                count = self
+                    .c
+                    .base(self.pdb(), None, &["Multiplier:ExertingWarcryCount"])?;
+            }
+            let base = out(self, "Life").unwrap_or(0.0) * mult / 100.0 * count;
+            let taken = self.dmg_taken_conversion(o, &t, base)?;
+            sources.push((t, taken));
+        }
         let has_cost = matches!(
             self.c.out_val(actor, "ManaHasCost"),
             Some(OutVal::Bool(true))
         );
-        if (name == "Summon Skeletons" && any(self, "HeartboundLoopSelfDamage")?)
-            || (name == "Herald of Thunder" && any(self, "StormSecretSelfDamage")?)
-            || (self.has_flag(i, "ignite") && any(self, "EyeOfInnocenceSelfDamage")?)
-            || any(self, "EchoesOfCreationSelfDamage")?
-            || (has_cost && any(self, "ScoldsBridleSelfDamage")?)
-            || self.c.flag(self.lists[i].base, None, &["HasTrauma"])?
-            || any(self, "EnmitysEmbraceSelfDamage")?
+        if has_cost
+            && let Some(r) = records(self, "ScoldsBridleSelfDamage")?.into_iter().next()
+            && let Some(t) = typ(&r)
         {
-            return Err("not ported: self hit damage".into());
+            let mult = num(&r, "dmgMult")?;
+            let base = out(self, "ManaCost").unwrap_or(0.0) * mult / 100.0;
+            let taken = self.dmg_taken_conversion(o, &t, base)?;
+            sources.push((t, taken));
+        }
+        if self.c.flag(self.lists[i].base, None, &["HasTrauma"])? {
+            let stacks = m_max(self.c.base(list, None, &["Multiplier:TraumaStacks"])?, 1.0);
+            let per = self.c.base(list, None, &["TraumaSelfDamageTakenLife"])?;
+            let taken = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
+            sources.push(("Physical".into(), taken));
+        }
+        if let Some((t, v)) = summed(self, "EnmitysEmbraceSelfDamage")? {
+            let taken = self.dmg_taken_conversion(o, &t, v)?;
+            sources.push((t, taken));
+        }
+        for (_, taken) in sources {
+            let v = out(self, "SelfHitDamage").unwrap_or(0.0) + taken;
+            self.c.set_out(actor, "SelfHitDamage", v);
         }
         Ok(())
+    }
+
+    /// `calcs.applyDmgTakenConversion(activeSkill, output, breakdown,
+    /// sourceType, baseDmg)`: the damage the actor takes from its own hit
+    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<f64> {
+        let (list, actor) = (o.list, o.actor);
+        let out = |k: &str| self.c.out(actor, k);
+        let elemental = |t: &str| matches!(t, "Lightning" | "Cold" | "Fire");
+        let types = ["Physical", "Lightning", "Cold", "Fire", "Chaos"];
+        let mut shift = Vec::new();
+        let mut total_as = 0.0;
+        for t in types {
+            let mut names = vec![
+                format!("{source}DamageTakenAs{t}"),
+                format!("{source}DamageFromHitsTakenAs{t}"),
+            ];
+            if elemental(source) {
+                names.push(format!("ElementalDamageTakenAs{t}"));
+                names.push(format!("ElementalDamageFromHitsTakenAs{t}"));
+            }
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            let v = self.c.base(list, None, &names)?;
+            total_as += v;
+            shift.push(v);
+        }
+        let mut total = 0.0;
+        for (k, t) in types.iter().enumerate() {
+            let taken_as = if *t == source {
+                m_max(1.0 - total_as / 100.0, 0.0)
+            } else {
+                shift[k] / 100.0
+            };
+            if taken_as == 0.0 {
+                continue;
+            }
+            let damage = base * taken_as;
+            let names = [
+                "DamageTaken".to_string(),
+                format!("{t}DamageTaken"),
+                "DamageTakenWhenHit".to_string(),
+                format!("{t}DamageTakenWhenHit"),
+            ];
+            let names: Vec<&str> = names.iter().map(String::as_str).collect();
+            let mut inc = self.c.inc(list, None, &names)?;
+            let mut more = self.c.more(list, None, &names)?;
+            if elemental(t) {
+                inc += self.c.inc(
+                    list,
+                    None,
+                    &["ElementalDamageTaken", "ElementalDamageTakenWhenHit"],
+                )?;
+                more *= self.c.more(
+                    list,
+                    None,
+                    &["ElementalDamageTaken", "ElementalDamageTakenWhenHit"],
+                )?;
+            }
+            let taken_mods = m_max((1.0 + inc / 100.0) * more, 0.0);
+            let reduction =
+                if self
+                    .c
+                    .flag(list, None, &[&format!("SelfIgnoreBase{t}DamageReduction")])?
+                {
+                    0.0
+                } else {
+                    out(&format!("Base{t}DamageReductionWhenHit"))
+                        .or_else(|| out(&format!("Base{t}DamageReduction")))
+                        .ok_or("attempt to perform arithmetic on a nil value (reduction)")?
+                };
+            let resist = if self
+                .c
+                .flag(list, None, &[&format!("SelfIgnore{t}Resistance")])?
+            {
+                0.0
+            } else {
+                out(&format!("{t}ResistWhenHit"))
+                    .or_else(|| out(&format!("{t}Resist")))
+                    .ok_or("attempt to perform arithmetic on a nil value (resist)")?
+            };
+            let res_mult = 1.0 - resist / 100.0;
+            let applies = if self.c.flag(
+                list,
+                None,
+                &[&format!("ArmourDoesNotApplyTo{t}DamageTaken")],
+            )? {
+                0.0
+            } else {
+                self.c
+                    .base(list, None, &[&format!("ArmourAppliesTo{t}DamageTaken")])?
+            };
+            let applies = m_min(applies, 100.0);
+            let ward =
+                *t == "Physical" && self.c.flag(list, None, &["PhysicalReductionBasedOnWard"])?;
+            let reduct_max = out("DamageReductionMax").unwrap_or(f64::NAN);
+            let mut armour_reduct = 0.0;
+            if applies > 0.0 || ward {
+                let mut eff = (out("Armour").unwrap_or(f64::NAN) * applies / 100.0)
+                    * (1.0 + out("ArmourDefense").unwrap_or(f64::NAN));
+                if ward {
+                    let m = self
+                        .c
+                        .override_num(list, None, &["PhysicalReductionBasedOnWardPercent"])?
+                        .ok_or("attempt to perform arithmetic on a nil value (ward percent)")?
+                        / 100.0;
+                    eff = out("Ward").unwrap_or(f64::NAN) * m;
+                }
+                let eff_damage = damage * res_mult;
+                armour_reduct = if eff != 0.0 && damage * res_mult != 0.0 {
+                    round(eff / (eff + eff_damage * 5.0) * 100.0, 0.0)
+                } else {
+                    0.0
+                };
+                armour_reduct = m_min(reduct_max, armour_reduct);
+            }
+            let reduct_mult = (1.0
+                - m_max(m_min(reduct_max, armour_reduct + reduction), 0.0) / 100.0)
+                * taken_mods;
+            total += damage * (res_mult * reduct_mult);
+        }
+        Ok(total)
     }
 
     /// The combined DPS estimate, with damage over time
@@ -603,6 +809,69 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "ImpaleDPS", impale);
             combined += impale;
         }
+        // The mirage's damage (`activeSkill.mirage`)
+        let mut mirage_cull = 1.0;
+        let mirage = if actor == crate::calc::PLAYER && i == self.main() {
+            self.mirage.clone()
+        } else {
+            None
+        };
+        if let Some(m) = mirage
+            && let Some(total) = m
+                .output
+                .get(&crate::mods::Sym::new("TotalDPS"))
+                .and_then(OutVal::num)
+        {
+            let mo = |k: &str| {
+                m.output
+                    .get(&crate::mods::Sym::new(k))
+                    .and_then(OutVal::num)
+            };
+            let count = m.count.unwrap_or(1.0);
+            let mut dps = total * count;
+            combined += total * count;
+            for (k, from) in [
+                ("MirageBurningGroundDPS", "BurningGroundDPS"),
+                ("MirageCausticGroundDPS", "CausticGroundDPS"),
+            ] {
+                match mo(from) {
+                    Some(v) => self.c.set_out(actor, k, v),
+                    None => self.c.clear_out(actor, k),
+                }
+            }
+            for k in ["IgniteDPS", "BleedDPS"] {
+                if let Some(v) = mo(k)
+                    && v > g(self, k).unwrap_or(0.0)
+                {
+                    dps += v;
+                    self.c.set_out(actor, k, 0.0);
+                }
+            }
+            for k in ["PoisonDPS", "ImpaleDPS"] {
+                if let Some(v) = mo(k) {
+                    dps += v * count;
+                    combined += v * count;
+                }
+            }
+            if let Some(v) = mo("DecayDPS") {
+                dps += v;
+                combined += v;
+            }
+            let stack = self.has_flag(i, "DotCanStack");
+            if let Some(v) = mo("TotalDot")
+                && (stack || g(self, "TotalDot").is_none_or(|t| t == 0.0))
+            {
+                let k = if stack { count } else { 1.0 };
+                dps += v * k;
+                combined += v * k;
+            }
+            let cull = mo("CullMultiplier")
+                .ok_or("attempt to compare nil with number (mirage CullMultiplier)")?;
+            if cull > 1.0 {
+                mirage_cull = cull;
+            }
+            self.c.set_out(actor, "MirageDPS", dps);
+        }
         let total_dot = g(self, "TotalDot").unwrap_or(0.0)
             + g(self, "TotalPoisonDPS").unwrap_or(0.0)
             + m_max(
@@ -628,7 +897,7 @@ impl<'a> Perform<'a> {
         if !show_average {
             combined += capped;
         }
-        let best_cull = m_max(1.0, n(self, "CullMultiplier"));
+        let best_cull = m_max(mirage_cull, n(self, "CullMultiplier"));
         self.c
             .set_out(actor, "CullingDPS", combined * (best_cull - 1.0));
         let reservation = n(self, "ReservationDpsMultiplier");
@@ -639,4 +908,20 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "CombinedAvg", avg);
         Ok(())
     }
+}
+
+/// `string.gsub(" " .. s, "%W%l", string.upper):sub(2)`: each word's
+/// first lowercase letter in upper case
+fn title_case(s: &str) -> String {
+    let mut out = String::new();
+    let mut prev_word = false;
+    for c in s.chars() {
+        if !prev_word && c.is_ascii_lowercase() {
+            out.push(c.to_ascii_uppercase());
+        } else {
+            out.push(c);
+        }
+        prev_word = c.is_ascii_alphanumeric();
+    }
+    out
 }

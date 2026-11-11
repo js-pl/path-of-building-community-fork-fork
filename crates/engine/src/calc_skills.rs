@@ -313,6 +313,8 @@ pub struct SkillsSetup {
     pub weapon_data: [Fields; 2],
     /// Whether each group's slot is in use (`group.slotEnabled`)
     pub slot_enabled: Vec<bool>,
+    /// The supports marked `fromItem` on the shared skill data
+    pub from_item: HashSet<String>,
 }
 
 /// `calcLib.doesTypeExpressionMatch(checkTypes, skillTypes, minionTypes)`
@@ -356,6 +358,21 @@ fn can_support(
     all_one_hand: bool,
     data: &SkillData,
 ) -> bool {
+    can_support_summoned(support, skill, None, from_item, groups, all_one_hand, data)
+}
+
+/// The same for a minion's skill: the summoning skill's types count
+/// (`activeSkill.summonSkill`), and triggers support no minion skills
+fn can_support_summoned(
+    support: &GrantedEffect,
+    skill: &ActiveSkill,
+    summon: Option<&ActiveSkill>,
+    from_item: &HashSet<String>,
+    groups: &[SocketGroup],
+    all_one_hand: bool,
+    data: &SkillData,
+) -> bool {
+    let types = summon.unwrap_or(skill);
     let active = &skill.active_effect;
     let effect = &active.granted_effect;
     if support.unsupported || effect.cannot_be_supported {
@@ -383,11 +400,14 @@ fn can_support(
     let minion = if support.ignore_minion_types {
         None
     } else {
-        skill.minion_skill_types.as_ref()
+        types.minion_skill_types.as_ref()
     };
     if !support.exclude_skill_types.is_empty()
-        && type_expression_matches(&support.exclude_skill_types, &skill.skill_types, None, data)
+        && type_expression_matches(&support.exclude_skill_types, &types.skill_types, None, data)
     {
+        return false;
+    }
+    if support.is_trigger && summon.is_some() {
         return false;
     }
     if let Some(weapons) = &support.weapon_types {
@@ -416,7 +436,7 @@ fn can_support(
     support.require_skill_types.is_empty()
         || type_expression_matches(
             &support.require_skill_types,
-            &skill.skill_types,
+            &types.skill_types,
             minion,
             data,
         )
@@ -470,6 +490,88 @@ fn create_active_skill(
         }
     }
     skill
+}
+
+/// `calcs.createActiveSkill(activeEffect, summonSkill.supportList, minion,
+/// nil, summonSkill)`: a minion's skill, supported by the summoning
+/// skill's supports. `all_one_hand` is whether the minion's weapons count
+/// as every one handed weapon.
+pub fn create_minion_skill(
+    active: SkillEffect,
+    summon: &ActiveSkill,
+    from_item: &HashSet<String>,
+    all_one_hand: bool,
+    data: &SkillData,
+) -> ActiveSkill {
+    let effect = active.granted_effect.clone();
+    let mut skill = ActiveSkill {
+        skill_types: effect.skill_types.clone(),
+        minion_skill_types: effect.minion_skill_types.clone(),
+        skill_flags: effect.base_flags.iter().cloned().collect(),
+        active_effect: active,
+        support_list: summon.support_list.clone(),
+        effect_list: vec![],
+        group: None,
+        slot_name: None,
+        mods: None,
+    };
+    let st = |n: &str| data.skill_type(n);
+    if [st("Attack"), st("Damage"), st("Projectile")]
+        .iter()
+        .any(|t| t.is_some_and(|t| skill.skill_types.contains(&t)))
+    {
+        skill.skill_flags.insert("hit".into());
+    }
+    skill.effect_list.push(skill.active_effect.clone());
+    let can = |g: &GrantedEffect, skill: &ActiveSkill| {
+        can_support_summoned(g, skill, Some(summon), from_item, &[], all_one_hand, data)
+    };
+    // Pass 1: the skill types compatible supports add
+    for i in 0..skill.support_list.len() {
+        let support = skill.support_list[i].granted_effect.clone();
+        if support.support && can(&support, &skill) {
+            skill
+                .skill_types
+                .extend(support.add_skill_types.iter().copied());
+        }
+    }
+    // Pass 2: the compatible supports, which add no flags to minion skills
+    for i in 0..skill.support_list.len() {
+        let support = skill.support_list[i].clone();
+        if support.granted_effect.support && can(&support.granted_effect, &skill) {
+            skill.effect_list.push(support);
+        }
+    }
+    skill
+}
+
+/// `calcs.copyActiveSkill(env, mode, skill)` before its mod list: a new
+/// skill of the same effect at its gem's level and quality, with the same
+/// supports matched again
+pub fn copy_active_skill(
+    skill: &ActiveSkill,
+    groups: &[SocketGroup],
+    from_item: &HashSet<String>,
+    all_one_hand: bool,
+    data: &SkillData,
+) -> ActiveSkill {
+    let e = &skill.active_effect;
+    let mut active = SkillEffect::new(e.granted_effect.clone(), e.level, e.quality);
+    if let Some((g, k)) = e.src
+        && let Some(gem) = groups.get(g).and_then(|g| g.gem_list.get(k))
+    {
+        active.level = gem.level;
+        active.quality = gem.quality.unwrap_or(f64::NAN);
+        active.src = e.src;
+        active.gem = gem.gem.clone();
+    }
+    let ctx = SupportContext {
+        from_item: from_item.clone(),
+        groups,
+        all_one_hand,
+        data,
+    };
+    create_active_skill(active, skill.support_list.clone(), skill.group, &ctx)
 }
 
 /// What the support checks read
@@ -1090,5 +1192,6 @@ fn active_skills(
         main_socket_group: main_index,
         weapon_data,
         slot_enabled,
+        from_item: ctx.from_item,
     })
 }

@@ -343,6 +343,26 @@ impl<'a> Perform<'a> {
         let asm = self.action_speed_mod(actor)?;
         self.c.set_out(actor, "ActionSpeedMod", asm);
         self.resistances(actor)?;
+        let minion = self.minion_actor();
+        if let Some(m) = minion {
+            let added = self.c.base(db, None, &["ResistanceAddedToMinions"])?;
+            if added > 0.0 {
+                let mdb = self.c.db(m);
+                for elem in ["Fire", "Cold", "Lightning", "Chaos"] {
+                    let k = format!("{elem}Resist");
+                    let v = (o(self, &k) * added / 100.0).floor();
+                    self.c.add(
+                        mdb,
+                        crate::mods::Mod::new(&k, crate::mods::ModType::Base, v, Some("Player")),
+                    );
+                }
+            }
+        }
+        // Formless Inferno
+        if minion == Some(actor) {
+            self.life_mana(actor)?;
+            self.life_mana_reservation(actor, false)?;
+        }
 
         // Block
         let block_max = m_min(
@@ -379,6 +399,14 @@ impl<'a> Perform<'a> {
             .iter()
             .any(|k| k == "Necromantic Aegis");
         if !necro && let Some(v) = self.c.override_num(db, None, &["ReplaceShieldBlock"])? {
+            base_block = v;
+        }
+        if minion == Some(actor)
+            && necro
+            && let Some(v) = self
+                .c
+                .override_num(self.pdb(), None, &["ReplaceShieldBlock"])?
+        {
             base_block = v;
         }
         if self

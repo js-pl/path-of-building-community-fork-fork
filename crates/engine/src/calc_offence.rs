@@ -710,7 +710,25 @@ impl<'a> Perform<'a> {
                 .c
                 .flag(list, None, &["ClawCritMultiplierAppliesToMinions"])?
         {
-            return Err("not ported: minions".into());
+            let mdb = self
+                .minion_actor()
+                .map(|a| self.c.db(a))
+                .ok_or("attempt to index a nil value (field 'minion')")?;
+            for (flag, typ, stat) in [
+                ("ClawCritChanceAppliesToMinions", Inc, "CritChance"),
+                ("ClawCritMultiplierAppliesToMinions", Base, "CritMultiplier"),
+            ] {
+                if !self.c.flag(list, None, &[flag])? {
+                    continue;
+                }
+                for (_, m) in self.c.tabulate(list, Some(typ), Some(&claw_hit), &[stat])? {
+                    if m.flags & claw != 0 {
+                        let v = number(&m.value)?;
+                        self.c
+                            .add(mdb, Mod::new(stat, m.typ, v, m.source.as_deref()));
+                    }
+                }
+            }
         }
         for (flag, stat, name) in [
             (
@@ -1385,8 +1403,29 @@ impl<'a> Perform<'a> {
         let cfg = self.cfg(i);
         let c = Some(&cfg);
         let set = |p: &mut Self, k: &str, v: f64| p.c.set_out(actor, k, v);
-        if self.mods(i).minion.is_some() {
-            return Err("not ported: minions".into());
+        if let Some(m) = self.mods(i).minion.clone() {
+            let limit = self
+                .data()
+                .minions
+                .get(&m.typ)
+                .and_then(|d| d.str("limit"))
+                .map(str::to_string);
+            if let Some(limit) = limit {
+                let pdb = self.pdb();
+                let v = match self.c.override_num(pdb, None, &[&limit])? {
+                    Some(v) => v,
+                    None => {
+                        self.c.val(list, &limit, c)?
+                            * self.c.more(list, c, &["ActiveMinionLimit"])?
+                    }
+                };
+                set(self, "ActiveMinionLimit", v.floor());
+            }
+            let mut n = self.c.val(list, "MinionPerCastCount", c)?.floor();
+            if n == 0.0 {
+                n = 1.0;
+            }
+            set(self, "SummonedMinionsPerCast", n);
         }
         if self.has_flag(i, "chaining") {
             if self.c.flag(list, c, &["CannotChain"])?
@@ -1907,7 +1946,13 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "DurationMod", dmod);
         let base = self.sd_num(i, "duration").unwrap_or(0.0)
             + self.c.base(list, c, &["Duration", "PrimaryDuration"])?;
-        if base > 0.0 {
+        let permanent = match &self.mods(i).minion {
+            Some(m) => self
+                .c
+                .flag(list, c, &[&format!("{}PermanentDuration", m.typ)])?,
+            None => false,
+        };
+        if base > 0.0 && !permanent {
             let mut d = base * dmod;
             if self.sd_truthy(i, "debuff") {
                 d *= debuff_mult;
@@ -2418,7 +2463,7 @@ impl<'a> Perform<'a> {
 
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
-const TRIGGER_CONFIGS: [&str; 81] = [
+pub(crate) const TRIGGER_CONFIGS: [&str; 81] = [
     "law of the wilds",
     "the rippling thoughts",
     "the surging thoughts",
@@ -2507,52 +2552,20 @@ impl<'a> Perform<'a> {
     /// `calcs.offence(env, env.player, env.player.mainSkill)`
     pub fn player_offence(&mut self) -> Result<()> {
         let main = self.main();
-        if !self.has_flag(main, "disable") {
-            let s = self.skill(main);
-            let ge = &s.active_effect.granted_effect;
-            let mut names = vec![ge.id.clone(), ge.name.to_lowercase()];
-            if let Some(t) = self.mods(main).triggered_by {
-                let t = s.effect_list[t].granted_effect.name.to_lowercase();
-                names.push(t.trim_start_matches("awakened ").to_string());
-                names.push(t);
-            }
-            if let Some(ModValue::Str(t)) = self.sd(main, "triggerSource") {
-                names.push(t.to_lowercase());
-            }
-            for e in &s.support_list {
-                if e.granted_effect.from_item && !e.granted_effect.support {
-                    names.push(e.granted_effect.name.to_lowercase());
-                }
-            }
-            if let Some(src) = s
-                .group
-                .and_then(|g| self.env.groups.get(g))
-                .and_then(|g| g.source.clone())
-                && let Some(n) = unique_trigger_name(&src)
-            {
-                names.push(n.to_lowercase());
-            }
-            if names.iter().any(|n| TRIGGER_CONFIGS.contains(&n.as_str())) {
-                return Err("not ported: triggers".into());
-            }
-            self.sd_clear(main, "triggered");
-        }
+        self.triggers(crate::calc::PLAYER)?;
         // Mirages
-        let used_by_mirage = self
-            .cfg(main)
-            .skill_cond
-            .as_ref()
-            .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
-        if !used_by_mirage && !self.has_flag(main, "disable") {
-            let name = self.skill_name(main).to_string();
-            if self.sd_truthy(main, "triggeredByMirageArcher")
-                || name == "Reflection"
-                || name == "Tawhoa's Chosen"
-                || self.sd_truthy(main, "triggeredBySacredWisps")
-                || self.sd_truthy(main, "triggeredByGeneralsCry")
-            {
-                return Err("not ported: mirages".into());
-            }
+        let generals_cry = self.sd_truthy(main, "triggeredByGeneralsCry")
+            && !self.has_flag(main, "disable")
+            && !self
+                .cfg(main)
+                .skill_cond
+                .as_ref()
+                .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
+        if generals_cry && !self.is_limited(main) {
+            self.generals_cry(main)?;
+        }
+        if !generals_cry && self.mirages()? {
+            return Ok(());
         }
         self.offence(crate::calc::PLAYER, main)?;
         // The main skill's gem level and quality
@@ -2580,8 +2593,89 @@ impl<'a> Perform<'a> {
     }
 }
 
+impl<'a> Perform<'a> {
+    /// General's Cry in `calcs.mirages`: the main skill used by its mirage
+    /// warriors, scaled by their count and the cry's cooldown
+    fn generals_cry(&mut self, main: usize) -> Result<()> {
+        for t in ["Triggered", "OtherThingUsesSkill"] {
+            let t = self.st(t);
+            match main.checked_sub(self.n_player) {
+                None => self.env.skills.active_skills[main].skill_types.insert(t),
+                Some(k) => self.minion_skills[k].skill_types.insert(t),
+            };
+        }
+        self.set_skill_cond(main, "usedByMirage", true);
+        let cached = self
+            .cached_calc(main, true)?
+            .ok_or("attempt to index a nil value (the cached calculation of the main skill)")?;
+        let slot_of = |p: &Self, k: usize| {
+            p.skill(k)
+                .group
+                .and_then(|g| p.env.groups.get(g))
+                .and_then(|g| g.slot.clone())
+        };
+        let main_slot = slot_of(self, main);
+        let cry = (0..self.n_player)
+            .find(|&k| self.skill_name(k) == "General's Cry" && slot_of(self, k) == main_slot)
+            .ok_or("attempt to index a nil value (local 'generalsCryActiveSkill')")?;
+        let (cl, cc) = (self.lists[cry].list, self.cfg(cry));
+        let (mut cooldown, _, _) = self.skill_cooldown(cl, &cc, cry)?;
+        let list = self.lists[main].list;
+        let cfg = self.cfg(main);
+        let copy = |m: &Mod, name: &str| {
+            let mut d = Mod::new(name, m.typ, m.value.clone(), m.source.as_deref());
+            d.flags = m.flags;
+            d.keyword_flags = m.keyword_flags;
+            d
+        };
+        let mut warriors = 0.0;
+        for (_, m) in self
+            .c
+            .tabulate(cl, Some(Base), Some(&cc), &["GeneralsCryDoubleMaxCount"])?
+        {
+            self.c.add(list, copy(&m, "QuantityMultiplier"));
+            warriors += number(&m.value)?;
+        }
+        // The mirages' spawn time only shows in upstream's info message
+        let _ = warriors;
+        if !self.has_type(main, "Channel") {
+            self.sd_set(main, "hitTimeOverride", 1.0);
+        }
+        let time = cached
+            .out("HitTime")
+            .or_else(|| cached.out("Time"))
+            .unwrap_or(f64::NAN);
+        cooldown = m_max(cooldown, time);
+        self.c.add(
+            list,
+            Mod::new(
+                "DPS",
+                More,
+                (1.0 / cooldown - 1.0) * 100.0,
+                Some("General's Cry Cooldown"),
+            ),
+        );
+        self.c.add(
+            list,
+            Mod::new("HasNoCost", ModType::Flag, true, Some("Used by mirage")),
+        );
+        for (typ, name, to) in [
+            (Inc, "ExertIncrease", "Damage"),
+            (More, "ExertIncrease", "Damage"),
+            (More, "ExertAttackIncrease", "Damage"),
+            (More, "OverexertionExertAverageIncrease", "Damage"),
+            (Base, "ExertDoubleDamageChance", "DoubleDamageChance"),
+        ] {
+            for (_, m) in self.c.tabulate(list, Some(typ), Some(&cfg), &[name])? {
+                self.c.add(list, copy(&m, to));
+            }
+        }
+        Ok(())
+    }
+}
+
 /// `source:find(".*:.*:(.*),.*")`
-fn unique_trigger_name(src: &str) -> Option<String> {
+pub(crate) fn unique_trigger_name(src: &str) -> Option<String> {
     let comma = src.rfind(',')?;
     let head = &src[..comma];
     let colon = head.rfind(':')?;

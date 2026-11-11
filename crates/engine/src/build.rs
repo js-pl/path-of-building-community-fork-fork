@@ -78,6 +78,7 @@ pub struct LoadContext<'a> {
 }
 
 /// A loaded build: what the calculations read of it
+#[derive(Clone)]
 pub struct Build<'t> {
     pub info: BuildInfo,
     pub config: ConfigTab,
@@ -149,7 +150,7 @@ impl<'t> Build<'t> {
         let mut spec = PassiveSpec::new(tree, parser)?;
         if let Some(s) = active_spec(root) {
             spec.load(s)?;
-            spec.post_load()?;
+            spec.build_cluster_jewel_graphs(&items, ctx.items.data)?;
         }
         items.populate_slots(&mut spec, tree as &dyn Sockets, ctx.one_hand);
         let mut state = ConfigState::default();

@@ -388,9 +388,11 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
    and seen by its cfg as `skillStats`. Skills' Lua functions
    (`preDamageFunc`, ...) are ported by hand per granted effect id
    (`calc_skill_funcs.rs`); the skill data records which ones an effect
-   has, so a missing one fails loudly. `tests/perform.rs` compares the
-   outputs and databases with the translation at each stage and after
-   `calcs.perform`. What is not ported yet is listed in
+   has, so a missing one fails loudly. Each skill's minion is an actor of
+   its own whose skills' mod lists stand on its database, set up and
+   calculated after the player (`calc_minion.rs`). `tests/perform.rs`
+   compares the outputs and databases, the minion's with them, with the
+   translation at each stage and after `calcs.perform`. What is not ported yet is listed in
    `docs/progress.md`.
 
    Item text and data lines are matched with upstream's own patterns

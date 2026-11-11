@@ -742,7 +742,7 @@ impl<'a> Perform<'a> {
             return Ok(());
         }
         let max_hit = self.c.flag(list, None, &["Condition:WarcryMaxHit"])?;
-        for j in 0..self.lists.len() {
+        for j in self.actor_skills(actor) {
             let name = self.skill_name(j).to_string();
             let Some(&(_, key, short, ratio, count_stat, needs)) =
                 EXERTING_CRIES.iter().find(|c| c.0 == name)
@@ -988,7 +988,7 @@ impl<'a> Perform<'a> {
         if !self.has_type(i, "Spell") || self.has_type(i, "Brand") {
             return Ok(());
         }
-        for j in 0..self.lists.len() {
+        for j in self.actor_skills(actor) {
             let pact_name = self.skill_name(j).to_string();
             let Some(key) = pact_name.strip_prefix("Pact of ") else {
                 continue;
@@ -1271,7 +1271,14 @@ impl<'a> Perform<'a> {
         } else {
             let mut crit_override = self.c.override_num(list, c, &["CritChance"])?;
             if self.c.flag(list, c, &["MainHandCritIsEqualToParent"])? {
-                return Err("not ported: minions".into());
+                let parent = self.c.actors.actors[actor]
+                    .parent
+                    .ok_or("an actor without a parent")?;
+                let from_output = match self.c.out_val(parent, "MainHand") {
+                    Some(OutVal::Table(t)) => t.get("CritChance").and_then(OutVal::num),
+                    _ => None,
+                };
+                crit_override = from_output.or_else(|| self.weapon_num(parent, 0, "CritChance"));
             } else if self
                 .c
                 .flag(list, c, &["MainHandCritIsEqualToPartyMember"])?
@@ -1287,7 +1294,10 @@ impl<'a> Perform<'a> {
                 .c
                 .flag(list, c, &["AttackCritIsEqualToParentMainHand"])?
             {
-                return Err("not ported: minions".into());
+                let parent = self.c.actors.actors[actor].parent;
+                if let Some(c) = parent.and_then(|p| self.weapon_num(p, 0, "CritChance")) {
+                    base_crit = c;
+                }
             }
             if crit_override == Some(100.0) {
                 self.set_po(o, "PreEffectiveCritChance", 100.0);
@@ -2331,6 +2341,13 @@ impl<'a> Perform<'a> {
             return Err("not ported: the Calcs tab's offence".into());
         }
         let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+        if self.mods(i).minion.is_some() {
+            let speed = self.c.out(actor, "HitSpeed").unwrap_or(g(self, "Speed"));
+            let v = g(self, "SummonedMinionsPerCast")
+                * speed
+                * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            self.sd_set(i, "summonSpeed", v);
+        }
         let base = self.misc_data("LeechRateBase");
         for pool in ["Life", "EnergyShield", "Mana"] {
             let rate =

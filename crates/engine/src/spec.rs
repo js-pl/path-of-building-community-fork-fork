@@ -124,12 +124,37 @@ pub struct SpecNode {
     pub all_mastery_options: Option<bool>,
     /// Set when processing the spec's stats found an unknown line
     pub unknown: bool,
+    /// A cluster jewel subgraph's node, which the tree does not have
+    pub synth: Option<Rc<tree::Node>>,
     visited: bool,
 }
 
+impl SpecNode {
+    /// A node of a cluster jewel subgraph
+    pub(crate) fn synthetic(node: tree::Node, linked: Vec<usize>) -> SpecNode {
+        SpecNode {
+            id: node.id,
+            tree: usize::MAX,
+            linked,
+            alloc: false,
+            depends: Vec::new(),
+            connected_to_start: false,
+            path_dist: 0.0,
+            path: None,
+            distance_to_class_start: None,
+            stats: None,
+            all_mastery_options: None,
+            unknown: false,
+            synth: Some(Rc::new(node)),
+            visited: false,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct PassiveSpec<'t> {
     pub tree: &'t PassiveTree,
-    parser: &'t ModParser,
+    pub(crate) parser: &'t ModParser,
     pub nodes: Vec<SpecNode>,
     pub index: HashMap<u32, usize>,
     /// Allocated nodes, by id
@@ -150,6 +175,13 @@ pub struct PassiveSpec<'t> {
     /// Jewel socket node id to the id of the item in it
     pub jewels: BTreeMap<u32, f64>,
     pub title: Option<String>,
+    /// `clusterHashFormatVersion`: 1 for builds saved with legacy cluster
+    /// node ids
+    pub cluster_hash_format_version: f64,
+    /// `legacyClusterNodeMap` (in insertion order) and its reverse, while
+    /// the subgraphs are built
+    pub(crate) legacy_map: Option<Vec<(u32, u32)>>,
+    pub(crate) legacy_reverse: Option<HashMap<u32, u32>>,
 }
 
 impl<'t> PassiveSpec<'t> {
@@ -174,6 +206,9 @@ impl<'t> PassiveSpec<'t> {
             allocated_mastery_type_count: 0,
             jewels: BTreeMap::new(),
             title: None,
+            cluster_hash_format_version: 2.0,
+            legacy_map: None,
+            legacy_reverse: None,
         };
         // A copy of the tree without proxies, groupless nodes and nested
         // cluster sockets
@@ -198,6 +233,7 @@ impl<'t> PassiveSpec<'t> {
                     stats: None,
                     all_mastery_options: None,
                     unknown: false,
+                    synth: None,
                     visited: false,
                 });
             }
@@ -215,8 +251,11 @@ impl<'t> PassiveSpec<'t> {
         Ok(spec)
     }
 
-    pub fn tree_node(&self, i: usize) -> &'t tree::Node {
-        &self.tree.nodes[self.nodes[i].tree]
+    pub fn tree_node(&self, i: usize) -> &tree::Node {
+        match &self.nodes[i].synth {
+            Some(n) => n,
+            None => &self.tree.nodes[self.nodes[i].tree],
+        }
     }
 
     fn kind(&self, i: usize) -> NodeType {
@@ -359,6 +398,14 @@ impl<'t> PassiveSpec<'t> {
     /// the old URL format only are not ported.
     pub fn load(&mut self, xml: &crate::xml::Element) -> Result<()> {
         self.title = xml.attr("title").map(String::from);
+        self.cluster_hash_format_version = xml
+            .attr("clusterHashFormatVersion")
+            .and_then(crate::pat::to_number)
+            .unwrap_or(if xml.attr("nodes").is_some() {
+                1.0
+            } else {
+                2.0
+            });
         let mut url = false;
         for node in xml.elements() {
             if node.elem == "URL" {
