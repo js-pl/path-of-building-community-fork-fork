@@ -8,6 +8,7 @@ use lua::Value;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+pub mod bench;
 pub mod bridge;
 pub mod outputs;
 pub mod typed_build;
