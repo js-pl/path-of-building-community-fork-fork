@@ -10,6 +10,10 @@ local t_insert = table.insert
 
 local api = { }
 
+-- Headless upstream runs in dev mode, whose build mode saves a temporary
+-- build file when it closes; the engine does no I/O
+main.disableDevAutoSave = true
+
 local function build()
 	return main.modes.BUILD
 end
@@ -308,6 +312,28 @@ function api.state()
 		unsaved = b.unsaved and true or false,
 		outputRevision = b.outputRevision,
 	}
+end
+
+-- The sidebar calculation's outputs, gems and items by name
+
+local function plainOutput(v, key)
+	if type(v) ~= "table" then
+		return v
+	elseif key == "sourceGem" then
+		return { ["$gem"] = v.nameSpec }
+	elseif key == "sourceItem" then
+		return { ["$item"] = v.name }
+	end
+	local out = { }
+	for k, x in pairs(v) do
+		out[k] = plainOutput(x, k)
+	end
+	return out
+end
+
+function api.outputs()
+	local env = build().calcsTab.mainEnv
+	return { player = plainOutput(env.player.output), minion = env.minion and plainOutput(env.minion.output) }
 end
 
 -- Passive tree

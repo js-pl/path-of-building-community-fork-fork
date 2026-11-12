@@ -1,0 +1,245 @@
+//! The engine API on the typed engine: a build loaded with
+//! `engine::build`, calculated with `engine::calcs`, and the commands
+//! ported so far answered from it with the JSON the translated session
+//! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
+
+pub mod display_stats;
+mod sidebar;
+
+use engine::build::{Build, LoadContext};
+use engine::calc_env::{CalcData, CalcMode};
+use engine::calcs::BuildOutput;
+use engine::game_data::GameData;
+use engine::mod_parser::ModParser;
+use engine::tree::{NodeType, PassiveTree};
+use serde_json::{Map, Value as J, json};
+use std::cell::RefCell;
+use std::collections::HashMap;
+
+pub use sidebar::Controls;
+
+/// A command the typed engine cannot answer yet; the caller falls back
+/// to the translation
+pub const NOT_PORTED: &str = "not ported";
+
+pub type Result<T> = std::result::Result<T, String>;
+
+/// Loads a tree version's passive tree
+pub type TreeSource = dyn Fn(&str, &ModParser) -> Result<PassiveTree>;
+
+/// The typed engine's game data, mod parser and passive trees
+pub struct TypedData {
+    pub game: GameData,
+    pub parser: ModParser,
+    /// The jewel sockets of the latest tree
+    socket_ids: Vec<u32>,
+    trees: RefCell<HashMap<String, &'static PassiveTree>>,
+    source: Box<TreeSource>,
+}
+
+impl TypedData {
+    pub fn new(game: GameData, parser: ModParser, source: Box<TreeSource>) -> Result<TypedData> {
+        let data = TypedData {
+            game,
+            parser,
+            socket_ids: Vec::new(),
+            trees: RefCell::default(),
+            source,
+        };
+        let latest = data.tree(data.game.latest_tree_version())?;
+        let socket_ids = latest
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeType::Socket)
+            .map(|n| n.id)
+            .collect();
+        Ok(TypedData { socket_ids, ..data })
+    }
+
+    /// Makes the data from upstream's source directory, as `gamedata`
+    /// does at build time
+    pub fn from_source(src_dir: &std::path::Path) -> Result<TypedData> {
+        let src = gamedata::Source::load(src_dir)?;
+        let game = src.game_data()?;
+        let parser = src.mod_parser()?;
+        let latest = game.latest_tree_version().to_string();
+        let source = move |v: &str, p: &ModParser| src.tree(v, p, v == latest);
+        TypedData::new(game, parser, Box::new(source))
+    }
+
+    /// A tree version's passive tree, loaded once. Trees live as long as
+    /// the process, as builds borrow them.
+    pub fn tree(&self, version: &str) -> Result<&'static PassiveTree> {
+        if let Some(t) = self.trees.borrow().get(version) {
+            return Ok(t);
+        }
+        let tree: &'static PassiveTree = Box::leak(Box::new((self.source)(version, &self.parser)?));
+        self.trees.borrow_mut().insert(version.to_string(), tree);
+        Ok(tree)
+    }
+
+    pub fn calc_data(&self) -> CalcData<'_> {
+        CalcData {
+            setup: &self.game.setup,
+            items: &self.game.items,
+            skills: &self.game.skills,
+            parser: &self.parser,
+            jewel_radius: &self.game.jewel_radius,
+        }
+    }
+
+    fn load_build<'d>(&'d self, xml: &str) -> Result<Build<'d>> {
+        let root = engine::xml::parse(xml)?;
+        let tree = self.tree(&engine::build::tree_version(&root))?;
+        let one_hand = |t: &str| self.game.setup.weapon_type_info.get(t).map(|w| w.one_hand);
+        let minions = |m: &str| self.game.setup.minions.contains_key(m);
+        let ctx = LoadContext {
+            items: engine::item::ItemContext {
+                data: &self.game.items,
+                parser: &self.parser,
+                jewel_radius: &self.game.jewel_radius,
+                default_affix_quality: 0.5,
+            },
+            skill_data: &self.game.skills,
+            config_data: &self.game.config,
+            option_defaults: &self.game.option_defaults,
+            parser: &self.parser,
+            socket_ids: &self.socket_ids,
+            one_hand: &one_hand,
+            minions: &minions,
+        };
+        Build::load(&root, &ctx, tree, &self.parser)
+    }
+}
+
+/// What the translated session's UI state holds that the build does not:
+/// open popups, the unsaved flag and the output revision
+#[derive(Clone, Debug)]
+pub struct Ui {
+    pub popups: J,
+    pub unsaved: bool,
+    pub output_revision: f64,
+}
+
+impl Default for Ui {
+    fn default() -> Ui {
+        Ui {
+            popups: json!([]),
+            unsaved: true,
+            output_revision: 1.0,
+        }
+    }
+}
+
+/// A build on the typed engine
+pub struct TypedSession<'d> {
+    data: &'d TypedData,
+    build: Build<'d>,
+    name: String,
+    main: BuildOutput,
+    pub ui: Ui,
+    controls: Controls,
+}
+
+impl<'d> TypedSession<'d> {
+    /// `loadXml`: the build, calculated
+    pub fn load(data: &'d TypedData, xml: &str, name: Option<&str>) -> Result<TypedSession<'d>> {
+        let mut build = data.load_build(xml)?;
+        if build.info.character_level_auto_mode {
+            return Err(format!("{NOT_PORTED}: the character level's auto mode"));
+        }
+        let main =
+            engine::calcs::build_output(&mut build, &data.calc_data(), CalcMode::Main, None)?;
+        let mut s = TypedSession {
+            data,
+            build,
+            name: name.unwrap_or("Imported build").to_string(),
+            main,
+            ui: Ui::default(),
+            controls: Controls::default(),
+        };
+        s.refresh_controls()?;
+        Ok(s)
+    }
+
+    /// `outputs`: the sidebar calculation's player and minion outputs
+    pub fn outputs(&self) -> J {
+        let mut o = Map::new();
+        let mut player = output(&self.main.player);
+        if let Some(m) = &self.main.minion {
+            let m = output(m);
+            // `output.Minion` is the minion's output
+            if let J::Object(p) = &mut player {
+                p.insert("Minion".into(), m.clone());
+            }
+            o.insert("minion".into(), m);
+        }
+        o.insert("player".into(), player);
+        J::Object(o)
+    }
+}
+
+/// A number as `dkjson` writes it: `tostring`, `%.14g`; NaN and the
+/// infinities as `null`
+pub fn num(n: f64) -> J {
+    if !n.is_finite() {
+        return J::Null;
+    }
+    serde_json::from_str(&lua::value::format_number(n)).unwrap_or(J::Null)
+}
+
+/// An empty table: `dkjson` writes it as an array
+fn object(m: Map<String, J>) -> J {
+    if m.is_empty() {
+        json!([])
+    } else {
+        J::Object(m)
+    }
+}
+
+/// The length `dkjson` writes a table with these keys as an array with,
+/// if it does: keys from 1 on, without too many holes
+fn array_len<'a>(keys: impl Iterator<Item = &'a String>) -> Option<usize> {
+    let (mut max, mut n) = (0, 0);
+    for k in keys {
+        let i: usize = k
+            .parse()
+            .ok()
+            .filter(|&i| i >= 1 && k.as_bytes()[0] != b'0')?;
+        max = max.max(i);
+        n += 1;
+    }
+    (n > 0 && !(max > 10 && max > n * 2)).then_some(max)
+}
+
+/// An actor's output as the translated session writes it: gems and items
+/// by name
+fn output(out: &engine::calcs::Output) -> J {
+    object(
+        out.iter()
+            .map(|(k, v)| (k.as_str().to_string(), out_val(v)))
+            .collect(),
+    )
+}
+
+fn out_val(v: &engine::actor::OutVal) -> J {
+    use engine::actor::OutVal;
+    match v {
+        OutVal::Num(n) => num(*n),
+        OutVal::Bool(b) => J::Bool(*b),
+        OutVal::Str(s) => J::from(&**s),
+        OutVal::Table(t) => match array_len(t.keys()) {
+            Some(n) => {
+                let mut a = vec![J::Null; n];
+                for (k, v) in t.iter() {
+                    a[k.parse::<usize>().unwrap() - 1] = out_val(v);
+                }
+                J::Array(a)
+            }
+            None => object(t.iter().map(|(k, v)| (k.clone(), out_val(v))).collect()),
+        },
+        OutVal::List(l) => J::Array(l.iter().map(out_val).collect()),
+        OutVal::Gem(n) => json!({ "$gem": &**n }),
+        OutVal::Item(n) => json!({ "$item": &**n }),
+    }
+}

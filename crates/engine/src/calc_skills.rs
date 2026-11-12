@@ -313,6 +313,8 @@ pub struct SkillsSetup {
     pub active_skills: Vec<ActiveSkill>,
     /// `env.player.mainSkill`, by index in the list
     pub main_skill: usize,
+    /// Each socket group's active skills (`displaySkillList`), by index
+    pub group_skills: Vec<Vec<usize>>,
     /// `env.mainSocketGroup`
     pub main_socket_group: usize,
     /// `env.player.weaponData1` and `weaponData2`
@@ -1283,6 +1285,7 @@ fn active_skills(
     Ok(Some(SkillsSetup {
         active_skills,
         main_skill,
+        group_skills,
         main_socket_group: main_index,
         weapon_data,
         slot_enabled,

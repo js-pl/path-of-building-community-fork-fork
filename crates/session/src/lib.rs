@@ -8,6 +8,10 @@
 //! ([`Files`]), as the browser does.
 
 pub mod bundle;
+pub mod dispatch;
+pub mod typed;
+
+pub use dispatch::{Dispatcher, Prefer};
 
 use lua::rt::{self, first, func};
 use lua::{LResult, LuaError, Value};

@@ -52,6 +52,20 @@ pub struct Slot {
     pub active: bool,
 }
 
+impl Slot {
+    /// The label the tab shows (`slot.label`)
+    pub fn label(&self) -> String {
+        if self.node_id.is_some() {
+            return "Socket".into();
+        }
+        if self.parent_slot.is_some() {
+            let n = crate::pat::capture(&self.slot_name, "%d+$").unwrap_or_default();
+            return format!("Abyssal #{n}");
+        }
+        self.slot_name.trim_end_matches(" Swap").to_string()
+    }
+}
+
 /// What an item set has in a slot
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SlotSelection {

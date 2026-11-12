@@ -1,13 +1,15 @@
 //! Native runner of the engine API.
 //!
-//!   pob serve                 JSON requests on stdin, one per line; responses on stdout
+//!   pob serve [--typed]       JSON requests on stdin, one per line; responses on stdout;
+//!                             with --typed, the commands the typed engine has are its
 //!   pob bundle <out> [xml..]  writes the data files the engine reads (starting up
 //!                             and loading the given builds) as `<out>/core.bin`, and
 //!                             every tree version's data under `<out>/files/` for
 //!                             builds on other trees, which the browser fetches on demand
 //!   pob bench <xml>           times loading, editing and node power for a build
 
-use session::{Recording, Session};
+use session::typed::TypedData;
+use session::{Dispatcher, Prefer, Recording, Session};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -36,8 +38,19 @@ fn ok(s: &Session, req: serde_json::Value) -> serde_json::Value {
     v["ok"].clone()
 }
 
-fn serve() {
+fn serve(typed: bool) {
     let s = Session::new(Rc::new(Imported::new(src_dir()))).unwrap_or_else(|e| die(e));
+    let data = typed.then(|| {
+        &*Box::leak(Box::new(
+            TypedData::from_source(&src_dir()).unwrap_or_else(|e| die(e)),
+        ))
+    });
+    let prefer = if typed {
+        Prefer::Typed
+    } else {
+        Prefer::Translated
+    };
+    let mut s = Dispatcher::new(s, data, prefer);
     let stdout = std::io::stdout();
     for line in std::io::stdin().lock().lines() {
         let line = line.unwrap_or_else(|e| die(e));
@@ -204,9 +217,11 @@ fn bench(path: &str) {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
-        Some("serve") => serve(),
+        Some("serve") => serve(args.get(1).is_some_and(|a| a == "--typed")),
         Some("bundle") if args.len() >= 2 => bundle(Path::new(&args[1]), &args[2..]),
         Some("bench") if args.len() == 2 => bench(&args[1]),
-        _ => die("usage: pob serve | pob bundle <out dir> [build.xml ...] | pob bench <build.xml>"),
+        _ => die(
+            "usage: pob serve [--typed] | pob bundle <out dir> [build.xml ...] | pob bench <build.xml>",
+        ),
     }
 }

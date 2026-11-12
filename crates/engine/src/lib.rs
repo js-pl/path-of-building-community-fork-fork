@@ -45,6 +45,7 @@ pub mod mods;
 pub mod pat;
 pub mod power;
 pub mod rt;
+pub mod sidebar;
 pub mod skill_data;
 pub mod skills;
 pub mod spec;

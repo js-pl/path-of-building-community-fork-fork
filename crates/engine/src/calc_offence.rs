@@ -3265,6 +3265,19 @@ impl<'a> Perform<'a> {
     fn offence_pre_damage(&mut self, o: &mut Off) -> Result<()> {
         self.run_skill_func(o, "preDamageFunc")?;
         let (i, list) = (o.skill, o.list);
+        if self.has_type(i, "Brand") {
+            let label = if self.sd_truthy(i, "countsAttachedBrandsInDamage") {
+                "Average Damage"
+            } else {
+                "DPS"
+            };
+            let n = self
+                .c
+                .out(o.actor, "AttachedBrandCount")
+                .unwrap_or(f64::NAN);
+            let s = if n == 1.0 { "" } else { "s" };
+            self.mods_mut(i).info_message = Some(sf!("%s for %d attached Brand%s", label, n, s));
+        }
         // Handle corpse and enemy explosions
         let monster_life = match self.sd_num(i, "corpseLife") {
             Some(l) => l,
@@ -3536,11 +3549,13 @@ impl<'a> Perform<'a> {
             self.c.add(list, copy(&m, "QuantityMultiplier"));
             warriors += number(&m.value)?;
         }
-        // The mirages' spawn time only shows in upstream's info message
-        let _ = warriors;
-        if !self.has_type(main, "Channel") {
+        let mut spawn_time = 0.3 + 0.2 * warriors;
+        if self.has_type(main, "Channel") {
+            spawn_time += 1.0;
+        } else {
             self.sd_set(main, "hitTimeOverride", 1.0);
         }
+        let spawn_time = crate::calc::round(spawn_time, 2.0);
         let time = cached
             .out("HitTime")
             .or_else(|| cached.out("Time"))
@@ -3570,6 +3585,13 @@ impl<'a> Perform<'a> {
                 self.c.add(list, copy(&m, to));
             }
         }
+        let (n, name) = (crate::pat::num(warriors), self.skill_name(main).to_string());
+        let mods = self.mods_mut(main);
+        mods.info_message = Some(format!("{n} GC Mirages using {name}"));
+        mods.info_message2 = Some(format!(
+            "{}s for {n} Mirages to finish Attacking",
+            crate::pat::num(spawn_time)
+        ));
         Ok(())
     }
 }

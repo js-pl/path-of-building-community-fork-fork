@@ -64,6 +64,8 @@ pub struct BuildOutput {
     /// The Calcs tab's breakdowns of the player and the minion
     pub breakdown: Option<Breakdowns>,
     pub minion_breakdown: Option<Breakdowns>,
+    /// What the sidebar reads besides the outputs (`MAIN` only)
+    pub sidebar: Option<crate::sidebar::Sidebar>,
 }
 
 fn num(out: &Output, k: &str) -> Option<f64> {
@@ -518,10 +520,12 @@ pub fn build_output(
     p.c.set_out(PLAYER, "FullDPS", full_dps.combined_dps);
     p.c.set_out(PLAYER, "FullDotDPS", full_dps.total_dot_dps);
     let mut multipliers_used = HashSet::new();
+    let mut sidebar = None;
     match mode {
         CalcMode::Main => {
             main_extras(&mut p, &recalc)?;
             multipliers_used = used_multipliers(&p);
+            sidebar = Some(crate::sidebar::collect(&p)?);
         }
         CalcMode::Calcs => {
             let used = main.map_or(&multipliers_used, |m| &m.multipliers_used);
@@ -544,6 +548,7 @@ pub fn build_output(
         multipliers_used,
         breakdown: player.breakdown.take().map(|b| *b),
         minion_breakdown,
+        sidebar,
     })
 }
 

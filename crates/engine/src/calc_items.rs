@@ -106,6 +106,48 @@ pub struct ItemsSetup {
     /// Energy Blade's weapons, by the ids `item_list` gives them (-1 in
     /// the main hand, -2 in the off hand), for the items tab's `generated`
     pub generated: BTreeMap<i64, Item>,
+    pub warnings: ItemWarnings,
+}
+
+/// `env.itemWarnings`: jewels over their limit, slots with more gems than
+/// sockets, slots whose item misses anoints
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ItemWarnings {
+    pub jewel_limit: Vec<String>,
+    pub socket_limit: Vec<String>,
+    pub missing_anoint: Vec<String>,
+}
+
+/// `ItemsTab:getMissingAnointCount(item)`
+fn missing_anoints(item: &Item) -> usize {
+    let Some(base) = &item.base else { return 0 };
+    if base.cannot_be_anointed
+        || base.sub_type.as_deref() == Some("Talisman")
+        || !(item.can_be_anointed || base.typ == "Amulet")
+    {
+        return 0;
+    }
+    let max = if item.can_have_four_enchants {
+        4
+    } else if item.can_have_three_enchants {
+        3
+    } else if item.can_have_two_enchants {
+        2
+    } else {
+        1
+    };
+    let anoints = [
+        &item.enchant_mod_lines,
+        &item.scourge_mod_lines,
+        &item.implicit_mod_lines,
+        &item.explicit_mod_lines,
+        &item.crucible_mod_lines,
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|m| pat::is_match(&m.line, "Allocates ([a-zA-Z ]+)"))
+    .count();
+    max - anoints.min(max)
 }
 
 /// What Energy Blade needs to replace the weapons
@@ -439,8 +481,9 @@ fn equip<'a>(
                     } else {
                         item.title.clone().unwrap_or_default()
                     };
-                    let count = jewel_limits.entry(key).or_insert(0.0);
+                    let count = jewel_limits.entry(key.clone()).or_insert(0.0);
                     if *count >= limit {
+                        out.warnings.jewel_limit.push(key);
                         continue;
                     }
                     *count += 1.0;
@@ -584,6 +627,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         iron_mass_mods: None,
         weapon1_mods: None,
         generated: BTreeMap::new(),
+        warnings: ItemWarnings::default(),
     };
     let p = input.precision;
     let spec = input.spec;
@@ -594,6 +638,17 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         .is_some_and(|v| v.truthy())
     {
         disable_items(input, &mut items)?;
+    }
+    for slot in &input.tab.ordered_slots {
+        let n = items.get(&slot.slot_name).map_or(0, |i| missing_anoints(i));
+        if n > 0 {
+            let label = slot.label();
+            out.warnings.missing_anoint.push(if n > 1 {
+                format!("{label} ({n} missing)")
+            } else {
+                label.to_string()
+            });
+        }
     }
     // `env.itemSlotIndex`: the number in the name of each item's slot
     let mut slot_index: HashMap<i64, f64> = HashMap::new();
@@ -961,6 +1016,9 @@ fn count_item(
                 *empty.entry(socket.color).or_insert(0.0) += 1.0;
             }
         }
+    }
+    if gems.len() > gem_sockets {
+        out.warnings.socket_limit.push(slot_name.to_string());
     }
     let socketed = gem_sockets.min(gems.len());
     let mut colours = [0.0; 3];

@@ -93,6 +93,21 @@ What remains for the full migration, in order:
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
    translation, `luagen` and the Lua runtime (`docs/design.md`, phase 7).
+   Started: `session::Dispatcher` answers each command with the typed
+   session (`session::typed`) where it is ported, else with the
+   translated one, which replays the typed requests that change the
+   build before it answers (`Prefer::Translated` forces the
+   translation; `pob serve --typed`). Typed: `loadXml`, `loadCode`,
+   `state` (the sidebar: `BuildDisplayStats.lua`, the stat list,
+   warnings, class and skill selection controls; the engine's side in
+   `engine::sidebar`) and `outputs` (the sidebar calculation's player
+   and minion outputs, new). `crates/session/tests/typed.rs`: equal JSON
+   to the translation's for all 61 corpus builds (typed load 12.5 s,
+   translated 74 s in total). A typed load that fails (or the character
+   level's auto mode) and any command only the translation has that
+   changes the build hand the build to the translation until the next
+   load. Next: Calcs tab cells and breakdowns, node power, the simple
+   edits, save and export.
 
 ## Done
 
