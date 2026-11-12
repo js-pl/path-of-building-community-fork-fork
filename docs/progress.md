@@ -155,12 +155,34 @@ What remains for the full migration, in order:
    icons, connectors, which the typed tree does not import yet) and
    `nodeTooltip` stay on the translation.
 
+   Skills edits are typed (`session::typed::skills`): `skills`,
+   `gemList`, `setMainSocketGroup`, `setSocketGroup`, `addSocketGroup`,
+   `removeSocketGroup`, `setGem` (with `ProcessSocketGroup`'s level reset
+   when the gem's natural maximum changes), `removeGem`,
+   `selectSkillSet`, and `control` of the skill selection controls of the
+   sidebar (`build.mainSocketGroup`, `mainSkill`, `mainSkillPart`, stage
+   and mine counts, minion and minion skill) and of the Calcs tab
+   (`calcs.*`, with `mode` and `showMinion`). `displayLabel` is kept on
+   the socket groups as upstream sets it (every group after loading, then
+   the groups the sidebar's calculation uses). Ported on the way:
+   `ProcessSocketGroup` clearing the cost of a triggered granted skill's
+   level on the shared skill data, and `next(levels)` in
+   `validateGemLevel` in the data's order (`GrantedEffect::first_level`).
+   `skills_edits_match`: random edit sequences (6 per build) give the
+   translation's `skills`, `state`, `outputs`, `calcs` and controls after
+   each step (358 edits: typed 4.8 s, translated 52 s with its replays).
+   Known: upstream's `calcFullDPS` calculates each Full DPS skill on the
+   environment the one before left (`calcs.perform(fullEnv, true)`), the
+   typed engine each afresh; adding a group to Full DPS in
+   3.13-dual-wield-cospris-coc gives a Full DPS 0.2 % apart, which the
+   test reports apart. Edits that make Saviour's mirage the main skill
+   fall back (its gem level outputs are not ported).
+
    Still on the translation, before it can be dropped:
-   - Edits on the typed model with a recalculation: `setMainSocketGroup`,
-     `setGem`, `removeGem`, `setSocketGroup`, `addSocketGroup`,
-     `removeSocketGroup`, `equipItem`, `selectItemSet`,
-     `selectSkillSet`, `selectConfigSet`, `selectTreeSpec`, `control`
-     (sidebar and config options), `undo`, `newBuild`.
+   - Edits on the typed model with a recalculation: `equipItem`,
+     `selectItemSet`, `selectConfigSet`, `selectTreeSpec`, `control` of
+     the class and level, config options and other tabs, `undo`,
+     `newBuild`.
    - Save: `saveXml`, `saveCode` (`buildMode:SaveDB` and every tab's
      `Save`), equal to upstream's.
    - Read-only views: `tree`, `skills`, `copySocketGroup`,

@@ -390,8 +390,6 @@ fn list_of(v: Option<&OutVal>) -> Option<Vec<String>> {
     }
 }
 
-/// `group.displayLabel`
-
 impl TypedSession<'_> {
     fn sidebar(&self) -> Result<&Sidebar> {
         self.main

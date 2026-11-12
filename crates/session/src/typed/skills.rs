@@ -7,14 +7,18 @@
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use super::{Result, TypedSession, num};
-use engine::skills::{GemInstance, SocketGroup, Skills, process_socket_group};
+use engine::skills::{GemInstance, Skills, SocketGroup, process_socket_group};
 use serde_json::{Map, Value as J, json};
 
 /// A gem as `describeGem` gives it
 fn gem_json(g: &GemInstance) -> J {
     let mut o = Map::new();
     o.insert("name".into(), json!(g.name_spec));
-    for (k, v) in [("level", g.level), ("quality", g.quality), ("count", g.count)] {
+    for (k, v) in [
+        ("level", g.level),
+        ("quality", g.quality),
+        ("count", g.count),
+    ] {
         if let Some(v) = v {
             o.insert(k.into(), num(v));
         }
@@ -53,7 +57,10 @@ pub struct GroupEdit {
 
 impl TypedSession<'_> {
     fn skills_tab(&mut self) -> Result<&mut Skills> {
-        self.build.skills.as_mut().ok_or_else(|| "no skills tab".into())
+        self.build
+            .skills
+            .as_mut()
+            .ok_or_else(|| "no skills tab".into())
     }
 
     fn group_mut(&mut self, index: f64) -> Result<&mut SocketGroup> {
@@ -79,7 +86,12 @@ impl TypedSession<'_> {
         };
         let main = sb.main_socket_group;
         let used = sb.slot_enabled.clone();
-        let Some(list) = self.build.skills.as_mut().and_then(|s| s.socket_group_list_mut()) else {
+        let Some(list) = self
+            .build
+            .skills
+            .as_mut()
+            .and_then(|s| s.socket_group_list_mut())
+        else {
             return;
         };
         for (gi, g) in list.iter_mut().enumerate() {
@@ -108,7 +120,10 @@ impl TypedSession<'_> {
                 }
                 o.insert("enabled".into(), J::Bool(g.enabled));
                 o.insert("includeInFullDPS".into(), J::Bool(g.include_in_full_dps));
-                o.insert("gems".into(), J::Array(g.gem_list.iter().map(gem_json).collect()));
+                o.insert(
+                    "gems".into(),
+                    J::Array(g.gem_list.iter().map(gem_json).collect()),
+                );
                 J::Object(o)
             })
             .collect();
@@ -413,7 +428,12 @@ impl TypedSession<'_> {
                     let entry = c.minion_entry(i as usize - 1);
                     let gem = self.selected_gem(calcs)?;
                     match name {
-                        "mainSkillPart" => set(calcs, &mut gem.skill_part_calcs, &mut gem.skill_part, Some(i)),
+                        "mainSkillPart" => set(
+                            calcs,
+                            &mut gem.skill_part_calcs,
+                            &mut gem.skill_part,
+                            Some(i),
+                        ),
                         "mainSkillMinionSkill" => set(
                             calcs,
                             &mut gem.skill_minion_skill_calcs,
@@ -451,9 +471,19 @@ impl TypedSession<'_> {
                 let n = engine::pat::to_number(t);
                 let gem = self.selected_gem(calcs)?;
                 if name == "mainSkillStageCount" {
-                    set(calcs, &mut gem.skill_stage_count_calcs, &mut gem.skill_stage_count, n);
+                    set(
+                        calcs,
+                        &mut gem.skill_stage_count_calcs,
+                        &mut gem.skill_stage_count,
+                        n,
+                    );
                 } else {
-                    set(calcs, &mut gem.skill_mine_count_calcs, &mut gem.skill_mine_count, n);
+                    set(
+                        calcs,
+                        &mut gem.skill_mine_count_calcs,
+                        &mut gem.skill_mine_count,
+                        n,
+                    );
                 }
                 self.rebuild()?;
             }
