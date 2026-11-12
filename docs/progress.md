@@ -41,7 +41,12 @@ State at the handoff:
   write breakdowns as the main skill of a corpus build, in each of their
   parts (61 variants, `skill_function_breakdowns_match_upstream`).
   Mirages calculate in `CALCULATOR` mode, without breakdowns, so the
-  player's stay.
+  player's stay. `calcs_inputs_match_upstream` compares the Calcs tab's
+  outputs and breakdowns for its other inputs: the buff modes `COMBAT`,
+  `BUFFED` and `UNBUFFED` (whose Full DPS sets up on base databases with
+  that mode's conditions, `calc_env::init_env_on`), another main socket
+  group, a gem's own skill part and second active skill (46 variants).
+  PvP scaling is ported, offence and defence.
 
 What remains for the full migration, in order:
 
@@ -49,13 +54,11 @@ What remains for the full migration, in order:
    `CalcTriggers.lua` (only the configurations the corpus and variants
    reach are ported; a variants test per trigger support would cover
    them), overcapped lightning
-   resistance's mana, PvP, Cryogenesis' added damage redirection, the
-   party tab.
-2. PvP scaling and its breakdowns. The corpus only has the Calcs tab on
-   its first socket group, effective, so a variants test of its inputs
-   (`skill_number`, `misc_buffMode`, the `*Calcs` selections) is due.
-   `CalcSections.lua` (which breakdown each cell shows) belongs to
+   resistance's mana, Cryogenesis' added damage redirection, the party
+   tab. `CalcSections.lua` (which breakdown each cell shows) belongs to
    the session API.
+2. A variants test per trigger support and per helmet focus, and of
+   the Calcs tab's other minion and stage selections.
 3. Calculation overrides and the power calculators (node power, item
    comparisons).
 4. `Data.lua` into the importer, so no Lua runs at load.
@@ -153,14 +156,12 @@ a skip:
 - The party tab, and a minion's curses on itself
 - Tawhoa's Chosen, mirages of skills with minions
 - Trigger configurations other than those in `calc_triggers.rs`
-  (`Perform::trigger_config`), breakdowns of triggers
+  (`Perform::trigger_config`)
 - Overcapped lightning resistance's
-  mana, PvP scaling, added damage redirection (Cryogenesis)
+  mana, added damage redirection (Cryogenesis)
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
-- The Calcs tab in a buff mode other than effective: `calcFullDPS` then
-  sets up from that mode's databases
 
 ## Next
 

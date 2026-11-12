@@ -944,6 +944,13 @@ impl<'a> Perform<'a> {
                 .set_out(PLAYER, "FlaskChargeOnCritChance", m_min(100.0, crit));
         }
 
+        if self.input.breakdown {
+            let player = actor_cfg("player");
+            let effect = self.c.inc(pdb, Some(&player), &["TinctureEffect"])?;
+            let limit = self.c.base(pdb, None, &["TinctureLimit"])?;
+            self.c.set_out(PLAYER, "TinctureEffect", effect);
+            self.c.set_out(PLAYER, "TinctureLimit", limit);
+        }
         let mode = self.env.mode;
         if mode.combat {
             self.merge_flasks(&flasks, false, true)?;
@@ -1802,10 +1809,6 @@ impl<'a> Perform<'a> {
         let effect_inc = self.c.inc(pdb, Some(&player), &["TinctureEffect"])?;
         let effect_inc_magic = self.c.inc(pdb, Some(&player), &["MagicTinctureEffect"])?;
         let mut limit = self.c.base(pdb, None, &["TinctureLimit"])?;
-        if self.input.breakdown {
-            self.c.set_out(PLAYER, "TinctureEffect", effect_inc);
-            self.c.set_out(PLAYER, "TinctureLimit", limit);
-        }
         let not_burn = m_min(
             self.c.base(pdb, None, &["TincturesNotInflictManaBurn"])?,
             100.0,

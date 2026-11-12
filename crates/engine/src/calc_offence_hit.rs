@@ -3087,7 +3087,174 @@ impl<'a> Perform<'a> {
         }
         if self.config_truthy("PvpScaling") {
             let _ = pdb;
-            return Err("not ported: PvP scaling".into());
+            self.pvp_hit(o, [total_hit_min, total_hit_max], avg_hit)?;
+        }
+        Ok(())
+    }
+
+    /// The hit's PvP damage (`PvpScaling`)
+    fn pvp_hit(&mut self, o: &mut Off, [min, max]: [f64; 2], avg_hit: f64) -> Result<()> {
+        let (i, list) = (o.skill, o.list);
+        let f = |p: &Self, k: &str| p.has_flag(i, k);
+        let (attack, w1, w2, not_avg) = (
+            f(self, "attack"),
+            f(self, "weapon1Attack"),
+            f(self, "weapon2Attack"),
+            f(self, "notAverage"),
+        );
+        self.set_flag(i, "isPvP", true);
+        self.set_flag(i, "attackPvP", attack);
+        self.set_flag(i, "notAttackPvP", !attack);
+        self.set_flag(i, "weapon1AttackPvP", w1);
+        self.set_flag(i, "weapon2AttackPvP", w2);
+        self.set_flag(i, "notAveragePvP", not_avg);
+        let cfg = self.pcfg(o);
+        let c = Some(&cfg);
+        let pv = |p: &Self, k: &str| p.po(o, k).unwrap_or(f64::NAN);
+        let action = self.go(o, "ActionSpeedMod").unwrap_or(f64::NAN);
+        let speed = self
+            .go(o, "HitSpeed")
+            .or_else(|| self.go(o, "Speed"))
+            .unwrap_or(f64::NAN);
+        let t = match self.config_num("multiplierPvpTvalueOverride") {
+            Some(v) => v / 1000.0,
+            None => {
+                let t = if let Some(cd) = self.sd_num(i, "cooldown") {
+                    cd
+                } else if f(self, "mine") {
+                    self.po(o, "MineLayingTime").unwrap_or(1.0) / action
+                } else if f(self, "trap") {
+                    self.po(o, "TrapThrowingTime").unwrap_or(1.0) / action
+                } else {
+                    1.0 / (speed / action) * self.c.more(list, c, &["PvpTvalueMultiplier"])?
+                };
+                if t > 2147483647.0 { 1.0 } else { t }
+            }
+        };
+        let mult = self.c.more(list, c, &["PvpDamageMultiplier"])?;
+        let [ne1, ne2, e1, e2] = [
+            "PvpNonElemental1",
+            "PvpNonElemental2",
+            "PvpElemental1",
+            "PvpElemental2",
+        ]
+        .map(|k| self.misc_data(k));
+        let non_ele =
+            (pv(self, "PhysicalHitAverage") + pv(self, "ChaosHitAverage")) / (min + max) * 2.0;
+        let ele = 1.0 - non_ele;
+        let portion_ne = (avg_hit / t / ne2).powf(ne1) * t * ne2 * non_ele;
+        let portion_e = (avg_hit / t / e2).powf(e1) * t * e2 * ele;
+        let nan0 = |x: f64| if x.is_nan() { 0.0 } else { x };
+        let hit = (portion_ne + portion_e) * mult;
+        let hit_chance = pv(self, "HitChance");
+        let damage = hit * hit_chance / 100.0;
+        let dps = damage * speed * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+        self.set_po(o, "PvpAverageHit", nan0(hit));
+        self.set_po(o, "PvpAverageDamage", nan0(damage));
+        self.set_po(o, "PvpTotalDPS", nan0(dps));
+        if !self.has_bd(o.actor) {
+            return Ok(());
+        }
+        let both = non_ele > 0.0 && ele > 0.0;
+        let mut l = vec![
+            sf!(
+                "Pvp Formula is (D/(T*M))^E*T*%s, where D is the damage, T is the time taken,",
+                if both { "M*P" } else { "M" }
+            ),
+            sf!(
+                " M is the multiplier%s",
+                if both {
+                    ", E is the exponent and P is the percentage of that type (ele or non ele)"
+                } else {
+                    " and E is the exponent"
+                }
+            ),
+        ];
+        if both {
+            l.push(sf!(
+                "(M= %.1f for ele and %.1f for non-ele)(E= %.2f for ele and %.2f for non-ele)",
+                e2,
+                ne2,
+                e1,
+                ne1
+            ));
+            let line = |m2, m1, pct, portion| {
+                sf!(
+                    "(%.1f / (%.2f * %.1f)) ^ %.2f * %.2f * %.1f * %.2f = %.1f",
+                    avg_hit,
+                    t,
+                    m2,
+                    m1,
+                    t,
+                    m2,
+                    pct,
+                    portion
+                )
+            };
+            l.push(line(ne2, ne1, non_ele, portion_ne));
+            l.push(line(e2, e1, ele, portion_e));
+            l.push(sf!(
+                "(portionNonElemental + portionElemental)%s",
+                if mult != 1.0 {
+                    " * PvP multiplier"
+                } else {
+                    " "
+                }
+            ));
+            l.push(if mult != 1.0 {
+                sf!("(%.1f + %.1f) * %g", portion_ne, portion_e, mult)
+            } else {
+                sf!("%.1f + %.1f", portion_ne, portion_e)
+            });
+        } else {
+            let (m2, m1, portion, what) = if ele <= 0.0 {
+                (ne2, ne1, portion_ne, "non-ele")
+            } else {
+                (e2, e1, portion_e, "ele")
+            };
+            if ele <= 0.0 || non_ele <= 0.0 {
+                l.push(sf!(
+                    &format!("(M= %.1f for {what})(E= %.2f for {what})"),
+                    m2,
+                    m1
+                ));
+                l.push(sf!(
+                    "(%.1f / (%.2f * %.1f)) ^ %.2f * %.2f * %.1f = %.1f",
+                    avg_hit,
+                    t,
+                    m2,
+                    m1,
+                    t,
+                    m2,
+                    portion
+                ));
+                if mult != 1.0 {
+                    let name = if ele <= 0.0 {
+                        "portionNonElemental"
+                    } else {
+                        "portionElemental"
+                    };
+                    l.push(sf!(
+                        &format!("%.1f * %g ^8({name} * PvP multiplier)"),
+                        portion,
+                        mult
+                    ));
+                }
+            }
+        }
+        l.push(sf!("= %.1f", nan0(hit)));
+        let b = self.bd(o.actor).unwrap();
+        b.set_lines(Self::pkey(o, "PvpAverageHit"), l);
+        if o.is_attack {
+            b.set_lines(
+                Self::pkey(o, "PvpAverageDamage"),
+                vec![
+                    sf!("%s:", o.passes[o.pass].label),
+                    sf!("%.1f ^8(average pvp hit)", nan0(hit)),
+                    sf!("x %.2f ^8(chance to hit)", hit_chance / 100.0),
+                    sf!("= %.1f", nan0(damage)),
+                ],
+            );
         }
         Ok(())
     }
@@ -3469,6 +3636,22 @@ impl<'a> Perform<'a> {
                 sf!("= %.1f", avg),
             ];
             b.set_lines("AverageDamage", l);
+            if self.has_flag(i, "isPvP") {
+                let (m, f) = (
+                    get_num(&o.hands[0], "PvpAverageDamage").unwrap_or(f64::NAN),
+                    get_num(&o.hands[1], "PvpAverageDamage").unwrap_or(f64::NAN),
+                );
+                let l = vec![
+                    "Both weapons:".to_string(),
+                    if double {
+                        sf!("%.1f + %.1f ^8(skill hits with both weapons at once)", m, f)
+                    } else {
+                        sf!("(%.1f + %.1f) / 2 ^8(skill alternates weapons)", m, f)
+                    },
+                    sf!("= %.1f", out(self, "PvpAverageDamage")),
+                ];
+                self.bd(actor).unwrap().set_lines("PvpAverageDamage", l);
+            }
         }
     }
 
@@ -3641,6 +3824,26 @@ impl<'a> Perform<'a> {
             }
             l.push(sf!("= %.1f", g(self, "TotalDPS")));
             self.bd(actor).unwrap().set_lines("TotalDPS", l);
+            if self.has_flag(i, "isPvP") {
+                let mut l = vec![
+                    sf!("%.1f ^8(average pvp hit)", g(self, "PvpAverageDamage")),
+                    match self.c.out(actor, "HitSpeed") {
+                        Some(h) => sf!("x %.2f ^8(hit rate)", h),
+                        None => sf!(&format!("x %.2f ^8({what} rate)"), g(self, "Speed")),
+                    },
+                ];
+                if dps_mult != 1.0 {
+                    l.push(sf!("x %g ^8(DPS multiplier for this skill)", dps_mult));
+                }
+                if o.quantity_multiplier > 1.0 {
+                    l.push(sf!(
+                        "x %g ^8(quantity multiplier for this skill)",
+                        o.quantity_multiplier
+                    ));
+                }
+                l.push(sf!("= %.1f", g(self, "PvpTotalDPS")));
+                self.bd(actor).unwrap().set_lines("PvpTotalDPS", l);
+            }
         }
         if self.mods(i).minion.is_some() {
             let speed = self.c.out(actor, "HitSpeed").unwrap_or(g(self, "Speed"));

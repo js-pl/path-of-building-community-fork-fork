@@ -3,7 +3,7 @@
 //! `oracle/json.lua` encodes upstream's.
 
 use engine::data::Data;
-use engine::skill_data::{GrantedEffect, SkillData};
+use engine::skill_data::{Gem, GrantedEffect, SkillData};
 use lua::Value;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -200,6 +200,37 @@ pub fn skill_variants(
     data: &SkillData,
     keep: impl Fn(&GrantedEffect) -> bool,
 ) -> Vec<(String, String)> {
+    gem_variants(
+        data,
+        |g| keep(&g.granted_effect),
+        |g| {
+            let parts = g
+                .granted_effect
+                .parts
+                .as_ref()
+                .map_or(1, |p| p.len().max(1));
+            (1..=parts)
+                .map(|part| {
+                    (
+                        format!("fn-{}-{part}", g.id),
+                        "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string(),
+                        format!("skillPart=\"{part}\""),
+                    )
+                })
+                .collect()
+        },
+    )
+}
+
+/// Every active gem `keep` selects as the main skill of a generated corpus
+/// build whose main skill uses the same weapons or is a spell like it, once
+/// for each of `variants`: the id's prefix, the socket group's attributes
+/// and the gem's; ids `<prefix>-<template>`
+pub fn gem_variants(
+    data: &SkillData,
+    keep: impl Fn(&Gem) -> bool,
+    variants: impl Fn(&Gem) -> Vec<(String, String, String)>,
+) -> Vec<(String, String)> {
     let builds: Vec<(String, String, Option<Rc<GrantedEffect>>)> = corpus_builds()
         .into_iter()
         .filter(|(id, _)| id.starts_with("gen-"))
@@ -214,7 +245,7 @@ pub fn skill_variants(
     let mut out = Vec::new();
     for gem in data.gems() {
         let ge = &gem.granted_effect;
-        if !keep(ge) || ge.support || gem.name.contains("Unknown") {
+        if !keep(gem) || ge.support || gem.name.contains("Unknown") {
             continue;
         }
         let template = builds.iter().find(|(_, _, t)| {
@@ -228,24 +259,32 @@ pub fn skill_variants(
         let Some((tid, xml, _)) = template else {
             continue;
         };
-        let parts = ge.parts.as_ref().map_or(1, |p| p.len().max(1));
-        for part in 1..=parts {
+        for (prefix, group, attrs) in variants(gem) {
             let gem_xml = format!(
-                "<Skill enabled=\"true\" label=\"Variant\" mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\">\n<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\" skillPart=\"{part}\"/>\n</Skill>\n",
+                "<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\" {attrs}/>",
                 gem.game_id, gem.natural_max_level, gem.name, gem.id, gem.variant_id
             );
-            let Some(set) = xml.find("<SkillSet id=\"1\">") else {
-                continue;
-            };
-            let at = set + "<SkillSet id=\"1\">".len();
-            let mut v = String::new();
-            v.push_str(&xml[..at]);
-            v.push('\n');
-            v.push_str(&gem_xml);
-            v.push_str(&xml[at..]);
-            let v = engine::pat::gsub(&v, "mainSocketGroup=\"%d+\"", "mainSocketGroup=\"1\"");
-            out.push((format!("fn-{}-{part}-{tid}", gem.id), v));
+            if let Some(v) = with_group(xml, &group, &gem_xml) {
+                out.push((format!("{prefix}-{tid}"), v));
+            }
         }
     }
     out
+}
+
+/// A build's XML with a socket group of `gems` before its others, as the
+/// main skill's; `attrs` are the group's own
+pub fn with_group(xml: &str, attrs: &str, gems: &str) -> Option<String> {
+    let set = xml.find("<SkillSet id=\"1\">")?;
+    let at = set + "<SkillSet id=\"1\">".len();
+    let v = format!(
+        "{}\n<Skill enabled=\"true\" label=\"Variant\" {attrs}>\n{gems}\n</Skill>\n{}",
+        &xml[..at],
+        &xml[at..]
+    );
+    Some(engine::pat::gsub(
+        &v,
+        "mainSocketGroup=\"%d+\"",
+        "mainSocketGroup=\"1\"",
+    ))
 }

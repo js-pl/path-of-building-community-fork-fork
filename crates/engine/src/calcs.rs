@@ -17,7 +17,7 @@ use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
 use crate::build::Build;
 use crate::calc::{PLAYER, m_min};
 use crate::calc_cache::{Recalc, Recalculator, skill_uuid};
-use crate::calc_env::{CalcData, CalcMode, init_env};
+use crate::calc_env::{CalcData, CalcMode, init_env, init_env_on};
 use crate::calc_perform::BuffMap;
 use crate::calc_perform::{Perform, PerformInput, Result, perform};
 use crate::calc_setup::BuffMode;
@@ -127,10 +127,12 @@ impl Best {
     }
 }
 
-/// `calcs.calcFullDPS(build, "CALCULATOR")`
-pub fn calc_full_dps(build: &Build, data: &CalcData) -> Result<FullDps> {
+/// `calcs.calcFullDPS(build, "CALCULATOR", {}, specEnv)` with the base
+/// databases of a calculation in the buff mode `base`
+pub fn calc_full_dps(build: &Build, data: &CalcData, base: BuffMode) -> Result<FullDps> {
     let recalc = Recalculator::new(build, data, CalcMode::Calculator);
-    let mut first = Some(init_env(&mut build.clone(), data, CalcMode::Calculator)?);
+    let setup = |b: &mut Build| init_env_on(b, data, CalcMode::Calculator, base);
+    let mut first = Some(setup(&mut build.clone())?);
     let list: Vec<(usize, f64)> = {
         let env = first.as_ref().unwrap();
         env.skills
@@ -161,7 +163,7 @@ pub fn calc_full_dps(build: &Build, data: &CalcData) -> Result<FullDps> {
         let mut b = build.clone();
         let mut env = match first.take() {
             Some(e) => e,
-            None => init_env(&mut b, data, CalcMode::Calculator)?,
+            None => setup(&mut b)?,
         };
         env.skills.main_skill = i;
         let mut input = PerformInput::new(&b, data, false)?;
@@ -479,10 +481,8 @@ pub fn build_output(
     main: Option<&BuildOutput>,
 ) -> Result<BuildOutput> {
     let env = init_env(build, data, mode)?;
-    // `calcFullDPS` sets up from this calculation's setup
-    if env.mode != BuffMode::new(Some("EFFECTIVE")) {
-        return Err("not ported: Full DPS set up in another buff mode".into());
-    }
+    // `calcFullDPS` sets up from this calculation's base databases
+    let base = env.mode;
     let build = &*build;
     let recalc = Recalculator::new(build, data, mode);
     let breakdown = matches!(mode, CalcMode::Main | CalcMode::Calcs);
@@ -491,8 +491,8 @@ pub fn build_output(
     let mut p = perform(env, input)?;
     p.finish()?;
     let full_dps = match main {
-        Some(m) => m.full_dps.clone(),
-        None => calc_full_dps(build, data)?,
+        Some(m) if base == BuffMode::new(Some("EFFECTIVE")) => m.full_dps.clone(),
+        _ => calc_full_dps(build, data, base)?,
     };
     let mut skills = full_dps.skills.clone();
     if mode == CalcMode::Main {
