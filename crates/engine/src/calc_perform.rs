@@ -424,6 +424,19 @@ impl<'a> Perform<'a> {
         self.env_minion.map(|m| self.minions[m].actor)
     }
 
+    /// `activeSkill[name .. "Cfg"] = cfg`, kept where the Calcs tab reads it
+    pub(crate) fn keep_cfg(&mut self, i: usize, name: impl Into<String>, cfg: &Cfg) {
+        if !self.input.breakdown {
+            return;
+        }
+        let name = name.into();
+        let cfgs = &mut self.mods_mut(i).named_cfgs;
+        match cfgs.iter_mut().find(|(n, _)| *n == name) {
+            Some(c) => c.1 = cfg.clone(),
+            None => cfgs.push((name, cfg.clone())),
+        }
+    }
+
     pub(crate) fn cfg(&self, i: usize) -> Cfg {
         self.mods(i).skill_cfg.clone()
     }

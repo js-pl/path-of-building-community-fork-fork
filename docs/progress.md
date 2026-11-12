@@ -110,8 +110,50 @@ What remains for the full migration, in order:
    translated 74 s in total). A typed load that fails (or the character
    level's auto mode) and any command only the translation has that
    changes the build hand the build to the translation until the next
-   load. Next: Calcs tab cells and breakdowns, node power, the simple
-   edits, save and export.
+   load. `nodePower` is typed (`engine::power::node_power` on a
+   `MiscCalculator`), equal to the translation's on gen-0001 and gen-0002
+   for combined offence/defence and Full DPS (`SESSION_POWER=<id>` runs
+   others); the browser's background worker, which only loads builds and
+   runs node power, no longer needs the translation.
+
+   The Calcs tab is typed (`session::typed::calcs`): `calcs` (the
+   sections of `CalcSections.lua`, evaluated by the session's build
+   script, `CheckFlag`, `formatCalcStr`), `breakdown`
+   (`CalcBreakdownControl:SetBreakdownData`) and `controls` for the
+   tab's and the sidebar's controls, on the `CALCS` calculation made when
+   first asked for; `build_output` keeps that calculation's stores and
+   actors (`engine::calcs::CalcsView`) and the offence its other cfgs
+   (`bleedCfg`, `dotFireCfg`, ...). Equal to the translation for all 61
+   corpus builds, every cell's breakdown (14611; typed 1.3 s in total,
+   translated 128 s with its loads). Upstream's tree keeps the source
+   `modLib.mergeKeystones` last gave a keystone's mods, also across
+   builds: a session that loaded another build with an item granting
+   the keystone shows that item as the source of the tree's keystone
+   mods; the test compares such builds again on a fresh translated
+   session. Not followed either: the slots of energy shield converted
+   to ward, whose `inc` upstream leaves nil (typed: `false`).
+
+   Still on the translation, before it can be dropped:
+   - Edits on the typed model with a recalculation: `clickNode`,
+     `selectMastery`, `resetTree` (`PassiveSpec:AllocNode`,
+     `DeallocNode`, cluster jewel rebuilds), `setMainSocketGroup`,
+     `setGem`, `removeGem`, `setSocketGroup`, `addSocketGroup`,
+     `removeSocketGroup`, `equipItem`, `selectItemSet`,
+     `selectSkillSet`, `selectConfigSet`, `selectTreeSpec`, `control`
+     (sidebar and config options), `undo`, `newBuild`.
+   - Save: `saveXml`, `saveCode` (`buildMode:SaveDB` and every tab's
+     `Save`), equal to upstream's.
+   - Read-only views: `tree`, `treeState`, `treeSpecs`, `nodePath`,
+     `masteryOptions`, `powerStats`, `skills`, `copySocketGroup`,
+     `gemList`, `items`, `itemDb`, `config`, `party`, `notes`,
+     `controls` of other tabs.
+   - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
+     `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
+     `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
+   - Items and crafting: `addItem`, `editItem`, `deleteItem`,
+     `displayItem`, `setDisplayItem`, `craftItem`, `saveDisplayItem`,
+     `pasteSocketGroup`, `setNotes`, `popupButton`, `closePopup` (the
+     item editor's controls and popups).
 
 ## Done
 
