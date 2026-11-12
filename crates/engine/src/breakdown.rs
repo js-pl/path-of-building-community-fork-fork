@@ -4,8 +4,8 @@
 //! tab's calculations (`PerformInput::breakdown`, `env.buildBreakdown`);
 //! in calculators and Full DPS nothing of this runs.
 //!
-//! Not ported yet: `breakdown.leech` and the breakdowns of the triggers,
-//! mirages and offence.
+//! Mirages calculate in `CALCULATOR` mode, without breakdowns: upstream's
+//! replacing the player's breakdowns with the mirage's keeps the player's.
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 

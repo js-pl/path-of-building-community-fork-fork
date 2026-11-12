@@ -8,11 +8,11 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::{Breakdown, Chain, color, f, multi_chain};
 use crate::calc::{m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, armour_reduction_f};
 use crate::calc_offence::Off;
 use crate::calc_perform::{Perform, new_mod};
-use crate::breakdown::{Breakdown, Chain, color, f, multi_chain};
 use crate::mods::{Cfg, Mod, ModType, Sym, Tag};
 use crate::sf;
 
@@ -45,7 +45,11 @@ impl<'a> Perform<'a> {
                     b.lines.extend([
                         "Source damage:".into(),
                         sf!("%d to %d ^8(total damage)", r.0, r.1),
-                        sf!("x %g ^8(%g%% converted to other damage types)", m, (1.0 - m) * 100.0),
+                        sf!(
+                            "x %g ^8(%g%% converted to other damage types)",
+                            m,
+                            (1.0 - m) * 100.0
+                        ),
                         sf!("= %d to %d", r.0 * m, r.1 * m),
                     ]);
                 }
@@ -95,7 +99,9 @@ impl<'a> Perform<'a> {
             return Ok(base);
         }
         let cfg = self.pcfg(o);
-        let source_mult = self.c.more(o.list, Some(&cfg), &[&format!("{t}AsThoughDealing")])?;
+        let source_mult = self
+            .c
+            .more(o.list, Some(&cfg), &[&format!("{t}AsThoughDealing")])?;
         let label = o.is_attack.then(|| format!("{}:", o.passes[o.pass].label));
         let out_crit = self.po(o, "CritChance").unwrap_or(f64::NAN);
         let start = |b: &mut Breakdown| {
@@ -117,7 +123,11 @@ impl<'a> Perform<'a> {
                     on_hit,
                     crit_chance / 100.0
                 ));
-                b.push(sf!("+ %d x %.4f ^8(chance from crits)", on_crit, crit_chance / 100.0));
+                b.push(sf!(
+                    "+ %d x %.4f ^8(chance from crits)",
+                    on_crit,
+                    crit_chance / 100.0
+                ));
                 b.push(sf!(
                     "= %.2f",
                     on_hit * (1.0 - crit_chance / 100.0) + on_crit * crit_chance / 100.0
@@ -267,7 +277,13 @@ impl<'a> Perform<'a> {
 
     /// The effective multiplier with the resistance and the damage taken
     /// increase and more
-    fn dot_eff_parts(&self, o: &Off, cfg: &Cfg, t: &str, elemental: bool) -> Result<(f64, f64, f64, f64)> {
+    fn dot_eff_parts(
+        &self,
+        o: &Off,
+        cfg: &Cfg,
+        t: &str,
+        elemental: bool,
+    ) -> Result<(f64, f64, f64, f64)> {
         let resist = self.resist_for_type(o, t, Some(cfg))?;
         let (a, b) = (format!("{t}DamageTaken"), format!("{t}DamageTakenOverTime"));
         let mut names = vec!["DamageTaken", "DamageTakenOverTime", a.as_str(), b.as_str()];
@@ -276,13 +292,22 @@ impl<'a> Perform<'a> {
         }
         let inc = self.c.inc(o.edb, Some(cfg), &names)?;
         let more = self.c.more(o.edb, Some(cfg), &names)?;
-        Ok(((1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more, resist, inc, more))
+        Ok((
+            (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more,
+            resist,
+            inc,
+            more,
+        ))
     }
 
     /// `breakdown.effMult(t, resist, 0, takenInc, effMult, takenMore,
     /// sourceRes, true)` of a damage over time, `Your <t> Resistance` for
     /// an enemy with the player's
-    fn dot_eff_breakdown(&self, t: &str, (eff, resist, inc, more): (f64, f64, f64, f64)) -> Result<Vec<String>> {
+    fn dot_eff_breakdown(
+        &self,
+        t: &str,
+        (eff, resist, inc, more): (f64, f64, f64, f64),
+    ) -> Result<Vec<String>> {
         self.dot_type_eff_breakdown(t, eff, resist, inc, more)
     }
 
@@ -679,7 +704,10 @@ impl<'a> Perform<'a> {
             if let Some(p) = override_potential {
                 l.push(sf!("= %g ^8(stack potential override)", p));
             } else {
-                l.push(sf!("%.2f ^8(chance to hit)", pv(self, o, "HitChance") / 100.0));
+                l.push(sf!(
+                    "%.2f ^8(chance to hit)",
+                    pv(self, o, "HitChance") / 100.0
+                ));
                 l.push(sf!("* %.2f ^8(chance to bleed)", chance));
                 if speed > 0.0 {
                     let t = self.po(o, "HitTime").unwrap_or(pv(self, o, "Time"));
@@ -700,8 +728,15 @@ impl<'a> Perform<'a> {
             }
             let custom = color::CUSTOM;
             let mut r = vec![
-                format!("{custom}This is the average roll of a Bleed affecting the enemy if you are constantly attacking"),
-                sf!(&format!("{custom}If attacking constantly, your average strongest bleed currently achieves ^7%.2f%%{custom} of its max damage"), roll),
+                format!(
+                    "{custom}This is the average roll of a Bleed affecting the enemy if you are constantly attacking"
+                ),
+                sf!(
+                    &format!(
+                        "{custom}If attacking constantly, your average strongest bleed currently achieves ^7%.2f%%{custom} of its max damage"
+                    ),
+                    roll
+                ),
                 String::new(),
                 "Average Bleed Roll:".into(),
             ];
@@ -746,11 +781,17 @@ impl<'a> Perform<'a> {
             * pv(self, o, "FistOfWarDamageEffect")
             * self.go(o, "AilmentWarcryEffect").unwrap_or(f64::NAN);
         if bd {
-            let (pmin, pmax) = (pv(self, o, "BleedPhysicalMin"), pv(self, o, "BleedPhysicalMax"));
+            let (pmin, pmax) = (
+                pv(self, o, "BleedPhysicalMin"),
+                pv(self, o, "BleedPhysicalMax"),
+            );
             let dm = pv(self, o, "BleedDotMulti");
             let derive = |l: &mut Vec<String>| {
                 l.push(sf!("%.0f + (%.0f - %.0f) * %.2f%%", pmin, pmax, pmin, roll));
-                l.push("^8min source phys + (max source phys - min source phys) * average bleed roll".into());
+                l.push(
+                    "^8min source phys + (max source phys - min source phys) * average bleed roll"
+                        .into(),
+                );
             };
             let mut l = Vec::new();
             if avg_hit == avg_crit || crit == 0.0 {
@@ -783,10 +824,9 @@ impl<'a> Perform<'a> {
         let min_val = self.ailment_damage(o, "Bleed", ailment_crit, min_hit, 0.0, true)?
             * base_percent
             / 100.0;
-        let max_val = self.ailment_damage(o, "Bleed", 100.0, max_hit, max_crit, true)?
-            * base_percent
-            / 100.0
-            * effects;
+        let max_val =
+            self.ailment_damage(o, "Bleed", 100.0, max_hit, max_crit, true)? * base_percent / 100.0
+                * effects;
         let avg = self.ailment_damage(o, "Bleed", ailment_crit, avg_hit, avg_crit, false)?;
         let base_dps = avg * base_percent / 100.0 * effects;
         if base_dps > 0.0 {
@@ -998,7 +1038,10 @@ impl<'a> Perform<'a> {
                             "%g ^8(stack multiplier for this skill)",
                             self.sd_num(i, "stackMultiplier").unwrap_or(1.0),
                         ),
-                        f("%g ^8(quantity multiplier for this skill)", o.quantity_multiplier),
+                        f(
+                            "%g ^8(quantity multiplier for this skill)",
+                            o.quantity_multiplier,
+                        ),
                     ],
                     total: Some(sf!("= %.2f", stacks)),
                     ..Chain::default()
@@ -1015,7 +1058,10 @@ impl<'a> Perform<'a> {
             } else if let Some(lim) = limit
                 && stacks >= lim
             {
-                l.push(format!("^8(affected by poison stack limit of: {})", num(lim)));
+                l.push(format!(
+                    "^8(affected by poison stack limit of: {})",
+                    num(lim)
+                ));
                 if let Some(u) = uncapped {
                     l.push(format!("^8(uncapped poison stacks: {})", sf!("%.2f", u)));
                 }
@@ -1201,7 +1247,10 @@ impl<'a> Perform<'a> {
                     if tc != total_uncapped {
                         l.push(sf!("= %.1f ^8(Uncapped raw Poison DPS)", total_uncapped));
                         l.push(sf!(
-                            &format!("^8(Raw Poison DPS is {}overcapped ^8by^7 %.0f ^8:^7 %.1f%%^8)", color::NEGATIVE),
+                            &format!(
+                                "^8(Raw Poison DPS is {}overcapped ^8by^7 %.0f ^8:^7 %.1f%%^8)",
+                                color::NEGATIVE
+                            ),
                             total_uncapped - tc,
                             (total_uncapped - tc) / tc * 100.0
                         ));
@@ -1212,7 +1261,13 @@ impl<'a> Perform<'a> {
                     b.set_lines(Self::pkey(o, "TotalPoisonDPS"), l);
                 }
                 if duration != 2.0 {
-                    let l = ailment_duration_lines(duration_base, duration_mod, rate_mod, o.debuff_duration_mult, duration);
+                    let l = ailment_duration_lines(
+                        duration_base,
+                        duration_mod,
+                        rate_mod,
+                        o.debuff_duration_mult,
+                        duration,
+                    );
                     b.set_lines("PoisonDuration", l);
                 }
                 let mut l: Vec<String> = Vec::new();
@@ -1333,7 +1388,10 @@ impl<'a> Perform<'a> {
                     l.push(sf!("= %g ^8(stack potential override)", p));
                 }
             } else {
-                l.push(sf!("%.2f ^8(chance to hit)", pv(self, o, "HitChance") / 100.0));
+                l.push(sf!(
+                    "%.2f ^8(chance to hit)",
+                    pv(self, o, "HitChance") / 100.0
+                ));
                 l.push(sf!("* %.2f ^8(chance to ignite)", chance));
                 if on_death {
                     l.push("* 1 ^8Cast on Death override".into());
@@ -1360,8 +1418,15 @@ impl<'a> Perform<'a> {
                 l.push(sf!("= %.2f", potential));
             }
             let mut r = vec![
-                format!("{custom}This is the average roll of an ignite affecting the enemy if you are constantly attacking"),
-                sf!(&format!("{custom}If attacking constantly, your average strongest Ignite currently achieves ^7%.2f%%{custom} of its max damage"), roll),
+                format!(
+                    "{custom}This is the average roll of an ignite affecting the enemy if you are constantly attacking"
+                ),
+                sf!(
+                    &format!(
+                        "{custom}If attacking constantly, your average strongest Ignite currently achieves ^7%.2f%%{custom} of its max damage"
+                    ),
+                    roll
+                ),
                 String::new(),
                 "Average Ignite Roll:".into(),
             ];
@@ -1450,9 +1515,8 @@ impl<'a> Perform<'a> {
             self.bd(o.actor).unwrap().set_lines("IgniteDPS", l);
         }
         let min_val = self.ailment_damage(o, "Ignite", ailment_crit, min_hit, 0.0, true)? * percent;
-        let max_val = self.ailment_damage(o, "Ignite", 100.0, max_hit, max_crit, true)?
-            * percent
-            * effects;
+        let max_val =
+            self.ailment_damage(o, "Ignite", 100.0, max_hit, max_crit, true)? * percent * effects;
         let base = self.ailment_damage(o, "Ignite", ailment_crit, hit_dmg, crit_dmg, false)?
             * percent
             * effects;
@@ -1496,7 +1560,10 @@ impl<'a> Perform<'a> {
                     b.set_lines(
                         "BurningGroundDPS",
                         vec![
-                            sf!("%.1f ^8(ignite damage per second)", base * effect * rate_mod),
+                            sf!(
+                                "%.1f ^8(ignite damage per second)",
+                                base * effect * rate_mod
+                            ),
                             sf!("* %.1f%% ^8(percent as burning ground)", ground),
                             sf!("* %.3f ^8(effective DPS modifier)", fire),
                             sf!("= %.1f ^8per second", g),
@@ -1658,7 +1725,10 @@ impl<'a> Perform<'a> {
                     &mut l,
                     Chain {
                         factors: vec![
-                            f("%.2f ^8(increased/reduced effect of chill)", 1.0 + inc / 100.0),
+                            f(
+                                "%.2f ^8(increased/reduced effect of chill)",
+                                1.0 + inc / 100.0,
+                            ),
                             f("%.2f ^8(more/less effect of chill)", more),
                         ],
                         total: Some(sf!("= %.0f%%", source)),
@@ -1715,7 +1785,11 @@ impl<'a> Perform<'a> {
                 }
             }
         }
-        let threshold = if bd { self.enemy_ailment_threshold(o)? } else { 0.0 };
+        let threshold = if bd {
+            self.enemy_ailment_threshold(o)?
+        } else {
+            0.0
+        };
         let never_crit = self.c.flag(db, None, &["AilmentsAreNeverFromCrit"])?;
         for a in ["Chill", "Shock", "Scorch", "Brittle", "Sap"] {
             if pv(self, o, &format!("{a}ChanceOnHit")) + pv(self, o, &format!("{a}ChanceOnCrit"))
@@ -1771,7 +1845,10 @@ impl<'a> Perform<'a> {
                         }
                         l.push(sf!("%.2fs ^8(base duration)", base));
                         if inc != 0.0 {
-                            l.push(sf!("x %.2f ^8(increased/reduced duration)", 1.0 + inc / 100.0));
+                            l.push(sf!(
+                                "x %.2f ^8(increased/reduced duration)",
+                                1.0 + inc / 100.0
+                            ));
                         }
                         if more != 1.0 {
                             l.push(sf!("x %.2f ^8(more/less duration)", more));
@@ -1822,7 +1899,14 @@ impl<'a> Perform<'a> {
     }
 
     /// The table of a non-damaging ailment's effect by ailment threshold
-    fn ailment_effect_table(&mut self, o: &Off, a: &str, damage: f64, effect: f64, threshold: f64) -> Result<()> {
+    fn ailment_effect_table(
+        &mut self,
+        o: &Off,
+        a: &str,
+        damage: f64,
+        effect: f64,
+        threshold: f64,
+    ) -> Result<()> {
         let data = &self.data().non_damaging_ailment[a];
         let (min, max_default, precision) = (data.min, data.max, data.precision);
         let bonechill = self.po_val(o, "HasBonechill").is_some_and(|v| v.truthy());
@@ -1834,9 +1918,15 @@ impl<'a> Perform<'a> {
             _ => (vec![5.0, 10.0], false, 100.0 / 3.0),
         };
         let maximum = self.go(o, &format!("Maximum{a}")).unwrap_or(max_default);
-        let current = m_max(m_min(self.go(o, &format!("Current{a}")).unwrap_or(0.0), maximum), 0.0);
+        let current = m_max(
+            m_min(self.go(o, &format!("Current{a}")).unwrap_or(0.0), maximum),
+            0.0,
+        );
         let desired = m_max(
-            m_min(self.c.base(o.edb, None, &[&format!("Desired{a}Val")])?, maximum),
+            m_min(
+                self.c.base(o.edb, None, &[&format!("Desired{a}Val")])?,
+                maximum,
+            ),
             0.0,
         );
         if min != 0.0 {
@@ -1899,7 +1989,10 @@ impl<'a> Perform<'a> {
             .unwrap()
             .entry(&Self::pkey(o, &format!("{a}DPS")));
         b.label = Some(label);
-        b.footer = Some(sf!("^8(ailment threshold is about equal to life, except on bosses that have specific ailment thresholds)\n(the above table shows that when the enemy has X ailment threshold, you ^8%s for Y)", a.to_lowercase().as_str()));
+        b.footer = Some(sf!(
+            "^8(ailment threshold is about equal to life, except on bosses that have specific ailment thresholds)\n(the above table shows that when the enemy has X ailment threshold, you ^8%s for Y)",
+            a.to_lowercase().as_str()
+        ));
         b.rows = Some(rows);
         b.cols = Some(vec![
             crate::breakdown::Col::new("Ailment Threshold", "thresh"),
@@ -1992,7 +2085,10 @@ impl<'a> Perform<'a> {
                 l.push(sf!("x %.2f ^8(more/less stun duration)", more));
             }
             if double != 0.0 {
-                l.push(sf!("x %.2f ^8(chance to double stun duration)", 1.0 + double / 100.0));
+                l.push(sf!(
+                    "x %.2f ^8(chance to double stun duration)",
+                    1.0 + double / 100.0
+                ));
             }
             if recov != 0.0 {
                 l.push(sf!(
@@ -2186,14 +2282,20 @@ fn dps_lines(
         ));
     }
     if dps != uncapped {
-        l.push(sf!(&format!("= %.1f ^8(Uncapped raw {name} DPS)"), uncapped));
+        l.push(sf!(
+            &format!("= %.1f ^8(Uncapped raw {name} DPS)"),
+            uncapped
+        ));
         l.push(over(&format!("{name} DPS"), uncapped, dps));
         l.push(sf!(&format!("= %d ^8(Capped {name} DPS)"), dps));
     } else {
         l.push(sf!("= %.1f ^8per second", dps));
     }
     let (min_c, max_c) = (m_min(min, cap), m_min(max, cap));
-    l.push(sf!(&format!("%.2f%% of Maximum {name} DPS"), dps / max_c * 100.0));
+    l.push(sf!(
+        &format!("%.2f%% of Maximum {name} DPS"),
+        dps / max_c * 100.0
+    ));
     l.push(String::new());
     l.push("DPS Range:".into());
     if max_c == max && min_c == min {

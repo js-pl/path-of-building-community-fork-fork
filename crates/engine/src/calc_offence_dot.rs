@@ -543,8 +543,18 @@ impl<'a> Perform<'a> {
 
     /// `breakdown.effMult(t, resist, 0, takenInc, effMult, takenMore,
     /// sourceRes, true)` of a damage over time
-    pub(crate) fn dot_type_eff_breakdown(&self, t: &str, eff: f64, resist: f64, inc: f64, more: f64) -> Result<Vec<String>> {
-        let source = if self.c.flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])? {
+    pub(crate) fn dot_type_eff_breakdown(
+        &self,
+        t: &str,
+        eff: f64,
+        resist: f64,
+        inc: f64,
+        more: f64,
+    ) -> Result<Vec<String>> {
+        let source = if self
+            .c
+            .flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])?
+        {
             format!("Your {t} Resistance")
         } else {
             t.to_string()
@@ -639,7 +649,10 @@ impl<'a> Perform<'a> {
         {
             let v = num(&r, "baseDamage")?;
             let r = self.dmg_taken_conversion(o, &t, v)?;
-            let last = sf!("Total Eye of Innocence damage taken per cast/attack: %.2f ", r.0);
+            let last = sf!(
+                "Total Eye of Innocence damage taken per cast/attack: %.2f ",
+                r.0
+            );
             sources.push(wrap(r, sf!("Eye of Innocence base damage: %d", v), last));
         }
         if let Some(r) = records(self, "EchoesOfCreationSelfDamage")?
@@ -666,7 +679,10 @@ impl<'a> Perform<'a> {
                 count,
                 base
             );
-            let last = sf!("Total Echoes of Creation damage taken per Attack: %.2f ", r.0);
+            let last = sf!(
+                "Total Echoes of Creation damage taken per Attack: %.2f ",
+                r.0
+            );
             sources.push(wrap(r, first, last));
         }
         let has_cost = matches!(
@@ -722,7 +738,10 @@ impl<'a> Perform<'a> {
         }
         if let Some((t, v)) = summed(self, "EnmitysEmbraceSelfDamage")? {
             let r = self.dmg_taken_conversion(o, &t, v)?;
-            let last = sf!("Total Enmity's Embrace damage taken per cast/attack: %.2f ", r.0);
+            let last = sf!(
+                "Total Enmity's Embrace damage taken per cast/attack: %.2f ",
+                r.0
+            );
             sources.push(wrap(r, sf!("Enmity's Embrace base damage: %d", v), last));
         }
         let mut lines: Option<Vec<String>> = None;
@@ -1021,17 +1040,26 @@ impl<'a> Perform<'a> {
                 let mut l = Vec::new();
                 if both {
                     let mut dps = [0.0; 2];
-                    for (h, (label, short)) in [("Main Hand", "MH"), ("Off Hand", "OH")].into_iter().enumerate() {
+                    for (h, (label, short)) in [("Main Hand", "MH"), ("Off Hand", "OH")]
+                        .into_iter()
+                        .enumerate()
+                    {
                         let stored = hand(self, h, "impaleStoredHitAvg").unwrap_or(f64::NAN);
                         let m = hand(self, h, "ImpaleModifier").unwrap_or(1.0) - 1.0;
                         let hc = hand(self, h, "HitChance").unwrap_or(f64::NAN);
                         let hit = hc / 100.0;
                         dps[h] = stored * m * hc / 100.0 * dps_mult;
                         l.push(format!("{label}:"));
-                        l.push(sf!(&format!("%.2f ^8({short} average physical hit before mitigation)"), stored));
+                        l.push(sf!(
+                            &format!("%.2f ^8({short} average physical hit before mitigation)"),
+                            stored
+                        ));
                         l.push(sf!(&format!("x %.2f ^8({short} chance to hit)"), hit));
                         let nl = if h == 0 { "\n" } else { "" };
-                        l.push(sf!(&format!("x %.2f ^8({short} impale damage multiplier){nl}"), m));
+                        l.push(sf!(
+                            &format!("x %.2f ^8({short} impale damage multiplier){nl}"),
+                            m
+                        ));
                         l.push(sf!("= %.2f", dps[h]));
                     }
                     l.push("Combined total:".into());
@@ -1041,7 +1069,10 @@ impl<'a> Perform<'a> {
                         "%.2f ^8(average physical hit before mitigation)",
                         n(self, "impaleStoredHitAvg")
                     ));
-                    l.push(sf!("x %.2f ^8(chance to hit)", n(self, "HitChance") / 100.0));
+                    l.push(sf!(
+                        "x %.2f ^8(chance to hit)",
+                        n(self, "HitChance") / 100.0
+                    ));
                     l.push(sf!(
                         "x %.2f ^8(impale damage multiplier)",
                         g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0

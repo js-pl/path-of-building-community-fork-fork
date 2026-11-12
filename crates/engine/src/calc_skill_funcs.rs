@@ -514,7 +514,8 @@ impl<'a> Perform<'a> {
                 }
             }
             ("FlamethrowerTrap" | "FlamethrowerTrapAltX", "preDamageFunc") => {
-                let (duration, cooldown) = (out_req(self, "Duration")?, out_req(self, "TrapCooldown")?);
+                let (duration, cooldown) =
+                    (out_req(self, "Duration")?, out_req(self, "TrapCooldown")?);
                 let average = duration / cooldown;
                 self.c.set_out(actor, "AverageActiveTraps", average);
                 if let Some(b) = self.bd(actor) {
@@ -546,6 +547,24 @@ impl<'a> Perform<'a> {
                         self.c.set_out(actor, "SkillDPSMultiplier", cur * strikes);
                     }
                     self.c.set_out(actor, "NormalHitsPerCast", strikes);
+                    let (per, duration) = (sd(self, "strikeInterval"), sd(self, "duration"));
+                    if let Some(b) = self.bd(actor) {
+                        b.set_lines(
+                            "NormalHitsPerCast",
+                            vec![
+                                sf!(
+                                    "^8Lightning bolts strike all nearby enemies every^7 %.2f^8 seconds (^7%.2f^8 strikes/sec).",
+                                    per,
+                                    1.0 / per
+                                ),
+                                sf!(
+                                    "^8Balls lasts for ^7%d^8 seconds for a total of ^7%d^8 strikes.",
+                                    duration,
+                                    strikes
+                                ),
+                            ],
+                        );
+                    }
                 }
             }
             ("FrozenSweep" | "FrozenSweepAltX", "preDamageFunc") => {
@@ -613,6 +632,35 @@ impl<'a> Perform<'a> {
                             Mod::new("Damage", ModType::More, avg, Some(&format!("Skill:{id}"))),
                         );
                         self.c.set_out(actor, "KineticFusilladeAvgMoreMult", avg);
+                        if self.has_bd(actor) {
+                            let mut l = vec![
+                                sf!(
+                                    "^8Each projectile deals^7 %d%%^8 more damage per previous projectile",
+                                    per
+                                ),
+                                sf!("^8With^7 %d^8 projectiles, damage progression is:^7", count),
+                            ];
+                            let mut k = 1.0;
+                            while k <= count {
+                                l.push(sf!(
+                                    "  ^8Projectile %d:^7 %d%%^8 more damage",
+                                    k,
+                                    per * (k - 1.0)
+                                ));
+                                k += 1.0;
+                            }
+                            l.push(sf!("^8Average more multiplier:^7 %.1f%%", avg));
+                            let max = self
+                                .c
+                                .override_num(list, c, &["ProjectileCountMaximum"])?
+                                .ok_or("bad argument #2 to 'format' (number expected, got nil)")?;
+                            let b = self.bd(actor).unwrap();
+                            b.set_lines("KineticFusilladeSequentialBreakdown", l);
+                            b.entry("ProjectileCount").push(sf!(
+                                "^8Maximum number of Kinetic Fusilade projectiles:^7 %d",
+                                max
+                            ));
+                        }
                     }
                 }
             }
@@ -635,18 +683,53 @@ impl<'a> Perform<'a> {
                 let self_taken =
                     |v: f64| ((v + 0.5).floor() * (100.0 - res) / 100.0 * taken).floor();
                 let taken_es = self_taken(es * sd(self, "SelfDamageTakenES"));
-                let (add, total) = if id == "ForbiddenRite" {
+                let es_part = sd(self, "SelfDamageTakenES");
+                let (add, total, life) = if id == "ForbiddenRite" {
                     let life = out_req(self, &pick("TotemLife", "Life"))?;
                     let add = life * sd(self, "lifeDealtAsChaos")
                         + es * sd(self, "energyShieldDealtAsChaos");
                     let taken_life = self_taken(life * sd(self, "SelfDamageTakenLife"));
-                    (add, taken_life + taken_es + chaos_flat)
+                    (add, taken_life + taken_es + chaos_flat, Some(life))
                 } else {
                     (
                         es * sd(self, "energyShieldDealtAsChaos"),
                         taken_es + chaos_flat,
+                        None,
                     )
                 };
+                let life_part = sd(self, "SelfDamageTakenLife");
+                if let Some(b) = self.bd(actor) {
+                    let mut l = vec![sf!("Damage Taken per cast from Forbidden Rite: %d", total)];
+                    let mut chaos = es * es_part;
+                    if let Some(life) = life {
+                        let part = life_part;
+                        l.push(sf!(
+                            "^8=^7 %d^8 (Life) *^7 %d%%^8 (of Life taken as Chaos Damage)",
+                            life,
+                            part * 100.0
+                        ));
+                        chaos = life * part + es * es_part;
+                    }
+                    if es != 0.0 {
+                        l.push(sf!(
+                            "^8+^7 %d^8 (ES) *^7 %d%%^8 (of ES taken as Chaos Damage)",
+                            es,
+                            es_part * 100.0
+                        ));
+                    }
+                    l.push(sf!(
+                        "^8=^7 %d^8 (Chaos Damage) *^7 %d%%^8 (Chaos Resistance)",
+                        chaos,
+                        res
+                    ));
+                    if chaos_flat != 0.0 {
+                        l.push(sf!("^8 -^7 %d^8 (Flat Damage reduction)", -flat));
+                    }
+                    if taken != 1.0 {
+                        l.push(sf!("^8 *^7 %.2f^8 (Damage taken Multiplier)", taken));
+                    }
+                    b.set_lines("FRDamageTaken", l);
+                }
                 for k in ["ChaosMin", "ChaosMax"] {
                     let v = sd(self, k) + add;
                     self.sd_set(i, k, v);
@@ -864,14 +947,59 @@ impl<'a> Perform<'a> {
                 self.c.set_out(actor, "OverlapChance", overlap * 100.0);
                 let count = out_req(self, "ProjectileCount")?;
                 let alt = id == "MoltenStrikeAltX";
+                let bd = self.has_bd(actor);
+                let mut dps_l = None;
                 let mut mult = 1.0;
                 if part == Some(3.0) || (alt && (part == Some(5.0) || part == Some(6.0))) {
                     mult = overlap * count;
                     if alt && part == Some(6.0) {
                         let fifth = 1.0 + sd(self, "FifthStrikeDamage") / 100.0;
-                        let overall =
-                            fifth * overlap * (count + sd(self, "FifthStrikeProjectiles"));
+                        let extra = sd(self, "FifthStrikeProjectiles");
+                        let overall = fifth * overlap * (count + extra);
                         mult = 0.8 * mult + 0.2 * overall;
+                        dps_l = bd.then(|| vec![
+                            "Weighted average DPS multiplier for balls".into(),
+                            "^8= (0.8 * balls dps) + (0.2 * 5th attack balls dps)".into(),
+                            sf!("^8= (0.8 * normal ball hit * overlap chance * number of projectiles) + (0.2 * ball hit * 5th attack multiplier * overlap chance * (number of projectiles + %d))", extra),
+                            sf!("^8= ball hit * overlap chance * (0.8 * number of projectiles + 0.2 * 5th attack multiplier * (number of projectiles + %d))", extra),
+                            sf!(
+                                "^8= ball hit * ^7%.3f ^8* (0.8 * ^7%d ^8+ 0.2 * ^7%.1f ^8* ^7%d^8)",
+                                overlap,
+                                count,
+                                fifth,
+                                count + extra
+                            ),
+                            sf!("^8= ball hit * ^7 %.3f", mult),
+                        ]);
+                    } else if bd {
+                        dps_l = Some(vec![
+                            "DPS multiplier".into(),
+                            "^8= number of projectiles * overlap chance".into(),
+                            sf!("^8=^7 %d^8 *^7 %.3f^8", count, overlap),
+                            sf!("^8=^7 %.3f", mult),
+                        ]);
+                    }
+                }
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines(
+                        "OverlapChance",
+                        vec![
+                            "Chance for individual balls to land on the enemy:".into(),
+                            "^8= (area where a ball can land on enemy) / (total area)".into(),
+                            "^8= (enemy radius + ball radius - min travel) / (max travel - min travel)".into(),
+                            sf!(
+                                "^8= (^7%d^8 + ^7%d^8 - ^7%d) / (^7%d^8 - ^7%d)",
+                                enemy,
+                                ball,
+                                inner,
+                                outer,
+                                inner
+                            ),
+                            sf!("^8=^7 %.2f^8%%", overlap * 100.0),
+                        ],
+                    );
+                    if let Some(l) = dps_l {
+                        b.set_lines("SkillDPSMultiplier", l);
                     }
                 }
                 if mult != 1.0 {
@@ -890,7 +1018,8 @@ impl<'a> Perform<'a> {
                     let max_strikes = (sd(self, "duration") / per_strike).floor();
                     let inc = 1.0 + self.c.inc(list, c, &["ProjectileSpeed"])? / 100.0;
                     let more = self.c.more(list, c, &["ProjectileSpeed"])?;
-                    let per = sd(self, "projectileSpeed") * (inc * more) * per_strike;
+                    let per_sec = sd(self, "projectileSpeed") * (inc * more);
+                    let per = per_sec * per_strike;
                     let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
                         Some(r) => r,
                         None => self.c.base(list, c, &["EnemyRadius"])?,
@@ -907,8 +1036,40 @@ impl<'a> Perform<'a> {
                         / per)
                         .floor();
                     let n = m_max(0.0, m_min(max_strikes, last + 1.0 - first));
-                    if self.input.breakdown {
+                    if self.has_bd(actor) {
+                        let last = first + n - 1.0;
+                        let l = vec![
+                            sf!("^8Balls travel at^7 %.2f^8 units/sec.", per_sec),
+                            sf!(
+                                "^8Lightning bolts strike all nearby enemies every^7 %.2f^8 seconds (^7%.2f^8 strikes/sec).",
+                                per_strike,
+                                1.0 / per_strike
+                            ),
+                            sf!(
+                                "^8Balls travel^7 %.2f^8 units between each bolt strike.",
+                                per
+                            ),
+                            sf!(
+                                "^8Assumes balls are cast^7 %d^8 units from the enemy.",
+                                dist
+                            ),
+                            sf!(
+                                "^8Balls can strike enemies up to^7 %d^8 units away from themselves.",
+                                radius
+                            ),
+                            sf!(
+                                "^8The first strike is at^7 %.2f^8 seconds after it is cast, when the ball is^7 %d^8 units from the cast point.",
+                                first * per_strike,
+                                first * per
+                            ),
+                            sf!(
+                                "^8The last strike is at^7 %.2f^8 seconds after it is cast, when the ball is^7 %d^8 units from the cast point.",
+                                last * per_strike,
+                                last * per
+                            ),
+                        ];
                         self.c.set_out(actor, "NormalHitsPerCast", n);
+                        self.bd(actor).unwrap().set_lines("NormalHitsPerCast", l);
                     }
                     mult = n;
                 }
@@ -926,12 +1087,95 @@ impl<'a> Perform<'a> {
                 } else {
                     1.0
                 };
-                let effective =
-                    (sd(self, "duration") + delay * (count - 1.0)) * out_req(self, "DurationMod")?;
+                let hover = sd(self, "duration");
+                let all = delay * (count - 1.0);
+                let duration_mod = out_req(self, "DurationMod")?;
+                let effective = (hover + all) * duration_mod;
                 let tick = self.misc_data("ServerTickTime");
-                let max_aps = 1.0 / ((effective / tick).ceil() * tick);
+                let rounded = (effective / tick).ceil() * tick;
+                let max_aps = 1.0 / rounded;
                 self.c
                     .set_out(actor, "KineticFusilladeMaxEffectiveAPS", max_aps);
+                if self.has_bd(actor) {
+                    let predictive = 1.0 / effective;
+                    let mut l = vec![
+                        sf!("^8Base hover delay:^7 %.1fs", hover),
+                        sf!("^8Base delay between projectiles:^7 %.2fs", delay),
+                        sf!(
+                            "^8Base time for^7 %d added ^8projectiles:^7 %.2fs x %d = %.1fs",
+                            count - 1.0,
+                            delay,
+                            count - 1.0,
+                            all
+                        ),
+                        sf!("^8Duration modifier:^7 %.4f", duration_mod),
+                        String::new(),
+                        "^6Lockstep".into(),
+                        sf!(
+                            "^8Effective delay:^7 (%.1f + %.2f) x %.4f = %.4fs",
+                            hover,
+                            all,
+                            duration_mod,
+                            effective
+                        ),
+                        sf!("^8Rounded up to nearest server tick^7 = %.4fs", rounded),
+                        sf!(
+                            "^8Max effective attack rate:^7 1 / %.4f = %.2f",
+                            rounded,
+                            max_aps
+                        ),
+                    ];
+                    if let Some(aps) = self.c.out(actor, "Speed") {
+                        let inc = self.c.inc(list, c, &["Speed"])?;
+                        let extra =
+                            |max: f64| ((max / aps) * (1.0 + inc / 100.0) - 1.0) * 100.0 - inc;
+                        let rate_lines = |l: &mut Vec<String>, max: f64| {
+                            let add = extra(max);
+                            if aps > max {
+                                l.push(sf!(
+                                    "^1Current attack rate (%.2f) exceeds max effective rate!",
+                                    aps
+                                ));
+                                l.push(sf!(
+                                    "^1Reduce attack speed by at least^7 %d%% ^1",
+                                    (-add).ceil()
+                                ));
+                                l.push(sf!(
+                                    "^1DPS is reduced by %.1f%%",
+                                    (1.0 - max / aps) * 100.0
+                                ));
+                            } else {
+                                l.push(sf!(
+                                    "^2Current attack rate (%.2f) is within effective limits",
+                                    aps
+                                ));
+                                l.push(sf!(
+                                    "^2You can add up to^7 %d%% ^2increased attack speed",
+                                    add.floor()
+                                ));
+                            }
+                        };
+                        rate_lines(&mut l, max_aps);
+                        l.push(String::new());
+                        l.push("^6Predictive".into());
+                        l.push(sf!(
+                            "^8Effective delay:^7 (%.1f + %.2f) x %.4f = %.4fs",
+                            hover,
+                            all,
+                            duration_mod,
+                            effective
+                        ));
+                        l.push(sf!(
+                            "^8Max effective attack rate:^7 1 / %.4f = %.2f",
+                            effective,
+                            predictive
+                        ));
+                        rate_lines(&mut l, predictive);
+                    }
+                    self.bd(actor)
+                        .unwrap()
+                        .set_lines("KineticFusilladeMaxEffectiveAPS", l);
+                }
                 if part == Some(1.0)
                     && let Some(aps) = self.c.out(actor, "Speed")
                     && aps > max_aps
@@ -973,7 +1217,11 @@ impl<'a> Perform<'a> {
                         dmore,
                         pulses,
                         traps,
-                        per: ("Average active traps, not considering stored cooldown uses:", "cooldown", cooldown),
+                        per: (
+                            "Average active traps, not considering stored cooldown uses:",
+                            "cooldown",
+                            cooldown,
+                        ),
                     });
                 }
                 let enemy = match self.c.override_num(list, c, &["EnemyRadius"])? {
@@ -995,14 +1243,19 @@ impl<'a> Perform<'a> {
                     _ => 1.0,
                 };
                 if let Some(b) = self.bd(actor) {
-                    b.set_lines("OverlapChance", wave_overlap_lines(wave, enemy, full, overlap));
+                    b.set_lines(
+                        "OverlapChance",
+                        wave_overlap_lines(wave, enemy, full, overlap),
+                    );
                     if let Some(p) = &pulse {
                         for (k, l) in p.lines() {
                             b.set_lines(k, l);
                         }
                     }
                     let parts = if base { 6.0 } else { 3.0 };
-                    if let Some(l) = wave_dps_lines(part.filter(|p| *p <= parts), waves, overlap, traps, mult) {
+                    if let Some(l) =
+                        wave_dps_lines(part.filter(|p| *p <= parts), waves, overlap, traps, mult)
+                    {
                         b.set_lines("SkillDPSMultiplier", l);
                     }
                 }
@@ -1082,7 +1335,10 @@ impl<'a> Perform<'a> {
                         "AreaOfEffectRadius",
                         vec!["Targeting area of this skill is not affected by Area of Effect modifiers.".into()],
                     );
-                    b.set_lines("OverlapChance", wave_overlap_lines(wave, enemy, full, overlap));
+                    b.set_lines(
+                        "OverlapChance",
+                        wave_overlap_lines(wave, enemy, full, overlap),
+                    );
                     let p = Pulses {
                         frequency,
                         rate,
@@ -1679,13 +1935,24 @@ fn wave_overlap_lines(wave: f64, enemy: f64, full: f64, overlap: f64) -> Vec<Str
         "Chance for individual wave to land within range to damage enemy:".into(),
         "^8= (area where wave can spawn to damage enemy) / (total area)".into(),
         "^8= (^7secondary radius^8 + ^7enemy radius^8 - 1) ^ 2 / ^7radius^8 ^ 2".into(),
-        sf!("^8= (^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2", wave, enemy, full),
+        sf!(
+            "^8= (^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2",
+            wave,
+            enemy,
+            full
+        ),
         sf!("^8=^7 %.3f^8%%", overlap * 100.0),
     ]
 }
 
 /// `breakdown.SkillDPSMultiplier` of a wave trap's skill part
-fn wave_dps_lines(part: Option<f64>, waves: f64, overlap: f64, traps: f64, mult: f64) -> Option<Vec<String>> {
+fn wave_dps_lines(
+    part: Option<f64>,
+    waves: f64,
+    overlap: f64,
+    traps: f64,
+    mult: f64,
+) -> Option<Vec<String>> {
     let l = match part? {
         2.0 => vec![
             "^8= ^7maximum waves^8 * ^7overlap chance^8".into(),
@@ -1706,5 +1973,9 @@ fn wave_dps_lines(part: Option<f64>, waves: f64, overlap: f64, traps: f64, mult:
         ],
         _ => return None,
     };
-    Some(std::iter::once("DPS multiplier".to_string()).chain(l).collect())
+    Some(
+        std::iter::once("DPS multiplier".to_string())
+            .chain(l)
+            .collect(),
+    )
 }

@@ -8,12 +8,12 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::{Breakdown, Breakdowns, Cell, Chain, Row, color, f, multi_chain};
 use crate::calc::{PLAYER, floor, m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, armour_reduction_f, hit_chance, is_elemental};
 use crate::calc_offence::{Off, OutMap, Pass, dmg_index, get_num, set_num};
 use crate::calc_perform::{Perform, new_mod};
 use crate::mods::{Cfg, Mod, ModType, ModValue, Sym};
-use crate::breakdown::{Breakdown, Breakdowns, Cell, Chain, Row, color, f, multi_chain};
 use crate::sf;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -203,7 +203,11 @@ impl<'a> Perform<'a> {
                         if mode == Combine::Chance {
                             let double = self.sd_truthy(o.skill, "doubleHitsWhenDualWielding");
                             let (mp, op, what) = if double {
-                                (main / 10000.0, off / 10000.0, ["chance of main hand", "chance of  off hand"])
+                                (
+                                    main / 10000.0,
+                                    off / 10000.0,
+                                    ["chance of main hand", "chance of  off hand"],
+                                )
                             } else {
                                 (
                                     main / (main + off),
@@ -215,7 +219,9 @@ impl<'a> Perform<'a> {
                                 )
                             };
                             let v = a * mp + b * op;
-                            for (hand, x, p, w) in [("Main", a, mp, what[0]), ("Off", b, op, what[1])] {
+                            for (hand, x, p, w) in
+                                [("Main", a, mp, what[0]), ("Off", b, op, what[1])]
+                            {
                                 lines.push(format!("Contribution from {hand} Hand:"));
                                 lines.push(sf!("%.1f", x));
                                 lines.push(sf!(&format!("x %.3f ^8({w})"), p));
@@ -236,7 +242,10 @@ impl<'a> Perform<'a> {
                             );
                             let v = max * stacks + min * (1.0 - stacks);
                             lines.push(String::new());
-                            lines.push(sf!("%.2f%% of ailment stacks use maximum damage", stacks * 100.0));
+                            lines.push(sf!(
+                                "%.2f%% of ailment stacks use maximum damage",
+                                stacks * 100.0
+                            ));
                             lines.push(sf!(
                                 "Max Damage comes from %s",
                                 if a >= b { "Main Hand" } else { "Off Hand" }
@@ -453,7 +462,8 @@ impl<'a> Perform<'a> {
                 100.0
             } else {
                 let evasion = m_max(round(self.c.val(edb, "Evasion", None)?, 0.0), 0.0);
-                let h = hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?;
+                let h =
+                    hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?;
                 if bd {
                     let num = crate::pat::num;
                     let note = if self.input.config.contains_key("enemyLevel") {
@@ -797,7 +807,10 @@ impl<'a> Perform<'a> {
                 }
                 if let Some(b) = self.bd(actor) {
                     let speed = get_num(&o.hands[1], "Speed").unwrap_or(f64::NAN);
-                    let l = vec!["Use Offhand Weapon Attack Speed:".into(), sf!("= %.2f", speed)];
+                    let l = vec![
+                        "Use Offhand Weapon Attack Speed:".into(),
+                        sf!("= %.2f", speed),
+                    ];
                     b.set_lines("Speed", l);
                 }
             } else if both && let Some(b) = self.bd(actor) {
@@ -883,7 +896,10 @@ impl<'a> Perform<'a> {
             let mut l = Vec::new();
             if m.floor() != m {
                 l.push(sf!(
-                    &format!("{}NOTE: First stage has a %.2fx channel time multiplier", color::CUSTOM),
+                    &format!(
+                        "{}NOTE: First stage has a %.2fx channel time multiplier",
+                        color::CUSTOM
+                    ),
                     m - m.floor()
                 ));
             }
@@ -2031,7 +2047,10 @@ impl<'a> Perform<'a> {
                     if enemy_inc != 1.0 && self.has_bd(actor) {
                         let own = self.c.base(list, c, &["CritMultiplier"])?;
                         let l = vec![
-                            sf!("%d%% ^8(additional extra damage)", (enemy_base + own) / 100.0),
+                            sf!(
+                                "%d%% ^8(additional extra damage)",
+                                (enemy_base + own) / 100.0
+                            ),
                             sf!(
                                 "x %.2f ^8(increased/reduced extra crit damage taken by enemy)",
                                 enemy_inc
@@ -2071,9 +2090,15 @@ impl<'a> Perform<'a> {
                             sf!("x %.2f%%", pre),
                         ];
                         if use_chance < 1.0 {
-                            l.push(sf!("x %.2f%% ^8(uses that can bifurcate)", use_chance * 100.0));
+                            l.push(sf!(
+                                "x %.2f%% ^8(uses that can bifurcate)",
+                                use_chance * 100.0
+                            ));
                         }
-                        l.push(sf!("= %.2f%% ^8(chance both crit rolls succeed)", multi_chance));
+                        l.push(sf!(
+                            "= %.2f%% ^8(chance both crit rolls succeed)",
+                            multi_chance
+                        ));
                         l.push(sf!("/ %.2f%% ^8(effective crit chance)", effective_crit));
                         l.push(sf!("= %.2f ^8(crit Bifurcates effect)", 1.0 + conditional));
                         b.set_lines(Self::pkey(o, "CritBifurcates"), l);
@@ -2214,8 +2239,15 @@ impl<'a> Perform<'a> {
             }
             let conv_mult = conv[oi].total[ti];
             if conv_mult > 0.0 {
-                let (min, max) =
-                    self.calc_damage_raw(o, cfg, conv, other, flags, rows.as_deref_mut(), Some(ti))?;
+                let (min, max) = self.calc_damage_raw(
+                    o,
+                    cfg,
+                    conv,
+                    other,
+                    flags,
+                    rows.as_deref_mut(),
+                    Some(ti),
+                )?;
                 add_min += min * conv_mult;
                 add_max += max * conv_mult;
             }
@@ -2238,7 +2270,10 @@ impl<'a> Perform<'a> {
                 ];
                 if let Some(d) = conv_dst {
                     row.push(("convDst", dst(d, &conv[ti].conversion, "%d%% to %s").into()));
-                    row.push(("gainDst", dst(d, &conv[ti].gain, "%d%% gained as %s").into()));
+                    row.push((
+                        "gainDst",
+                        dst(d, &conv[ti].gain, "%d%% gained as %s").into(),
+                    ));
                 }
                 rows.push(row);
             }
@@ -2431,7 +2466,12 @@ impl<'a> Perform<'a> {
                             } else {
                                 "skill"
                             };
-                            let arg = |v: Option<f64>| v.map_or(crate::breakdown::Arg::Str("nil"), crate::breakdown::Arg::Num);
+                            let arg = |v: Option<f64>| {
+                                v.map_or(
+                                    crate::breakdown::Arg::Str("nil"),
+                                    crate::breakdown::Arg::Num,
+                                )
+                            };
                             l.push(crate::breakdown::lua_format(
                                 "%d to %d ^8(base damage from %s)",
                                 &[arg(a), arg(b), from.into()],
@@ -2442,7 +2482,12 @@ impl<'a> Perform<'a> {
                             plus = "+ ";
                         }
                         if added_min != 0.0 || added_max != 0.0 {
-                            l.push(sf!("%s%d to %d ^8(added damage)", plus, added_min, added_max));
+                            l.push(sf!(
+                                "%s%d to %d ^8(added damage)",
+                                plus,
+                                added_min,
+                                added_max
+                            ));
                             if effectiveness != 1.0 {
                                 l.push(sf!("x %.2f ^8(damage effectiveness)", effectiveness));
                             }
@@ -2588,7 +2633,7 @@ impl<'a> Perform<'a> {
                     };
                     if (hit_min != 0.0 || hit_max != 0.0) && effective {
                         let (eff_mult, eff_bd) =
-                            self.hit_eff_mult(o, &cfg, t, pass, hit_avg, crit, bd_key.is_some())?;
+                            self.hit_eff_mult(o, &cfg, t, pass, hit_avg, crit)?;
                         hit_min *= eff_mult;
                         hit_max *= eff_mult;
                         hit_avg *= eff_mult;
@@ -3026,9 +3071,7 @@ impl<'a> Perform<'a> {
                     l.push(sf!("x %.2f ^8(number of hits)", burst_hits));
                 }
                 l.push(sf!("= %.1f ^8(total burst damage)", burst));
-                self.bd(actor)
-                    .unwrap()
-                    .set_lines("AverageBurstDamage", l);
+                self.bd(actor).unwrap().set_lines("AverageBurstDamage", l);
             }
         }
         // PvP
@@ -3059,7 +3102,6 @@ impl<'a> Perform<'a> {
         pass: u32,
         hit_avg: f64,
         crit: f64,
-        bd: bool,
     ) -> Result<(f64, Option<Vec<String>>)> {
         let (i, list, edb) = (o.skill, o.list, o.edb);
         let mut source_res = t;
@@ -3244,7 +3286,7 @@ impl<'a> Perform<'a> {
             };
             eff *= 1.0 - effective_resist / 100.0;
         }
-        if !(bd && pass == 2) {
+        if !(pass == 2 && self.has_bd(o.actor)) {
             return Ok((eff, None));
         }
         let source = if self.c.flag(
@@ -3278,12 +3320,21 @@ impl<'a> Perform<'a> {
     fn leech_breakdown(&self, o: &Off, pool: &str, hit_rate: f64) -> Result<Vec<String>> {
         let actor = o.actor;
         let g = |k: &str| self.c.out(actor, &format!("{pool}{k}")).unwrap_or(f64::NAN);
-        let (instant, instant_rate, instances) = (g("LeechInstant"), g("LeechInstantRate"), g("LeechInstances"));
+        let (instant, instant_rate, instances) = (
+            g("LeechInstant"),
+            g("LeechInstantRate"),
+            g("LeechInstances"),
+        );
         let size = self.c.out(actor, pool).unwrap_or(f64::NAN);
-        let max = self.c.out(actor, &format!("Max{pool}LeechRate")).unwrap_or(f64::NAN);
+        let max = self
+            .c
+            .out(actor, &format!("Max{pool}LeechRate"))
+            .unwrap_or(f64::NAN);
         let (dur, proportion) = (g("LeechDuration"), g("LeechInstantProportion"));
         let base = self.misc_data("LeechRateBase");
-        let rate_mod = self.c.calc_mod(o.db, None, &[&format!("{pool}LeechRate")])?;
+        let rate_mod = self
+            .c
+            .calc_mod(o.db, None, &[&format!("{pool}LeechRate")])?;
         let mut l = Vec::new();
         let instant_line = |l: &mut Vec<String>| {
             l.push(if proportion != 1.0 {
@@ -3422,7 +3473,14 @@ impl<'a> Perform<'a> {
     }
 
     /// The lines of a damage type's breakdown after its `damageTypes` table
-    fn hit_damage_lines(&self, o: &Off, min: f64, max: f64, conv_mult: f64, max_hit: bool) -> Vec<String> {
+    fn hit_damage_lines(
+        &self,
+        o: &Off,
+        min: f64,
+        max: f64,
+        conv_mult: f64,
+        max_hit: bool,
+    ) -> Vec<String> {
         let po = |k: &str| self.po(o, k).unwrap_or(f64::NAN);
         let go = |k: &str| self.go(o, k).unwrap_or(f64::NAN);
         let mut l = vec![
@@ -3647,10 +3705,7 @@ impl<'a> Perform<'a> {
             }
         }
         if self.has_bd(actor) {
-            let speed = self
-                .c
-                .out(actor, "HitSpeed")
-                .unwrap_or(g(self, "Speed"));
+            let speed = self.c.out(actor, "HitSpeed").unwrap_or(g(self, "Speed"));
             let hit_rate = g(self, "HitChance") / 100.0
                 * speed
                 * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);

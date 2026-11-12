@@ -3,20 +3,20 @@
 //! (`configTable`) and `defaultTriggerHandler`, with the simulation of
 //! skill rotations (`calcMultiSpellRotationImpact`).
 //!
-//! Not ported yet: breakdowns, Arcanist Brand's
-//! activation, Manaforged Arrows, Cast while Channelling's handler, and every
-//! configuration but those in [`Perform::trigger_config`].
+//! Not ported yet: Manaforged Arrows, the uptime of exerting warcries as a
+//! trigger, the helmet's Focus, and every configuration but those in
+//! [`Perform::trigger_config`].
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
 
-use crate::sf;
 use crate::calc::{PLAYER, m_max, m_min, round};
 use crate::calc_cache::CachedCalc;
 use crate::calc_perform::{Perform, Result, src};
 use crate::mods::{ModType, ModValue};
+use crate::sf;
 
 /// A skill as the rotation simulation sees it
 /// (`packageSkillDataForSimulation`)
@@ -66,6 +66,10 @@ pub(crate) struct TriggerConfig {
     /// (`triggeredBy.mainSkill`, `activationFreqInc`, `activationFreqMore`)
     pub brand: Option<(usize, f64, f64)>,
 }
+
+/// A rotation simulation's main rate, simulated time and each skill's rate
+/// by uuid
+type Sim = (f64, f64, Vec<(String, f64)>);
 
 /// The cooldowns `breakdown.TriggerRateCap` shows
 struct TriggerCaps<'n> {
@@ -688,19 +692,33 @@ impl<'a> Perform<'a> {
         };
         let mut l = Vec::new();
         if let Some(o) = t.cd_override {
-            l.push(sf!("%.2f ^8(hard override of cooldown of %s)", o, triggered_name));
+            l.push(sf!(
+                "%.2f ^8(hard override of cooldown of %s)",
+                o,
+                triggered_name
+            ));
         } else if t.triggered_adj == 0.0 {
-            l.push(format!("{triggered_name} has no base cooldown or cooldown override"));
+            l.push(format!(
+                "{triggered_name} has no base cooldown or cooldown override"
+            ));
         } else {
             match t.triggered_cd {
                 Some(cd) => l.push(sf!("%.2f ^8(base cooldown of triggered skill)", cd)),
-                None => l.push(format!("{triggered_name} has no base cooldown or cooldown override")),
+                None => l.push(format!(
+                    "{triggered_name} has no base cooldown or cooldown override"
+                )),
             }
             if let Some(a) = t.added {
                 l.push(sf!("+ %.2f ^8(flat added cooldown)", a));
             }
-            l.push(sf!("/ %.2f ^8(increased/reduced cooldown recovery)", t.icdr));
-            l.push(sf!("= %.4f ^8(final cooldown of triggered skill)", t.triggered_adj));
+            l.push(sf!(
+                "/ %.2f ^8(increased/reduced cooldown recovery)",
+                t.icdr
+            ));
+            l.push(sf!(
+                "= %.4f ^8(final cooldown of triggered skill)",
+                t.triggered_adj
+            ));
         }
         l.push(String::new());
         if t.actor == PLAYER {
@@ -717,12 +735,17 @@ impl<'a> Perform<'a> {
                         a
                     ));
                 }
-                l.push(sf!("/ %.2f ^8(increased/reduced cooldown recovery)", t.icdr));
+                l.push(sf!(
+                    "/ %.2f ^8(increased/reduced cooldown recovery)",
+                    t.icdr
+                ));
                 l.push(sf!("= %.4f ^8(final cooldown of trigger)", t.trigger_adj));
             }
         }
         l.push(String::new());
-        let action_adj = t.cd_override.unwrap_or(m_max(t.trigger_adj, t.triggered_adj));
+        let action_adj = t
+            .cd_override
+            .unwrap_or(m_max(t.trigger_adj, t.triggered_adj));
         if t.triggered_adj != 0.0 && t.trigger_adj != 0.0 {
             l.push(sf!(
                 "%.3f ^8(biggest of trigger cooldown and triggered skill cooldown)",
@@ -792,7 +815,7 @@ impl<'a> Perform<'a> {
         trigger_cd: f64,
         chance: f64,
         actor: usize,
-    ) -> Result<(f64, f64, Vec<(String, f64)>)> {
+    ) -> Result<Sim> {
         let increment = 1.0 / source_rate;
         let sim_time = increment * 1000.0;
         let tick = self.misc_data("ServerTickTime");
@@ -843,7 +866,7 @@ impl<'a> Perform<'a> {
         Ok((main_rate, sim_time, rates))
     }
 
-    /// `defaultTriggerHandler(env, config)` without its breakdowns
+    /// `defaultTriggerHandler(env, config)`
     fn default_trigger_handler(&mut self, config: TriggerConfig) -> Result<()> {
         let actor = config.actor.unwrap_or(PLAYER);
         let main = self
@@ -1350,9 +1373,11 @@ impl<'a> Perform<'a> {
                 } else {
                     trigger_cd.or(triggered_cd).unwrap_or(0.0)
                 };
-                let (mut r, sim_time, rates) = self.rotation_sim(rotation, esr, cd, chance, actor)?;
+                let (mut r, sim_time, rates) =
+                    self.rotation_sim(rotation, esr, cd, chance, actor)?;
                 let db = self.c.db(actor);
-                let bots = self.c.flag(db, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell");
+                let bots =
+                    self.c.flag(db, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell");
                 if bots {
                     r *= 2.0;
                 }
@@ -1372,7 +1397,9 @@ impl<'a> Perform<'a> {
                         let name = match source {
                             Some(s) => self.skill_name(s).to_string(),
                             None => match self.mods(main).triggered_by {
-                                Some(t) => self.skill(main).effect_list[t].granted_effect.name.clone(),
+                                Some(t) => {
+                                    self.skill(main).effect_list[t].granted_effect.name.clone()
+                                }
                                 None => self.skill_name(main).to_string(),
                             },
                         };
@@ -1389,7 +1416,11 @@ impl<'a> Perform<'a> {
                         sf!("= %.2f ^8per second", r),
                     ];
                     if bots {
-                        l.insert(2, "x 2 ^8(Trigger bots effectively cause the skill to trigger twice)".into());
+                        l.insert(
+                            2,
+                            "x 2 ^8(Trigger bots effectively cause the skill to trigger twice)"
+                                .into(),
+                        );
                     }
                     if hits > 1.0 {
                         l.insert(2, sf!("x %.2f ^8(hits per triggered skill cast)", hits));
@@ -1403,10 +1434,9 @@ impl<'a> Perform<'a> {
                         l.insert(0, "100% ^8(Base chance)".into());
                     }
                     rate_l = Some(l);
-                    self.bd(actor).unwrap().set(
-                        "SimData",
-                        sim_breakdown(sim_time, &rates),
-                    );
+                    self.bd(actor)
+                        .unwrap()
+                        .set("SimData", sim_breakdown(sim_time, &rates));
                 }
                 r
             }
@@ -1450,7 +1480,7 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
-    /// `CWCHandler(env)` without its breakdowns: Cast while Channelling
+    /// `CWCHandler(env)`: Cast while Channelling
     /// triggers the main skill while its source channels
     fn cwc_handler(&mut self) -> Result<()> {
         let main = self.main();
@@ -1550,7 +1580,8 @@ impl<'a> Perform<'a> {
                 self.skill_name(source)
             );
             let mut l = if triggered_cd.is_some() || cd_override.is_some() {
-                let cd = triggered_cd.ok_or("bad argument #2 to 'format' (number expected, got nil)")?;
+                let cd =
+                    triggered_cd.ok_or("bad argument #2 to 'format' (number expected, got nil)")?;
                 let mut l = vec![
                     first,
                     String::new(),
@@ -1593,7 +1624,10 @@ impl<'a> Perform<'a> {
                     name.as_str()
                 ));
                 l.push(sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr));
-                l.push(sf!("= %.4f ^8(final cooldown of triggered skill)", a / icdr));
+                l.push(sf!(
+                    "= %.4f ^8(final cooldown of triggered skill)",
+                    a / icdr
+                ));
                 l.push(String::new());
                 l.push(sf!("%.3f ^8(adjusted for server tick rate)", adjusted));
                 l.push(String::new());

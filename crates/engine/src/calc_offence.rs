@@ -3,7 +3,9 @@
 //! per pass (main hand, off hand or the skill), speed, accuracy, crits,
 //! leech, ailments and damage over time, and the combined DPS.
 //!
-//! Breakdowns are not built. Skill functions (`preDamageFunc`, ...) are
+//! Breakdowns are written only for an actor that has them (the sidebar's
+//! and the Calcs tab's calculations); a weapon's pass writes its own under
+//! `MainHand.` and `OffHand.`. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
@@ -12,13 +14,13 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::area as area_bd;
+use crate::breakdown::{Breakdown, Chain, Col, Row, area, f, multi_chain};
 use crate::calc::{floor, m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_perform::{Perform, converted_tags, new_mod};
 use crate::item_tools::round_symmetric;
 use crate::mods::{Cfg, Mod, ModType, ModValue, StoreId, Sym, Tag};
-use crate::breakdown::{Breakdown, Chain, Col, Row, area, f, multi_chain};
-use crate::breakdown::area as area_bd;
 use crate::sf;
 use std::collections::BTreeMap;
 
@@ -226,7 +228,10 @@ impl<'a> Perform<'a> {
         names: &[&str],
     ) -> Result<()> {
         if self.has_bd(actor) {
-            let l = crate::breakdown::mod_(self.c.inc(list, cfg, names)?, self.c.more(list, cfg, names)?);
+            let l = crate::breakdown::mod_(
+                self.c.inc(list, cfg, names)?,
+                self.c.more(list, cfg, names)?,
+            );
             self.bd(actor).unwrap().set_opt(k, l);
         }
         Ok(())
@@ -1451,7 +1456,9 @@ impl<'a> Perform<'a> {
                     label(self, "radiusSecondaryLabel").as_deref(),
                     Some(radius_mod),
                 );
-                self.bd(actor).unwrap().set("AreaOfEffectRadiusSecondary", b);
+                self.bd(actor)
+                    .unwrap()
+                    .set("AreaOfEffectRadiusSecondary", b);
             }
         }
         if let Some(tertiary) = self.sd_num(i, "radiusTertiary") {
@@ -1594,7 +1601,12 @@ fn throwing_time(speed: f64, time_mod: f64) -> Vec<String> {
 
 /// `calcRadiusBreakpoints(baseRadius, incArea, moreArea, radiusMod)`:
 /// increased, more, reduced and less, as `breakdown.area` takes them
-pub(crate) fn radius_breakpoints(base: f64, inc: f64, more: f64, radius_mod: f64) -> Option<[f64; 4]> {
+pub(crate) fn radius_breakpoints(
+    base: f64,
+    inc: f64,
+    more: f64,
+    radius_mod: f64,
+) -> Option<[f64; 4]> {
     let radius = calc_radius(base, calc_area_mod(inc, more), radius_mod);
     if radius <= 0.0 {
         return None;
@@ -1626,9 +1638,25 @@ fn molten_strike_breakdown(
     [inc_area, more_area, inc_spd, more_spd]: [f64; 4],
 ) -> Breakdown {
     let calc = |a: [f64; 4]| {
-        let area_mod = round(round((inc_area + a[0] / 100.0) * more_area * (1.0 + a[1] / 100.0), 10.0), 2.0);
-        let speed_mod = round(round((inc_spd + a[2] / 100.0) * more_spd * (1.0 + a[3] / 100.0), 10.0), 2.0);
-        (molten_strike_tertiary_radius(base, deadzone, area_mod, speed_mod), area_mod, speed_mod)
+        let area_mod = round(
+            round(
+                (inc_area + a[0] / 100.0) * more_area * (1.0 + a[1] / 100.0),
+                10.0,
+            ),
+            2.0,
+        );
+        let speed_mod = round(
+            round(
+                (inc_spd + a[2] / 100.0) * more_spd * (1.0 + a[3] / 100.0),
+                10.0,
+            ),
+            2.0,
+        );
+        (
+            molten_strike_tertiary_radius(base, deadzone, area_mod, speed_mod),
+            area_mod,
+            speed_mod,
+        )
     };
     let (dist, area_mod, speed_mod) = calc([0.0; 4]);
     let mut l: Vec<String> = label.into_iter().map(String::from).collect();
@@ -1647,15 +1675,31 @@ fn molten_strike_breakdown(
         };
         for (fmt, sign, k) in [
             ("^8Next AoE breakpoint: %d%% increased or %d%% more", 1.0, 0),
-            ("^8Next Proj. Speed breakpoint: %d%% increased or %d%% more", 1.0, 2),
-            ("^8Previous AoE breakpoint: %d%% increased or %d%% more", -1.0, 0),
-            ("^8Previous Proj. Speed breakpoint: %d%% increased or %d%% more", -1.0, 2),
+            (
+                "^8Next Proj. Speed breakpoint: %d%% increased or %d%% more",
+                1.0,
+                2,
+            ),
+            (
+                "^8Previous AoE breakpoint: %d%% increased or %d%% more",
+                -1.0,
+                0,
+            ),
+            (
+                "^8Previous Proj. Speed breakpoint: %d%% increased or %d%% more",
+                -1.0,
+                2,
+            ),
         ] {
             l.push(sf!(fmt, find(sign, k), find(sign, k + 1)));
         }
     }
     let row = |n: &str, v: String, d: &str| -> Row {
-        vec![("name", n.into()), ("value", v.into()), ("description", d.into())]
+        vec![
+            ("name", n.into()),
+            ("value", v.into()),
+            ("description", d.into()),
+        ]
     };
     Breakdown {
         lines: l,
@@ -1663,8 +1707,16 @@ fn molten_strike_breakdown(
         rows: Some(vec![
             row("r", sf!("%d", deadzone), "fixed deadzone radius"),
             row("R", sf!("%d", base), "base outer radius"),
-            row("a", sf!("%.2f", area_mod), "net AoE multiplier (scales area)"),
-            row("s", sf!("%.2f", speed_mod), "net projectile speed multiplier (scales range)"),
+            row(
+                "a",
+                sf!("%.2f", area_mod),
+                "net AoE multiplier (scales area)",
+            ),
+            row(
+                "s",
+                sf!("%.2f", speed_mod),
+                "net projectile speed multiplier (scales range)",
+            ),
         ]),
         cols: Some(vec![
             Col::new("Variable", "name"),
@@ -2108,7 +2160,13 @@ impl<'a> Perform<'a> {
         if self.has_type(i, "Link") {
             let v = self.c.calc_mod(list, c, &["LinkEffect", "BuffEffect"])?;
             set(self, "LinkEffectMod", v);
-            self.bd_mod(actor, "LinkEffectMod", list, c, &["LinkEffect", "BuffEffect"])?;
+            self.bd_mod(
+                actor,
+                "LinkEffectMod",
+                list,
+                c,
+                &["LinkEffect", "BuffEffect"],
+            )?;
         }
         if self.has_type(i, "Buff") && self.has_type(i, "Herald") {
             let v = self
@@ -2214,7 +2272,10 @@ impl<'a> Perform<'a> {
             if bd {
                 let inc = 1.0 + self.c.inc(list, c, &["CooldownRecovery"])? / 100.0;
                 let mut l = vec![
-                    sf!("%.2fs ^8(base)", self.sd_num(i, "cooldown").unwrap_or(added)),
+                    sf!(
+                        "%.2fs ^8(base)",
+                        self.sd_num(i, "cooldown").unwrap_or(added)
+                    ),
                     sf!("/ %.2f ^8(increased/reduced cooldown recovery)", inc),
                 ];
                 if rounded {
@@ -2366,7 +2427,10 @@ impl<'a> Perform<'a> {
                 } else {
                     " ^8(can be overridden in the Configuration tab)"
                 };
-                let l = vec![format!("Totems Summoned: {}{note}", crate::pat::num(summoned))];
+                let l = vec![format!(
+                    "Totems Summoned: {}{note}",
+                    crate::pat::num(summoned)
+                )];
                 self.bd(actor).unwrap().set_lines("ActiveTotemLimit", l);
             }
             let (life, life_mod) = self.totem_life(i)?;
@@ -2525,7 +2589,10 @@ impl<'a> Perform<'a> {
                 l.push(sf!("x %.4f ^8(duration modifier)", m));
             }
             if debuff && debuff_mult != 1.0 {
-                l.push(sf!("/ %.3f ^8(debuff expires slower/faster)", 1.0 / debuff_mult));
+                l.push(sf!(
+                    "/ %.3f ^8(debuff expires slower/faster)",
+                    1.0 / debuff_mult
+                ));
             }
             l.push("rounded up to nearest server tick".into());
             l.push(sf!("= %.3fs", total));
@@ -2535,7 +2602,10 @@ impl<'a> Perform<'a> {
         let dmod = m_max(self.c.calc_mod(list, c, &names)?, 0.0);
         self.c.set_out(actor, "DurationMod", dmod);
         if bd {
-            let label = if self.sd(i, "durationSecondary").is_some_and(ModValue::truthy) {
+            let label = if self
+                .sd(i, "durationSecondary")
+                .is_some_and(ModValue::truthy)
+            {
                 "Primary duration:"
             } else {
                 ""
@@ -2656,7 +2726,10 @@ impl<'a> Perform<'a> {
             let ml = mod_lines(self, &["ImpaleDuration"], "")?;
             let mut l = vec![sf!("%.2fs ^8(base)", base)];
             if debuff_mult != 1.0 {
-                l.push(sf!("/ %.3f ^8(debuff expires slower/faster)", 1.0 / debuff_mult));
+                l.push(sf!(
+                    "/ %.3f ^8(debuff expires slower/faster)",
+                    1.0 / debuff_mult
+                ));
             }
             if m != 1.0 {
                 l.push(sf!("x %.4f ^8(duration modifier)", m));

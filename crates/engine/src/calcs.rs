@@ -6,7 +6,7 @@
 //! from the setup, where upstream reuses the first calculation's setup;
 //! the Calcs tab's calculation reuses the sidebar's Full DPS results.
 //!
-//! Not ported yet: the offence's breakdowns, the conditions and mods in use that the
+//! Not ported yet: the conditions and mods in use that the
 //! Configuration tab reads (`env.conditionsUsed`, ...; of them only
 //! `env.multipliersUsed`), the node and misc calculators.
 //!
