@@ -304,7 +304,7 @@ upstream = "16de4b82d57f1c0de6eb40f37143c32d4da36a02"
 "Modules/BuildSiteTools.lua" = { status = "todo" }
 "Modules/CalcActiveSkill.lua" = { status = "partial", port = "crates/engine/src/calc_skills.rs crates/engine/src/calc_skill_mods.rs crates/engine/src/calc_minion.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcBase.lua" = { status = "skip", reason = "the empty table the calc modules share; no logic" }
-"Modules/CalcBreakdown.lua" = { status = "todo" }
+"Modules/CalcBreakdown.lua" = { status = "partial", port = "crates/engine/src/breakdown.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcDefence.lua" = { status = "partial", port = "crates/engine/src/calc_defence.rs crates/engine/src/calc_ehp.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcFormat.lua" = { status = "todo" }
 "Modules/CalcMirages.lua" = { status = "partial", port = "crates/engine/src/calc_mirage.rs crates/engine/src/calc_offence.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
