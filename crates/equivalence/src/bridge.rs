@@ -53,7 +53,7 @@ pub fn cfg(v: &Value) -> Result<Option<Cfg>, String> {
     };
     let skill_stats = match g("skillStats") {
         Value::Table(t) => {
-            let mut map = HashMap::new();
+            let mut map = engine::mods::SymMap::default();
             for (k, x) in t.entries() {
                 if let (Key::Str(name), Some(n)) = (k, x.as_number()) {
                     map.insert(Sym::new(&name.to_str_lossy()), n);

@@ -224,16 +224,16 @@ shared 4-core machine (expect noise of 10 to 30 %):
 Each column is typed ms (speedup over the translation in the same run,
 which is steadier than the ms on a shared machine), after each change:
 
-| operation | translation | baseline | shared build | cheap copies |
-|---|---|---|---|---|
-| load | - | 594 | 486 | 475 |
-| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) |
-| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) |
-| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) |
-| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) |
-| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) |
-| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) |
-| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) |
+| operation | translation | baseline | shared build | cheap copies | names |
+|---|---|---|---|---|---|
+| load | - | 594 | 486 | 475 | 526 |
+| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) | 8.8 (5.4x) |
+| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) | 25.6 (4.0x) |
+| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) | 249 (2.6x) |
+| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) | 62.4 (4.4x) |
+| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) | 302 (2.9x) |
+| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) | 33.0 (5.6x) |
+| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) | 3407 (8.5x) |
 
 - shared build: a build's copies share its spec and config (`Rc`); every
   calculation copies the build, and copying the spec's nodes and the
@@ -241,6 +241,12 @@ which is steadier than the ms on a shared machine), after each change:
 - cheap copies: a mod's tags (`Tags`, copy on write), a build's items
   and the spec nodes' stats are shared between copies (`Rc`): copying
   mods into each calculation's databases was a fifth of it.
+- names: symbol maps and the interner hash with FxHash, a per-thread
+  cache of recent names skips the interner's lock and its names'
+  scattered bytes, and a list query no mod's name matches gives the empty
+  result without copying the list (each node's mods were copied for
+  five queries); `Sym::new` went from 14 % to 8 % of node power in the
+  profile (the bench gain is within its noise).
 
 ## Not ported yet in `initEnv`
 

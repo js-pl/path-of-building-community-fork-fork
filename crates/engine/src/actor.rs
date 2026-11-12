@@ -62,7 +62,7 @@ pub struct Actor {
     /// `actor.itemList`: the item in each slot, by id
     pub item_list: BTreeMap<String, f64>,
     /// `actor.output`
-    pub output: HashMap<Sym, OutVal>,
+    pub output: crate::mods::SymMap<OutVal>,
     /// `actor.weaponData1` and `weaponData2`
     pub weapon_data: [Option<Fields>; 2],
     /// `actor.minionData.monsterTags`

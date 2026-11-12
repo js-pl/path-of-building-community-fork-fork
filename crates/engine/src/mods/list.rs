@@ -42,6 +42,13 @@ impl Actors for NoActors {
     }
 }
 
+/// The name as a symbol when a mod has it: a query of a name no mod has
+/// gives the empty result
+fn named(mods: &[Mod], name: &str) -> Option<Sym> {
+    let n = Sym::new(name);
+    mods.iter().any(|m| m.name == n).then_some(n)
+}
+
 /// Runs a query on a plain list of mods
 fn query<T>(mods: &[Mod], f: impl FnOnce(&Query, StoreId) -> T) -> T {
     let mut store = Store::list();
@@ -66,22 +73,34 @@ pub fn on_store<T>(store: Store, f: impl FnOnce(&Query, StoreId) -> T) -> T {
 
 /// `modList:Sum(type, nil, name)`
 pub fn sum(mods: &[Mod], typ: ModType, name: &str) -> Result<f64> {
-    query(mods, |q, id| q.sum(id, typ, None, &[Sym::new(name)]))
+    let Some(n) = named(mods, name) else {
+        return Ok(0.0);
+    };
+    query(mods, |q, id| q.sum(id, typ, None, &[n]))
 }
 
 /// `modList:More(nil, name)`
 pub fn more(mods: &[Mod], name: &str) -> Result<f64> {
-    query(mods, |q, id| q.more(id, None, &[Sym::new(name)]))
+    let Some(n) = named(mods, name) else {
+        return Ok(1.0);
+    };
+    query(mods, |q, id| q.more(id, None, &[n]))
 }
 
 /// `modList:Flag(nil, name)`
 pub fn flag(mods: &[Mod], name: &str) -> Result<bool> {
-    query(mods, |q, id| q.flag(id, None, &[Sym::new(name)]))
+    let Some(n) = named(mods, name) else {
+        return Ok(false);
+    };
+    query(mods, |q, id| q.flag(id, None, &[n]))
 }
 
 /// `modList:List(nil, name)`
 pub fn list(mods: &[Mod], name: &str) -> Result<Vec<ModValue>> {
-    query(mods, |q, id| q.list(id, None, &[Sym::new(name)]))
+    let Some(n) = named(mods, name) else {
+        return Ok(vec![]);
+    };
+    query(mods, |q, id| q.list(id, None, &[n]))
 }
 
 /// `modList:Tabulate(type, nil, name)`: each mod's value with the mod

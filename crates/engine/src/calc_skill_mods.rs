@@ -345,7 +345,7 @@ pub fn build_skill_mod_lists(
     main_skill: usize,
     groups: &mut [SocketGroup],
     mod_db: &mut Store,
-    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    enemy_multipliers: &mut crate::mods::SymMap<f64>,
     input: &ModsInput,
 ) -> Result<()> {
     let mut db = PlayerDb::new(
@@ -407,7 +407,7 @@ pub(crate) fn build_copied_skill_mod_list(
     skill: &mut ActiveSkill,
     groups: &mut [SocketGroup],
     db: &mut PlayerDb,
-    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    enemy_multipliers: &mut crate::mods::SymMap<f64>,
     input: &ModsInput,
     owner: &Owner,
 ) -> Result<()> {
@@ -417,7 +417,7 @@ pub(crate) fn build_copied_skill_mod_list(
 pub(crate) fn build_minion_skill_mod_list(
     skill: &mut ActiveSkill,
     db: &mut PlayerDb,
-    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    enemy_multipliers: &mut crate::mods::SymMap<f64>,
     input: &ModsInput,
     owner: &Owner,
 ) -> Result<()> {
@@ -430,7 +430,7 @@ fn build_skill_mod_list(
     skill: &mut ActiveSkill,
     groups: &mut [SocketGroup],
     db: &mut PlayerDb,
-    enemy_multipliers: &mut std::collections::HashMap<Sym, f64>,
+    enemy_multipliers: &mut crate::mods::SymMap<f64>,
     input: &ModsInput,
     owner: &Owner,
     main: bool,

@@ -17,7 +17,6 @@ use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Store, Sym};
 use crate::skill_data::SkillData;
 use crate::skills::{ExplodeSource, SocketGroup, update_socket_groups};
-use std::collections::HashMap;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -69,7 +68,7 @@ pub struct Env {
     pub groups: Vec<SocketGroup>,
     pub skills: SkillsSetup,
     /// Multipliers set on `env.enemyDB` by the skills
-    pub enemy_multipliers: HashMap<Sym, f64>,
+    pub enemy_multipliers: crate::mods::SymMap<f64>,
 }
 
 /// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
@@ -300,7 +299,7 @@ fn init_env_pass(
         iron_mass: setup.items.iron_mass_mods.is_some(),
         enemy_db: &enemy_db,
     };
-    let mut enemy_multipliers = HashMap::new();
+    let mut enemy_multipliers = crate::mods::SymMap::default();
     calc_skill_mods::build_skill_mod_lists(
         &mut skills.active_skills,
         skills.main_skill,

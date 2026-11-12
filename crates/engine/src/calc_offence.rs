@@ -71,7 +71,7 @@ fn molten_strike_tertiary_radius(base: f64, deadzone: f64, area_mod: f64, speed_
 }
 
 /// An output map: the actor's output or a pass's (`output.MainHand`)
-pub(crate) type OutMap = std::collections::HashMap<Sym, OutVal>;
+pub(crate) type OutMap = crate::mods::SymMap<OutVal>;
 
 pub(crate) fn get_num(o: &OutMap, k: &str) -> Option<f64> {
     o.get(&Sym::new(k)).and_then(OutVal::num)

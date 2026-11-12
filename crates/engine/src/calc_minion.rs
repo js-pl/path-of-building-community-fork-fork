@@ -157,7 +157,7 @@ impl<'a> Perform<'a> {
         let summon_name = self.skill(i).active_effect.granted_effect.name.clone();
         let spectre = self.has_flag(i, "spectre");
         let effectiveness = self.sd_num(i, "minionDamageEffectiveness").unwrap_or(0.0);
-        let mut enemy_multipliers = std::collections::HashMap::new();
+        let mut enemy_multipliers = crate::mods::SymMap::default();
         let mut built = Vec::new();
         {
             let input = ModsInput {
