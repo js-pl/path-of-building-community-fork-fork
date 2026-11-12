@@ -21,6 +21,7 @@ use crate::skills::Skills;
 use crate::spec::PassiveSpec;
 use crate::tree::PassiveTree;
 use crate::xml::Element;
+use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -117,12 +118,14 @@ pub struct LoadContext<'a> {
 #[derive(Clone)]
 pub struct Build<'t> {
     pub info: BuildInfo,
-    pub config: ConfigTab,
+    /// Shared between a build's copies, as the calculations only read it
+    pub config: Rc<ConfigTab>,
     /// The active config set's mods (`configTab.modList`, `enemyModList`)
     pub config_mods: Vec<Mod>,
     pub config_enemy_mods: Vec<Mod>,
     pub config_state: ConfigState,
-    pub spec: PassiveSpec<'t>,
+    /// Shared between a build's copies, as the calculations only read it
+    pub spec: Rc<PassiveSpec<'t>>,
     pub items: ItemsTab,
     pub skills: Option<Skills>,
     pub calcs: CalcsInput,
@@ -204,11 +207,11 @@ impl<'t> Build<'t> {
         )?;
         Ok(Build {
             info,
-            config,
+            config: Rc::new(config),
             config_mods,
             config_enemy_mods,
             config_state: state,
-            spec,
+            spec: Rc::new(spec),
             items,
             skills,
             calcs,

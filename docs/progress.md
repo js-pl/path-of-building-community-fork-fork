@@ -176,16 +176,23 @@ each to make).
 operation's median of 5 runs, in ms, typed against the translation, on a
 shared 4-core machine (expect noise of 10 to 30 %):
 
-| operation | baseline typed | translation | speedup |
+Each column is typed ms (speedup over the translation in the same run,
+which is steadier than the ms on a shared machine), after each change:
+
+| operation | translation | baseline | shared build |
 |---|---|---|---|
-| load | 594 | - | - |
-| init_env | 25.1 | 50.4 | 2.0x |
-| perform | 55.5 | 108 | 1.9x |
-| build_outputs | 705 | 653 | 0.9x |
-| misc calculator | 230 | 298 | 1.3x |
-| recalc | 793 | 1069 | 1.3x |
-| override | 99.8 | 211 | 2.1x |
-| node power (depth 1) | 8014 | 35836 | 4.5x |
+| load | - | 594 | 486 |
+| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) |
+| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) |
+| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) |
+| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) |
+| recalc | 1069 | 793 (1.3x) | 371 (2.4x) |
+| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) |
+| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) |
+
+- shared build: a build's copies share its spec and config (`Rc`); every
+  calculation copies the build, and copying the spec's nodes and the
+  config sets was a third of `build_outputs`.
 
 ## Not ported yet in `initEnv`
 
