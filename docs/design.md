@@ -101,7 +101,7 @@ web/ (TypeScript, Preact)               crates/
   (the importer's tables with `Data.lua`'s processing, read into the
   engine's typed tables) and stored in `engine::codec`'s binary form:
   varints, interned strings, shared tables written once, compressed by the
-  bundle. The engine decodes it (`engine::game_data::GameData`) without
+  bundle; mods with their tags. The engine decodes it (`engine::game_data::GameData`) without
   running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.

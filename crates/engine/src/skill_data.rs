@@ -6,6 +6,7 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
+use crate::codec::{self, Codec, Reader, Writer};
 use crate::item::Fields;
 use crate::mods::convert::{Converter, array, get, number, text};
 use crate::mods::{Mod, ModValue};
@@ -219,7 +220,7 @@ pub struct Gem {
     pub vaal_gem: bool,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SkillData {
     pub skills: HashMap<String, Rc<GrantedEffect>>,
     /// In data order
@@ -689,5 +690,169 @@ impl SkillData {
     /// The gem of a lower case base name (`data.gemForBaseName[name]`)
     pub fn gem_for_base_name(&self, name: &str) -> Option<&Rc<Gem>> {
         self.gem_for_base_name.get(name).and_then(|id| self.gem(id))
+    }
+}
+
+crate::codec_struct!(SkillLevel {
+    values,
+    level_requirement,
+    stat_interpolation,
+    cost,
+    fields
+});
+crate::codec_struct!(StatScale {
+    value,
+    mult,
+    div,
+    base
+});
+crate::codec_struct!(StatMap {
+    entries,
+    scale,
+    skill_flag,
+    error
+});
+crate::codec_struct!(GrantedEffect {
+    id,
+    name,
+    base_type_name,
+    color,
+    support,
+    plus_version_of,
+    unsupported,
+    levels,
+    skill_types,
+    minion_skill_types,
+    base_flags,
+    add_skill_types,
+    require_skill_types,
+    exclude_skill_types,
+    weapon_types,
+    add_flags,
+    is_trigger,
+    cannot_be_supported,
+    support_gems_only,
+    has_global_effect,
+    ignore_minion_types,
+    from_item,
+    mod_source,
+    stats,
+    constant_stats,
+    quality_stats,
+    base_mods,
+    stat_map,
+    not_minion_stat,
+    parts,
+    skill_totem_id,
+    minion_list,
+    add_minion_list,
+    minion_has_item_set,
+    minion_uses,
+    base_effectiveness,
+    incremental_effectiveness,
+    funcs,
+    cast_time,
+});
+
+impl Codec for StatMapEntry {
+    fn put(&self, w: &mut Writer) {
+        match self {
+            StatMapEntry::Mod(m) => {
+                false.put(w);
+                m.put(w);
+            }
+            StatMapEntry::Group(mods, scale) => {
+                true.put(w);
+                mods.put(w);
+                scale.put(w);
+            }
+        }
+    }
+    fn get(r: &mut Reader) -> codec::Result<Self> {
+        Ok(if bool::get(r)? {
+            StatMapEntry::Group(Codec::get(r)?, Codec::get(r)?)
+        } else {
+            StatMapEntry::Mod(Codec::get(r)?)
+        })
+    }
+}
+
+/// Gems refer to their granted effects by id
+impl Codec for SkillData {
+    fn put(&self, w: &mut Writer) {
+        self.skills.put(w);
+        w.uint(self.gems.len() as u64);
+        for g in &self.gems {
+            g.id.put(w);
+            g.name.put(w);
+            g.base_type_name.put(w);
+            g.game_id.put(w);
+            g.variant_id.put(w);
+            g.granted_effect.id.put(w);
+            g.secondary_granted_effect
+                .as_ref()
+                .map(|e| e.id.clone())
+                .put(w);
+            g.natural_max_level.put(w);
+            g.req_str.put(w);
+            g.req_dex.put(w);
+            g.req_int.put(w);
+            g.tags.put(w);
+            g.tag_string.put(w);
+            g.vaal_gem.put(w);
+        }
+        self.gem_for_skill.put(w);
+        self.gems_by_game_id.put(w);
+        self.gem_for_base_name.put(w);
+        self.color_codes.put(w);
+        self.skill_type.put(w);
+        self.gem_vaal_gem_id_for_base_gem_id.put(w);
+        self.skill_stat_map.put(w);
+    }
+
+    fn get(r: &mut Reader) -> codec::Result<Self> {
+        let skills = <HashMap<String, Rc<GrantedEffect>> as Codec>::get(r)?;
+        let effect = |id: String| -> codec::Result<Rc<GrantedEffect>> {
+            skills
+                .get(&id)
+                .cloned()
+                .ok_or_else(|| format!("no skill {id}"))
+        };
+        let mut gems = Vec::new();
+        for _ in 0..r.count()? {
+            gems.push(Rc::new(Gem {
+                id: Codec::get(r)?,
+                name: Codec::get(r)?,
+                base_type_name: Codec::get(r)?,
+                game_id: Codec::get(r)?,
+                variant_id: Codec::get(r)?,
+                granted_effect: effect(Codec::get(r)?)?,
+                secondary_granted_effect: Option::<String>::get(r)?.map(effect).transpose()?,
+                natural_max_level: Codec::get(r)?,
+                req_str: Codec::get(r)?,
+                req_dex: Codec::get(r)?,
+                req_int: Codec::get(r)?,
+                tags: Codec::get(r)?,
+                tag_string: Codec::get(r)?,
+                vaal_gem: Codec::get(r)?,
+            }));
+        }
+        let gem_index = gems
+            .iter()
+            .enumerate()
+            .map(|(i, g)| (g.id.clone(), i))
+            .collect();
+        Ok(SkillData {
+            skills,
+            gems,
+            gem_index,
+            gem_for_skill: Codec::get(r)?,
+            gems_by_game_id: Codec::get(r)?,
+            gem_for_base_name: Codec::get(r)?,
+            color_codes: Codec::get(r)?,
+            skill_type: Codec::get(r)?,
+            gem_vaal_gem_id_for_base_gem_id: Codec::get(r)?,
+            skill_stat_map: Codec::get(r)?,
+        })
     }
 }
