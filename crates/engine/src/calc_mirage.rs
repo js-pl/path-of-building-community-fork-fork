@@ -236,7 +236,7 @@ impl<'a> Perform<'a> {
                 .base(list, Some(&cfg), &["SaviourMirageWarriorMaxCount"])?;
             // The best attack with a one handed sword that can crit
             let sword = self.mf("Sword") | self.mf("Weapon1H");
-            let mut best: Option<(f64, std::rc::Rc<CachedCalc>)> = None;
+            let mut best: Option<(f64, std::sync::Arc<CachedCalc>)> = None;
             for k in 0..self.n_player {
                 let flags = self.cfg(k).flags.unwrap_or(0);
                 let mirage = self

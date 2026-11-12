@@ -26,7 +26,7 @@ use crate::mods::{Mod, ModType, ModValue, Record, Sym, Tag};
 use lua::pattern;
 use rules::FlagType;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{OnceLock, RwLock};
 use val::V;
@@ -113,7 +113,7 @@ pub struct ModParser {
     cache: RwLock<HashMap<Vec<u8>, Parsed>>,
     hits: Vec<Vec<AtomicBool>>,
     /// `modName[2]` that DOUBLED lines wrote into `modNameList` entries
-    doubled: RwLock<HashMap<usize, Rc<str>>>,
+    doubled: RwLock<HashMap<usize, Arc<str>>>,
 }
 
 /// Mods of an intermediate parse: a mod upstream would build with a nil
@@ -144,7 +144,7 @@ pub fn frag<D: Dyn>(v: &D) -> Result<Frag, String> {
             .map(|t| conv.tag(t))
             .collect()
     };
-    let text = |x: &D| -> Result<Rc<str>, String> {
+    let text = |x: &D| -> Result<Arc<str>, String> {
         match x.kind() {
             Kind::Str(s) => Ok(s.into()),
             _ => Err("a name is not a string".into()),
@@ -517,7 +517,7 @@ impl ModParser {
             make_mod(&[
                 val::s("ExtraSkillMod"),
                 val::s("LIST"),
-                val::tbl(vec![(val::s("mod"), V::Mod(Rc::new(inner)))], vec![]),
+                val::tbl(vec![(val::s("mod"), V::Mod(Arc::new(inner)))], vec![]),
                 tag(),
             ])
         };
@@ -554,7 +554,7 @@ impl ModParser {
         make_mod(&[
             val::s("ExtraSkillMod"),
             val::s("LIST"),
-            val::tbl(vec![(val::s("mod"), V::Mod(Rc::new(inner)))], vec![]),
+            val::tbl(vec![(val::s("mod"), V::Mod(Arc::new(inner)))], vec![]),
             tag,
         ])
     }
@@ -611,7 +611,7 @@ impl ModParser {
                     pattern::Capture::Pos(p) => ModValue::Number((p + 1) as f64),
                 })
             }));
-            let func = ModValue::Func(Rc::new(crate::mods::Func {
+            let func = ModValue::Func(Arc::new(crate::mods::Func {
                 name: "jewelFunc".into(),
                 args,
             }));
@@ -799,9 +799,9 @@ impl ModParser {
             x => x,
         };
         let mut mod_type = val::s("BASE");
-        let mut mod_suffix: Option<Rc<str>> = None;
+        let mut mod_suffix: Option<Arc<str>> = None;
         let mut extra_tags = ExtraTags::None;
-        let scan_suffix = |line: &[u8]| -> (Option<Rc<str>>, Vec<u8>) {
+        let scan_suffix = |line: &[u8]| -> (Option<Arc<str>>, Vec<u8>) {
             let (found, rest) = self.scan(line, &r.suffix_types, true, 6);
             (Self::value_of(&r.suffix_types, &found).cloned(), rest)
         };
@@ -919,7 +919,7 @@ impl ModParser {
                         .first()
                         .cloned()
                         .expect("attempt to concatenate a nil value");
-                    let second: Rc<str> = format!("Multiplier:{first_name}Doubled").into();
+                    let second: Arc<str> = format!("Multiplier:{first_name}Doubled").into();
                     if name.table {
                         match name.names.len() {
                             0 | 1 => name.names.push(second.clone()),

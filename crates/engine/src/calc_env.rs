@@ -18,8 +18,7 @@ use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Store, Sym};
 use crate::skill_data::SkillData;
 use crate::skills::{ExplodeSource, SocketGroup, update_socket_groups};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -78,7 +77,7 @@ pub struct Env {
 /// by their inputs, which the entries hold on to, so that a changed input
 /// is a new one
 #[derive(Clone, Default)]
-pub struct BaseDbs(Rc<RefCell<Vec<BaseEntry>>>);
+pub struct BaseDbs(Arc<Mutex<Vec<BaseEntry>>>);
 
 /// The player's and the enemy's databases
 type Dbs = (Store, Store);
@@ -89,19 +88,20 @@ struct BaseEntry {
 }
 
 struct BaseKey {
-    config: Rc<ConfigTab>,
-    mods: Rc<Vec<Mod>>,
-    enemy_mods: Rc<Vec<Mod>>,
-    setup: *const SetupData,
+    config: Arc<ConfigTab>,
+    mods: Arc<Vec<Mod>>,
+    enemy_mods: Arc<Vec<Mod>>,
+    /// The setup data, by address
+    setup: usize,
     values: [u64; 5],
     mode: BuffMode,
 }
 
 impl BaseKey {
     fn same(&self, o: &BaseKey) -> bool {
-        Rc::ptr_eq(&self.config, &o.config)
-            && Rc::ptr_eq(&self.mods, &o.mods)
-            && Rc::ptr_eq(&self.enemy_mods, &o.enemy_mods)
+        Arc::ptr_eq(&self.config, &o.config)
+            && Arc::ptr_eq(&self.mods, &o.mods)
+            && Arc::ptr_eq(&self.enemy_mods, &o.enemy_mods)
             && self.setup == o.setup
             && self.values == o.values
             && self.mode == o.mode
@@ -110,7 +110,7 @@ impl BaseKey {
 
 impl std::fmt::Debug for BaseDbs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BaseDbs({})", self.0.borrow().len())
+        write!(f, "BaseDbs({})", self.0.lock().expect("base dbs").len())
     }
 }
 
@@ -126,7 +126,7 @@ impl BaseDbs {
             config: build.config.clone(),
             mods: build.config_mods.clone(),
             enemy_mods: build.config_enemy_mods.clone(),
-            setup: data.setup,
+            setup: data.setup as *const SetupData as usize,
             values: [
                 s,
                 d,
@@ -136,7 +136,7 @@ impl BaseDbs {
             ],
             mode: b.mode,
         };
-        let mut cache = self.0.borrow_mut();
+        let mut cache = self.0.lock().expect("base dbs");
         if let Some(e) = cache.iter().find(|e| e.key.same(&key)) {
             return Ok(e.dbs.clone());
         }
@@ -199,7 +199,7 @@ pub fn init_env_with(
         build
             .items
             .items
-            .insert(REP_ITEM_ID, std::rc::Rc::new(item));
+            .insert(REP_ITEM_ID, std::sync::Arc::new(item));
     }
     match init_env_pass(build, data, calc_mode, base, ovr, false)? {
         Some(env) => Ok(env),

@@ -10,7 +10,7 @@ use lua::{Key, Value};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A table key as conversion sees it
 pub enum DKey {
@@ -27,7 +27,7 @@ pub enum Kind<'a, D> {
     Str(Cow<'a, str>),
     Table,
     /// A closure made by ported code: its name and upvalues
-    Closure(Rc<str>, Vec<D>),
+    Closure(Arc<str>, Vec<D>),
     /// `getThreshold`'s closure: its attribute and the mod it builds
     Threshold(D, D),
     /// Already typed
@@ -74,12 +74,12 @@ impl Dyn for Value {
             Value::Number(n) => Kind::Num(*n),
             Value::Str(x) => Kind::Str(x.to_str_lossy()),
             Value::Table(_) => Kind::Table,
-            Value::Func(f) => Kind::Typed(ModValue::Func(Rc::new(Func {
-                name: f.key.clone(),
+            Value::Func(f) => Kind::Typed(ModValue::Func(Arc::new(Func {
+                name: (*f.key).into(),
                 args: vec![],
             }))),
-            Value::Function(f) => Kind::Typed(ModValue::Func(Rc::new(Func {
-                name: f.name.clone(),
+            Value::Function(f) => Kind::Typed(ModValue::Func(Arc::new(Func {
+                name: (*f.name).into(),
                 args: vec![],
             }))),
             // `getThreshold` closes over the mod it builds,
@@ -96,7 +96,7 @@ impl Dyn for Value {
                 let base = lua::modlib::create_mod_args(&mod_args);
                 Kind::Threshold(attrib, Value::Table(base))
             }
-            Value::Closure(c) => Kind::Closure(c.name.clone(), c.upvalues.clone()),
+            Value::Closure(c) => Kind::Closure((*c.name).into(), c.upvalues.clone()),
         }
     }
 
@@ -151,7 +151,7 @@ impl Dyn for Value {
     }
 }
 
-fn d_text<D: Dyn>(v: &D) -> Result<Rc<str>, String> {
+fn d_text<D: Dyn>(v: &D) -> Result<Arc<str>, String> {
     match v.kind() {
         Kind::Str(x) => Ok(x.into()),
         _ => Err(format!("expected a string, got {}", describe(v))),
@@ -220,7 +220,7 @@ pub fn get(v: &Value, k: &str) -> Value {
     rt::index(v, &s(k)).unwrap_or_default()
 }
 
-pub fn text(v: &Value) -> Result<Rc<str>, String> {
+pub fn text(v: &Value) -> Result<Arc<str>, String> {
     match v {
         Value::Str(x) => Ok(x.to_str_lossy().into()),
         v => Err(format!("expected a string, got {v:?}")),
@@ -338,14 +338,14 @@ impl Converter<'_> {
             Kind::Num(n) => ModValue::Number(n),
             Kind::Str(x) => ModValue::Str(x.into()),
             Kind::Typed(m) => m,
-            Kind::Threshold(attrib, base) => ModValue::Func(Rc::new(Func {
+            Kind::Threshold(attrib, base) => ModValue::Func(Arc::new(Func {
                 name: "getThreshold".into(),
                 args: vec![
                     Some(self.value(&attrib)?),
                     Some(ModValue::Mod(Box::new(self.mod_(&base)?))),
                 ],
             })),
-            Kind::Closure(name, upvalues) => ModValue::Func(Rc::new(Func {
+            Kind::Closure(name, upvalues) => ModValue::Func(Arc::new(Func {
                 name,
                 args: upvalues
                     .iter()
@@ -653,7 +653,7 @@ impl Converter<'_> {
                     x if x.is_nil() => None,
                     x => Some(x.truthy()),
                 };
-                let ic = Rc::new(ItemCondition {
+                let ic = Arc::new(ItemCondition {
                     item_slot: d_text(&g("itemSlot"))?,
                     all_slots: flag(&g("allSlots")),
                     both_slots: flag(&g("bothSlots")),
@@ -669,7 +669,7 @@ impl Converter<'_> {
                 if let (Some(o), Some(lv)) = (self.originals, v.lua()) {
                     o.borrow_mut()
                         .item_conditions
-                        .insert(Rc::as_ptr(&ic), lv.clone());
+                        .insert(Arc::as_ptr(&ic), lv.clone());
                 }
                 TagKind::ItemCondition(ic)
             }
@@ -693,7 +693,7 @@ impl Converter<'_> {
                     x if x.is_nil() => Ok(None),
                     x => d_text(&x).map(Some),
                 };
-                TagKind::SocketedIn(Rc::new(SocketedIn {
+                TagKind::SocketedIn(Arc::new(SocketedIn {
                     slot_name: d_opt_sym(&g("slotName"))?,
                     keyword: opt_text("keyword")?,
                     socket_color: opt_text("socketColor")?,

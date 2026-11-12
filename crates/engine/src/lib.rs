@@ -81,3 +81,14 @@ pub(crate) fn class(env: &std::rc::Rc<lua::env::Env>, name: &str) -> lua::LResul
         _ => Err(LuaError::msg(format!("class '{name}' is not defined"))),
     }
 }
+
+/// What calculations share can be shared between threads
+const _: () = {
+    const fn shared<T: Send + Sync>() {}
+    shared::<game_data::GameData>();
+    shared::<mod_parser::ModParser>();
+    shared::<tree::PassiveTree>();
+    shared::<build::Build<'static>>();
+    shared::<calc_env::CalcData<'static>>();
+    shared::<calculator::MiscCalculator<'static, 'static>>();
+};

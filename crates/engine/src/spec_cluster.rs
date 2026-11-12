@@ -17,7 +17,7 @@ use crate::mods::{Mod, ModType, ModValue};
 use crate::spec::{PassiveSpec, SpecNode};
 use crate::tree::{ExpansionJewel, Node, NodeType};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -99,8 +99,8 @@ enum Parent {
 struct Synth {
     kind: NodeType,
     id: u32,
-    dn: Rc<str>,
-    sd: Vec<Rc<str>>,
+    dn: Arc<str>,
+    sd: Vec<Arc<str>>,
     expansion: Option<ExpansionJewel>,
     orbit: i64,
     oidx: i64,
@@ -548,7 +548,7 @@ impl<'t> PassiveSpec<'t> {
             let Some(&ni) = small_indices.get(k) else {
                 break;
             };
-            let mut sd: Vec<Rc<str>> = skill.stats.iter().map(|s| s.as_str().into()).collect();
+            let mut sd: Vec<Arc<str>> = skill.stats.iter().map(|s| s.as_str().into()).collect();
             sd.extend(added.iter().map(|s| s.as_str().into()));
             nodes.push(Synth {
                 kind: NodeType::Normal,

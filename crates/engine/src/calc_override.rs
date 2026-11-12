@@ -9,7 +9,7 @@ use crate::mods::{Mod, ModType, Store};
 use crate::spec::{PassiveSpec, SpecNode, copy_table};
 use crate::tree::NodeType;
 use lua::ljtab::LjMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -22,7 +22,7 @@ pub enum OverrideNode {
     /// A node of the spec, by index
     Spec(usize),
     /// A node of its own: a mastery's effect, a cluster notable
-    Own(Rc<SpecNode>),
+    Own(Arc<SpecNode>),
 }
 
 /// `CalcOverride`
@@ -91,7 +91,7 @@ pub fn mastery_effect_node(spec: &PassiveSpec, i: usize, effect: f64) -> Result<
     let (mods, mod_list, unknown, _) =
         crate::tree::process_stats(spec.parser, &mut sd, Some(&source))?;
     node.unknown = unknown;
-    node.stats = Some(std::rc::Rc::new(crate::spec::NodeStats {
+    node.stats = Some(std::sync::Arc::new(crate::spec::NodeStats {
         sd,
         mods,
         mod_list,
@@ -116,7 +116,7 @@ pub struct Allocation {
     pub mastery: i64,
     pub mastery_type_count: i64,
     /// Allocated masteries by mastery name
-    pub mastery_types: Vec<(Rc<str>, i64)>,
+    pub mastery_types: Vec<(Arc<str>, i64)>,
 }
 
 impl Allocation {

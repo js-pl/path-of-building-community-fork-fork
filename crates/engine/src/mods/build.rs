@@ -5,7 +5,7 @@
 use super::sym::Sym;
 use super::tag::*;
 use super::types::*;
-use std::rc::Rc;
+use std::sync::Arc;
 
 impl From<f64> for ModValue {
     fn from(n: f64) -> ModValue {
@@ -54,7 +54,7 @@ impl Mod {
             value: value.into(),
             flags: 0,
             keyword_flags: 0,
-            source: source.map(Rc::from),
+            source: source.map(Arc::from),
             source_slot: None,
             tags: Default::default(),
             unreached_tags: vec![],

@@ -24,7 +24,7 @@ use crate::mods::{Cfg, Mod, ModType, ModValue, Store, StoreId, Sym, Tag, record}
 use crate::sf;
 use crate::tree::PassiveTree;
 use std::collections::{BTreeMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -503,7 +503,7 @@ impl<'a> Perform<'a> {
         self.c.actors.actors[actor].weapon_data[n].as_ref()
     }
 
-    pub(crate) fn weapon_str(&self, actor: usize, n: usize, k: &str) -> Option<Rc<str>> {
+    pub(crate) fn weapon_str(&self, actor: usize, n: usize, k: &str) -> Option<Arc<str>> {
         match self.weapon(actor, n)?.get(k)? {
             ModValue::Str(s) => Some(s.clone()),
             _ => None,
@@ -512,7 +512,7 @@ impl<'a> Perform<'a> {
 
     /// `modLib.mergeKeystones(env, modDB)`
     fn merge_keystones(&mut self, db: StoreId) -> Result<()> {
-        let grants: Vec<(String, Option<Rc<str>>)> = self
+        let grants: Vec<(String, Option<Arc<str>>)> = self
             .c
             .tabulate(db, Some(List), None, &["Keystone"])?
             .into_iter()
@@ -3006,7 +3006,7 @@ impl<'a> Perform<'a> {
                         self.c.set_out_val(
                             PLAYER,
                             &format!("Req{battr}Item"),
-                            OutVal::Table(Rc::new(t)),
+                            OutVal::Table(Arc::new(t)),
                         );
                     }
                     None => self.c.clear_out(PLAYER, &format!("Req{battr}Item")),
@@ -4257,7 +4257,7 @@ impl<'a> Perform<'a> {
         let minion_name = self.minion_data(mi)?.str("name").unwrap_or("").to_string();
         let set_source = |l: &mut Vec<Mod>, skill: Option<&str>| {
             if spectre {
-                let source: Rc<str> = match skill {
+                let source: Arc<str> = match skill {
                     Some(s) => format!("Spectre:{s} - {minion_name}"),
                     None => format!("Spectre:{minion_name}"),
                 }
@@ -4614,7 +4614,7 @@ impl<'a> Perform<'a> {
                 {
                     self.c.set_cond(pdb, "HaveBeastSpectre", true);
                 }
-                let source: Rc<str> = format!("Spectre:{}", data.str("name").unwrap_or("")).into();
+                let source: Arc<str> = format!("Spectre:{}", data.str("name").unwrap_or("")).into();
                 let values = |m: &Mod| -> Vec<Mod> {
                     match &m.value {
                         ModValue::Record(r) => r
@@ -6041,7 +6041,7 @@ impl<'a> Perform<'a> {
                 continue;
             }
             let mut min = f64::INFINITY;
-            let mut source: Option<Rc<str>> = Some("".into());
+            let mut source: Option<Arc<str>> = Some("".into());
             for (v, m) in
                 self.c
                     .tabulate(edb, Some(Base), None, &[&format!("{element}Exposure")])?

@@ -25,7 +25,7 @@ use crate::skills::{
     ExplodeSource, GemInstance, SocketGroup, process_socket_group, validate_gem_level,
 };
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A skill an item or a passive node grants (`env.grantedSkills`)
 #[derive(Clone, Debug, PartialEq)]
@@ -220,7 +220,7 @@ pub fn add_granted_groups(
 /// `supportEffect`)
 #[derive(Clone, Debug)]
 pub struct SkillEffect {
-    pub granted_effect: Rc<GrantedEffect>,
+    pub granted_effect: Arc<GrantedEffect>,
     pub level: Option<f64>,
     pub quality: f64,
     pub global_quality: f64,
@@ -230,7 +230,7 @@ pub struct SkillEffect {
     /// The attribute requirement a gem property sets (`req`)
     pub req: Option<f64>,
     /// `gemData`
-    pub gem: Option<Rc<Gem>>,
+    pub gem: Option<Arc<Gem>>,
     /// The gem the effect is of (`srcInstance`): its group and place
     pub src: Option<(usize, usize)>,
     /// `gemCfg`: the group's cfg with the gem's socket
@@ -244,7 +244,7 @@ pub struct SkillEffect {
 
 impl SkillEffect {
     pub(crate) fn new(
-        granted_effect: Rc<GrantedEffect>,
+        granted_effect: Arc<GrantedEffect>,
         level: Option<f64>,
         quality: f64,
     ) -> SkillEffect {
@@ -639,7 +639,7 @@ fn add_best_support(support: &SkillEffect, list: &mut Vec<SkillEffect>) {
     let e = &support.granted_effect;
     for other in list.iter_mut() {
         let o = &other.granted_effect;
-        if Rc::ptr_eq(e, o) || e.id == o.id {
+        if Arc::ptr_eq(e, o) || e.id == o.id {
             let (l, ol) = (
                 support.level.unwrap_or(f64::NAN),
                 other.level.unwrap_or(f64::NAN),
@@ -1038,7 +1038,7 @@ fn active_skills(
         let group_cfg = cfgs[gi].clone();
         let mut gem_cfg = group_cfg.cfg();
         let color = socket_color(&group_cfg.slot_name, i);
-        gem_cfg.socket_color = color.map(|c| Rc::from(c.to_string().as_str()));
+        gem_cfg.socket_color = color.map(|c| Arc::from(c.to_string().as_str()));
         gem_cfg.socket_num = Some(i as f64 + 1.0);
         let rows = if color.is_some() {
             db.tabulate(Some(&gem_cfg), "GemProperty")?
@@ -1080,7 +1080,7 @@ fn active_skills(
                 None => slot_groups.push((slot.clone(), vec![gi])),
             }
         }
-        let mut extra = |effect: Option<Rc<GrantedEffect>>,
+        let mut extra = |effect: Option<Arc<GrantedEffect>>,
                          value: Option<&ModValue>,
                          level: Option<f64>| {
             let mut effect = effect.or_else(|| {
@@ -1136,7 +1136,7 @@ fn active_skills(
             if !gem.enabled {
                 continue;
             }
-            let effects: Vec<Rc<GrantedEffect>> = match &gem.gem {
+            let effects: Vec<Arc<GrantedEffect>> = match &gem.gem {
                 Some(g) => std::iter::once(g.granted_effect.clone())
                     .chain(g.secondary_granted_effect.clone())
                     .collect(),
@@ -1177,7 +1177,7 @@ fn active_skills(
             if !gem.enabled || (gem.gem.is_none() && gem.granted_effect.is_none()) {
                 continue;
             }
-            let effects: Vec<Option<Rc<GrantedEffect>>> = match &gem.gem {
+            let effects: Vec<Option<Arc<GrantedEffect>>> = match &gem.gem {
                 Some(g) => vec![
                     Some(g.granted_effect.clone()),
                     g.secondary_granted_effect.clone(),

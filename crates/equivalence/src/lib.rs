@@ -10,7 +10,6 @@ use engine::data::Data;
 use engine::skill_data::{Gem, GrantedEffect, SkillData};
 use lua::Value;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 pub mod bench;
 pub mod bridge;
@@ -252,7 +251,7 @@ pub fn gem_variants(
     keep: impl Fn(&Gem) -> bool,
     variants: impl Fn(&Gem) -> Vec<(String, String, String)>,
 ) -> Vec<(String, String)> {
-    let builds: Vec<(String, String, Option<Rc<GrantedEffect>>)> = corpus_builds()
+    let builds: Vec<(String, String, Option<std::sync::Arc<GrantedEffect>>)> = corpus_builds()
         .into_iter()
         .filter(|(id, _)| id.starts_with("gen-"))
         .map(|(id, xml)| {
