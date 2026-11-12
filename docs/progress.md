@@ -63,20 +63,38 @@ State at the handoff:
   cluster notables; `POWER_FULL=1` runs every node). Full node power of
   gen-0004 (2618 nodes with power): typed 14 to 22 s with the build's
   own calculations, the translation 42 to 51 s (one thread, a loaded
-  machine). Builds with Intuitive Leap and the
-  like return `not ported` (the spec does not port them).
+  machine).
+- Jewels that let nodes be allocated without a connection (Intuitive
+  Leap, Thread of Hope, Impossible Escape: `intuitiveLeapLikesAffecting`,
+  the dependencies and paths around them) and tattoos (`hashOverrides`,
+  `Data/TattooPassives` in the typed tree, `allocatedTattooTypes`) are in
+  the spec: `tests/spec.rs` loads generated corpus builds with such a
+  jewel socketed and unconnected nodes in its radius allocated
+  (`jewel_specs_match_upstream`, 28 specs) and with tattoos on a keystone,
+  attribute nodes and a mastery (`tattoo_specs_match_upstream`, 10), and
+  `tests/perform.rs` calculates the tattooed builds
+  (`tattoos_match_upstream`).
+- Every trigger configuration of `configTable` is ported, with the
+  helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
+  Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
+  part's cooldown of Automation and the like; so are Tawhoa's Chosen,
+  overcapped lightning resistance's mana and a minion's curses on itself.
+  `triggers_match_upstream` (`equivalence::variants::trigger_variants`)
+  calculates every gem a configuration's key names, a support with each
+  of a spell, hex, mark and warcry it supports, next to the main skill of
+  a melee, bow, wand and spell build, in each of its active skills (379
+  variants), and every unique a key names or that triggers skills,
+  equipped, with a spell socketed in its slot (372) and as each socket
+  group it grants next to a slam and a spell (257).
+  `mods_match_upstream` gives builds mod lines as custom modifiers.
 
 What remains for the full migration, in order:
 
-1. Tawhoa's Chosen, the rest of `configTable` in
-   `CalcTriggers.lua` (only the configurations the corpus and variants
-   reach are ported; a variants test per trigger support would cover
-   them), overcapped lightning
-   resistance's mana, the party
-   tab. `CalcSections.lua` (which breakdown each cell shows) belongs to
-   the session API.
-2. A variants test per trigger support and per helmet focus, and of
-   the Calcs tab's other minion and stage selections.
+1. Timeless jewels (`conqueredBy`: the legion passives and the jewels'
+   look-up tables, read by the importer from the submodule), the party
+   tab, mirages of skills with minions. `CalcSections.lua` (which
+   breakdown each cell shows) belongs to the session API.
+2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
    `rayon` pool (`power::node_power_with`: a recording pass lists them,
@@ -110,8 +128,7 @@ What remains for the full migration, in order:
    `engine::sidebar`) and `outputs` (the sidebar calculation's player
    and minion outputs, new). `crates/session/tests/typed.rs`: equal JSON
    to the translation's for all 61 corpus builds (typed load 12.5 s,
-   translated 74 s in total). A typed load that fails (or the character
-   level's auto mode) and any command only the translation has that
+   translated 74 s in total). A typed load that fails and any command only the translation has that
    changes the build hand the build to the translation until the next
    load. `nodePower` is typed (`engine::power::node_power` on a
    `MiscCalculator`), equal to the translation's on gen-0001 and gen-0002
@@ -152,7 +169,7 @@ What remains for the full migration, in order:
    put back, then a reset) on every corpus build give the translation's
    `treeState`, `state`, `outputs`, `nodePath` and `masteryOptions` after
    each step (417 edits: typed 16 s, translated 89 s with its replays).
-   Builds with Intuitive Leap and the like (2 of the corpus) fall back.
+   Builds with Intuitive Leap and the like are typed too.
    Bloodline nodes are told by their ascendancy being an alternate one
    (the typed tree has no `isBloodline`). `tree` (geometry: positions,
    icons, connectors, which the typed tree does not import yet) and
@@ -308,8 +325,7 @@ were ported, a node at some depth failed with `not ported` on most
 builds, and the session's `nodePower` answered with the translation
 after the failed typed run, so it measured no speedup. The session's
 `nodePower` on gen-0001: typed 4.3 s, translated 26.9 s; with Full DPS
-14.1 s and 69.6 s. Of the corpus only gen-0028 (Intuitive Leap) still
-falls back.
+14.1 s and 69.6 s. No corpus build falls back.
 
 Where the time goes now (perf, node power of gen-0049): `perform` about
 half (the offence a quarter), `init_env` a third (`calc_tree::setup`,
@@ -346,9 +362,9 @@ copying Lua tables).
 - `initial_node_mods_match_upstream` skips the builds with cluster jewel
   subgraphs, as it loads no items
 - `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
-  given by the caller; tattoo counts
+  given by the caller
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
-  skills, the character level's auto mode, timeless jewel data
+  skills, timeless jewel data (conquered nodes; abyss jewels)
 - Passives granted only by the latest tree
 
 ## Not ported yet in `perform`
@@ -356,11 +372,10 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The party tab, and a minion's curses on itself
-- Tawhoa's Chosen, mirages of skills with minions
-- Trigger configurations other than those in `calc_triggers.rs`
-  (`Perform::trigger_config`)
-- Overcapped lightning resistance's mana
+- The party tab (`env.partyMembers`; the build's `<Party>` section is not
+  read, so a build with party members calculates as without them)
+- Mirages of skills with minions
+- A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
@@ -414,6 +429,23 @@ the tests align these:
   mirages take a cached result without calculating it again: typed,
   each calculator calculation starts from the cache of the calculator's
   base calculation, so calculations stay independent of their order
+- `SkillsTab:ProcessGemInstance` empties the cost of the level of a
+  triggered skill an item or a node grants on the shared skill data
+  (`levels[level].cost = {}`), for every later calculation and build:
+  typed, the costs of such a level are empty within the build
+  (`Perform::cost_wiped`); `tests/perform.rs` restores the translation's
+  costs before each build
+- a mirage's copy is cached under the copied skill's uuid, so a later
+  calculation without a fresh `GlobalCache` finds the copy's results
+  (`TotalDPS`, `Speed`) for that skill: `tests/perform.rs` wipes the cache
+  before its translated perform, as a frame's calculation does
+- after a mirage that replaces the main skill (the Saviour, Tawhoa's
+  Chosen), `calcs.perform` writes the gem level and quality into the
+  output table the copy's replaced, so they show only when no skill was
+  found for the mirage
+- the build's `EstimatePlayerProgress` sets the level of the auto mode
+  after a calculation and rebuilds the configuration's mods without
+  calculating again: the shown outputs are the previous level's
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact

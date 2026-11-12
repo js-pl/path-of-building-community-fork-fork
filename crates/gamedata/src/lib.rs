@@ -142,6 +142,10 @@ impl Source {
             .load1("Data/TimelessJewelData/LegionPassives", vec![])
             .map_err(|e| e.to_string())?;
         tree.add_legion_keystones(&legion, parser)?;
+        let tattoos = im
+            .load1("Data/TattooPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        tree.add_tattoos(&tattoos, parser)?;
         Ok(tree)
     }
 

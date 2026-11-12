@@ -126,6 +126,72 @@ pub struct Node {
     pub nodes_in_radius: Option<Vec<Vec<u32>>>,
 }
 
+/// A node that replaces a tree node's stats: a tattoo
+/// (`Data/TattooPassives`), or a timeless jewel's passive
+/// (`Data/TimelessJewelData/LegionPassives`)
+#[derive(Clone, Debug, PartialEq)]
+pub struct Overlay {
+    /// The data's id, which sources its mods (`Tree:<id>`)
+    pub id: Arc<str>,
+    pub dn: Arc<str>,
+    pub kind: NodeType,
+    pub sd: Vec<Arc<str>>,
+    pub mods: Vec<StatLine>,
+    pub mod_list: Vec<Mod>,
+    pub keystone_mod: Option<Mod>,
+    pub is_tattoo: bool,
+    pub override_type: Option<Arc<str>>,
+    pub icon: Option<Arc<str>>,
+    pub active_effect_image: Option<Arc<str>>,
+}
+
+impl Overlay {
+    /// A node of the data, its type and stats processed as
+    /// `PassiveTree:ProcessStats` does
+    pub fn from_lua(nt: &Value, parser: &ModParser) -> Result<Overlay> {
+        let kind = if truthy(nt, "m") {
+            NodeType::Mastery
+        } else if truthy(nt, "ks") {
+            NodeType::Keystone
+        } else if truthy(nt, "not") {
+            NodeType::Notable
+        } else {
+            NodeType::Normal
+        };
+        let s = |k: &str| -> Result<Option<Arc<str>>> {
+            match get(nt, k) {
+                Value::Nil => Ok(None),
+                v => text(&v).map(Some),
+            }
+        };
+        let id = s("id")?.ok_or("an overlay node without an id")?;
+        let dn = s("dn")?.unwrap_or_else(|| "".into());
+        let mut sd = texts(&get(nt, "sd"))?;
+        let (mods, mod_list, _, _) = process_stats(parser, &mut sd, Some(&format!("Tree:{id}")))?;
+        let keystone_mod = (kind == NodeType::Keystone).then(|| {
+            create_mod(
+                "Keystone",
+                ModType::List,
+                ModValue::Str(dn.clone()),
+                &format!("Tree{id}"),
+            )
+        });
+        Ok(Overlay {
+            id,
+            dn,
+            kind,
+            sd,
+            mods,
+            mod_list,
+            keystone_mod,
+            is_tattoo: truthy(nt, "isTattoo"),
+            override_type: s("overrideType")?,
+            icon: s("icon")?,
+            active_effect_image: s("activeEffectImage")?,
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ascendancy {
     pub id: Option<Arc<str>>,
@@ -161,6 +227,8 @@ pub struct PassiveTree {
     /// name, which `keystoneMap` holds where the tree has no keystone of
     /// that name
     pub legion_keystones: HashMap<Arc<str>, Vec<Mod>>,
+    /// `tattoo.nodes`: the tattoos, by name
+    pub tattoos: HashMap<Arc<str>, Arc<Overlay>>,
     /// `notableMap`: by lower case name
     pub notable_map: HashMap<Arc<str>, u32>,
     /// `ascendancyMap`: by lower case name
@@ -411,6 +479,17 @@ impl PassiveTree {
         Ok(())
     }
 
+    /// Adds the tattoos (`Data/TattooPassives`)
+    pub fn add_tattoos(&mut self, tattoos: &Value, parser: &ModParser) -> Result<()> {
+        let nodes = get(tattoos, "nodes");
+        for (k, node) in nodes.as_table().map(|t| t.entries()).unwrap_or_default() {
+            let name: Arc<str> = lua::to_string(&k.to_value()).to_str_lossy().into();
+            self.tattoos
+                .insert(name, Arc::new(Overlay::from_lua(&node, parser)?));
+        }
+        Ok(())
+    }
+
     /// The mods of a keystone by name (`keystoneMap[name].modList`)
     pub fn keystone_mods(&self, name: &str) -> Option<&[Mod]> {
         match self.keystone_map.get(name) {
@@ -580,6 +659,7 @@ impl PassiveTree {
             skills_per_orbit: per_orbit.clone(),
             keystone_map: HashMap::new(),
             legion_keystones: HashMap::new(),
+            tattoos: HashMap::new(),
             notable_map: HashMap::new(),
             ascendancy_map: HashMap::new(),
             cluster_node_map: HashMap::new(),
@@ -1047,6 +1127,19 @@ crate::codec_struct!(Node {
     extra,
     nodes_in_radius,
 });
+crate::codec_struct!(Overlay {
+    id,
+    dn,
+    kind,
+    sd,
+    mods,
+    mod_list,
+    keystone_mod,
+    is_tattoo,
+    override_type,
+    icon,
+    active_effect_image,
+});
 crate::codec_struct!(Ascendancy {
     id,
     name,
@@ -1068,6 +1161,7 @@ crate::codec_struct!(PassiveTree {
     node_index,
     keystone_map,
     legion_keystones,
+    tattoos,
     notable_map,
     ascendancy_map,
     cluster_node_map,

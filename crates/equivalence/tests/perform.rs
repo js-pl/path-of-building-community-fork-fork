@@ -13,7 +13,6 @@ use engine::calc_env::CalcMode;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use engine::mods::{Mod, ModValue, Mods, Store};
-use engine::skill_data::SkillData;
 use equivalence::typed_build::TypedData;
 use equivalence::{corpus_builds, skill_variants, typed_json, upstream_src};
 use lua::rt;
@@ -412,15 +411,44 @@ fn perform_matches_upstream() {
 /// Every gem whose skill has functions of its own (`preDamageFunc`, ...)
 #[test]
 fn skill_functions_match_upstream() {
-    run_builds(&|data| skill_variants(data, |ge| !ge.funcs.is_empty()));
+    run_builds(&|data| skill_variants(&data.skills, |ge| !ge.funcs.is_empty()));
 }
 
-fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
+/// Every trigger configuration's gems and uniques
+/// (`equivalence::variants::trigger_variants`)
+#[test]
+fn triggers_match_upstream() {
+    run_builds(&equivalence::variants::trigger_variants);
+}
+
+/// Mod lines the corpus does not reach
+/// (`equivalence::variants::mod_variants`)
+#[test]
+fn mods_match_upstream() {
+    run_builds(&|_| equivalence::variants::mod_variants());
+}
+
+/// Tattoos (`equivalence::variants::tattoo_variants`)
+#[test]
+fn tattoos_match_upstream() {
+    run_builds(&equivalence::variants::tattoo_variants);
+}
+
+fn run_builds(make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
     let mut data = TypedData::load();
+    // `SkillsTab:ProcessGemInstance` empties the shared cost of the level of
+    // a triggered skill an item grants; the typed engine does within a
+    // build only, so each build starts from the data's own costs
+    let mut costs: Vec<(Value, Value)> = Vec::new();
+    for (_, skill) in entries(&get(&host.global("data"), "skills")) {
+        for (_, level) in entries(&get(&skill, "levels")) {
+            costs.push((level.clone(), get(&level, "cost")));
+        }
+    }
     let mut failures = Vec::new();
     let (mut compared, mut skipped, mut offence_skipped) = (0, 0, 0);
     // `OFFENCE_PARTIAL=1`: after the offence, only the outputs the typed
@@ -428,14 +456,25 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
     let stage_name = |k: usize| ["defence", "buildDefenceEstimations", "triggers", "offence"][k];
     let mut skip_reasons: BTreeMap<String, usize> = BTreeMap::new();
-    for (id, xml) in make(&data.skills) {
-        if !id.contains(&filter) {
+    // `CALCS_SKIP=<a>,<b>`: leaves out the builds whose ids contain any
+    let skip = std::env::var("CALCS_SKIP").unwrap_or_default();
+    let skip: Vec<&str> = skip.split(',').filter(|s| !s.is_empty()).collect();
+    for (id, xml) in make(&mut data) {
+        if !id.contains(&filter) || skip.iter().any(|s| id.contains(s)) {
             continue;
+        }
+        for (level, cost) in &costs {
+            if let Some(t) = level.as_table() {
+                t.set_str("cost", cost.clone());
+            }
         }
         host.load_build_xml(xml.as_bytes(), &id)
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let build = host.build().unwrap();
-        // The translated perform, up to the defence
+        // The translated perform, up to the defence, on a cache of its own
+        // as a frame's calculation starts with
+        rt::call(&host.global("wipeGlobalCache"), &[])
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let calcs = get(&get(&build, "calcsTab"), "calcs");
         let env = rt::call(&get(&calcs, "initEnv"), &[build.clone(), s("MAIN")])
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)))
@@ -546,6 +585,21 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
             }
         }
         if !fail.is_empty() {
+            let lua_main = get(
+                &get(
+                    &get(&get(&get(&env, "player"), "mainSkill"), "activeEffect"),
+                    "grantedEffect",
+                ),
+                "name",
+            );
+            fail.insert(
+                0,
+                format!(
+                    "main skill: typed {}, translated {}",
+                    p.skill_name(p.main()),
+                    lua::to_string(&lua_main).to_str_lossy()
+                ),
+            );
             fail.truncate(25);
             failures.push(format!("{id}:\n    {}", fail.join("\n    ")));
         }

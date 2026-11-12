@@ -3,9 +3,9 @@
 //! (`configTable`) and `defaultTriggerHandler`, with the simulation of
 //! skill rotations (`calcMultiSpellRotationImpact`).
 //!
-//! Not ported yet: Manaforged Arrows, the uptime of exerting warcries as a
-//! trigger, the helmet's Focus, and every configuration but those in
-//! [`Perform::trigger_config`].
+//! Every configuration of `configTable` is ported, with the helmet's Focus
+//! (`helmetFocusHandler`), Snipe, Manaforged Arrows and the uptime of
+//! exerting warcries.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -61,6 +61,13 @@ pub(crate) struct TriggerConfig {
     pub overlaps: Option<f64>,
     /// `customHandler`: a handler of its own in place of the default one
     pub custom_handler: Option<fn(&mut Perform) -> Result<()>>,
+    /// `minimumCostPerUse`: the cost stat a source must pay per use
+    pub minimum_cost: Option<(&'static str, f64)>,
+    /// `sourceName`: the source's name in the breakdown
+    pub source_name: Option<String>,
+    /// The skill whose active effect stands for the trigger's
+    /// (`triggeredBy.grantedEffect`), for its cooldown
+    pub trigger_effect: Option<usize>,
     /// Arcanist Brand as the trigger: the brand skill, its activation
     /// frequency's increase and more multipliers
     /// (`triggeredBy.mainSkill`, `activationFreqInc`, `activationFreqMore`)
@@ -70,6 +77,15 @@ pub(crate) struct TriggerConfig {
 /// A rotation simulation's main rate, simulated time and each skill's rate
 /// by uuid
 type Sim = (f64, f64, Vec<(String, f64)>);
+
+/// `defaultComparer`: whether the skill's cached rate beats the source's
+fn default_comparer(c: &CachedCalc, source: Option<usize>, rate: Option<f64>) -> bool {
+    let speed = c.out("HitSpeed").or_else(|| c.out("Speed"));
+    match source {
+        None => speed.is_some(),
+        Some(_) => speed.is_some_and(|s| s > rate.unwrap_or(0.0)),
+    }
+}
 
 /// The cooldowns `breakdown.TriggerRateCap` shows
 struct TriggerCaps<'n> {
@@ -122,6 +138,35 @@ fn sim_breakdown(sim_time: f64, rates: &[(String, f64)]) -> crate::breakdown::Br
         ]),
         ..Breakdown::default()
     }
+}
+
+/// The rotation of `calcMultiSpellRotationImpact`: the simulated time
+/// and how often each skill, of these cooldowns, is triggered
+pub(crate) fn simulate_rotation(cds: &[f64], source_rate: f64, tick: f64) -> (f64, Vec<f64>) {
+    let increment = 1.0 / source_rate;
+    let sim_time = increment * 1000.0;
+    let n = cds.len();
+    let mut next_trig = vec![0.0; n];
+    let mut count = vec![0.0; n];
+    let mut rotation_index = 0;
+    let mut next_trigger = 0.0;
+    while next_trigger < sim_time {
+        let mut current = rotation_index;
+        loop {
+            if next_trig[current] <= next_trigger {
+                count[current] += 1.0;
+                next_trig[current] = ceil_b(floor_b(next_trigger, tick) + cds[current], tick);
+                break;
+            }
+            current = (current + 1) % n;
+            if current == rotation_index {
+                break;
+            }
+        }
+        rotation_index = (rotation_index + 1) % n;
+        next_trigger += increment;
+    }
+    (sim_time, count)
 }
 
 /// `ceil_b(x, base)` and `floor_b(x, base)` of `Modules/Common.lua`
@@ -240,6 +285,22 @@ impl<'a> Perform<'a> {
     fn trigger_config(&mut self, key: &str) -> Result<Option<TriggerConfig>> {
         let main = self.main();
         let set_global = |p: &mut Self| p.set_flag(main, "globalTrigger", true);
+        fn melee_or_attack(p: &Perform, s: usize) -> bool {
+            p.has_type(s, "Melee") || p.has_type(s, "Attack")
+        }
+        fn damage_or_attack(p: &Perform, s: usize) -> bool {
+            p.has_type(s, "Damage") || p.has_type(s, "Attack")
+        }
+        let named = |name: &str, cond: fn(&Perform, usize) -> bool| TriggerConfig {
+            trigger_name: Some(name.into()),
+            trigger_skill_cond: Some(cond),
+            ..TriggerConfig::default()
+        };
+        let kills = |cond: fn(&Perform, usize) -> bool| TriggerConfig {
+            assuming_every_hit_kills: true,
+            trigger_skill_cond: Some(cond),
+            ..TriggerConfig::default()
+        };
         Ok(Some(match key {
             "nova" => {
                 let Some(a) = self.minion_actor() else {
@@ -273,9 +334,13 @@ impl<'a> Perform<'a> {
             "cast on melee kill" => {
                 let pdb = self.pdb();
                 if !self.c.flag(pdb, None, &["Condition:KilledRecently"])? {
+                    let mods = self.mods_mut(main);
+                    mods.info_message2 = Some("DPS reported assuming Self-Cast".into());
+                    mods.info_message = Some("Cast on Melee Kill requires recent kills".into());
                     return Ok(None);
                 }
                 TriggerConfig {
+                    assuming_every_hit_kills: true,
                     trigger_skill_cond: Some(|p, s| {
                         p.has_type(s, "Attack") && p.has_type(s, "Melee") && p.slot_match(s)
                     }),
@@ -335,25 +400,11 @@ impl<'a> Perform<'a> {
                     ..TriggerConfig::default()
                 }
             }
-            "uul-netol's embrace" => TriggerConfig {
-                trigger_name: Some("Bone Nova".into()),
-                trigger_skill_cond: Some(|p, s| p.has_type(s, "Damage") || p.has_type(s, "Attack")),
-                ..TriggerConfig::default()
-            },
-            "duskblight" => TriggerConfig {
-                trigger_name: Some("Stalking Pustule".into()),
-                trigger_skill_cond: Some(|p, s| p.has_type(s, "Damage") || p.has_type(s, "Attack")),
-                ..TriggerConfig::default()
-            },
-            "jorrhast's blacksteel" => {
+            "uul-netol's embrace" => named("Bone Nova", damage_or_attack),
+            "duskblight" => named("Stalking Pustule", damage_or_attack),
+            "jorrhast's blacksteel" | "rigwald's crest" | "ashcaller" => {
                 self.sd_set(main, "sourceRateIsFinal", true);
-                TriggerConfig {
-                    assuming_every_hit_kills: true,
-                    trigger_skill_cond: Some(|p, s| {
-                        p.has_type(s, "Damage") || p.has_type(s, "Attack")
-                    }),
-                    ..TriggerConfig::default()
-                }
+                kills(damage_or_attack)
             }
             "cospri's malice" => TriggerConfig {
                 trigger_skill_cond: Some(|p, s| {
@@ -361,13 +412,8 @@ impl<'a> Perform<'a> {
                     p.has_type(s, "Melee") && p.cfg(s).flags.unwrap_or(0) & sword > 0
                 }),
                 triggered_skill_cond: Some(|p, s| {
-                    let slot = |k: usize| {
-                        p.skill(k)
-                            .group
-                            .and_then(|g| p.env.groups.get(g))
-                            .map(|g| g.slot.clone())
-                    };
-                    p.sd_truthy(s, "triggeredByCospris") && slot(p.main()) == slot(s)
+                    p.sd_truthy(s, "triggeredByCospris")
+                        && p.group_slot(p.main()) == p.group_slot(s)
                 }),
                 ..TriggerConfig::default()
             },
@@ -502,12 +548,13 @@ impl<'a> Perform<'a> {
                     "automation" => "Automation",
                     _ => "Call to Arms",
                 };
+                let mut trigger_effect = None;
                 if self.skill_name(main) == name {
                     set_global(self);
                     self.set_flag(main, "skipEffectiveRate", true);
-                } else if (0..self.n_player).any(|i| self.skill_name(i) == name) {
+                } else {
                     // The trigger's cooldown comes from the active part
-                    return Err(format!("not ported: the cooldown of {name}'s active part"));
+                    trigger_effect = (0..self.n_player).find(|&i| self.skill_name(i) == name);
                 }
                 if key != "automation" {
                     self.sd_set(main, "sourceRateIsFinal", true);
@@ -517,6 +564,7 @@ impl<'a> Perform<'a> {
                     trigger_on_use: true,
                     use_cast_rate: true,
                     source: Some(main),
+                    trigger_effect,
                     ..TriggerConfig::default()
                 }
             }
@@ -551,7 +599,441 @@ impl<'a> Perform<'a> {
             }
             "FieryImpactHeistMaceImplicit" => TriggerConfig {
                 source_weapon: true,
-                trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee") || p.has_type(s, "Attack")),
+                trigger_skill_cond: Some(melee_or_attack),
+                ..TriggerConfig::default()
+            },
+            "law of the wilds" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| {
+                    !p.has_type(s, "SummonsTotem")
+                        && (p.has_type(s, "Melee") || p.has_type(s, "Attack"))
+                        && p.cfg(s).flags.unwrap_or(0) & p.mf("Claw") > 0
+                }),
+                ..TriggerConfig::default()
+            },
+            "the rippling thoughts" | "the surging thoughts" => {
+                if self.skill_name(main) != "Storm Cascade" {
+                    return Ok(None);
+                }
+                TriggerConfig {
+                    trigger_on_use: key == "the surging thoughts",
+                    trigger_skill_cond: Some(melee_or_attack),
+                    ..TriggerConfig::default()
+                }
+            }
+            "the hidden blade" => {
+                set_global(self);
+                self.sd_set(main, "triggerRateCapOverride", 2.0);
+                let pdb = self.pdb();
+                if self.c.flag(pdb, None, &["Condition:Phasing"])? {
+                    if let Some(b) = self.bd(PLAYER) {
+                        b.set_lines(
+                            "TriggerRateCap",
+                            vec![
+                                sf!(
+                                    "%.2f ^8(Unseen Strike from The Hidden Blade has no cooldown but is still triggered)",
+                                    2.0
+                                ),
+                                sf!("= %.2f", 2.0),
+                            ],
+                        );
+                    }
+                    TriggerConfig {
+                        source: Some(main),
+                        ..TriggerConfig::default()
+                    }
+                } else {
+                    self.set_flag(main, "disable", true);
+                    self.mods_mut(main).disable_reason =
+                        Some("This skill is requires you to be phasing".into());
+                    return Ok(None);
+                }
+            }
+            "limbsplit" | "the cauteriser" => named("Gore Shockwave", melee_or_attack),
+            "lioneye's paws" | "replica lioneye's paws" => {
+                self.sd_set(main, "cooldown", 1.0);
+                TriggerConfig {
+                    trigger_on_use: true,
+                    trigger_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Attack") && p.cfg(s).flags.unwrap_or(0) & p.mf("Bow") > 0
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "moonbender's wing" => {
+                self.sd_set(main, "cooldown", 1.0);
+                named("Lightning Warp", melee_or_attack)
+            }
+            "ngamahu's flame" => named("Molten Burst", melee_or_attack),
+            "cameria's avarice" => named("Icicle Burst", damage_or_attack),
+            "starcaller" => named("Starfall", melee_or_attack),
+            "arakaali's fang" | "sporeguard" | "mark of the elder" | "mark of the shaper" => {
+                kills(damage_or_attack)
+            }
+            "poet's pen" => TriggerConfig {
+                trigger_on_use: true,
+                trigger_skill_cond: Some(|p, s| {
+                    (p.has_type(s, "Damage") || p.has_type(s, "Attack"))
+                        && p.cfg(s).flags.unwrap_or(0) & p.mf("Wand") > 0
+                }),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByUnique")
+                        && p.group_slot(p.main()) == p.group_slot(s)
+                        && p.has_type(s, "Spell")
+                }),
+                ..TriggerConfig::default()
+            },
+            "maloney's mechanism" => {
+                let slot = self.cfg(main).slot_name;
+                let item = slot
+                    .and_then(|s| self.item(PLAYER, s.as_str()))
+                    .ok_or("attempt to index a nil value (field '?')")?;
+                let name = crate::calc_offence::unique_trigger_name(&item.mod_source)
+                    .ok_or("attempt to index a nil value (local 'uniqueTriggerName')")?;
+                let replica = crate::pat::find(&name, "Replica.").is_some();
+                TriggerConfig {
+                    trigger_on_use: true,
+                    trigger_name: Some(name),
+                    use_cast_rate: replica,
+                    trigger_skill_cond: Some(if replica {
+                        |p, s| p.has_type(s, "Spell")
+                    } else {
+                        |p, s| {
+                            p.has_type(s, "Attack") && p.cfg(s).flags.unwrap_or(0) & p.mf("Bow") > 0
+                        }
+                    }),
+                    triggered_skill_cond: Some(|p, s| {
+                        p.sd_truthy(s, "triggeredByUnique")
+                            && p.group_slot(p.main()) == p.group_slot(s)
+                            && p.has_type(s, "RangedAttack")
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "asenath's chant" => TriggerConfig {
+                trigger_on_use: true,
+                trigger_skill_cond: Some(|p, s| {
+                    (p.has_type(s, "Damage") || p.has_type(s, "Attack"))
+                        && p.cfg(s).flags.unwrap_or(0) & p.mf("Bow") > 0
+                }),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByUnique")
+                        && p.group_slot(p.main()) == p.group_slot(s)
+                        && p.has_type(s, "Spell")
+                }),
+                ..TriggerConfig::default()
+            },
+            "vixen's entrapment" => TriggerConfig {
+                use_cast_rate: true,
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Hex")),
+                ..TriggerConfig::default()
+            },
+            "flames of judgement" | "storm of judgement" => {
+                self.sd_set(main, "sourceRateIsFinal", true);
+                TriggerConfig {
+                    trigger_name: Some(self.skill_name(main).to_string()),
+                    trigger_skill_cond: Some(|p, s| p.skill_name(s) == "Queen's Demand"),
+                    triggered_skill_cond: Some(|p, s| {
+                        p.sd_truthy(s, "triggeredByUnique")
+                            && p.group_slot(p.main()) == p.group_slot(s)
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "trigger craft" => {
+                if !self.sd_truthy(main, "triggeredByCraft") {
+                    return Ok(None);
+                }
+                let (mut source, mut rate, mut use_cast_rate) = (None, None, false);
+                let mut triggered = Vec::new();
+                for i in 0..self.n_player {
+                    if (self.has_type(i, "Damage")
+                        || self.has_type(i, "Attack")
+                        || self.has_type(i, "Spell"))
+                        && !self.has_flag(i, "aura")
+                        && i != main
+                        && !self.sd_truthy(i, "triggeredByCraft")
+                        && !self.skill(i).active_effect.granted_effect.from_item
+                        && !self.is_triggered(i)
+                    {
+                        (source, rate) = self.find_trigger_skill(i, source, rate, None, None)?;
+                        let ae = &self.skill(i).active_effect;
+                        if ["totem", "golem", "banner", "ballista"]
+                            .iter()
+                            .any(|f| self.has_flag(i, f))
+                            && let Some(t) = ae.granted_effect.cast_time
+                        {
+                            let cd = ae
+                                .level
+                                .and_then(|l| ae.granted_effect.level(l))
+                                .and_then(|l| l.field("cooldown"))
+                                .unwrap_or(0.0);
+                            rate = Some(1.0 / (t + cd));
+                            use_cast_rate = true;
+                        }
+                    }
+                    if self.sd_truthy(i, "triggeredByCraft")
+                        && self.group_slot(main) == self.group_slot(i)
+                    {
+                        triggered.push(self.package_skill(i)?);
+                    }
+                }
+                TriggerConfig {
+                    trig_rate: rate,
+                    source,
+                    use_cast_rate,
+                    triggered_skills: triggered,
+                    ..TriggerConfig::default()
+                }
+            }
+            "kitava's thirst" | "foulborn kitava's thirst" => {
+                let pdb = self.pdb();
+                let (chance, name, stat, min) = if key == "kitava's thirst" {
+                    (
+                        "KitavaTriggerChance",
+                        "Kitava's Thirst",
+                        "ManaCost",
+                        "KitavaRequiredManaCost",
+                    )
+                } else {
+                    (
+                        "FoulbornKitavaTriggerChance",
+                        "Foulborn Kitava's Thirst",
+                        "LifeCost",
+                        "FoulbornKitavaRequiredLifeCost",
+                    )
+                };
+                TriggerConfig {
+                    trigger_chance: Some(self.c.base(pdb, None, &[chance])?),
+                    trigger_name: Some(name.into()),
+                    minimum_cost: Some((stat, self.c.base(pdb, None, &[min])?)),
+                    trigger_skill_cond: Some(|_, _| true),
+                    ..TriggerConfig::default()
+                }
+            }
+            "mjolner" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| {
+                    (p.has_type(s, "Damage") || p.has_type(s, "Attack"))
+                        && p.cfg(s).flags.unwrap_or(0) & (p.mf("Mace") | p.mf("Weapon1H")) > 0
+                        && !p.slot_match(s)
+                }),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByMjolner") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "wing of the wyvern" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| {
+                    (p.has_type(s, "Damage") || p.has_type(s, "Attack"))
+                        && p.cfg(s).flags.unwrap_or(0) & p.mf("Bow") > 0
+                        && !p.slot_match(s)
+                }),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByUnique") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "seven teachings" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| {
+                    let both = p.mf("Unarmed") | p.mf("Melee");
+                    p.has_type(s, "Melee") && p.cfg(s).flags.unwrap_or(0) & both == both
+                }),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredBySevenTeachings") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "squirming terror" => {
+                let pdb = self.pdb();
+                if !self.c.flag(pdb, None, &["Condition:KilledRecently"])? {
+                    let mods = self.mods_mut(main);
+                    mods.info_message2 = Some("DPS reported assuming Self-Cast".into());
+                    mods.info_message = Some("Squirming Terror requires recent kills".into());
+                    return Ok(None);
+                }
+                TriggerConfig {
+                    assuming_every_hit_kills: true,
+                    trigger_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Attack") && p.has_type(s, "Melee")
+                    }),
+                    triggered_skill_cond: Some(|p, s| {
+                        p.sd_truthy(s, "triggeredBySquirmingTerror") && p.slot_match(s)
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "kinetic flux" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Attack") && p.slot_match(s)),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByKineticFlux") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "spellslinger" => {
+                if self.skill_name(main) == "Spellslinger" {
+                    self.set_flag(main, "skipEffectiveRate", true);
+                }
+                self.sd_set(main, "sourceRateIsFinal", true);
+                TriggerConfig {
+                    trigger_name: Some("Spellslinger".into()),
+                    trigger_on_use: true,
+                    trigger_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Attack")
+                            && p.has_type(s, "Projectile")
+                            && p.cfg(s).flags.unwrap_or(0) & p.mf("Wand") > 0
+                            && !p.sd_truthy(s, "triggeredBySpellSlinger")
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
+            "seize the flesh" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Warcry") && p.slot_match(s)),
+                ..TriggerConfig::default()
+            },
+            "fissure" => TriggerConfig {
+                trigger_on_use: true,
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Slam") && p.slot_match(s)),
+                ..TriggerConfig::default()
+            },
+            "mark on hit" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Attack")),
+                ..TriggerConfig::default()
+            },
+            "hextouch" => {
+                self.sd_set(main, "sourceRateIsFinal", true);
+                TriggerConfig {
+                    trigger_skill_cond: Some(|p, s| p.has_type(s, "Attack") && p.slot_match(s)),
+                    ..TriggerConfig::default()
+                }
+            }
+            "shattershard" => {
+                set_global(self);
+                let c = self
+                    .cached_calc(main, true, true)?
+                    .ok_or("attempt to index a nil value (field '?')")?;
+                let duration = c.out("Duration").unwrap_or(f64::NAN);
+                self.sd_set(main, "triggerRateCapOverride", 1.0 / duration);
+                if let Some(b) = self.bd(PLAYER) {
+                    b.set_lines(
+                        "SkillTriggerRate",
+                        vec![
+                            "Shattershard uses duration as pseudo cooldown".into(),
+                            sf!("1 / %.2f ^8(Shattershard duration)", duration),
+                            sf!("= %.2f ^8per second", 1.0 / duration),
+                        ],
+                    );
+                }
+                TriggerConfig {
+                    source: Some(main),
+                    ..TriggerConfig::default()
+                }
+            }
+            "battlemage's cry" | "combust" => {
+                if key == "battlemage's cry" && self.skill_name(main) == "Battlemage's Cry" {
+                    return Ok(None);
+                }
+                TriggerConfig {
+                    trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee")),
+                    comparer: Some(if key == "combust" {
+                        |c, source, rate| {
+                            default_comparer(c, source, rate)
+                                && c.out("InfernalUpTimeRatio").is_some()
+                        }
+                    } else {
+                        |c, source, rate| {
+                            default_comparer(c, source, rate)
+                                && c.out("BattlemageUpTimeRatio").is_some()
+                        }
+                    }),
+                    triggered_skill_cond: (key == "battlemage's cry").then_some(
+                        |p: &Perform, s| {
+                            p.sd_truthy(s, "triggeredByBattleMageCry") && p.slot_match(s)
+                        },
+                    ),
+                    ..TriggerConfig::default()
+                }
+            }
+            "voidstorm" => TriggerConfig {
+                trigger_on_use: true,
+                trigger_skill_cond: Some(|p, s| {
+                    p.has_type(s, "Attack") && p.has_type(s, "Rain") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "shockwave" | "void shockwave" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee") && p.slot_match(s)),
+                ..TriggerConfig::default()
+            },
+            "manaforged arrows" => TriggerConfig {
+                trigger_on_use: true,
+                trigger_name: Some("Manaforged Arrows".into()),
+                trigger_skill_cond: Some(|p, s| {
+                    p.has_type(s, "Attack") && p.cfg(s).flags.unwrap_or(0) & p.mf("Bow") > 0
+                }),
+                ..TriggerConfig::default()
+            },
+            "focus" => TriggerConfig {
+                custom_handler: Some(|p| p.helmet_focus_handler()),
+                ..TriggerConfig::default()
+            },
+            "snipe" => return self.snipe_config(),
+            "intuitive link" => {
+                if self.skill_name(main) == "Intuitive Link" {
+                    return Ok(None);
+                }
+                let link =
+                    |p: &Self| (0..p.n_player).find(|&k| p.skill_name(k) == "Intuitive Link");
+                let pdb = self.pdb();
+                let rate = self.c.base(pdb, None, &["IntuitiveLinkSourceRate"])?;
+                TriggerConfig {
+                    triggered_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Spell")
+                            && p.slot_match(s)
+                            && Some(s)
+                                != (0..p.n_player).find(|&k| p.skill_name(k) == "Intuitive Link")
+                    }),
+                    trig_rate: Some(rate),
+                    source: link(self),
+                    source_name: Some("Custom source".into()),
+                    use_cast_rate: true,
+                    ..TriggerConfig::default()
+                }
+            }
+            "svalinn cast on block" | "festering resentment cast on block" => {
+                set_global(self);
+                TriggerConfig {
+                    source: Some(main),
+                    triggered_skill_cond: Some(|p, s| p.slot_match(s) && p.trigger_supports(s)),
+                    ..TriggerConfig::default()
+                }
+            }
+            "hex on trap" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Trapped")),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredByTrapTrigger") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "supporttriggerfirespellonhit" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee")),
+                triggered_skill_cond: Some(|p, s| {
+                    p.sd_truthy(s, "triggeredBySettlersEnchantTrigger") && p.slot_match(s)
+                }),
+                ..TriggerConfig::default()
+            },
+            "ghostly artillery" => TriggerConfig {
+                source_weapon: true,
+                trigger_on_use: true,
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Attack")),
+                ..TriggerConfig::default()
+            },
+            "replica gifts from above" => TriggerConfig {
+                trigger_skill_cond: Some(|p, s| {
+                    !p.has_type(s, "SummonsTotem") && p.has_type(s, "Attack")
+                }),
+                ..TriggerConfig::default()
+            },
+            "TriggeredMoltenStrike" => TriggerConfig {
+                trigger_skill_cond: Some(melee_or_attack),
                 ..TriggerConfig::default()
             },
             k => return Err(format!("not ported: the trigger {k}")),
@@ -574,16 +1056,12 @@ impl<'a> Perform<'a> {
         source: Option<usize>,
         rate: Option<f64>,
         comparer: Option<Comparer>,
+        minimum_cost: Option<(&str, f64)>,
     ) -> Result<(Option<usize>, Option<f64>)> {
         if let Some(c) = self.cached_calc(skill, false, true)? {
             let speed = c.out("HitSpeed").or_else(|| c.out("Speed"));
-            let better = match comparer {
-                Some(f) => f(&c, source, rate),
-                None => match source {
-                    None => speed.is_some(),
-                    Some(_) => speed.is_some_and(|s| s > rate.unwrap_or(0.0)),
-                },
-            };
+            let better = comparer.unwrap_or(default_comparer)(&c, source, rate)
+                && minimum_cost.is_none_or(|(stat, min)| c.out(stat).unwrap_or(0.0) >= min);
             let used_by_mirage = self
                 .cfg(skill)
                 .skill_cond
@@ -816,40 +1294,19 @@ impl<'a> Perform<'a> {
         chance: f64,
         actor: usize,
     ) -> Result<Sim> {
-        let increment = 1.0 / source_rate;
-        let sim_time = increment * 1000.0;
         let tick = self.misc_data("ServerTickTime");
+        let cds: Vec<f64> = rotation
+            .iter()
+            .map(|s| {
+                let own = s
+                    .cd_override
+                    .unwrap_or((s.cd.unwrap_or(0.0) + s.added_cooldown) / s.icdr);
+                m_max(own, (trigger_cd + s.adds_cast_time.unwrap_or(0.0)) / s.icdr)
+            })
+            .collect();
+        let increment = 1.0 / source_rate;
+        let (sim_time, count) = simulate_rotation(&cds, source_rate, tick);
         let n = rotation.len();
-        let mut cds = Vec::with_capacity(n);
-        for s in &rotation {
-            let own = s
-                .cd_override
-                .unwrap_or((s.cd.unwrap_or(0.0) + s.added_cooldown) / s.icdr);
-            cds.push(m_max(
-                own,
-                (trigger_cd + s.adds_cast_time.unwrap_or(0.0)) / s.icdr,
-            ));
-        }
-        let mut next_trig = vec![0.0; n];
-        let mut count = vec![0.0; n];
-        let mut rotation_index = 0;
-        let mut next_trigger = 0.0;
-        while next_trigger < sim_time {
-            let mut current = rotation_index;
-            loop {
-                if next_trig[current] <= next_trigger {
-                    count[current] += 1.0;
-                    next_trig[current] = ceil_b(floor_b(next_trigger, tick) + cds[current], tick);
-                    break;
-                }
-                current = (current + 1) % n;
-                if current == rotation_index {
-                    break;
-                }
-            }
-            rotation_index = (rotation_index + 1) % n;
-            next_trigger += increment;
-        }
         let main_uuid = self
             .actor_main(actor)
             .map(|m| self.skill_uuid(m))
@@ -905,8 +1362,13 @@ impl<'a> Perform<'a> {
                         || config.allow_triggered)
                     && i != main
                 {
-                    (source, trig_rate) =
-                        self.find_trigger_skill(i, source, trig_rate, config.comparer)?;
+                    (source, trig_rate) = self.find_trigger_skill(
+                        i,
+                        source,
+                        trig_rate,
+                        config.comparer,
+                        config.minimum_cost,
+                    )?;
                     source_uuid = source.map(|s| self.skill_uuid(s));
                 }
                 if let Some(cond) = config.triggered_skill_cond
@@ -965,7 +1427,8 @@ impl<'a> Perform<'a> {
                 } else {
                     "attack rate"
                 };
-                esr_l.push(sf!("%.2f ^8(%s %s)", r, self.skill_name(s), what));
+                let name = config.source_name.as_deref().unwrap_or(self.skill_name(s));
+                esr_l.push(sf!("%.2f ^8(%s %s)", r, name, what));
             }
         }
         let esr_insert = |l: &mut Vec<String>, at: usize, x: String| l.insert(at.min(l.len()), x);
@@ -1039,14 +1502,101 @@ impl<'a> Perform<'a> {
             }
         }
         let melee_source = source.is_some_and(|s| self.has_type(s, "Melee"));
-        if (self.sd_truthy(main, "triggeredByBattleMageCry") || self.skill_name(main) == "Combust")
-            && cached.is_some()
-            && melee_source
-        {
-            return Err("not ported: the uptime of exerting warcries as a trigger".into());
+        // The uptime of the exerting warcry: Battlemage's Cry, Infernal Cry
+        let tick_time = self.misc_data("ServerTickTime");
+        for (on, prefix, cry) in [
+            (
+                self.sd_truthy(main, "triggeredByBattleMageCry"),
+                "BattleCry",
+                "BattleMageCry",
+            ),
+            (
+                self.skill_name(main) == "Combust",
+                "Infernal",
+                "InfernalCry",
+            ),
+        ] {
+            let Some(c) = cached.as_ref().filter(|_| on && melee_source) else {
+                continue;
+            };
+            let num = |k: String| {
+                c.out(&k)
+                    .ok_or_else(|| format!("attempt to perform arithmetic on a nil value ({k})"))
+            };
+            let exerts = num(format!("{prefix}ExertsCount"))?;
+            let duration = ceil_b(num(format!("{cry}Duration"))?, tick_time);
+            let cast = num(format!("{cry}CastTime"))?;
+            let cd = ceil_b(num(format!("{cry}Cooldown"))?, tick_time);
+            let rate = trig_rate.ok_or("attempt to perform arithmetic on a nil value")?;
+            let hits = m_max(m_min(rate * duration, exerts), 0.0);
+            if bd {
+                esr_l.push(sf!(
+                    "^8(min(%.2f * %.2f, %d) = %.2f average number of exerted attacks capped by exerted count)",
+                    rate,
+                    duration,
+                    exerts,
+                    hits
+                ));
+                esr_l.push(sf!(
+                    "= %.2f / (%.2f + %.2f) ^8(the calculated number of exerted attacks happens every cooldown + duration)",
+                    hits,
+                    cast,
+                    cd
+                ));
+            }
+            trig_rate = Some(hits / (cast + cd));
         }
         if self.sd_truthy(main, "triggeredByManaforged") && trig_rate.is_some_and(|r| r > 0.0) {
-            return Err("not ported: Manaforged Arrows".into());
+            let own = self
+                .cached_calc(main, true, false)?
+                .ok_or("attempt to index a nil value (field '?')")?;
+            let cost = own.out("ManaCostRaw").unwrap_or(0.0);
+            if cost > 0.0 {
+                let pct = self
+                    .sd_num(main, "ManaForgedArrowsPercentThreshold")
+                    .ok_or("attempt to perform arithmetic on a nil value")?;
+                let threshold = cost * pct;
+                let source_cost = cached
+                    .as_ref()
+                    .ok_or("attempt to index a nil value (field '?')")?
+                    .out("ManaCostRaw")
+                    .unwrap_or(0.0);
+                let rate = trig_rate.unwrap_or(0.0);
+                if source_cost > 0.0 {
+                    let uses = threshold / source_cost;
+                    if bd {
+                        let first = esr_l.first().cloned();
+                        let mut l = vec![
+                            sf!("%.4f ^8(Mana cost of trigger source)", source_cost),
+                            String::new(),
+                            sf!("%.4f ^8(Mana Cost of triggered)", cost),
+                            sf!("%.2f ^8(Manaforged threshold multiplier)", pct),
+                            sf!("= %.4f ^8(Manaforged trigger threshold)", threshold),
+                            String::new(),
+                            sf!("%.4f ^8(Manaforged trigger threshold)", threshold),
+                            sf!("/ %.4f ^8(Mana cost of trigger source)", source_cost),
+                            sf!("= %.2f ^8(Skill usages required)", uses),
+                            String::new(),
+                        ];
+                        // A nil first line ends the list there
+                        if let Some(f) = first {
+                            l.push(f);
+                            l.push(sf!(
+                                "/ ceil(%.2f) ^8(%d Skill usages required)",
+                                uses,
+                                uses.ceil()
+                            ));
+                        }
+                        esr_l = l;
+                    }
+                    trig_rate = Some(rate / uses.ceil());
+                } else {
+                    if bd {
+                        esr_l.push("Source skill has no mana cost".into());
+                    }
+                    trig_rate = Some(0.0);
+                }
+            }
         }
         let by_brand = self.sd_truthy(main, "triggeredByBrand");
         if by_brand && config.brand.is_none() {
@@ -1060,25 +1610,30 @@ impl<'a> Perform<'a> {
         let added = self.c.base(list, c, &["CooldownRecovery"])?;
         let added = (added != 0.0).then_some(added);
         let cd_override = self.c.override_num(list, c, &["CooldownRecovery"])?;
-        let effect_cd = |p: &Self, i: usize| -> Result<Option<f64>> {
+        let effect_cd = |p: &Self, i: usize, by: Option<usize>| -> Result<Option<f64>> {
             let Some(t) = p.mods(i).triggered_by else {
                 return Ok(None);
             };
             let e = &p.skill(i).effect_list[t];
+            let ge = match by {
+                Some(k) => &p.skill(k).active_effect.granted_effect,
+                None => &e.granted_effect,
+            };
             let level = e
                 .level
-                .and_then(|l| e.granted_effect.level(l))
+                .and_then(|l| ge.level(l))
                 .ok_or("attempt to index a nil value (field '?')")?;
             Ok(level.field("cooldown"))
         };
         let mut trigger_cd = if self.mods(main).triggered_by.is_some() {
-            effect_cd(self, player_main)?
+            effect_cd(self, player_main, config.trigger_effect)?
         } else {
             None
         };
         if trigger_cd.is_none() {
             let s = source.ok_or("attempt to index a nil value (local 'source')")?;
-            trigger_cd = effect_cd(self, s)?;
+            let by = config.trigger_effect.filter(|_| s == player_main);
+            trigger_cd = effect_cd(self, s, by)?;
         }
         let triggered_cd = self.sd_num(main, "cooldown");
         // Brand activation is not affected by cooldown recovery
@@ -1184,7 +1739,7 @@ impl<'a> Perform<'a> {
             let (mut hexblast, mut rate) = (None, None);
             for i in 0..self.n_player {
                 if self.skill_name(i) == "Hexblast" && !self.is_triggered(i) && i != main {
-                    (hexblast, rate) = self.find_trigger_skill(i, hexblast, rate, None)?;
+                    (hexblast, rate) = self.find_trigger_skill(i, hexblast, rate, None, None)?;
                 }
             }
             if hexblast.is_some() {
@@ -1724,6 +2279,279 @@ impl<'a> Perform<'a> {
         );
         self.mods_mut(main).info_message = Some(info);
         Ok(())
+    }
+
+    /// `skill.socketGroup.slot`
+    pub(crate) fn group_slot(&self, i: usize) -> Option<String> {
+        self.skill(i)
+            .group
+            .and_then(|g| self.env.groups.get(g))
+            .and_then(|g| g.slot.clone())
+    }
+
+    /// `skill.triggeredBy and
+    /// calcLib.canGrantedEffectSupportActiveSkill(skill.triggeredBy.grantedEffect, skill)`
+    fn trigger_supports(&self, i: usize) -> bool {
+        let Some(t) = self.mods(i).triggered_by else {
+            return false;
+        };
+        let skill = self.skill(i);
+        let weapons =
+            crate::calc_skills::ActorWeapons::new((0..2).filter_map(|n| self.weapon(PLAYER, n)));
+        let effect = crate::calc_skills::SkillEffect::new(
+            skill.effect_list[t].granted_effect.clone(),
+            None,
+            0.0,
+        );
+        crate::calc_skills::can_support(
+            &effect,
+            skill,
+            &self.env.skills.from_item,
+            &self.env.groups,
+            &weapons,
+            self.input.data.skills,
+        )
+    }
+
+    /// `helmetFocusHandler(env)`: skills triggered when the player
+    /// focuses, assuming focus is used again as soon as it can be
+    fn helmet_focus_handler(&mut self) -> Result<()> {
+        let main = self.main();
+        let Some(t) = self.mods(main).triggered_by else {
+            return Ok(());
+        };
+        if self.has_flag(main, "minion") || self.has_flag(main, "disable") {
+            return Ok(());
+        }
+        self.sd_set(main, "triggered", true);
+        let e = &self.skill(main).effect_list[t];
+        let trigger_cd = e
+            .level
+            .and_then(|l| e.granted_effect.level(l))
+            .ok_or("attempt to index a nil value (field '?')")?
+            .field("cooldown");
+        let triggered_cd = self.sd_num(main, "cooldown");
+        let (list, cfg) = (self.lists[main].list, self.cfg(main));
+        let icdr_focus = self
+            .c
+            .calc_mod(list, Some(&cfg), &["FocusCooldownRecovery"])?;
+        let icdr = self.c.calc_mod(list, Some(&cfg), &["CooldownRecovery"])?;
+        let focus = self
+            .input
+            .data
+            .skills
+            .skills
+            .get("Focus")
+            .ok_or("attempt to index a nil value (local 'skillFocus')")?;
+        let duration = focus
+            .constant_stats
+            .first()
+            .and_then(|(_, v)| *v)
+            .ok_or("attempt to perform arithmetic on a nil value")?
+            / 1000.0;
+        let focus_base_cd = focus
+            .level(1.0)
+            .and_then(|l| l.field("cooldown"))
+            .ok_or("attempt to perform arithmetic on a nil value")?;
+        let total = duration + focus_base_cd / icdr_focus;
+        let action_cd = m_max(
+            triggered_cd.unwrap_or(0.0),
+            trigger_cd.unwrap_or(0.0) / icdr,
+        );
+        let tick = self.misc_data("ServerTickRate");
+        let adjusted = (action_cd * tick).ceil() / tick;
+        let rate = if adjusted != 0.0 {
+            1.0 / adjusted
+        } else {
+            f64::INFINITY
+        };
+        self.c.set_out(PLAYER, "TriggerRateCap", rate);
+        self.c.set_out(PLAYER, "SkillTriggerRate", 1.0 / total);
+        if self.has_bd(PLAYER) {
+            let tcd = trigger_cd.ok_or("bad argument #2 to 'format' (number expected, got nil)")?;
+            let rounding = if self.sd_truthy(main, "ignoresTickRate") {
+                String::new()
+            } else {
+                sf!("%.3f ^8(adjusted for server tick rate)", adjusted)
+            };
+            let trigger = [
+                sf!("%.2f ^8(base cooldown of trigger)", tcd),
+                sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr),
+                sf!("= %.4f ^8(final cooldown of trigger)", tcd / icdr),
+                String::new(),
+            ];
+            let mut l = Vec::new();
+            match triggered_cd {
+                Some(cd) => {
+                    l.extend([
+                        sf!("%.2f ^8(base cooldown of triggered skill)", cd),
+                        sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr),
+                        sf!("= %.4f ^8(final cooldown of triggered skill)", cd / icdr),
+                        String::new(),
+                    ]);
+                    l.extend(trigger);
+                    l.extend([
+                        sf!(
+                            "%.3f ^8(biggest of trigger cooldown and triggered skill cooldown)",
+                            action_cd
+                        ),
+                        String::new(),
+                        rounding,
+                        String::new(),
+                        "Trigger rate:".into(),
+                        sf!("1 / %.3f", adjusted),
+                        sf!("= %.2f ^8per second", rate),
+                    ]);
+                }
+                None => {
+                    l.extend(["Triggered skill has no base cooldown".into(), String::new()]);
+                    l.extend(trigger);
+                    l.extend([
+                        rounding,
+                        String::new(),
+                        "Trigger rate:".into(),
+                        sf!("1 / %.3f", adjusted),
+                        sf!("= %.3f ^8per second", rate),
+                    ]);
+                }
+            }
+            let b = self.bd(PLAYER).unwrap();
+            b.set_lines("TriggerRateCap", l);
+            b.set_lines(
+                "SkillTriggerRate",
+                vec![
+                    sf!("%.2f ^8(focus base cooldown)", focus_base_cd),
+                    sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr_focus),
+                    sf!(
+                        "+ %.2f ^8(skills are only triggered on activation thus we add focus duration)",
+                        duration
+                    ),
+                    sf!("= %.2f ^8(effective skill cooldown for trigger purposes)", total),
+                    String::new(),
+                    sf!(
+                        "%.3f casts per second ^8(Assuming player uses focus exactly when its cooldown of %.2fs expires)",
+                        1.0 / total,
+                        total
+                    ),
+                ],
+            );
+        }
+        self.add_trigger_inc_more(main, main)?;
+        let mods = self.mods_mut(main);
+        mods.info_message = Some("Assuming perfect focus Re-Use".into());
+        mods.info_trigger = Some("Focus".into());
+        self.sd_set(main, "triggerRate", 1.0 / total);
+        self.set_flag(main, "globalTrigger", true);
+        Ok(())
+    }
+
+    /// `configTable["snipe"](env)`: Snipe by itself, as the trigger of the
+    /// skills linked to it, or such a skill triggered by its stages
+    fn snipe_config(&mut self) -> Result<Option<TriggerConfig>> {
+        let main = self.main();
+        let pdb = self.pdb();
+        let mut stages = m_min(
+            self.c.base(pdb, None, &["Multiplier:SnipeStage"])?,
+            self.c.base(pdb, None, &["Multiplier:SnipeStagesMax"])?,
+        );
+        let (list, cfg) = (self.lists[main].list, self.cfg(main));
+        let hit_multi = self.c.base(list, Some(&cfg), &["snipeHitMulti"])?;
+        let ailment_multi = self.c.base(list, Some(&cfg), &["snipeAilmentMulti"])?;
+        let main_slot = self.group_slot(main);
+        let in_slot =
+            |p: &Self, i: usize| p.skill(i).group.is_some() && p.group_slot(i) == main_slot;
+        let triggered: Vec<usize> = (0..self.n_player)
+            .filter(|&i| self.sd_truthy(i, "triggeredBySnipe") && in_slot(self, i))
+            .collect();
+        let (hit, ailment) = (self.mf("Hit"), self.mf("Ailment"));
+        let stage_mods = |p: &mut Self, stages: f64, hit_first: bool| {
+            let base = src("Multiplier:SnipeStages", ModType::Base, stages, "Snipe");
+            let more = |v: f64, f: u32| {
+                src("Damage", ModType::More, v, "Snipe")
+                    .flags(f, 0)
+                    .tag(crate::mods::tag::Tag::multiplier("SnipeStages"))
+            };
+            p.c.add(list, base);
+            let (a, b) = (more(hit_multi, hit), more(ailment_multi, ailment));
+            let (a, b) = if hit_first { (a, b) } else { (b, a) };
+            p.c.add(list, a);
+            p.c.add(list, b);
+        };
+        if self.skill_name(main) == "Snipe" {
+            if self.is_limited(main) {
+                stages = 0.0;
+            } else {
+                self.sd_set(main, "hitTimeMultiplier", m_max(1.0, stages) - 0.5);
+            }
+            if triggered.is_empty() {
+                stage_mods(self, stages, true);
+            } else {
+                for n in ["Lightning", "Cold", "Fire", "Chaos", "Physical"] {
+                    let mut tag = crate::mods::tag::Tag::skill_name("Snipe");
+                    if let crate::mods::tag::TagKind::SkillName {
+                        include_transfigured,
+                        ..
+                    } = &mut tag.kind
+                    {
+                        *include_transfigured = true;
+                    }
+                    let mut m =
+                        crate::mods::Mod::new(&format!("DealNo{n}"), ModType::Flag, true, None);
+                    m.tags.push(tag);
+                    self.c.add(list, m);
+                }
+            }
+            return Ok(None);
+        }
+        let index = triggered
+            .iter()
+            .position(|&i| i == main)
+            .map(|k| k as f64 + 1.0);
+        if !index.is_some_and(|k| k <= stages) {
+            self.sd_clear(main, "triggered");
+            let mods = self.mods_mut(main);
+            mods.info_message2 = Some("DPS reported assuming Self-Cast".into());
+            mods.info_message = Some("Not enough Snipe stages to trigger this skill".into());
+            mods.info_trigger = Some(String::new());
+            return Ok(None);
+        }
+        stage_mods(self, stages, false);
+        let (mut source, mut rate) = (None, None);
+        for i in 0..self.n_player {
+            if self.skill_name(i) != "Snipe" || !in_slot(self, i) {
+                continue;
+            }
+            self.sd_set(i, "hitTimeMultiplier", stages - 0.5);
+            let c = self
+                .cached_calc(i, false, true)?
+                .ok_or("attempt to index a nil value (field '?')")?;
+            let speed = c.out("HitSpeed");
+            let used_by_mirage = self
+                .cfg(i)
+                .skill_cond
+                .as_ref()
+                .is_some_and(|c| c.contains(&crate::mods::Sym::new("usedByMirage")));
+            if !self.has_flag(i, "disable")
+                && !used_by_mirage
+                && !self.has_type(i, "OtherThingUsesSkill")
+                && match source {
+                    None => speed.is_some(),
+                    Some(_) => speed.is_some_and(|s| s > rate.unwrap_or(0.0)),
+                }
+            {
+                rate = speed;
+                match c.out("HitTime") {
+                    Some(t) => self.c.set_out(PLAYER, "ChannelTimeToTrigger", t),
+                    None => self.c.clear_out(PLAYER, "ChannelTimeToTrigger"),
+                }
+                source = Some(i);
+            }
+        }
+        Ok(Some(TriggerConfig {
+            trig_rate: rate,
+            source,
+            ..TriggerConfig::default()
+        }))
     }
 
     /// `activeEffect.srcInstance.skillStageCount`

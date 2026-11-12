@@ -191,7 +191,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Data/StatDescriptions/stat_descriptions.lua" = { status = "todo" }
 "Data/StatDescriptions/tincture_stat_descriptions.lua" = { status = "todo" }
 "Data/StatDescriptions/variable_duration_skill_stat_descriptions.lua" = { status = "todo" }
-"Data/TattooPassives.lua" = { status = "todo" }
+"Data/TattooPassives.lua" = { status = "data", port = "crates/engine/src/tree.rs crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/TimelessJewelData/AbyssNotableNames.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/TimelessJewelData/LegionPassives.lua" = { status = "todo" }
 "Data/TimelessJewelData/LegionTradeIds.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }

@@ -155,9 +155,6 @@ impl<'d> TypedSession<'d> {
     /// `loadXml`: the build, calculated
     pub fn load(data: &'d TypedData, xml: &str, name: Option<&str>) -> Result<TypedSession<'d>> {
         let mut build = data.load_build(xml)?;
-        if build.info.character_level_auto_mode {
-            return Err(format!("{NOT_PORTED}: the character level's auto mode"));
-        }
         let main =
             engine::calcs::build_output(&mut build, &data.calc_data(), CalcMode::Main, None)?;
         let mut s = TypedSession {
@@ -172,6 +169,7 @@ impl<'d> TypedSession<'d> {
             ui: Ui::default(),
             controls: Controls::default(),
         };
+        s.estimate_progress()?;
         s.refresh_controls()?;
         Ok(s)
     }

@@ -100,9 +100,31 @@ fn typed_session_matches_translated() {
 fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut skipped, mut compared) = (Vec::new(), Vec::new(), 0);
     let mut times = [Duration::ZERO; 4];
-    for (id, path) in corpus() {
-        let xml =
-            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let mut builds: Vec<(String, String)> = corpus()
+        .into_iter()
+        .map(|(id, path)| {
+            let xml = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            (id, xml)
+        })
+        .collect();
+    // The character level's auto mode, on every tenth build
+    let auto: Vec<(String, String)> = builds
+        .iter()
+        .step_by(10)
+        .filter_map(|(id, xml)| {
+            let at = xml.find("characterLevelAutoMode=\"")?;
+            let end = at + xml[at..].find("\" ")? + 1;
+            let v = format!(
+                "{}characterLevelAutoMode=\"true\"{}",
+                &xml[..at],
+                &xml[end..]
+            );
+            Some((format!("{id}-auto"), v))
+        })
+        .collect();
+    builds.extend(auto);
+    for (id, xml) in builds {
         if let Err(e) = TypedSession::load(data, &xml, None) {
             skipped.push(format!("{id}: {e}"));
             continue;

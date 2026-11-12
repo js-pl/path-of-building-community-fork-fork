@@ -1045,21 +1045,31 @@ impl TypedSession<'_> {
                 Some(id) => {
                     let id: u32 = id.parse().map_err(|_| "bad node id")?;
                     let spec = &self.build.spec;
-                    let node = match spec.index.get(&id) {
-                        Some(&i) => Some(spec.tree_node(i)),
-                        None => spec.tree.node(id).or_else(|| {
-                            self.data
-                                .tree(self.data.game.latest_tree_version())
-                                .ok()?
-                                .node(id)
-                        }),
-                    };
+                    if let Some(&i) = spec.index.get(&id) {
+                        return Ok(Some(spec.dn(i).to_string()));
+                    }
+                    let node = spec.tree.node(id).or_else(|| {
+                        self.data
+                            .tree(self.data.game.latest_tree_version())
+                            .ok()?
+                            .node(id)
+                    });
                     Some(node.ok_or("attempt to index local 'node'")?.dn.to_string())
                 }
-                None if rest("Tree:([%w_]+)").is_some() => {
-                    return Err(format!("{NOT_PORTED}: tattoo and legion sources"));
-                }
-                None => None,
+                None => match rest("Tree:([%w_]+)") {
+                    Some(text) => match self
+                        .build
+                        .spec
+                        .tree
+                        .tattoos
+                        .values()
+                        .find(|t| *t.id == *text)
+                    {
+                        Some(t) => Some(t.dn.to_string()),
+                        None => return Err(format!("{NOT_PORTED}: timeless jewel sources")),
+                    },
+                    None => None,
+                },
             },
             "Skill" => {
                 let id = rest("Skill:(.+)").unwrap_or_default();

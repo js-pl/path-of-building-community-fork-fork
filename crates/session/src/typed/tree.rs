@@ -5,7 +5,7 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
-use super::{NOT_PORTED, Result, TypedSession, num, object};
+use super::{Result, TypedSession, num, object};
 use engine::spec::PassiveSpec;
 use engine::tree::NodeType;
 use serde_json::{Map, Value as J, json};
@@ -38,13 +38,8 @@ impl<'d> TypedSession<'d> {
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
+        self.estimate_progress()?;
         self.refresh_controls()
-    }
-
-    /// Edits of the tree are not ported where jewels change its paths
-    fn check_tree(&self) -> Result<()> {
-        engine::power::check_tree_jewels(&self.build)
-            .map_err(|_| format!("{NOT_PORTED}: tree edits with Intuitive Leap and the like"))
     }
 
     fn alloc(&mut self, i: usize) -> Result<()> {
@@ -76,7 +71,6 @@ impl<'d> TypedSession<'d> {
 
     /// `clickNode`: a left click on a node in the tree view
     pub fn click_node(&mut self, id: u32) -> Result<J> {
-        self.check_tree()?;
         let i = self.node(id)?;
         let spec = &self.build.spec;
         if spec.nodes[i].alloc {
@@ -159,7 +153,6 @@ impl<'d> TypedSession<'d> {
 
     /// `selectMastery`: `TreeTab:SaveMasteryPopup`
     pub fn select_mastery(&mut self, id: u32, effect: f64) -> Result<J> {
-        self.check_tree()?;
         let i = self.node(id)?;
         if !self
             .build
@@ -183,7 +176,6 @@ impl<'d> TypedSession<'d> {
 
     /// `resetTree`
     pub fn reset_tree(&mut self) -> Result<J> {
-        self.check_tree()?;
         let spec = self.spec_mut();
         spec.reset_nodes();
         spec.build_all_depends_and_paths()?;

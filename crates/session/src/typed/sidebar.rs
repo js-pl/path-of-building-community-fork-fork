@@ -546,6 +546,19 @@ impl TypedSession<'_> {
             .and_then(OutVal::num)
     }
 
+    /// `EstimatePlayerProgress` after a calculation: in the level's auto
+    /// mode, the estimated level, with the configuration's mods built
+    /// again for the next calculation
+    pub(super) fn estimate_progress(&mut self) -> Result<()> {
+        let level = self.estimated_level();
+        if self.build.info.character_level_auto_mode && self.build.info.character_level != level {
+            let data = self.data;
+            self.build
+                .set_character_level(level, &data.game.config, &data.parser)?;
+        }
+        Ok(())
+    }
+
     /// The level `EstimatePlayerProgress` estimates from the points used
     pub fn estimated_level(&self) -> f64 {
         let (used, _, _) = self.count_alloc_nodes();

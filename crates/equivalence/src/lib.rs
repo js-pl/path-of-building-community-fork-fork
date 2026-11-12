@@ -16,6 +16,7 @@ pub mod bridge;
 pub mod outputs;
 pub mod typed_build;
 pub mod typed_json;
+pub mod variants;
 
 /// The repository root.
 pub fn root() -> PathBuf {

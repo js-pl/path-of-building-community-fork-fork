@@ -157,6 +157,20 @@ impl<'a> Perform<'a> {
     }
 
     /// `activeSkill.activeEffect.grantedEffectLevel`
+    /// Whether the skill's level has no cost: `SkillsTab:ProcessGemInstance`
+    /// empties the cost of the level of each triggered skill an item or
+    /// a node grants, on the shared skill data
+    pub(crate) fn cost_wiped(&self, i: usize) -> bool {
+        let e = &self.skill(i).active_effect;
+        self.env.groups.iter().flat_map(|g| &g.gem_list).any(|g| {
+            g.triggered
+                && g.gem_id.is_none()
+                && g.skill_id.as_deref() == Some(e.granted_effect.id.as_str())
+                && g.level.is_some()
+                && g.level == e.level
+        })
+    }
+
     pub(crate) fn effect_level(&self, i: usize) -> Option<&crate::skill_data::SkillLevel> {
         let e = &self.skill(i).active_effect;
         e.granted_effect.level(e.level?)
@@ -2847,10 +2861,13 @@ impl<'a> Perform<'a> {
             let hybrid_life = self.c.base(list, c, &["HybridManaAndLifeCost_Life"])? / 100.0;
             let mut costs = costs();
             let idx = |costs: &[Cost], r: &str| costs.iter().position(|x| x.resource == r).unwrap();
-            let level_cost: Vec<(String, f64)> = self
-                .effect_level(i)
-                .map(|l| l.cost.clone())
-                .unwrap_or_default();
+            let level_cost: Vec<(String, f64)> = if self.cost_wiped(i) {
+                Vec::new()
+            } else {
+                self.effect_level(i)
+                    .map(|l| l.cost.clone())
+                    .unwrap_or_default()
+            };
             for k in 0..costs.len() {
                 let resource = costs[k].resource;
                 let skill_cost =
@@ -3336,7 +3353,7 @@ impl<'a> Perform<'a> {
 
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
-pub(crate) const TRIGGER_CONFIGS: [&str; 82] = [
+pub const TRIGGER_CONFIGS: [&str; 82] = [
     "law of the wilds",
     "the rippling thoughts",
     "the surging thoughts",
@@ -3438,10 +3455,15 @@ impl<'a> Perform<'a> {
         if generals_cry && !self.is_limited(main) {
             self.generals_cry(main)?;
         }
-        if !generals_cry && self.mirages()? {
+        let mirage = !generals_cry && self.mirages()?;
+        // The gem level and quality below go to the output the copy's
+        // replaced
+        if mirage && self.main_copy.is_some() {
             return Ok(());
         }
-        self.offence(crate::calc::PLAYER, main)?;
+        if !mirage {
+            self.offence(crate::calc::PLAYER, main)?;
+        }
         // The main skill's gem level and quality
         let e = &self.skill(main).active_effect;
         if e.src.is_some() {
