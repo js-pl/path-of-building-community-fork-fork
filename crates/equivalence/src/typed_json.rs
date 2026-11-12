@@ -42,7 +42,7 @@ fn opt_sym(m: &mut Map<String, J>, k: &str, v: Option<Sym>) {
     }
 }
 
-fn opt_text(m: &mut Map<String, J>, k: &str, v: &Option<std::rc::Rc<str>>) {
+fn opt_text(m: &mut Map<String, J>, k: &str, v: &Option<std::sync::Arc<str>>) {
     if let Some(v) = v {
         m.insert(k.into(), json!(&**v));
     }

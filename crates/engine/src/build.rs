@@ -21,7 +21,7 @@ use crate::skills::Skills;
 use crate::spec::PassiveSpec;
 use crate::tree::PassiveTree;
 use crate::xml::Element;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -125,13 +125,13 @@ pub struct LoadContext<'a> {
 pub struct Build<'t> {
     pub info: BuildInfo,
     /// Shared between a build's copies, as the calculations only read it
-    pub config: Rc<ConfigTab>,
+    pub config: Arc<ConfigTab>,
     /// The active config set's mods (`configTab.modList`, `enemyModList`)
-    pub config_mods: Rc<Vec<Mod>>,
-    pub config_enemy_mods: Rc<Vec<Mod>>,
+    pub config_mods: Arc<Vec<Mod>>,
+    pub config_enemy_mods: Arc<Vec<Mod>>,
     pub config_state: ConfigState,
     /// Shared between a build's copies, as the calculations only read it
-    pub spec: Rc<PassiveSpec<'t>>,
+    pub spec: Arc<PassiveSpec<'t>>,
     pub items: ItemsTab,
     pub skills: Option<Skills>,
     pub calcs: CalcsInput,
@@ -216,11 +216,11 @@ impl<'t> Build<'t> {
         )?;
         Ok(Build {
             info,
-            config: Rc::new(config),
-            config_mods: Rc::new(config_mods),
-            config_enemy_mods: Rc::new(config_enemy_mods),
+            config: Arc::new(config),
+            config_mods: Arc::new(config_mods),
+            config_enemy_mods: Arc::new(config_enemy_mods),
             config_state: state,
-            spec: Rc::new(spec),
+            spec: Arc::new(spec),
             items,
             skills,
             calcs,

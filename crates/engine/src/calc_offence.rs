@@ -233,7 +233,7 @@ impl<'a> Perform<'a> {
                     .map(|(k, v)| (k.as_str().to_string(), v))
                     .collect();
                 self.c
-                    .set_out_val(actor, k, OutVal::Table(std::rc::Rc::new(t)));
+                    .set_out_val(actor, k, OutVal::Table(std::sync::Arc::new(t)));
             }
         }
         result
@@ -522,7 +522,7 @@ impl<'a> Perform<'a> {
         }
         let w1_type = self.weapon_str(actor, 0, "type");
         let w2_type = self.weapon_str(actor, 1, "type");
-        let info = |t: &Option<std::rc::Rc<str>>| {
+        let info = |t: &Option<std::sync::Arc<str>>| {
             t.as_ref()
                 .and_then(|t| self.data().weapon_type_info.get(&**t))
                 .cloned()
@@ -956,7 +956,7 @@ impl<'a> Perform<'a> {
         }
         if let Some(pct) = self.sd_num(i, "gainPercentBaseWandDamageToSpells") {
             let mult = pct / 100.0;
-            let is_wand = |t: &Option<std::rc::Rc<str>>| t.as_deref() == Some("Wand");
+            let is_wand = |t: &Option<std::sync::Arc<str>>| t.as_deref() == Some("Wand");
             let weapons: Vec<usize> = if is_wand(&w1_type) && is_wand(&w2_type) {
                 vec![0, 1]
             } else if is_wand(&w1_type) {
@@ -989,7 +989,7 @@ impl<'a> Perform<'a> {
             }
         }
         if let Some(pct) = self.sd_num(i, "gainPercentBaseDaggerDamageToSpells") {
-            let is_dagger = |n: usize, t: &Option<std::rc::Rc<str>>| {
+            let is_dagger = |n: usize, t: &Option<std::sync::Arc<str>>| {
                 self.weapon(actor, n)
                     .and_then(|w| w.get("AddedUsingDagger"))
                     .is_some_and(ModValue::truthy)
@@ -1532,7 +1532,7 @@ impl<'a> Perform<'a> {
                 self.c.set_out_val(
                     actor,
                     "AreaOfEffectRadiusTertiaryOccurrences",
-                    OutVal::Table(std::rc::Rc::new(
+                    OutVal::Table(std::sync::Arc::new(
                         radii
                             .into_iter()
                             .map(|(k, v)| (k.to_string(), OutVal::Num(v)))

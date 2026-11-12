@@ -21,7 +21,7 @@ use crate::mods::Sym;
 use crate::skills::SocketGroup;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// What a calculation leaves for others (`GlobalCache.cachedData[mode][uuid]`)
 #[derive(Clone, Debug)]
@@ -49,7 +49,7 @@ impl CachedCalc {
 /// Calculations of the build's other skills, and the cache of their results
 pub trait Recalc {
     /// The cached results of a skill's calculation
-    fn cached(&self, uuid: &str) -> Option<Rc<CachedCalc>>;
+    fn cached(&self, uuid: &str) -> Option<Arc<CachedCalc>>;
     /// Whether this is a calculator's calculation (`env.mode ==
     /// "CALCULATOR"`), which most lookups recalculate even when cached
     fn calculator(&self) -> bool;
@@ -92,7 +92,7 @@ pub fn skill_uuid(skill: &ActiveSkill, groups: &[SocketGroup]) -> String {
 }
 
 /// Cached calculations by skill id
-pub type Cache = HashMap<String, Rc<CachedCalc>>;
+pub type Cache = HashMap<String, Arc<CachedCalc>>;
 
 /// Recalculates a build with other main skills
 pub struct Recalculator<'a, 't> {
@@ -106,7 +106,7 @@ pub struct Recalculator<'a, 't> {
     cache: RefCell<Cache>,
     /// The setup of the calculations and the build it leaves, which does
     /// not depend on the main skill
-    setup: RefCell<Option<Rc<(Build<'t>, Env)>>>,
+    setup: RefCell<Option<Arc<(Build<'t>, Env)>>>,
 }
 
 impl<'a, 't> Recalculator<'a, 't> {
@@ -151,14 +151,14 @@ impl<'a, 't> Recalculator<'a, 't> {
         let env =
             crate::calc_env::init_env_with(&mut build, self.data, self.mode, base, &self.ovr)?;
         if reuse {
-            *self.setup.borrow_mut() = Some(Rc::new((build.clone(), env.clone())));
+            *self.setup.borrow_mut() = Some(Arc::new((build.clone(), env.clone())));
         }
         Ok((build, env))
     }
 }
 
 impl Recalc for Recalculator<'_, '_> {
-    fn cached(&self, uuid: &str) -> Option<Rc<CachedCalc>> {
+    fn cached(&self, uuid: &str) -> Option<Arc<CachedCalc>> {
         self.cache.borrow().get(uuid).cloned()
     }
 
@@ -169,7 +169,7 @@ impl Recalc for Recalculator<'_, '_> {
     fn store(&self, uuid: &str, calc: CachedCalc) {
         self.cache
             .borrow_mut()
-            .insert(uuid.to_string(), Rc::new(calc));
+            .insert(uuid.to_string(), Arc::new(calc));
     }
 
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
@@ -400,7 +400,7 @@ impl<'a> Perform<'a> {
         i: usize,
         limit_self: bool,
         refresh: bool,
-    ) -> Result<Option<Rc<CachedCalc>>> {
+    ) -> Result<Option<Arc<CachedCalc>>> {
         let recalc = self
             .input
             .recalc

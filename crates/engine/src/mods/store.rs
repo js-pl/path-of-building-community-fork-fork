@@ -9,7 +9,7 @@ use super::sym::Sym;
 use super::tag::*;
 use super::types::*;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -78,11 +78,11 @@ impl Stores {
 pub struct Cfg {
     pub flags: Option<u32>,
     pub keyword_flags: Option<u32>,
-    pub source: Option<Rc<str>>,
-    pub skill_name: Option<Rc<str>>,
-    pub summon_skill_name: Option<Rc<str>>,
+    pub source: Option<Arc<str>>,
+    pub skill_name: Option<Arc<str>>,
+    pub summon_skill_name: Option<Arc<str>>,
     /// `skillGrantedEffect.id`, when there is a granted effect
-    pub skill_id: Option<Option<Rc<str>>>,
+    pub skill_id: Option<Option<Arc<str>>>,
     /// The truthy `skillGrantedEffect.baseFlags`, or else `baseFlags`
     pub base_flags: Option<HashSet<Sym>>,
     pub skill_part: Option<f64>,
@@ -93,13 +93,13 @@ pub struct Cfg {
     pub slot_name: Option<Sym>,
     pub actor: Option<Sym>,
     pub skill_stats: Option<crate::mods::SymMap<f64>>,
-    pub socket_color: Option<Rc<str>>,
+    pub socket_color: Option<Arc<str>>,
     pub socket_num: Option<f64>,
     pub strength_gems: Option<f64>,
     pub dexterity_gems: Option<f64>,
     pub intelligence_gems: Option<f64>,
     /// `skillGem`: the gem a socket query is for
-    pub skill_gem: Option<Rc<crate::skill_data::Gem>>,
+    pub skill_gem: Option<Arc<crate::skill_data::Gem>>,
 }
 
 /// What queries need from outside the stores: actors, their outputs and
@@ -118,13 +118,13 @@ pub trait Actors {
     /// all one handed weapons), when there is one and it is set
     fn one_handed_added(&self, store: StoreId, var: Sym) -> Option<bool>;
     /// `actor.minionData.monsterTags`
-    fn monster_tags(&self, store: StoreId) -> Option<Vec<Rc<str>>>;
+    fn monster_tags(&self, store: StoreId) -> Option<Vec<Arc<str>>>;
     /// Whether an `ItemCondition` tag holds
     fn item_condition(&self, store: StoreId, tag: &ItemCondition, cfg: Option<&Cfg>) -> bool;
     /// `calcLib.gemIsType(cfg.skillGem, keyword)`, false without a gem
     fn gem_is_type(&self, cfg: &Cfg, keyword: &str) -> bool;
     /// `calcLib.getGameIdFromGemName(name, true)`
-    fn game_id(&self, gem_name: &str) -> Option<Rc<str>>;
+    fn game_id(&self, gem_name: &str) -> Option<Arc<str>>;
     /// `data.highPrecisionMods[name][type]`
     fn high_precision(&self, name: Sym, typ: ModType) -> Option<f64>;
 }

@@ -19,7 +19,7 @@ use crate::mods::{Mod, Sym};
 use crate::tree::{self, NodeType, PassiveTree, StatLine};
 use lua::ljtab::LjMap;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -51,14 +51,14 @@ pub fn copy_table<V: Clone>(t: &LjMap<V>) -> LjMap<V> {
 #[derive(Debug)]
 pub struct PathStep {
     pub node: usize,
-    pub rest: Option<Rc<PathStep>>,
+    pub rest: Option<Arc<PathStep>>,
 }
 
 /// A node's stat lines and mods when the spec changed them (a mastery's
 /// selected effect, or all its effects).
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeStats {
-    pub sd: Vec<Rc<str>>,
+    pub sd: Vec<Arc<str>>,
     pub mods: Vec<StatLine>,
     pub mod_list: Vec<Mod>,
 }
@@ -76,15 +76,15 @@ pub struct SpecNode {
     pub connected_to_start: bool,
     pub path_dist: f64,
     /// `node.path`: `None` when nil, `Some(None)` for a root's empty path
-    pub path: Option<Option<Rc<PathStep>>>,
+    pub path: Option<Option<Arc<PathStep>>>,
     pub distance_to_class_start: Option<f64>,
     /// Stats the spec set, instead of the tree's
-    pub stats: Option<Rc<NodeStats>>,
+    pub stats: Option<Arc<NodeStats>>,
     pub all_mastery_options: Option<bool>,
     /// Set when processing the spec's stats found an unknown line
     pub unknown: bool,
     /// A cluster jewel subgraph's node, which the tree does not have
-    pub synth: Option<Rc<tree::Node>>,
+    pub synth: Option<Arc<tree::Node>>,
     visited: bool,
 }
 
@@ -104,7 +104,7 @@ impl SpecNode {
             stats: None,
             all_mastery_options: None,
             unknown: false,
-            synth: Some(Rc::new(node)),
+            synth: Some(Arc::new(node)),
             visited: false,
         }
     }
@@ -133,7 +133,7 @@ pub struct PassiveSpec<'t> {
     pub allocated_notable_count: u32,
     pub allocated_keystone_count: u32,
     /// Allocated masteries by mastery name, in the order first counted
-    pub allocated_mastery_types: Vec<(Rc<str>, u32)>,
+    pub allocated_mastery_types: Vec<(Arc<str>, u32)>,
     pub allocated_mastery_type_count: u32,
     /// Jewel socket node id to the id of the item in it
     pub jewels: BTreeMap<u32, f64>,
@@ -243,7 +243,7 @@ impl<'t> PassiveSpec<'t> {
         }
     }
 
-    pub fn sd(&self, i: usize) -> &[Rc<str>] {
+    pub fn sd(&self, i: usize) -> &[Arc<str>] {
         match &self.nodes[i].stats {
             Some(s) => &s.sd,
             None => &self.tree_node(i).sd,
@@ -479,11 +479,11 @@ impl<'t> PassiveSpec<'t> {
 
     /// `ProcessStats` on a node with the given lines, keeping its unknown
     /// flag as upstream does
-    fn set_stats(&mut self, i: usize, sd: Vec<Rc<str>>, starts: &[usize]) -> Result<()> {
+    fn set_stats(&mut self, i: usize, sd: Vec<Arc<str>>, starts: &[usize]) -> Result<()> {
         let source = format!("Tree:{}", self.nodes[i].id);
         let mut mods = Vec::new();
         let mut mod_list = Vec::new();
-        let mut lines: Vec<Rc<str>> = Vec::new();
+        let mut lines: Vec<Arc<str>> = Vec::new();
         let mut unknown = false;
         // Lines are added and processed effect by effect
         let mut bounds: Vec<usize> = starts.to_vec();
@@ -515,7 +515,7 @@ impl<'t> PassiveSpec<'t> {
             }
         }
         self.nodes[i].unknown |= unknown;
-        self.nodes[i].stats = Some(Rc::new(NodeStats {
+        self.nodes[i].stats = Some(Arc::new(NodeStats {
             sd: lines,
             mods,
             mod_list,
@@ -592,7 +592,7 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `curAscendClassBaseName`: the current ascendancy's id
-    pub fn ascend_class_base_name(&self) -> Option<Rc<str>> {
+    pub fn ascend_class_base_name(&self) -> Option<Arc<str>> {
         self.ascend_class(self.cur_ascend_class_id?)
             .ok()?
             .id
@@ -829,7 +829,7 @@ impl<'t> PassiveSpec<'t> {
                     }
                     self.nodes[other].path_dist = dist;
                     let rest = self.nodes[node].path.clone().flatten();
-                    self.nodes[other].path = Some(Some(Rc::new(PathStep { node: other, rest })));
+                    self.nodes[other].path = Some(Some(Arc::new(PathStep { node: other, rest })));
                 }
             }
         }

@@ -9,11 +9,11 @@ use super::{NOT_PORTED, Result, TypedSession, num, object};
 use engine::spec::PassiveSpec;
 use engine::tree::NodeType;
 use serde_json::{Map, Value as J, json};
-use std::rc::Rc;
+use std::sync::Arc;
 
 impl<'d> TypedSession<'d> {
     fn spec_mut(&mut self) -> &mut PassiveSpec<'d> {
-        Rc::make_mut(&mut self.build.spec)
+        Arc::make_mut(&mut self.build.spec)
     }
 
     /// The spec's index of a node id
@@ -51,7 +51,7 @@ impl<'d> TypedSession<'d> {
 
     fn alloc(&mut self, i: usize) -> Result<()> {
         let b = &mut self.build;
-        Rc::make_mut(&mut b.spec).alloc_node(i, &b.items, &self.data.game.items)
+        Arc::make_mut(&mut b.spec).alloc_node(i, &b.items, &self.data.game.items)
     }
 
     /// Whether the node belongs to a bloodline (an alternate ascendancy)
@@ -65,7 +65,7 @@ impl<'d> TypedSession<'d> {
             .any(|(_, a)| a.id.as_deref() == Some(asc))
     }
 
-    fn secondary_id(&self) -> Option<Rc<str>> {
+    fn secondary_id(&self) -> Option<Arc<str>> {
         let spec = &self.build.spec;
         let id = spec.cur_secondary_ascend_class_id?;
         spec.tree
@@ -83,7 +83,7 @@ impl<'d> TypedSession<'d> {
         let spec = &self.build.spec;
         if spec.nodes[i].alloc {
             let b = &mut self.build;
-            Rc::make_mut(&mut b.spec).dealloc_node(i, &b.items, &self.data.game.items)?;
+            Arc::make_mut(&mut b.spec).dealloc_node(i, &b.items, &self.data.game.items)?;
             self.rebuild()?;
             return Ok(json!([]));
         }

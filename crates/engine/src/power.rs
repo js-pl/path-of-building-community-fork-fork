@@ -19,7 +19,7 @@ use crate::spec::PassiveSpec;
 use crate::tree::{NodeType, PassiveTree, StatLine};
 use lua::ljtab::LjMap;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A stat of `data.powerStatList`
 #[derive(Clone, Debug, PartialEq)]
@@ -296,15 +296,15 @@ fn spec_mod_key(spec: &PassiveSpec, i: usize) -> String {
 struct Candidates<'c, 'a, 't> {
     calc: &'c MiscCalculator<'a, 't>,
     full_dps: bool,
-    cache: HashMap<String, Rc<CalcOutput>>,
+    cache: HashMap<String, Arc<CalcOutput>>,
 }
 
 impl Candidates<'_, '_, '_> {
-    fn get(&mut self, key: String, ovr: impl FnOnce() -> Override) -> Result<Rc<CalcOutput>> {
+    fn get(&mut self, key: String, ovr: impl FnOnce() -> Override) -> Result<Arc<CalcOutput>> {
         if let Some(out) = self.cache.get(&key) {
             return Ok(out.clone());
         }
-        let out = Rc::new(self.calc.calculate(&ovr(), self.full_dps)?);
+        let out = Arc::new(self.calc.calculate(&ovr(), self.full_dps)?);
         self.cache.insert(key, out.clone());
         Ok(out)
     }
@@ -491,7 +491,7 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
             if !assignable || !spec.tree.mastery_effects.contains_key(&effect.to_bits()) {
                 continue;
             }
-            let node = Rc::new(mastery_effect_node(spec, i, effect)?);
+            let node = Arc::new(mastery_effect_node(spec, i, effect)?);
             let key = match &node.stats {
                 Some(s) => mod_key(&s.mods),
                 None => String::new(),
@@ -561,7 +561,7 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
         if !key.is_empty() && !granted.contains(&id) {
             let out = cands.get(key, || Override {
                 add_nodes: tree_node(spec, id)
-                    .map(|n| OverrideNode::Own(Rc::new(n)))
+                    .map(|n| OverrideNode::Own(Arc::new(n)))
                     .into_iter()
                     .collect(),
                 ..Override::default()

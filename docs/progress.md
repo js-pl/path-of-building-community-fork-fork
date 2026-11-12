@@ -334,10 +334,15 @@ Where the time goes now (perf, node power of gen-0049): `perform` about
 half (the offence a quarter), `init_env` a third (`calc_tree::setup`,
 the skills' mod lists), and `Sym::new` a fifth: the queries take their
 names as strings (`Calc::sum(.., &["Life"])`, often `format!`ed), so
-symbols made once per call site are the next step. Running candidates
-and Full DPS skills on threads needs the build, the calculation data and
-the mods `Send + Sync`: the engine shares them with `Rc`; `ModParser`
-(which `base_dbs` and mastery nodes call) no longer holds Lua tables.
+symbols made once per call site are the next step. What calculations share (game data, the
+mod parser, trees, a build's shared parts, mods' tags, sources and
+values) is `Arc` and `Send + Sync`, asserted at compile time in
+`engine/src/lib.rs` (`MiscCalculator` included; its base databases'
+cache is a `Mutex`), so candidates and Full DPS skills can run on
+threads. `Arc` costs nothing measurable on one thread: six alternating
+`--typed-only` runs each, best (mean) ms, `Rc` against `Arc`: perform
+10.6 (11.7) / 9.7 (11.2), build_outputs 70.0 (74.3) / 63.6 (75.9),
+recalc 91.8 (95.7) / 82.8 (97.3), node power 1549 (1581) / 1368 (1564).
 
 The mod parser (`cargo run --release -p equivalence --example
 parser_bench`): its typed data is made in about 2 s at build time and

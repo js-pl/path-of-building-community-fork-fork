@@ -13,22 +13,22 @@ use crate::mods::{ModType, ModValue, Sym};
 use crate::pat;
 use crate::skill_data::SkillData;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A value of an actor's output: mostly numbers
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutVal {
     Num(f64),
     Bool(bool),
-    Str(Rc<str>),
+    Str(Arc<str>),
     /// A table: a weapon's output, a requirement's source, ...
-    Table(Rc<BTreeMap<String, OutVal>>),
+    Table(Arc<BTreeMap<String, OutVal>>),
     /// A list: the Full DPS skills, the skills a cost warning names
-    List(Rc<Vec<OutVal>>),
+    List(Arc<Vec<OutVal>>),
     /// A gem or an item in a table, by name (`oracle/json.lua` writes them
     /// as `{"$gem": name}` and `{"$item": name}`)
-    Gem(Rc<str>),
-    Item(Rc<str>),
+    Gem(Arc<str>),
+    Item(Arc<str>),
 }
 
 impl OutVal {
@@ -66,7 +66,7 @@ pub struct Actor {
     /// `actor.weaponData1` and `weaponData2`
     pub weapon_data: [Option<Fields>; 2],
     /// `actor.minionData.monsterTags`
-    pub monster_tags: Option<Vec<Rc<str>>>,
+    pub monster_tags: Option<Vec<Arc<str>>>,
     /// What `GetStat` reads of the actor's active skills
     pub reserving_skills: Vec<ReservingSkill>,
     /// `actor.ManaEfficiency`
@@ -194,7 +194,7 @@ impl Actors for EnvActors<'_> {
                 let mut reserved = 0.0;
                 if let Some(cfg) = cfg {
                     for skill in &actor.reserving_skills {
-                        let has = |n: &Option<Rc<str>>| {
+                        let has = |n: &Option<Arc<str>>| {
                             n.as_deref()
                                 .is_some_and(|n| skill.buff_names.iter().any(|b| b == n))
                         };
@@ -238,7 +238,7 @@ impl Actors for EnvActors<'_> {
         all.get(&format!("Added{var}")).map(ModValue::truthy)
     }
 
-    fn monster_tags(&self, store: StoreId) -> Option<Vec<Rc<str>>> {
+    fn monster_tags(&self, store: StoreId) -> Option<Vec<Arc<str>>> {
         self.actor_of(store)?.monster_tags.clone()
     }
 
@@ -294,10 +294,10 @@ impl Actors for EnvActors<'_> {
             .is_some_and(|g| self.skill_data.gem_is_type(g, keyword, false))
     }
 
-    fn game_id(&self, gem_name: &str) -> Option<Rc<str>> {
+    fn game_id(&self, gem_name: &str) -> Option<Arc<str>> {
         self.skill_data
             .game_id_from_gem_name(gem_name, true)
-            .map(Rc::from)
+            .map(Arc::from)
     }
 
     fn high_precision(&self, name: Sym, typ: ModType) -> Option<f64> {

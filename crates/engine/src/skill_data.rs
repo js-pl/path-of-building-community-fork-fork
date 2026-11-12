@@ -12,7 +12,7 @@ use crate::mods::convert::{Converter, array, get, number, text};
 use crate::mods::{Mod, ModValue};
 use lua::{Key, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -211,8 +211,8 @@ pub struct Gem {
     pub base_type_name: Option<String>,
     pub game_id: String,
     pub variant_id: String,
-    pub granted_effect: Rc<GrantedEffect>,
-    pub secondary_granted_effect: Option<Rc<GrantedEffect>>,
+    pub granted_effect: Arc<GrantedEffect>,
+    pub secondary_granted_effect: Option<Arc<GrantedEffect>>,
     pub natural_max_level: f64,
     pub req_str: f64,
     pub req_dex: f64,
@@ -224,9 +224,9 @@ pub struct Gem {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SkillData {
-    pub skills: HashMap<String, Rc<GrantedEffect>>,
+    pub skills: HashMap<String, Arc<GrantedEffect>>,
     /// In data order
-    gems: Vec<Rc<Gem>>,
+    gems: Vec<Arc<Gem>>,
     gem_index: HashMap<String, usize>,
     /// `data.gemForSkill`, by granted effect id
     gem_for_skill: HashMap<String, String>,
@@ -497,9 +497,9 @@ impl SkillData {
             let id = key(&k)?;
             let effect =
                 GrantedEffect::from_lua(&id, &v).map_err(|e| format!("skill {id}: {e}"))?;
-            d.skills.insert(id, Rc::new(effect));
+            d.skills.insert(id, Arc::new(effect));
         }
-        let effect = |v: &Value| -> Result<Option<Rc<GrantedEffect>>> {
+        let effect = |v: &Value| -> Result<Option<Arc<GrantedEffect>>> {
             if v.is_nil() {
                 return Ok(None);
             }
@@ -539,7 +539,7 @@ impl SkillData {
         }
         for gem in gems {
             d.gem_index.insert(gem.id.clone(), d.gems.len());
-            d.gems.push(Rc::new(gem));
+            d.gems.push(Arc::new(gem));
         }
         // `gemForSkill` is keyed by the granted effect tables
         for (k, gem_id) in pairs(&get(data, "gemForSkill")) {
@@ -662,22 +662,22 @@ impl SkillData {
         self.skill_type.get(name).copied()
     }
 
-    pub fn gem(&self, id: &str) -> Option<&Rc<Gem>> {
+    pub fn gem(&self, id: &str) -> Option<&Arc<Gem>> {
         self.gem_index.get(id).map(|&i| &self.gems[i])
     }
 
     /// The gems, in data order
-    pub fn gems(&self) -> &[Rc<Gem>] {
+    pub fn gems(&self) -> &[Arc<Gem>] {
         &self.gems
     }
 
     /// The gem that grants a skill (`data.gemForSkill[grantedEffect]`)
-    pub fn gem_for_skill(&self, skill_id: &str) -> Option<&Rc<Gem>> {
+    pub fn gem_for_skill(&self, skill_id: &str) -> Option<&Arc<Gem>> {
         self.gem_for_skill.get(skill_id).and_then(|id| self.gem(id))
     }
 
     /// The gem of a game id and variant (`data.gemsByGameId[gameId][variantId]`)
-    pub fn gem_by_game_id(&self, game_id: &str, variant_id: &str) -> Option<&Rc<Gem>> {
+    pub fn gem_by_game_id(&self, game_id: &str, variant_id: &str) -> Option<&Arc<Gem>> {
         self.gems_by_game_id
             .get(game_id)?
             .iter()
@@ -686,14 +686,14 @@ impl SkillData {
     }
 
     /// The variants of a game id, in data order
-    pub fn variants_of(&self, game_id: &str) -> Option<impl Iterator<Item = &Rc<Gem>>> {
+    pub fn variants_of(&self, game_id: &str) -> Option<impl Iterator<Item = &Arc<Gem>>> {
         self.gems_by_game_id
             .get(game_id)
             .map(|v| v.iter().filter_map(|(_, id)| self.gem(id)))
     }
 
     /// The gem of a lower case base name (`data.gemForBaseName[name]`)
-    pub fn gem_for_base_name(&self, name: &str) -> Option<&Rc<Gem>> {
+    pub fn gem_for_base_name(&self, name: &str) -> Option<&Arc<Gem>> {
         self.gem_for_base_name.get(name).and_then(|id| self.gem(id))
     }
 }
@@ -817,8 +817,8 @@ impl Codec for SkillData {
     }
 
     fn get(r: &mut Reader) -> codec::Result<Self> {
-        let skills = <HashMap<String, Rc<GrantedEffect>> as Codec>::get(r)?;
-        let effect = |id: String| -> codec::Result<Rc<GrantedEffect>> {
+        let skills = <HashMap<String, Arc<GrantedEffect>> as Codec>::get(r)?;
+        let effect = |id: String| -> codec::Result<Arc<GrantedEffect>> {
             skills
                 .get(&id)
                 .cloned()
@@ -826,7 +826,7 @@ impl Codec for SkillData {
         };
         let mut gems = Vec::new();
         for _ in 0..r.count()? {
-            gems.push(Rc::new(Gem {
+            gems.push(Arc::new(Gem {
                 id: Codec::get(r)?,
                 name: Codec::get(r)?,
                 base_type_name: Codec::get(r)?,

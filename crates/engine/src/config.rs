@@ -11,7 +11,7 @@ use crate::mods::{Mod, ModType, ModValue, Sym, Tag, record};
 use crate::pat;
 use lua::{Key, Value};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -20,7 +20,7 @@ pub type Result<T> = std::result::Result<T, String>;
 pub enum Val {
     Bool(bool),
     Number(f64),
-    Str(Rc<str>),
+    Str(Arc<str>),
 }
 
 impl Val {

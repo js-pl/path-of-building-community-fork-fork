@@ -280,9 +280,10 @@ fn trees_match_upstream() {
                 })
                 .collect()
         };
-        let typed_map = |m: &std::collections::HashMap<Rc<str>, u32>| -> BTreeMap<String, u32> {
-            m.iter().map(|(k, v)| (k.to_string(), *v)).collect()
-        };
+        let typed_map =
+            |m: &std::collections::HashMap<std::sync::Arc<str>, u32>| -> BTreeMap<String, u32> {
+                m.iter().map(|(k, v)| (k.to_string(), *v)).collect()
+            };
         for (name, t) in [
             ("keystoneMap", &typed.keystone_map),
             ("notableMap", &typed.notable_map),

@@ -105,7 +105,7 @@ pub struct ItemsSetup {
     pub weapon1_mods: Option<Vec<Mod>>,
     /// Energy Blade's weapons, by the ids `item_list` gives them (-1 in
     /// the main hand, -2 in the off hand), for the items tab's `generated`
-    pub generated: BTreeMap<i64, std::rc::Rc<Item>>,
+    pub generated: BTreeMap<i64, std::sync::Arc<Item>>,
     pub warnings: ItemWarnings,
 }
 
@@ -784,7 +784,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
                     let blade = energy_blade_item(eb, info.one_hand, item)?;
                     let id = if slot_name == "Weapon 1" { -1 } else { -2 };
                     out.item_list.insert(slot_name.clone(), id as f64);
-                    out.generated.insert(id, std::rc::Rc::new(blade));
+                    out.generated.insert(id, std::sync::Arc::new(blade));
                 }
                 _ => out.scale_add_list(src, scale, p),
             }

@@ -1515,7 +1515,7 @@ pub fn merge_keystones(
     tree: &PassiveTree,
     added: &mut Vec<String>,
 ) -> Result<()> {
-    let grants: Vec<(String, Option<std::rc::Rc<str>>)> =
+    let grants: Vec<(String, Option<std::sync::Arc<str>>)> =
         list::tabulate(mods, Some(ModType::List), "Keystone")?
             .into_iter()
             .filter_map(|(v, m)| match v {

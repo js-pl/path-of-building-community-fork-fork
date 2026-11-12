@@ -14,7 +14,7 @@ use crate::calc_perform::{PerformInput, Result, perform};
 use crate::calcs::{FullDps, FullDpsSkill, Output, calc_full_dps_with};
 use crate::mods::Sym;
 use std::collections::BTreeSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A calculator's results: `env.player.output`, and the main skill's
 /// minion's (`output.Minion`)
@@ -42,7 +42,7 @@ impl CalcOutput {
         let mut set = |k: &str, v| {
             self.player.insert(Sym::new(k), v);
         };
-        set("SkillDPS", OutVal::List(Rc::new(skills)));
+        set("SkillDPS", OutVal::List(Arc::new(skills)));
         set("FullDPS", OutVal::Num(full.combined_dps));
         set("FullDotDPS", OutVal::Num(full.total_dot_dps));
     }

@@ -10,7 +10,7 @@
 use crate::mods::Sym;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -21,13 +21,13 @@ const VERSION: u32 = 1;
 #[derive(Default)]
 pub struct Writer {
     buf: Vec<u8>,
-    strs: HashMap<Rc<str>, u64>,
+    strs: HashMap<Arc<str>, u64>,
 }
 
 pub struct Reader<'a> {
     buf: &'a [u8],
     pos: usize,
-    strs: Vec<Rc<str>>,
+    strs: Vec<Arc<str>>,
 }
 
 impl Writer {
@@ -74,7 +74,7 @@ impl Reader<'_> {
         Ok(s)
     }
 
-    pub fn str(&mut self) -> Result<Rc<str>> {
+    pub fn str(&mut self) -> Result<Arc<str>> {
         let i = self.uint()? as usize;
         if let Some(s) = self.strs.get(i) {
             return Ok(s.clone());
@@ -83,7 +83,7 @@ impl Reader<'_> {
             return Err("bad string index in typed data".into());
         }
         let n = self.uint()? as usize;
-        let s: Rc<str> = std::str::from_utf8(self.bytes(n)?)
+        let s: Arc<str> = std::str::from_utf8(self.bytes(n)?)
             .map_err(|_| "bad string in typed data")?
             .into();
         self.strs.push(s.clone());
@@ -228,7 +228,7 @@ impl Codec for String {
     }
 }
 
-impl Codec for Rc<str> {
+impl Codec for Arc<str> {
     fn put(&self, w: &mut Writer) {
         w.str(self);
     }
@@ -274,12 +274,12 @@ impl<T: Codec> Codec for Box<T> {
 }
 
 /// Without sharing: shared values are written once by their owner
-impl<T: Codec> Codec for Rc<T> {
+impl<T: Codec> Codec for Arc<T> {
     fn put(&self, w: &mut Writer) {
         (**self).put(w);
     }
     fn get(r: &mut Reader) -> Result<Self> {
-        T::get(r).map(Rc::new)
+        T::get(r).map(Arc::new)
     }
 }
 
