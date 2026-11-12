@@ -3,7 +3,7 @@
 
 use super::sym::Sym;
 use super::types::Record;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A tag, and the global limit it may carry (`globalLimit`, `globalLimitKey`),
 /// which caps the sum of all mods sharing the key within one query.
@@ -15,7 +15,7 @@ pub struct Tag {
 
 /// A mod's tags, shared between its copies until one is changed
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Tags(Rc<Vec<Tag>>);
+pub struct Tags(Arc<Vec<Tag>>);
 
 impl std::ops::Deref for Tags {
     type Target = Vec<Tag>;
@@ -26,13 +26,13 @@ impl std::ops::Deref for Tags {
 
 impl std::ops::DerefMut for Tags {
     fn deref_mut(&mut self) -> &mut Vec<Tag> {
-        Rc::make_mut(&mut self.0)
+        Arc::make_mut(&mut self.0)
     }
 }
 
 impl From<Vec<Tag>> for Tags {
     fn from(v: Vec<Tag>) -> Tags {
-        Tags(Rc::new(v))
+        Tags(Arc::new(v))
     }
 }
 
@@ -46,7 +46,7 @@ impl<'a> IntoIterator for &'a Tags {
 
 impl FromIterator<Tag> for Tags {
     fn from_iter<I: IntoIterator<Item = Tag>>(i: I) -> Tags {
-        Tags(Rc::new(i.into_iter().collect()))
+        Tags(Arc::new(i.into_iter().collect()))
     }
 }
 
@@ -93,17 +93,17 @@ pub enum TagKind {
         vars: Option<Names>,
         neg: bool,
     },
-    ItemCondition(Rc<ItemCondition>),
-    SocketedIn(Rc<SocketedIn>),
+    ItemCondition(Arc<ItemCondition>),
+    SocketedIn(Arc<SocketedIn>),
     SkillName {
         names: Option<Names>,
         include_transfigured: bool,
         summon_skill: bool,
         neg: bool,
         /// Set on one tag by upstream's data, read by nothing
-        skill_id: Option<Rc<str>>,
+        skill_id: Option<Arc<str>>,
     },
-    SkillId(Option<Rc<str>>),
+    SkillId(Option<Arc<str>>),
     /// `skillPartList`, or `skillPart`, which may be nil
     SkillPart {
         list: Option<Vec<f64>>,
@@ -204,16 +204,16 @@ pub struct StatThreshold {
 /// Conditions on equipped items, which need the item data to evaluate
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ItemCondition {
-    pub item_slot: Rc<str>,
+    pub item_slot: Arc<str>,
     pub all_slots: bool,
     pub both_slots: bool,
     pub exclude_self: bool,
-    pub search_cond: Option<Rc<str>>,
-    pub rarity_cond: Option<Rc<str>>,
+    pub search_cond: Option<Arc<str>>,
+    pub rarity_cond: Option<Arc<str>>,
     pub corrupted_cond: Option<bool>,
     pub shaper_cond: Option<bool>,
     pub elder_cond: Option<bool>,
-    pub name_cond: Option<Rc<str>>,
+    pub name_cond: Option<Arc<str>>,
     pub neg: bool,
 }
 
@@ -228,8 +228,8 @@ pub enum Sockets {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SocketedIn {
     pub slot_name: Option<Sym>,
-    pub keyword: Option<Rc<str>>,
-    pub socket_color: Option<Rc<str>>,
+    pub keyword: Option<Arc<str>>,
+    pub socket_color: Option<Arc<str>>,
     pub sockets: Option<Sockets>,
     pub neg: bool,
 }
@@ -244,7 +244,7 @@ impl Tag {
                 *s = Sym::new(&n);
             }
         };
-        let rc = |s: &mut Rc<str>| {
+        let rc = |s: &mut Arc<str>| {
             if let Some(n) = f(s) {
                 *s = n.into();
             }
@@ -305,14 +305,14 @@ impl Tag {
                 opt(vars, names);
             }
             TagKind::ItemCondition(c) => {
-                let c = Rc::make_mut(c);
+                let c = Arc::make_mut(c);
                 rc(&mut c.item_slot);
                 opt(&mut c.search_cond, rc);
                 opt(&mut c.rarity_cond, rc);
                 opt(&mut c.name_cond, rc);
             }
             TagKind::SocketedIn(c) => {
-                let c = Rc::make_mut(c);
+                let c = Arc::make_mut(c);
                 opt(&mut c.slot_name, sym);
                 opt(&mut c.keyword, rc);
                 opt(&mut c.socket_color, rc);

@@ -281,7 +281,7 @@ impl Actors for Bridge {
         (!v.is_nil()).then(|| v.truthy())
     }
 
-    fn monster_tags(&self, store: StoreId) -> Option<Vec<Rc<str>>> {
+    fn monster_tags(&self, store: StoreId) -> Option<Vec<std::sync::Arc<str>>> {
         let actor = get(&self.lua[store], "actor");
         let md = get(&actor, "minionData");
         let tags = if md.truthy() {
@@ -322,7 +322,7 @@ impl Actors for Bridge {
         gem.truthy() && self.calc_lib("gemIsType", &[gem, s(keyword)]).truthy()
     }
 
-    fn game_id(&self, gem_name: &str) -> Option<Rc<str>> {
+    fn game_id(&self, gem_name: &str) -> Option<std::sync::Arc<str>> {
         match self.calc_lib("getGameIdFromGemName", &[s(gem_name), Value::Bool(true)]) {
             Value::Str(x) => Some(x.to_str_lossy().into()),
             _ => None,

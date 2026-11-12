@@ -7,7 +7,7 @@ use super::store::{Actors, Cfg, Query, Result, Store, StoreId, Stores};
 use super::sym::Sym;
 use super::tag::ItemCondition;
 use super::types::*;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// No actors: the queries of a list nothing owns
 pub struct NoActors;
@@ -25,7 +25,7 @@ impl Actors for NoActors {
     fn one_handed_added(&self, _: StoreId, _: Sym) -> Option<bool> {
         None
     }
-    fn monster_tags(&self, _: StoreId) -> Option<Vec<Rc<str>>> {
+    fn monster_tags(&self, _: StoreId) -> Option<Vec<Arc<str>>> {
         None
     }
     fn item_condition(&self, _: StoreId, _: &ItemCondition, _: Option<&Cfg>) -> bool {
@@ -34,7 +34,7 @@ impl Actors for NoActors {
     fn gem_is_type(&self, _: &Cfg, _: &str) -> bool {
         false
     }
-    fn game_id(&self, _: &str) -> Option<Rc<str>> {
+    fn game_id(&self, _: &str) -> Option<Arc<str>> {
         None
     }
     fn high_precision(&self, _: Sym, _: ModType) -> Option<f64> {

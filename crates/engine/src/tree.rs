@@ -14,7 +14,7 @@ use crate::mods::convert::{get, number, text};
 use crate::mods::{Mod, ModType, ModValue, Sym};
 use lua::{Key, Value};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -49,7 +49,7 @@ impl NodeType {
 pub struct StatLine {
     /// `nil` when the parser did not know the line
     pub list: Option<Vec<Mod>>,
-    pub extra: Option<Rc<str>>,
+    pub extra: Option<Arc<str>>,
 }
 
 /// A stat group of the tree data: nodes on orbits around a centre.
@@ -68,7 +68,7 @@ pub struct Group {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MasteryEffect {
     pub id: f64,
-    pub sd: Vec<Rc<str>>,
+    pub sd: Vec<Arc<str>>,
     pub mods: Vec<StatLine>,
     pub mod_list: Vec<Mod>,
 }
@@ -78,17 +78,17 @@ pub struct MasteryEffect {
 pub struct ExpansionJewel {
     pub size: f64,
     pub index: f64,
-    pub proxy: Option<Rc<str>>,
+    pub proxy: Option<Arc<str>>,
     /// The socket this one is nested in
-    pub parent: Option<Rc<str>>,
+    pub parent: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: u32,
-    pub dn: Rc<str>,
+    pub dn: Arc<str>,
     /// Stat lines, one per line (upstream splits multi-line stats)
-    pub sd: Vec<Rc<str>>,
+    pub sd: Vec<Arc<str>>,
     pub kind: NodeType,
     pub ascendancy_name: Option<Sym>,
     pub class_start_index: Option<i64>,
@@ -128,14 +128,14 @@ pub struct Node {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Ascendancy {
-    pub id: Option<Rc<str>>,
-    pub name: Rc<str>,
+    pub id: Option<Arc<str>>,
+    pub name: Arc<str>,
     pub start_node_id: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Class {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     /// Ascendancies by index; index 0 is "None"
     pub ascendancies: Vec<(i64, Ascendancy)>,
     pub start_node_id: Option<u32>,
@@ -146,7 +146,7 @@ pub struct Class {
 
 #[derive(Clone, Debug)]
 pub struct PassiveTree {
-    pub version: Rc<str>,
+    pub version: Arc<str>,
     /// `treeVersions[version].num`
     pub version_num: f64,
     /// By class index (0 = Scion)
@@ -156,19 +156,19 @@ pub struct PassiveTree {
     pub nodes: Vec<Node>,
     pub node_index: HashMap<u32, usize>,
     /// `keystoneMap`: by name and lower case name
-    pub keystone_map: HashMap<Rc<str>, u32>,
+    pub keystone_map: HashMap<Arc<str>, u32>,
     /// The mods of the timeless jewels' keystones (`self.legion.nodes`), by
     /// name, which `keystoneMap` holds where the tree has no keystone of
     /// that name
-    pub legion_keystones: HashMap<Rc<str>, Vec<Mod>>,
+    pub legion_keystones: HashMap<Arc<str>, Vec<Mod>>,
     /// `notableMap`: by lower case name
-    pub notable_map: HashMap<Rc<str>, u32>,
+    pub notable_map: HashMap<Arc<str>, u32>,
     /// `ascendancyMap`: by lower case name
-    pub ascendancy_map: HashMap<Rc<str>, u32>,
+    pub ascendancy_map: HashMap<Arc<str>, u32>,
     /// `clusterNodeMap`: notables and keystones outside the tree, by name
-    pub cluster_node_map: HashMap<Rc<str>, u32>,
+    pub cluster_node_map: HashMap<Arc<str>, u32>,
     /// `classNotables`: ascendancy notable names per class name
-    pub class_notables: HashMap<Rc<str>, Vec<Rc<str>>>,
+    pub class_notables: HashMap<Arc<str>, Vec<Arc<str>>>,
     /// Jewel sockets, in the data's order
     pub sockets: Vec<u32>,
     /// `skillsPerOrbit`, by orbit from 0
@@ -215,7 +215,7 @@ fn opt_int(v: &Value) -> Result<Option<i64>> {
     Ok(Some(number(v)? as i64))
 }
 
-fn texts(v: &Value) -> Result<Vec<Rc<str>>> {
+fn texts(v: &Value) -> Result<Vec<Arc<str>>> {
     v.as_table()
         .map(|t| t.array())
         .unwrap_or_default()
@@ -229,7 +229,7 @@ fn pairs(v: &Value) -> Vec<(Key, Value)> {
     v.as_table().map(|t| t.entries()).unwrap_or_default()
 }
 
-fn lower(s: &str) -> Rc<str> {
+fn lower(s: &str) -> Arc<str> {
     s.to_ascii_lowercase().into()
 }
 
@@ -281,14 +281,14 @@ fn orbit_angles(nodes_in_orbit: f64) -> Vec<f64> {
 }
 
 /// A line's mods (nil when unknown) and the part not understood
-type Parse = (Option<Vec<Mod>>, Option<Rc<str>>);
+type Parse = (Option<Vec<Mod>>, Option<Arc<str>>);
 
 /// Parses stat lines as `PassiveTreeClass:ProcessStats` does: multi-line
 /// stats are split, and a line the parser does not fully understand is
 /// combined with the lines after it until the combination parses.
 pub(crate) fn process_stats(
     parser: &ModParser,
-    sd: &mut Vec<Rc<str>>,
+    sd: &mut Vec<Arc<str>>,
     source: Option<&str>,
 ) -> Result<(Vec<StatLine>, Vec<Mod>, bool, bool)> {
     let mut mods = Vec::new();
@@ -301,7 +301,7 @@ pub(crate) fn process_stats(
 /// whether one was unknown or understood only partly.
 pub(crate) fn process_stats_from(
     parser: &ModParser,
-    sd: &mut Vec<Rc<str>>,
+    sd: &mut Vec<Arc<str>>,
     out: &mut Vec<StatLine>,
     start: usize,
     source: Option<&str>,
@@ -315,10 +315,10 @@ pub(crate) fn process_stats_from(
     let mut i = start;
     while i < sd.len() {
         if sd[i].contains('\n') {
-            let lines: Vec<Rc<str>> = sd[i]
+            let lines: Vec<Arc<str>> = sd[i]
                 .split('\n')
                 .filter(|l| !l.is_empty())
-                .map(Rc::from)
+                .map(Arc::from)
                 .collect();
             sd.splice(i..=i, lines);
             if i >= sd.len() {
@@ -397,7 +397,7 @@ impl PassiveTree {
             if !truthy(&node, "ks") {
                 continue;
             }
-            let dn: Rc<str> = lua::to_string(&get(&node, "dn")).to_str_lossy().into();
+            let dn: Arc<str> = lua::to_string(&get(&node, "dn")).to_str_lossy().into();
             if self.keystone_map.contains_key(&dn) || self.legion_keystones.contains_key(&dn) {
                 continue;
             }
@@ -449,7 +449,7 @@ impl PassiveTree {
         // Legacy alternate ascendancies upstream hides
         let legacy = ["Warden", "Warlock", "Primalist"];
         let alternate = get(data, "alternate_ascendancies");
-        let mut legacy_ids: Vec<Rc<str>> = Vec::new();
+        let mut legacy_ids: Vec<Arc<str>> = Vec::new();
         let mut alternates: Vec<(i64, Value)> = Vec::new();
         for (k, asc) in pairs(&alternate) {
             let id = text(&get(&asc, "id"))?;
@@ -460,7 +460,7 @@ impl PassiveTree {
             }
         }
 
-        let mut ascend_class_of: HashMap<Rc<str>, (i64, Rc<str>)> = HashMap::new();
+        let mut ascend_class_of: HashMap<Arc<str>, (i64, Arc<str>)> = HashMap::new();
         let mut classes = Vec::new();
         for (ci, class) in &class_tables {
             let name = text(&get(class, "name"))?;

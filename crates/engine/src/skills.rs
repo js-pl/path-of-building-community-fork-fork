@@ -13,7 +13,7 @@ use crate::pat::{self, gsub, gsub_fn};
 use crate::skill_data::{Gem, GrantedEffect, SkillData};
 use crate::xml::Element;
 use std::collections::{BTreeMap, HashMap};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A gem in a socket group.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -22,9 +22,9 @@ pub struct GemInstance {
     pub gem_id: Option<String>,
     pub skill_id: Option<String>,
     /// The gem, for skill gems
-    pub gem: Option<Rc<Gem>>,
+    pub gem: Option<Arc<Gem>>,
     /// The granted effect of a skill no gem grants (from an item)
-    pub granted_effect: Option<Rc<GrantedEffect>>,
+    pub granted_effect: Option<Arc<GrantedEffect>>,
     pub level: Option<f64>,
     pub quality: Option<f64>,
     pub enabled: bool,
@@ -72,7 +72,7 @@ pub enum ExplodeSource {
 
 impl GemInstance {
     /// The granted effect of the gem or skill
-    pub fn effect(&self) -> Option<&Rc<GrantedEffect>> {
+    pub fn effect(&self) -> Option<&Arc<GrantedEffect>> {
         self.granted_effect
             .as_ref()
             .or(self.gem.as_ref().map(|g| &g.granted_effect))
@@ -396,7 +396,7 @@ fn load_skill(node: &Element, ctx: &Ctx) -> Option<SocketGroup> {
 
 /// `SkillsTabClass:FindSkillGem(nameSpec)`: the gem a name or abbreviation
 /// means, or why none
-pub fn find_skill_gem(name_spec: &str, data: &SkillData) -> Result<Rc<Gem>, String> {
+pub fn find_skill_gem(name_spec: &str, data: &SkillData) -> Result<Arc<Gem>, String> {
     let any_case = |c: &[String]| {
         Some(format!(
             "[{}{}]",
@@ -421,7 +421,7 @@ pub fn find_skill_gem(name_spec: &str, data: &SkillData) -> Result<Rc<Gem>, Stri
         ),
     ];
     for pattern in &patterns {
-        let mut found: Option<&Rc<Gem>> = None;
+        let mut found: Option<&Arc<Gem>> = None;
         for gem in data.gems() {
             if pat::try_find(&format!(" {}", gem.name), pattern)
                 .ok()

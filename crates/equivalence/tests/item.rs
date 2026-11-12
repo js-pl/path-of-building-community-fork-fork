@@ -88,7 +88,7 @@ fn lua_mods(v: &Value) -> Result<Vec<Mod>, String> {
 fn no_funcs(v: &mut ModValue) {
     match v {
         ModValue::Func(f) => {
-            *f = std::rc::Rc::new(engine::mods::Func {
+            *f = std::sync::Arc::new(engine::mods::Func {
                 name: "".into(),
                 args: vec![],
             })

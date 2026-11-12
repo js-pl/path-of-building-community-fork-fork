@@ -13,6 +13,7 @@ use lua::modlib::create_mod_args;
 use lua::{Key, TableRef, Value};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 type R<T> = std::result::Result<T, InitError>;
 
@@ -75,7 +76,7 @@ fn value(v: &Value) -> R<engine::mods::ModValue> {
     Converter::default().value(v).map_err(bad)
 }
 
-fn name(v: &Value) -> R<Rc<str>> {
+fn name(v: &Value) -> R<Arc<str>> {
     Ok(text(v)?.into())
 }
 
@@ -305,7 +306,7 @@ fn add_gem_patterns(
         }
         let skill_name = field(&ge, "name");
         let lname = text(&lower(&skill_name))?;
-        let sname: Rc<str> = text(&skill_name)?.into();
+        let sname: Arc<str> = text(&skill_name)?.into();
         let name_tag = || {
             tbl(
                 vec![

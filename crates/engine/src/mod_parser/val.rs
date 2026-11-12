@@ -5,9 +5,9 @@
 
 use crate::mods::{Func, Mod, ModValue};
 use lua::pattern::{self, Capture, Repl};
-use std::rc::Rc;
+use std::sync::Arc;
 
-pub type Str = Rc<[u8]>;
+pub type Str = Arc<[u8]>;
 
 #[derive(Clone, Debug, Default)]
 pub enum V {
@@ -18,9 +18,9 @@ pub enum V {
     Str(Str),
     Tab(Box<Tab>),
     /// A mod made by `mod(...)`
-    Mod(Rc<Mod>),
+    Mod(Arc<Mod>),
     /// A function of upstream's data, e.g. what `getPerStat` returns
-    Func(Rc<Func>),
+    Func(Arc<Func>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -98,7 +98,7 @@ impl From<ModValue> for V {
             ModValue::Bool(b) => V::Bool(b),
             ModValue::Number(n) => V::Num(n),
             ModValue::Str(s) => V::Str(s.as_bytes().into()),
-            ModValue::Mod(m) => V::Mod(Rc::new(*m)),
+            ModValue::Mod(m) => V::Mod(Arc::new(*m)),
             ModValue::Func(f) => V::Func(f),
             ModValue::List(l) => tbl(vec![], l.into_iter().map(V::from).collect()),
             ModValue::Record(r) => tbl(
@@ -387,7 +387,7 @@ const STRING_LIBRARY: &[&str] = &[
 /// Indexing a string reaches the string library
 fn index_string(k: &[u8]) -> V {
     match STRING_LIBRARY.iter().find(|f| f.as_bytes() == k) {
-        Some(f) => V::Func(Rc::new(Func {
+        Some(f) => V::Func(Arc::new(Func {
             name: format!("string.{f}").into(),
             args: vec![],
         })),

@@ -287,7 +287,8 @@ fn specs_match_upstream() {
                                 .as_deref()
                                 .is_some_and(|s| !s.to_lowercase().contains("tree"))
                             {
-                                let tree_source: Rc<str> = format!("Tree:{}", node.id).into();
+                                let tree_source: std::sync::Arc<str> =
+                                    format!("Tree:{}", node.id).into();
                                 m.source = Some(tree_source.clone());
                                 // setSource rewrites a carried mod's source too
                                 if let engine::mods::ModValue::Record(r) = &mut m.value

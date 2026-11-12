@@ -7,7 +7,7 @@ use super::val::*;
 use crate::mods::convert::Converter;
 use crate::mods::{Func, Mod, ModType, ModValue, Sym};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct Ctx {
     /// Records by key, lists by position from 1
@@ -76,7 +76,7 @@ pub fn make_mod(args: &[V]) -> Mod {
 
 fn func(name: &str, args: Vec<V>) -> V {
     let conv = Converter::default();
-    V::Func(Rc::new(Func {
+    V::Func(Arc::new(Func {
         name: name.into(),
         args: args
             .iter()
@@ -134,7 +134,7 @@ impl Ctx {
 
     /// `mod(...)`
     pub fn mod_(&self, args: Vec<V>) -> Vec<V> {
-        vec![V::Mod(Rc::new(make_mod(&args)))]
+        vec![V::Mod(Arc::new(make_mod(&args)))]
     }
 
     /// `flag(name, ...)`
@@ -380,7 +380,7 @@ impl Ctx {
         let attrib = conv
             .value(&arg(&args, 0))
             .unwrap_or_else(panic_on("threshold"));
-        vec![V::Func(Rc::new(Func {
+        vec![V::Func(Arc::new(Func {
             name: "getThreshold".into(),
             args: vec![
                 Some(attrib),

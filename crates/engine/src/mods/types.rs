@@ -2,7 +2,7 @@
 
 use super::sym::Sym;
 use super::tag::{Tag, Tags};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// How a mod combines with others of its name.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -55,14 +55,14 @@ impl ModType {
 pub enum ModValue {
     Bool(bool),
     Number(f64),
-    Str(Rc<str>),
+    Str(Arc<str>),
     /// A mod carried by another, e.g. `MinionModifier`'s `{ mod = ... }`
     Mod(Box<Mod>),
     /// A structured value, e.g. `ExtraSkill`'s `{ skillId = ..., level = ... }`
     Record(Record),
     List(Vec<ModValue>),
     /// A function of upstream's data, e.g. a radius jewel's
-    Func(Rc<Func>),
+    Func(Arc<Func>),
 }
 
 impl ModValue {
@@ -83,7 +83,7 @@ impl ModValue {
 /// or the table entry that defines it) and the values it closes over
 #[derive(Clone, Debug, PartialEq)]
 pub struct Func {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     /// `None` for a `nil`
     pub args: Vec<Option<ModValue>>,
 }
@@ -127,9 +127,9 @@ pub struct Mod {
     pub value: ModValue,
     pub flags: u32,
     pub keyword_flags: u32,
-    pub source: Option<Rc<str>>,
+    pub source: Option<Arc<str>>,
     /// The item slot a mod from an item comes from (`sourceSlot`)
-    pub source_slot: Option<Rc<str>>,
+    pub source_slot: Option<Arc<str>>,
     /// Conditions and scaling, applied in order by `EvalMod`
     pub tags: Tags,
     /// Tags after a gap in upstream's tag list (`mod[2]` without `mod[1]`),

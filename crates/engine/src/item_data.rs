@@ -11,7 +11,7 @@ use crate::codec::{self, Codec, Reader, Writer};
 use crate::mods::convert::{array, get, number, opt_number, text};
 use lua::{Key, Value};
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -84,7 +84,7 @@ pub struct Affix {
 pub struct AffixSet {
     /// Sets share the affixes of the same table (`itemMods.Item` holds
     /// the other groups')
-    pub list: Vec<Rc<Affix>>,
+    pub list: Vec<Arc<Affix>>,
     index: HashMap<String, usize>,
 }
 
@@ -94,14 +94,14 @@ impl AffixSet {
     }
 
     /// `seen`: the affixes read so far, by table
-    fn from_lua(v: &Value, seen: &mut HashMap<usize, Rc<Affix>>) -> Result<AffixSet> {
+    fn from_lua(v: &Value, seen: &mut HashMap<usize, Arc<Affix>>) -> Result<AffixSet> {
         let mut set = AffixSet::default();
         for (k, m) in pairs(v) {
             let Key::Str(id) = k else {
                 return Err(format!("affix key {k:?}"));
             };
             let id = id.to_str_lossy().into_owned();
-            let addr = m.as_table().map(|t| Rc::as_ptr(&t.0) as usize);
+            let addr = m.as_table().map(|t| std::rc::Rc::as_ptr(&t.0) as usize);
             if let Some(a) = addr.and_then(|p| seen.get(&p)).filter(|a| a.id == id) {
                 set.index.insert(id, set.list.len());
                 set.list.push(a.clone());
@@ -125,7 +125,7 @@ impl AffixSet {
                 weight_multiplier_key: strings("weightMultiplierKey")?,
                 weight_multiplier_val: numbers("weightMultiplierVal")?,
             };
-            let affix = Rc::new(affix);
+            let affix = Arc::new(affix);
             if let Some(p) = addr {
                 seen.insert(p, affix.clone());
             }
@@ -139,7 +139,7 @@ impl AffixSet {
 /// `data.rareLikeUniques[title]`: a unique crafted with the rare controls
 #[derive(Clone, Debug, PartialEq)]
 pub struct RareLikeUnique {
-    pub affixes: Rc<AffixSet>,
+    pub affixes: Arc<AffixSet>,
     /// The spawn tags of the bases its mods come from, if not its own
     pub valid_base_tags: Option<Vec<HashSet<String>>>,
     pub prefix_limit: f64,
@@ -180,10 +180,10 @@ pub struct Scalability {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ItemData {
-    bases: Vec<Rc<Base>>,
+    bases: Vec<Arc<Base>>,
     base_index: HashMap<String, usize>,
     /// `data.itemMods`, by group (`Item`, `Explicit`, `Flask`, ...)
-    pub item_mods: HashMap<String, Rc<AffixSet>>,
+    pub item_mods: HashMap<String, Arc<AffixSet>>,
     pub rare_like_uniques: HashMap<String, RareLikeUnique>,
     /// Unique title to its (original mod, Foulborn mod) pairs
     pub foulborn_map: HashMap<String, Vec<(String, String)>>,
@@ -347,12 +347,12 @@ impl Base {
 }
 
 impl ItemData {
-    pub fn base(&self, name: &str) -> Option<&Rc<Base>> {
+    pub fn base(&self, name: &str) -> Option<&Arc<Base>> {
         self.base_index.get(name).map(|&i| &self.bases[i])
     }
 
     /// The bases, in data order
-    pub fn bases(&self) -> &[Rc<Base>] {
+    pub fn bases(&self) -> &[Arc<Base>] {
         &self.bases
     }
 
@@ -370,16 +370,16 @@ impl ItemData {
             let name = key_string(&k)?;
             let base = Base::from_lua(&name, &v).map_err(|e| format!("base {name}: {e}"))?;
             d.base_index.insert(name, d.bases.len());
-            d.bases.push(Rc::new(base));
+            d.bases.push(Arc::new(base));
         }
         // Tables shared between groups (and with rareLikeUniques) are read once
-        let mut by_table: Vec<(Value, Rc<AffixSet>)> = Vec::new();
+        let mut by_table: Vec<(Value, Arc<AffixSet>)> = Vec::new();
         let mut affixes = HashMap::new();
-        let mut set_of = |v: &Value| -> Result<Rc<AffixSet>> {
+        let mut set_of = |v: &Value| -> Result<Arc<AffixSet>> {
             if let Some((_, s)) = by_table.iter().find(|(t, _)| t.raw_eq(v)) {
                 return Ok(s.clone());
             }
-            let s = Rc::new(AffixSet::from_lua(v, &mut affixes)?);
+            let s = Arc::new(AffixSet::from_lua(v, &mut affixes)?);
             by_table.push((v.clone(), s.clone()));
             Ok(s)
         };
@@ -618,10 +618,10 @@ crate::codec_struct!(Scalability {
 /// groups share it
 impl Codec for ItemData {
     fn put(&self, w: &mut Writer) {
-        let mut affixes: Vec<&Rc<Affix>> = Vec::new();
+        let mut affixes: Vec<&Arc<Affix>> = Vec::new();
         let mut affix_index: HashMap<*const Affix, usize> = HashMap::new();
-        let mut sets: Vec<Rc<AffixSet>> = Vec::new();
-        let mut set_index = |s: &Rc<AffixSet>| match sets.iter().position(|x| Rc::ptr_eq(x, s)) {
+        let mut sets: Vec<Arc<AffixSet>> = Vec::new();
+        let mut set_index = |s: &Arc<AffixSet>| match sets.iter().position(|x| Arc::ptr_eq(x, s)) {
             Some(i) => i,
             None => {
                 sets.push(s.clone());
@@ -644,7 +644,7 @@ impl Codec for ItemData {
                 s.list
                     .iter()
                     .map(|a| {
-                        *affix_index.entry(Rc::as_ptr(a)).or_insert_with(|| {
+                        *affix_index.entry(Arc::as_ptr(a)).or_insert_with(|| {
                             affixes.push(a);
                             affixes.len() - 1
                         })
@@ -689,7 +689,7 @@ impl Codec for ItemData {
     }
 
     fn get(r: &mut Reader) -> codec::Result<Self> {
-        let affixes = Vec::<Rc<Affix>>::get(r)?;
+        let affixes = Vec::<Arc<Affix>>::get(r)?;
         let sets = Vec::<Vec<usize>>::get(r)?
             .into_iter()
             .map(|s| {
@@ -707,7 +707,7 @@ impl Codec for ItemData {
                     .enumerate()
                     .map(|(i, a)| (a.id.clone(), i))
                     .collect();
-                Ok(Rc::new(AffixSet { list, index }))
+                Ok(Arc::new(AffixSet { list, index }))
             })
             .collect::<codec::Result<Vec<_>>>()?;
         let set = |i: usize| -> codec::Result<_> {
@@ -735,7 +735,7 @@ impl Codec for ItemData {
                 },
             );
         }
-        let bases = Vec::<Rc<Base>>::get(r)?;
+        let bases = Vec::<Arc<Base>>::get(r)?;
         let base_index = bases
             .iter()
             .enumerate()

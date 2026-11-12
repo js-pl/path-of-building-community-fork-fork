@@ -7,7 +7,7 @@ use crate::codec::{Codec, Reader, Result as CResult, Writer};
 use crate::codec_struct;
 use crate::mods::{Mod, ModValue, Tag};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// What `formList` gives: how a line's value combines
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -95,7 +95,7 @@ impl Codec for Form {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Frag {
     pub table: bool,
-    pub names: Vec<Rc<str>>,
+    pub names: Vec<Arc<str>>,
     pub flags: u32,
     pub keyword_flags: u32,
     pub tag: Option<Tag>,
@@ -111,7 +111,7 @@ pub struct Frag {
     pub add_to_skill: Option<Tag>,
     pub apply_to_enemy: Option<bool>,
     pub actor_enemy: Option<bool>,
-    pub mod_suffix: Option<Rc<str>>,
+    pub mod_suffix: Option<Arc<str>>,
 }
 
 codec_struct!(Frag {
@@ -143,7 +143,7 @@ impl Frag {
         }
     }
 
-    pub fn names(names: Vec<Rc<str>>) -> Frag {
+    pub fn names(names: Vec<Arc<str>>) -> Frag {
         Frag {
             table: true,
             names,
@@ -176,10 +176,10 @@ impl Frag {
 /// A `flagTypes` entry: a flag's name, or a whole mod
 #[derive(Clone, Debug, PartialEq)]
 pub enum FlagType {
-    Name(Rc<str>),
+    Name(Arc<str>),
     Mod {
-        name: Rc<str>,
-        typ: Rc<str>,
+        name: Arc<str>,
+        typ: Arc<str>,
         value: ModValue,
     },
 }
@@ -215,7 +215,7 @@ impl Codec for FlagType {
 /// A ported closure of upstream's tables, by its key
 #[derive(Clone)]
 pub struct Closure {
-    pub key: Rc<str>,
+    pub key: Arc<str>,
     pub hash: u64,
     pub port: &'static Port,
 }
@@ -258,7 +258,7 @@ impl Codec for Closure {
         self.hash.put(w);
     }
     fn get(r: &mut Reader) -> CResult<Self> {
-        let key: Rc<str> = Codec::get(r)?;
+        let key: Arc<str> = Codec::get(r)?;
         let hash = u64::get(r)?;
         Closure::new(&key, hash).map_err(|e| e.to_string())
     }
@@ -308,7 +308,7 @@ pub enum Entry<T> {
     Value(T),
     Func(Closure),
     /// A gem loop rule, for the skill named
-    Gem(GemKind, Rc<str>),
+    Gem(GemKind, Arc<str>),
 }
 
 impl<T: Codec> Codec for Entry<T> {
@@ -396,7 +396,7 @@ impl<T> List<T> {
 /// A `jewelFuncList` entry: `{ func = ..., type = ... }`
 #[derive(Clone, Debug, PartialEq)]
 pub struct JewelFunc {
-    pub typ: Rc<str>,
+    pub typ: Arc<str>,
     pub value: ModValue,
 }
 
@@ -440,8 +440,8 @@ pub struct Rules {
     pub mod_tag_list: List<Frag>,
     pub special_mod_list: List<Vec<Mod>>,
     pub unsupported_mod_list: Vec<String>,
-    pub suffix_types: List<Rc<str>>,
-    pub dmg_types: HashMap<String, Rc<str>>,
+    pub suffix_types: List<Arc<str>>,
+    pub dmg_types: HashMap<String, Arc<str>>,
     pub pen_types: List<Frag>,
     pub flag_types: List<FlagType>,
     pub regen_types: HashMap<String, Frag>,

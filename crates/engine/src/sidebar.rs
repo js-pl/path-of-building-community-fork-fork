@@ -11,7 +11,7 @@ use crate::calc_items::ItemWarnings;
 use crate::calc_perform::{Perform, Result};
 use crate::mods::ModValue;
 use std::collections::BTreeSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// A main skill as the sidebar shows it
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -40,7 +40,7 @@ impl SkillInfo {
 /// An active skill of a socket group (`displaySkillList`)
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisplaySkill {
-    pub granted_effect: Rc<crate::skill_data::GrantedEffect>,
+    pub granted_effect: Arc<crate::skill_data::GrantedEffect>,
     /// The gem it comes from (`activeEffect.srcInstance`): group and place
     pub src: Option<(usize, usize)>,
     pub flags: BTreeSet<String>,

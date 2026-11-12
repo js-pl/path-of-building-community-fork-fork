@@ -15,7 +15,7 @@ use crate::mods::{Mod, ModType, ModValue, Record, Sym};
 use crate::pat::{self, capture, captures, gmatch, gmatch1, gsub, gsub_fn, is_match, num};
 use lua::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -249,7 +249,7 @@ pub struct ModMagnitude {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct GrantedSkill {
-    pub skill_id: Option<Rc<str>>,
+    pub skill_id: Option<Arc<str>>,
     pub level: Option<f64>,
     pub no_supports: bool,
     pub source: String,
@@ -272,7 +272,7 @@ pub struct Item {
     pub name_suffix: String,
     pub title: Option<String>,
     pub base_name: Option<String>,
-    pub base: Option<Rc<Base>>,
+    pub base: Option<Arc<Base>>,
     pub typ: Option<String>,
     pub rarity: String,
     pub quality: Option<f64>,
@@ -364,7 +364,7 @@ pub struct Item {
     pub socketed_jewel_effect_modifier: f64,
 
     pub requirements: Requirements,
-    pub affixes: Option<Rc<AffixSet>>,
+    pub affixes: Option<Arc<AffixSet>>,
     pub prefixes: Affixes,
     pub suffixes: Affixes,
     pub affix_limit: f64,
@@ -2083,7 +2083,7 @@ impl Item {
         &mut self,
         ctx: &ItemContext,
         base_name: String,
-        base: Rc<Base>,
+        base: Arc<Base>,
         flask_buff_lines: &mut Option<HashSet<String>>,
         tincture_buff_lines: &mut Option<HashSet<String>>,
     ) -> Result<()> {

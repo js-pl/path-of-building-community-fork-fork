@@ -440,6 +440,11 @@ each optimisation's numbers are in `docs/progress.md`.
    that what it makes, written and read back, equals what the typed
    tables read from a started upstream's `data`.
 
+   What calculations share (game data, the mod parser, trees, a build's
+   shared parts, mods' shared pieces) is `Arc` and `Send + Sync`, checked
+   at compile time, so calculations can run on threads natively; the
+   browser stays on one thread per worker.
+
    Upstream mutates shared data in a few places, and the typed engine does
    not copy that by accident: `modLib.mergeKeystones` sets the source of a
    tree keystone's mods to whatever else grants the keystone, so the tree

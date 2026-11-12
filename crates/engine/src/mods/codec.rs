@@ -326,7 +326,7 @@ mod tests {
     use super::*;
     use crate::codec::{decode, encode};
     use crate::mods::Sym;
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     #[test]
     fn mods_round_trip() {
@@ -350,7 +350,7 @@ mod tests {
             unreached_tags: vec![(
                 3,
                 Tag {
-                    kind: TagKind::SocketedIn(Rc::new(SocketedIn {
+                    kind: TagKind::SocketedIn(Arc::new(SocketedIn {
                         sockets: Some(Sockets::Numbers(vec![1.0])),
                         ..Default::default()
                     })),
@@ -363,7 +363,7 @@ mod tests {
             value: ModValue::List(vec![
                 ModValue::Mod(Box::new(inner.clone())),
                 ModValue::Str("x".into()),
-                ModValue::Func(Rc::new(Func {
+                ModValue::Func(Arc::new(Func {
                     name: "f".into(),
                     args: vec![None, Some(ModValue::Bool(true))],
                 })),

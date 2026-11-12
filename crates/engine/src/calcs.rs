@@ -26,7 +26,7 @@ use crate::calc_skills::ActiveSkill;
 use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, StoreId, Sym, TagKind};
 use crate::skills::SocketGroup;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// An actor's output
 pub type Output = crate::mods::SymMap<OutVal>;
@@ -218,21 +218,21 @@ fn active_skill_count(skill: &ActiveSkill, groups: &[SocketGroup]) -> (f64, bool
         let Some(data) = &gem.gem else { continue };
         let count = gem.count.unwrap_or(1.0);
         if data.vaal_gem {
-            if Rc::ptr_eq(effect, &data.granted_effect) {
+            if Arc::ptr_eq(effect, &data.granted_effect) {
                 return (count, gem.enable_global1);
             }
             if data
                 .secondary_granted_effect
                 .as_ref()
-                .is_some_and(|s| Rc::ptr_eq(effect, s))
+                .is_some_and(|s| Arc::ptr_eq(effect, s))
             {
                 return (count, gem.enable_global2);
             }
-        } else if (Rc::ptr_eq(effect, &data.granted_effect) && !data.granted_effect.support)
+        } else if (Arc::ptr_eq(effect, &data.granted_effect) && !data.granted_effect.support)
             || data
                 .secondary_granted_effect
                 .as_ref()
-                .is_some_and(|s| Rc::ptr_eq(effect, s))
+                .is_some_and(|s| Arc::ptr_eq(effect, s))
         {
             return (count, true);
         }
@@ -549,7 +549,7 @@ impl FullDpsSkill {
                 t.insert(k.into(), s(v));
             }
         }
-        OutVal::Table(Rc::new(t))
+        OutVal::Table(Arc::new(t))
     }
 }
 
@@ -654,7 +654,7 @@ pub fn build_output(
         lua_sort(&mut skills, |a, b| a.dps * a.count > b.dps * b.count);
     }
     let skills = skills.iter().map(FullDpsSkill::out_val).collect();
-    p.c.set_out_val(PLAYER, "SkillDPS", OutVal::List(Rc::new(skills)));
+    p.c.set_out_val(PLAYER, "SkillDPS", OutVal::List(Arc::new(skills)));
     p.c.set_out(PLAYER, "FullDPS", full_dps.combined_dps);
     p.c.set_out(PLAYER, "FullDotDPS", full_dps.total_dot_dps);
     let mut multipliers_used = HashSet::new();
@@ -1071,7 +1071,7 @@ fn cost_warnings(p: &mut Perform, recalc: &Recalculator) -> Result<()> {
         }
     }
     for (k, v) in lists {
-        p.c.set_out_val(PLAYER, &k, OutVal::List(Rc::new(v)));
+        p.c.set_out_val(PLAYER, &k, OutVal::List(Arc::new(v)));
     }
     Ok(())
 }
