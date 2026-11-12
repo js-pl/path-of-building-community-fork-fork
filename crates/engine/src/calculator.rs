@@ -7,7 +7,6 @@
 
 use crate::actor::OutVal;
 use crate::build::Build;
-use crate::calc::PLAYER;
 use crate::calc_cache::{Cache, Recalculator};
 use crate::calc_env::{CalcData, CalcMode, init_env_with};
 use crate::calc_override::Override;
@@ -68,17 +67,8 @@ fn calculate(
         .with_cache(cache);
     let mut input = PerformInput::new(&b, data, false)?;
     input.recalc = Some(&recalc);
-    let mut p = perform(env, input)?;
-    p.finish()?;
-    let minion = p
-        .minion_actor()
-        .map(|a| p.c.actors.actors[a].output.clone());
-    let out = CalcOutput {
-        player: std::mem::take(&mut p.c.actors.actors[PLAYER].output),
-        minion,
-    };
-    drop(p);
-    Ok((out, recalc.into_cache(), granted))
+    let (player, minion) = perform(env, input)?.finish_owned()?;
+    Ok((CalcOutput { player, minion }, recalc.into_cache(), granted))
 }
 
 /// `calcs.getMiscCalculator(build)`.
