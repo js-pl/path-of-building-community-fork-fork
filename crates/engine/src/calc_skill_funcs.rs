@@ -11,6 +11,7 @@ use crate::calc_offence::Off;
 use crate::calc_perform::Perform;
 use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Tag};
+use crate::sf;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -85,7 +86,7 @@ impl<'a> Perform<'a> {
                     .filter_map(|(k, v)| Some((k.parse::<f64>().ok()?, v.num()?)))
                     .collect();
                 radii.sort_by(|a, b| a.0.total_cmp(&b.0));
-                for (small, count) in radii {
+                for &(small, count) in &radii {
                     let damaging = small + enemy_radius - 1.0;
                     let chance = m_min(damaging * damaging / (full * full), 1.0);
                     overlap += chance * count / width;
@@ -98,6 +99,47 @@ impl<'a> Perform<'a> {
                     Some(3.0) => 1.0 + small,
                     _ => 1.0,
                 };
+                if let Some(b) = self.bd(actor) {
+                    let mut l = vec![
+                        "Chance for individual small explosion to land within range to damage enemy:".to_string(),
+                        "^8= (area where a small explosion can spawn to damage enemy) / (total area)".into(),
+                        "^8= (^7tertiary radius^8 + ^7enemy radius^8 - 1) ^ 2 / ^7secondary radius^8 ^ 2".into(),
+                        "^8Result is the weighted sum of overlap chances for each possible tertiary radius".into(),
+                    ];
+                    for (k, (r, count)) in radii.iter().enumerate() {
+                        let more = if k + 1 == radii.len() { "" } else { " ^8+" };
+                        l.push(sf!(
+                            "^8(^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2 *^7 %d/%d%s",
+                            *r,
+                            enemy_radius,
+                            full,
+                            *count,
+                            width,
+                            more
+                        ));
+                    }
+                    l.push(sf!("^8=^7 %.3f^8%%", overlap * 100.0));
+                    b.set_lines("OverlapChance", l);
+                    match part {
+                        Some(2.0) => b.set_lines(
+                            "SkillDPSMultiplier",
+                            vec![
+                                "DPS multiplier".into(),
+                                "^8= 1 + ^7small explosions^8 * ^7overlap chance^8".into(),
+                                sf!("^8= 1 +^7 %d^8 *^7 %.2f^8", small, overlap),
+                                sf!("^8=^7 %.3f", mult),
+                            ],
+                        ),
+                        Some(3.0) => b.set_lines(
+                            "SkillDPSMultiplier",
+                            vec![
+                                "DPS multiplier".into(),
+                                sf!("^8= 1 +^7 %d (small explosions)", mult),
+                            ],
+                        ),
+                        _ => {}
+                    }
+                }
                 if mult != 1.0 {
                     let cur = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0);
                     self.sd_set(i, "dpsMultiplier", cur * mult);
@@ -472,8 +514,20 @@ impl<'a> Perform<'a> {
                 }
             }
             ("FlamethrowerTrap" | "FlamethrowerTrapAltX", "preDamageFunc") => {
-                let average = out_req(self, "Duration")? / out_req(self, "TrapCooldown")?;
+                let (duration, cooldown) = (out_req(self, "Duration")?, out_req(self, "TrapCooldown")?);
+                let average = duration / cooldown;
                 self.c.set_out(actor, "AverageActiveTraps", average);
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines(
+                        "AverageActiveTraps",
+                        vec![
+                            "Average active traps, not considering stored cooldown uses:".into(),
+                            sf!("%.2f^8 (skill duration)", duration),
+                            sf!("/ %.2f^8 (cooldown)", cooldown),
+                            sf!("= %.2f traps", average),
+                        ],
+                    );
+                }
                 let alt = id == "FlamethrowerTrapAltX";
                 let slow = !alt && matches!(part, Some(p) if p == 2.0 || p == 4.0);
                 self.sd_set(i, "hitTimeOverride", if slow { 0.3 } else { 0.1 });
@@ -892,20 +946,35 @@ impl<'a> Perform<'a> {
             ("SeismicTrap" | "SeismicTrapAltX", "preDamageFunc") => {
                 let base = id == "SeismicTrap";
                 let mut traps = 1.0;
+                let mut pulse = None;
                 if base {
                     let names = ["TrapThrowingSpeed", "SeismicPulseFrequency"];
                     let inc = 1.0 + self.c.inc(list, c, &names)? / 100.0;
                     let more = self.c.more(list, c, &names)?;
-                    let rate = inc * more / sd(self, "repeatInterval");
+                    let interval = sd(self, "repeatInterval");
+                    let rate = inc * more / interval;
                     self.sd_set(i, "hitTimeOverride", 1.0 / rate);
                     self.c.set_out(actor, "WavePulseRate", rate);
                     let dinc = 1.0 + self.c.inc(list, c, &["Duration"])? / 100.0;
                     let dmore = self.c.more(list, c, &["Duration"])?;
-                    let duration = sd(self, "duration") * dinc * dmore;
+                    let base_duration = sd(self, "duration");
+                    let duration = base_duration * dinc * dmore;
                     let pulses = (duration * rate).floor();
                     self.c.set_out(actor, "PulsesPerTrap", pulses);
-                    traps = (pulses / rate) / out_req(self, "TrapCooldown")?;
+                    let cooldown = out_req(self, "TrapCooldown")?;
+                    traps = (pulses / rate) / cooldown;
                     self.c.set_out(actor, "AverageActiveTraps", traps);
+                    pulse = Some(Pulses {
+                        frequency: Some((interval, inc, more)),
+                        rate,
+                        duration,
+                        base_duration,
+                        dinc,
+                        dmore,
+                        pulses,
+                        traps,
+                        per: ("Average active traps, not considering stored cooldown uses:", "cooldown", cooldown),
+                    });
                 }
                 let enemy = match self.c.override_num(list, c, &["EnemyRadius"])? {
                     Some(v) => v,
@@ -925,6 +994,18 @@ impl<'a> Perform<'a> {
                     Some(6.0) if base => traps * waves,
                     _ => 1.0,
                 };
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines("OverlapChance", wave_overlap_lines(wave, enemy, full, overlap));
+                    if let Some(p) = &pulse {
+                        for (k, l) in p.lines() {
+                            b.set_lines(k, l);
+                        }
+                    }
+                    let parts = if base { 6.0 } else { 3.0 };
+                    if let Some(l) = wave_dps_lines(part.filter(|p| *p <= parts), waves, overlap, traps, mult) {
+                        b.set_lines("SkillDPSMultiplier", l);
+                    }
+                }
                 if mult != 1.0 {
                     let cur = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0);
                     self.sd_set(i, "dpsMultiplier", cur * mult);
@@ -942,11 +1023,13 @@ impl<'a> Perform<'a> {
                     None => self.c.clear_out(actor, "AreaOfEffectRadius"),
                 }
                 let interval = sd(self, "repeatInterval");
+                let mut frequency = None;
                 let rate = if id == "LightningSpireTrap" {
                     let inc = 1.0 + self.c.inc(list, c, &["TrapThrowingSpeed"])? / 100.0;
                     let more = self.c.more(list, c, &["TrapThrowingSpeed"])?;
                     let r = inc * more / interval;
                     self.c.set_out(actor, "WavePulseRate", r);
+                    frequency = Some((interval, inc, more));
                     r
                 } else {
                     1.0 / interval
@@ -954,20 +1037,27 @@ impl<'a> Perform<'a> {
                 self.sd_set(i, "hitTimeOverride", 1.0 / rate);
                 let dinc = 1.0 + self.c.inc(list, c, &["Duration"])? / 100.0;
                 let dmore = self.c.more(list, c, &["Duration"])?;
-                let pulses = (sd(self, "duration") * dinc * dmore * rate).floor();
+                let base_duration = sd(self, "duration");
+                let duration = base_duration * dinc * dmore;
+                let pulses = (duration * rate).floor();
                 self.c.set_out(actor, "PulsesPerTrap", pulses);
                 let effective = pulses / rate;
-                let traps = if id == "LightningSpireTrapAltX" {
+                let per = if id == "LightningSpireTrapAltX" {
                     let asm = 1.0 + self.c.inc(list, c, &["ActionSpeed"])? / 100.0;
                     let base = 1.0 / self.c.base(list, c, &["TrapThrowingTime"])?;
                     let throw = m_min(
                         base * self.c.calc_mod(list, c, &["TrapThrowingSpeed"])? * asm,
                         self.misc_data("ServerTickRate"),
                     );
-                    effective / (1.0 / throw)
+                    ("Average active traps:", "throw time", 1.0 / throw)
                 } else {
-                    effective / out_req(self, "TrapCooldown")?
+                    (
+                        "Average active traps, not considering stored cooldown uses:",
+                        "cooldown",
+                        out_req(self, "TrapCooldown")?,
+                    )
                 };
+                let traps = effective / per.2;
                 self.c.set_out(actor, "AverageActiveTraps", traps);
                 let enemy = match self.c.override_num(list, c, &["EnemyRadius"])? {
                     Some(v) => v,
@@ -987,6 +1077,30 @@ impl<'a> Perform<'a> {
                     Some(6.0) => traps * waves,
                     _ => 1.0,
                 };
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines(
+                        "AreaOfEffectRadius",
+                        vec!["Targeting area of this skill is not affected by Area of Effect modifiers.".into()],
+                    );
+                    b.set_lines("OverlapChance", wave_overlap_lines(wave, enemy, full, overlap));
+                    let p = Pulses {
+                        frequency,
+                        rate,
+                        duration,
+                        base_duration,
+                        dinc,
+                        dmore,
+                        pulses,
+                        traps,
+                        per,
+                    };
+                    for (k, l) in p.lines() {
+                        b.set_lines(k, l);
+                    }
+                    if let Some(l) = wave_dps_lines(part, waves, overlap, traps, mult) {
+                        b.set_lines("SkillDPSMultiplier", l);
+                    }
+                }
                 if mult != 1.0 {
                     let cur = self.sd_num(i, "dpsMultiplier").unwrap_or(1.0);
                     self.sd_set(i, "dpsMultiplier", cur * mult);
@@ -1467,4 +1581,130 @@ impl<'a> Perform<'a> {
             None => self.sd_clear(i, k),
         }
     }
+}
+
+/// The pulses of a trap that pulses waves (Seismic Trap, Lightning Spire
+/// Trap)
+struct Pulses<'a> {
+    /// The pulse frequency's interval, increase and more, when modifiers
+    /// change it
+    frequency: Option<(f64, f64, f64)>,
+    rate: f64,
+    duration: f64,
+    base_duration: f64,
+    dinc: f64,
+    dmore: f64,
+    pulses: f64,
+    traps: f64,
+    /// What the active traps divide by: label, name and value
+    per: (&'a str, &'a str, f64),
+}
+
+impl Pulses<'_> {
+    fn lines(&self) -> Vec<(&'static str, Vec<String>)> {
+        let p = self;
+        let mut out = Vec::new();
+        let by_duration = |n: f64| 100.0 * (n / (p.rate * p.base_duration * p.dmore) - p.dinc);
+        let (next, prev) = match p.frequency {
+            Some((interval, inc, more)) => {
+                out.push((
+                    "WavePulseRate",
+                    vec![
+                        "Pulse rate:".into(),
+                        sf!("%.2f ^8(base pulse rate)", 1.0 / interval),
+                        sf!("* %.2f ^8(increased/reduced pulse frequency)", inc),
+                        sf!("* %.2f ^8(more/less pulse frequency)", more),
+                        sf!("= %.2f^8/s", p.rate),
+                    ],
+                ));
+                let by_speed = |n: f64| 100.0 * (n * interval / (p.duration * more) - inc);
+                (
+                    sf!(
+                        "^8Next breakpoint: %d%% increased Trap Throwing Speed / %d%% increased Duration",
+                        by_speed(p.pulses + 1.0).ceil(),
+                        by_duration(p.pulses + 1.0).ceil()
+                    ),
+                    sf!(
+                        "^8Previous breakpoint: %d%% reduced Trap Throwing Speed / %d%% reduced Duration",
+                        -(by_speed(p.pulses) - 1.0).ceil(),
+                        -(by_duration(p.pulses) - 1.0).ceil()
+                    ),
+                )
+            }
+            None => (
+                sf!(
+                    "^8Next breakpoint: %d%% increased Duration",
+                    by_duration(p.pulses + 1.0).ceil()
+                ),
+                sf!(
+                    "^8Previous breakpoint: %d%% reduced Duration",
+                    -(by_duration(p.pulses) - 1.0).ceil()
+                ),
+            ),
+        };
+        out.push((
+            "PulsesPerTrap",
+            vec![
+                "Pulses per trap:".into(),
+                sf!("%.3f ^8(unrounded skill duration)", p.duration),
+                sf!("* %.2f ^8(pulse rate)", p.rate),
+                sf!("= %.2f ^8pulses", p.duration * p.rate),
+                "^8rounded down".into(),
+                sf!("= %d ^8pulses", p.pulses),
+                next,
+                prev,
+            ],
+        ));
+        let (label, what, by) = p.per;
+        out.push((
+            "AverageActiveTraps",
+            vec![
+                label.into(),
+                sf!(
+                    "%.2f^8 /^7 %.2f^8 (pulses / pulse rate = effective skill duration)",
+                    p.pulses,
+                    p.rate
+                ),
+                sf!(&format!("/ %.2f ^8({what})"), by),
+                sf!("= %.2f traps", p.traps),
+            ],
+        ));
+        out
+    }
+}
+
+/// `breakdown.OverlapChance` of a wave
+fn wave_overlap_lines(wave: f64, enemy: f64, full: f64, overlap: f64) -> Vec<String> {
+    vec![
+        "Chance for individual wave to land within range to damage enemy:".into(),
+        "^8= (area where wave can spawn to damage enemy) / (total area)".into(),
+        "^8= (^7secondary radius^8 + ^7enemy radius^8 - 1) ^ 2 / ^7radius^8 ^ 2".into(),
+        sf!("^8= (^7%d^8 +^7 %d^8 - 1) ^ 2 /^7 %d^8 ^ 2", wave, enemy, full),
+        sf!("^8=^7 %.3f^8%%", overlap * 100.0),
+    ]
+}
+
+/// `breakdown.SkillDPSMultiplier` of a wave trap's skill part
+fn wave_dps_lines(part: Option<f64>, waves: f64, overlap: f64, traps: f64, mult: f64) -> Option<Vec<String>> {
+    let l = match part? {
+        2.0 => vec![
+            "^8= ^7maximum waves^8 * ^7overlap chance^8".into(),
+            sf!("^8=^7 %d^8 *^7 %.2f^8", waves, overlap),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        3.0 => vec![sf!("^8=^7 %d (maximum waves)", mult)],
+        4.0 => vec![sf!("^8=^7 %.2f (average active traps)", mult)],
+        5.0 => vec![
+            "^8= ^7average active traps^8 * ^7maximum waves^8 * ^7overlap chance^8".into(),
+            sf!("^8=^7 %.2f^8 *^7 %d^8 *^7 %.2f", traps, waves, overlap),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        6.0 => vec![
+            "^8= ^7average active traps^8 * ^7maximum waves".into(),
+            sf!("^8=^7 %.2f^8 *^7 %d", traps, waves),
+            sf!("^8=^7 %.3f", mult),
+        ],
+        _ => return None,
+    };
+    Some(std::iter::once("DPS multiplier".to_string()).chain(l).collect())
 }
