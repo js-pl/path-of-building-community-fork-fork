@@ -798,7 +798,7 @@ fn build_skill_mod_list(
         |name: &str, typ: ModType, v: f64, source: Option<&str>, flags: u32, tags: Vec<Tag>| {
             let mut m = Mod::new(name, typ, v, source);
             m.flags = flags;
-            m.tags = tags;
+            m.tags = tags.into();
             m
         };
     // Support gem mods

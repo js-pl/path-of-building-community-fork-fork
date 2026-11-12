@@ -91,7 +91,11 @@ pub fn mastery_effect_node(spec: &PassiveSpec, i: usize, effect: f64) -> Result<
     let (mods, mod_list, unknown, _) =
         crate::tree::process_stats(spec.parser, &mut sd, Some(&source))?;
     node.unknown = unknown;
-    node.stats = Some(crate::spec::NodeStats { sd, mods, mod_list });
+    node.stats = Some(std::rc::Rc::new(crate::spec::NodeStats {
+        sd,
+        mods,
+        mod_list,
+    }));
     Ok(node)
 }
 

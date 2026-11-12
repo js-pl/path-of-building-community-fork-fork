@@ -345,7 +345,8 @@ mod tests {
                     actor: None,
                 },
                 global_limit: Some((5.0, Sym::new("k"))),
-            }],
+            }]
+            .into(),
             unreached_tags: vec![(
                 3,
                 Tag {
@@ -373,7 +374,8 @@ mod tests {
                     ..Default::default()
                 }),
                 global_limit: None,
-            }],
+            }]
+            .into(),
             ..inner
         };
         assert_eq!(decode::<Mod>(&encode(&m)).unwrap(), m);

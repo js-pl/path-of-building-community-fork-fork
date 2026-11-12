@@ -103,7 +103,10 @@ pub fn init_env_with(
     if let Some((_, Some(item))) = &ovr.rep_item {
         let mut item = item.clone();
         item.id = Some(REP_ITEM_ID as f64);
-        build.items.items.insert(REP_ITEM_ID, item);
+        build
+            .items
+            .items
+            .insert(REP_ITEM_ID, std::rc::Rc::new(item));
     }
     match init_env_pass(build, data, calc_mode, base, ovr, false)? {
         Some(env) => Ok(env),
