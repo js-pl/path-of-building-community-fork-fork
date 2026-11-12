@@ -7,18 +7,18 @@
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
-use engine::actor::OutVal;
 use engine::breakdown::{Breakdown, Breakdowns, Cell, Row};
 use engine::items_tab::ItemsTab;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use engine::skill_data::{Gem, SkillData};
+use equivalence::outputs::{compare, entries, key_str, list, lua_outputs, number, typed_outputs};
 use equivalence::typed_build::TypedData;
 use equivalence::{corpus_builds, gem_variants, skill_variants, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use serde_json::{Map, Value as J, json};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use upstream::host::Host;
 use upstream::imported::Imported;
@@ -37,24 +37,6 @@ fn describe(e: &LuaError) -> String {
         lua::to_string(e.value()),
         e.traceback().join("\n  ")
     )
-}
-
-fn entries(v: &Value) -> Vec<(Key, Value)> {
-    v.as_table().map(|t| t.entries()).unwrap_or_default()
-}
-
-fn number(n: f64) -> J {
-    if n.is_nan() {
-        json!({"$num": "nan"})
-    } else if n.is_infinite() {
-        json!({"$num": if n > 0.0 { "inf" } else { "-inf" }})
-    } else {
-        serde_json::Number::from_f64(n).map_or(J::Null, J::Number)
-    }
-}
-
-fn key_str(k: &Key) -> String {
-    lua::to_string(&k.to_value()).to_str_lossy().into_owned()
 }
 
 /// A Lua table as JSON: its array part under `#`, its other keys as they
@@ -162,15 +144,6 @@ fn opt_str(s: &Option<String>) -> J {
     s.as_ref().map_or(J::Bool(false), |s| json!(s))
 }
 
-/// A list as Lua's: `{}` when empty
-fn list(v: Vec<J>) -> J {
-    if v.is_empty() {
-        json!({})
-    } else {
-        json!({ "#": v })
-    }
-}
-
 fn rows(rows: &[Row]) -> J {
     list(
         rows.iter()
@@ -271,107 +244,6 @@ fn typed_breakdowns(b: &Breakdowns, tab: &ItemsTab) -> BTreeMap<String, J> {
         .iter()
         .map(|(k, v)| (k.clone(), typed_breakdown(v, tab)))
         .collect()
-}
-
-/// An output of the translation as JSON: arrays under `#`, gems and items
-/// by name
-fn lua_out(v: &Value, key: &str) -> J {
-    match v {
-        Value::Table(_) if key == "sourceGem" => {
-            json!({"$gem": lua::to_string(&get(v, "nameSpec")).to_str_lossy()})
-        }
-        Value::Table(_) if key == "sourceItem" => {
-            json!({"$item": lua::to_string(&get(v, "name")).to_str_lossy()})
-        }
-        Value::Table(_) => {
-            let mut m = Map::new();
-            let mut list: BTreeMap<i64, J> = BTreeMap::new();
-            for (k, x) in entries(v) {
-                match k {
-                    Key::Int(i) => {
-                        list.insert(i, lua_out(&x, ""));
-                    }
-                    k => {
-                        let k = key_str(&k);
-                        let j = lua_out(&x, &k);
-                        m.insert(k, j);
-                    }
-                }
-            }
-            if !list.is_empty() {
-                m.insert("#".into(), J::Array(list.into_values().collect()));
-            }
-            J::Object(m)
-        }
-        v => lua_json(v, key, &Converter::default()),
-    }
-}
-
-/// A typed output as [`lua_out`] encodes the translation's
-fn typed_out(v: &OutVal) -> J {
-    match v {
-        OutVal::Num(n) => number(*n),
-        OutVal::Bool(b) => J::Bool(*b),
-        OutVal::Str(x) => json!(&**x),
-        OutVal::Gem(n) => json!({"$gem": &**n}),
-        OutVal::Item(n) => json!({"$item": &**n}),
-        OutVal::List(l) => list(l.iter().map(typed_out).collect()),
-        OutVal::Table(t) => {
-            let mut m = Map::new();
-            let mut ints: BTreeMap<i64, J> = BTreeMap::new();
-            for (k, v) in t.iter() {
-                match k.parse::<i64>() {
-                    Ok(i) => {
-                        ints.insert(i, typed_out(v));
-                    }
-                    Err(_) => {
-                        m.insert(k.clone(), typed_out(v));
-                    }
-                }
-            }
-            if !ints.is_empty() {
-                m.insert("#".into(), J::Array(ints.into_values().collect()));
-            }
-            J::Object(m)
-        }
-    }
-}
-
-/// An actor's outputs by name
-fn lua_outputs(out: &Value) -> BTreeMap<String, J> {
-    entries(out)
-        .into_iter()
-        .map(|(k, v)| {
-            let k = key_str(&k);
-            let j = lua_out(&v, &k);
-            (k, j)
-        })
-        // `Minion` is the minion's output, compared as its own
-        .filter(|(k, _)| k != "Minion")
-        .collect()
-}
-
-fn typed_outputs(out: &engine::calcs::Output) -> BTreeMap<String, J> {
-    out.iter()
-        .map(|(k, v)| (k.as_str().to_string(), typed_out(v)))
-        .collect()
-}
-
-/// `false` in Lua is a missing key's value in a row: drop `false` cells
-/// both sides agree on by encoding them the same; a nil cell is absent
-fn compare(
-    what: &str,
-    got: &BTreeMap<String, J>,
-    want: &BTreeMap<String, J>,
-    fail: &mut Vec<String>,
-) {
-    for k in got.keys().chain(want.keys()).collect::<BTreeSet<_>>() {
-        let (g, w) = (got.get(k), want.get(k));
-        if g != w {
-            let show = |v: Option<&J>| v.map_or("missing".into(), J::to_string);
-            fail.push(format!("{what} {k}:\n      {}\n   != {}", show(g), show(w)));
-        }
-    }
 }
 
 #[test]

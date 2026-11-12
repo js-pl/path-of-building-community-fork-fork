@@ -311,10 +311,10 @@ upstream = "16de4b82d57f1c0de6eb40f37143c32d4da36a02"
 "Modules/CalcOffence.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs crates/engine/src/calc_offence_hit.rs crates/engine/src/calc_offence_ailments.rs crates/engine/src/calc_offence_dot.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcPerform.lua" = { status = "partial", port = "crates/engine/src/calc.rs crates/engine/src/calc_perform.rs crates/engine/src/calc_minion.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcSections.lua" = { status = "todo" }
-"Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_env.rs crates/engine/src/calc_items.rs crates/engine/src/calc_tree.rs crates/engine/src/calc_skills.rs crates/engine/src/jewel.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
+"Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_env.rs crates/engine/src/calc_override.rs crates/engine/src/calc_items.rs crates/engine/src/calc_tree.rs crates/engine/src/calc_skills.rs crates/engine/src/jewel.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs crates/engine/src/skill_data.rs crates/engine/src/calc_skills.rs crates/engine/src/calc_skill_mods.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/CalcTriggers.lua" = { status = "partial", port = "crates/engine/src/calc_triggers.rs crates/engine/src/calc_offence.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
-"Modules/Calcs.lua" = { status = "partial", port = "crates/engine/src/calcs.rs crates/engine/src/calc_cache.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
+"Modules/Calcs.lua" = { status = "partial", port = "crates/engine/src/calcs.rs crates/engine/src/calc_cache.rs crates/engine/src/calculator.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/Common.lua" = { status = "partial", port = "crates/engine/src/common.rs crates/engine/src/rt.rs crates/engine/src/pat.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/ConfigModBrowser.lua" = { status = "todo" }
 "Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }

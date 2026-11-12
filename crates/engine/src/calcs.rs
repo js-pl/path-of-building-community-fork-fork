@@ -8,7 +8,7 @@
 //!
 //! Not ported yet: the conditions and mods in use that the
 //! Configuration tab reads (`env.conditionsUsed`, ...; of them only
-//! `env.multipliersUsed`), the node and misc calculators.
+//! `env.multipliersUsed`). The calculators are in `calculator.rs`.
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
@@ -16,8 +16,9 @@ use crate::actor::OutVal;
 use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
 use crate::build::Build;
 use crate::calc::{PLAYER, m_min};
-use crate::calc_cache::{Recalc, Recalculator, skill_uuid};
-use crate::calc_env::{CalcData, CalcMode, init_env, init_env_on};
+use crate::calc_cache::{Cache, Recalc, Recalculator, skill_uuid};
+use crate::calc_env::{CalcData, CalcMode, init_env, init_env_with};
+use crate::calc_override::Override;
 use crate::calc_perform::BuffMap;
 use crate::calc_perform::{Perform, PerformInput, Result, perform};
 use crate::calc_setup::BuffMode;
@@ -130,8 +131,22 @@ impl Best {
 /// `calcs.calcFullDPS(build, "CALCULATOR", {}, specEnv)` with the base
 /// databases of a calculation in the buff mode `base`
 pub fn calc_full_dps(build: &Build, data: &CalcData, base: BuffMode) -> Result<FullDps> {
-    let recalc = Recalculator::new(build, data, CalcMode::Calculator);
-    let setup = |b: &mut Build| init_env_on(b, data, CalcMode::Calculator, base);
+    Ok(calc_full_dps_with(build, data, base, &Override::default(), Cache::new())?.0)
+}
+
+/// [`calc_full_dps`] with an override, on the calculator's cache, which
+/// it gives back
+pub fn calc_full_dps_with(
+    build: &Build,
+    data: &CalcData,
+    base: BuffMode,
+    ovr: &Override,
+    cache: Cache,
+) -> Result<(FullDps, Cache)> {
+    let recalc = Recalculator::new(build, data, CalcMode::Calculator)
+        .with_override(ovr)
+        .with_cache(cache);
+    let setup = |b: &mut Build| init_env_with(b, data, CalcMode::Calculator, base, ovr);
     let mut first = Some(setup(&mut build.clone())?);
     let list: Vec<(usize, f64)> = {
         let env = first.as_ref().unwrap();
@@ -374,7 +389,7 @@ pub fn calc_full_dps(build: &Build, data: &CalcData, base: BuffMode) -> Result<F
         full.skills.push(row("Full Culling DPS", dps, None));
         full.combined_dps += dps;
     }
-    Ok(full)
+    Ok((full, recalc.into_cache()))
 }
 
 impl FullDpsSkill {

@@ -6,6 +6,7 @@
 
 use crate::build::Build;
 use crate::calc_items::{EnergyBlade, ItemsInput};
+use crate::calc_override::{Allocation, Override, REP_ITEM_ID};
 use crate::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use crate::calc_skill_mods::{self, ModsInput};
 use crate::calc_skills::{self, SkillsInput, SkillsSetup};
@@ -87,10 +88,27 @@ pub fn init_env_on(
     calc_mode: CalcMode,
     base: BuffMode,
 ) -> Result<Env> {
-    match init_env_pass(build, data, calc_mode, base, false)? {
+    init_env_with(build, data, calc_mode, base, &Override::default())
+}
+
+/// `calcs.initEnv(build, mode, override, specEnv)` with an override; the
+/// base databases as [`init_env_on`]'s
+pub fn init_env_with(
+    build: &mut Build,
+    data: &CalcData,
+    calc_mode: CalcMode,
+    base: BuffMode,
+    ovr: &Override,
+) -> Result<Env> {
+    if let Some((_, Some(item))) = &ovr.rep_item {
+        let mut item = item.clone();
+        item.id = Some(REP_ITEM_ID as f64);
+        build.items.items.insert(REP_ITEM_ID, item);
+    }
+    match init_env_pass(build, data, calc_mode, base, ovr, false)? {
         Some(env) => Ok(env),
         // An enabled Energy Blade: everything again, with its condition
-        None => init_env_pass(build, data, calc_mode, base, true)?
+        None => init_env_pass(build, data, calc_mode, base, ovr, true)?
             .ok_or_else(|| "Energy Blade asked for a second rerun".to_string()),
     }
 }
@@ -103,11 +121,13 @@ fn init_env_pass(
     data: &CalcData,
     calc_mode: CalcMode,
     base_mode: BuffMode,
+    ovr: &Override,
     energy_blade: bool,
 ) -> Result<Option<Env>> {
     let calcs = calc_mode == CalcMode::Calcs;
     let mode = calc_mode.buff_mode(build);
-    let spec = &build.spec;
+    let (own_spec, added) = ovr.spec_with_nodes(&build.spec);
+    let spec = own_spec.as_ref().unwrap_or(&build.spec);
     let tree = spec.tree;
     let class_id = spec.cur_class_id.unwrap_or(0);
     let class = tree
@@ -142,10 +162,13 @@ fn init_env_pass(
         mode: base_mode,
     };
     let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
-    if energy_blade {
-        player_db
-            .conditions
-            .insert(Sym::new("AffectedByEnergyBlade"), true);
+    for c in ovr
+        .conditions
+        .iter()
+        .map(String::as_str)
+        .chain(energy_blade.then_some("AffectedByEnergyBlade"))
+    {
+        player_db.conditions.insert(Sym::new(c), true);
     }
     let item_ctx = ItemContext {
         data: data.items,
@@ -153,13 +176,14 @@ fn init_env_pass(
         jewel_radius: data.jewel_radius,
         default_affix_quality: 0.5,
     };
-    calc_setup::allocation_mods(spec, &mut player_db);
+    let allocation = Allocation::new(spec, ovr, &added);
+    allocation.add_mods(&mut player_db);
     // The tree before the items
-    let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+    let alloc: Vec<usize> = allocation.nodes.iter().map(|(_, &i)| i).collect();
     let (mut initial_node_mods, _) = calc_setup::build_mod_list_for_node_list(
         spec,
         &alloc,
-        &spec.alloc_nodes,
+        &allocation.nodes,
         &mut [],
         &[],
         true,
@@ -173,6 +197,8 @@ fn init_env_pass(
         .map_or(vec![], |s| s.socket_group_list().to_vec());
     let items_input = ItemsInput {
         spec,
+        alloc: &allocation.nodes,
+        ovr,
         tab: &build.items,
         socket_groups: &groups,
         node_mods: &initial_node_mods,
@@ -189,28 +215,31 @@ fn init_env_pass(
     // Energy Blade's weapons, where the calculations look items up
     build.items.generated = setup.items.generated.clone();
     let mut player_db = setup.mod_db.clone();
-    // The granted skills' socket groups
-    let granted = calc_skills::granted_skills(
-        &setup.tree.node_mods,
-        &setup.items.granted_skills,
-        data.skills,
-    );
-    let mut explode: Vec<ExplodeSource> = setup
-        .tree
-        .node_mods
-        .iter()
-        .filter(|(_, n)| n.explode)
-        .map(|(id, _)| ExplodeSource::Node(*id))
-        .collect();
-    explode.extend(
-        setup
-            .items
-            .explode_sources
-            .iter()
-            .map(|&id| ExplodeSource::Item(id)),
-    );
+    // The granted skills' socket groups, which only the sidebar's
+    // calculation updates
     let mut groups = groups;
-    calc_skills::add_granted_groups(&mut groups, &granted, &explode, data.skills);
+    if calc_mode == CalcMode::Main {
+        let granted = calc_skills::granted_skills(
+            &setup.tree.node_mods,
+            &setup.items.granted_skills,
+            data.skills,
+        );
+        let mut explode: Vec<ExplodeSource> = setup
+            .tree
+            .node_mods
+            .iter()
+            .filter(|(_, n)| n.explode)
+            .map(|(id, _)| ExplodeSource::Node(*id))
+            .collect();
+        explode.extend(
+            setup
+                .items
+                .explode_sources
+                .iter()
+                .map(|&id| ExplodeSource::Item(id)),
+        );
+        calc_skills::add_granted_groups(&mut groups, &granted, &explode, data.skills);
+    }
     update_socket_groups(&mut groups, &build.items);
     // The active skills
     let imbued = build

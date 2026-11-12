@@ -1551,37 +1551,3 @@ pub(crate) fn set_source(m: &mut Mod, source: &str) {
         inner.source = Some(source.into());
     }
 }
-
-/// The allocation counts' multipliers of `initEnv`
-pub fn allocation_mods(spec: &PassiveSpec, db: &mut Store) {
-    let counts = [
-        ("Multiplier:AllocatedNotable", spec.allocated_notable_count),
-        (
-            "Multiplier:AllocatedKeystone",
-            spec.allocated_keystone_count,
-        ),
-        ("Multiplier:AllocatedMastery", spec.allocated_mastery_count),
-        (
-            "Multiplier:AllocatedMasteryType",
-            spec.allocated_mastery_type_count,
-        ),
-    ];
-    for (name, n) in counts {
-        if n > 0 {
-            db.add(Mod::new(name, ModType::Base, n as f64, None));
-        }
-    }
-    if let Some((_, n)) = spec
-        .allocated_mastery_types
-        .iter()
-        .find(|(name, _)| &**name == "Life Mastery")
-        && *n > 0
-    {
-        db.add(Mod::new(
-            "Multiplier:AllocatedLifeMastery",
-            ModType::Base,
-            *n as f64,
-            None,
-        ));
-    }
-}

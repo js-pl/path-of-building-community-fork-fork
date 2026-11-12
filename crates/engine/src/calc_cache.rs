@@ -13,6 +13,7 @@
 use crate::actor::OutVal;
 use crate::build::Build;
 use crate::calc_env::{CalcData, CalcMode};
+use crate::calc_override::Override;
 use crate::calc_perform::{Perform, PerformInput, Result};
 use crate::calc_skills::ActiveSkill;
 use crate::mods::Sym;
@@ -85,6 +86,9 @@ pub fn skill_uuid(skill: &ActiveSkill, groups: &[SocketGroup]) -> String {
     format!("{name}_{slot}_{slot_index}_{group_index}")
 }
 
+/// Cached calculations by skill id
+pub type Cache = HashMap<String, Rc<CachedCalc>>;
+
 /// Recalculates a build with other main skills
 pub struct Recalculator<'a, 't> {
     /// The build after its main calculation's setup
@@ -92,7 +96,9 @@ pub struct Recalculator<'a, 't> {
     pub data: &'a CalcData<'a>,
     /// The mode of the calculations, each with a cache of its own
     pub mode: CalcMode,
-    cache: RefCell<HashMap<String, Rc<CachedCalc>>>,
+    /// The override of the calculations (`env.override`)
+    pub ovr: Override,
+    cache: RefCell<Cache>,
 }
 
 impl<'a, 't> Recalculator<'a, 't> {
@@ -101,8 +107,37 @@ impl<'a, 't> Recalculator<'a, 't> {
             build,
             data,
             mode,
+            ovr: Override::default(),
             cache: RefCell::new(HashMap::new()),
         }
+    }
+
+    /// The calculations with an override
+    pub fn with_override(mut self, ovr: &Override) -> Self {
+        self.ovr = ovr.clone();
+        self
+    }
+
+    /// The calculations with the results of earlier ones cached, as
+    /// upstream's `GlobalCache` keeps them between a calculator's
+    /// calculations
+    pub fn with_cache(self, cache: Cache) -> Self {
+        *self.cache.borrow_mut() = cache;
+        self
+    }
+
+    pub fn into_cache(self) -> Cache {
+        self.cache.into_inner()
+    }
+
+    fn init_env(&self, build: &mut Build) -> Result<crate::calc_env::Env> {
+        crate::calc_env::init_env_with(
+            build,
+            self.data,
+            self.mode,
+            self.mode.buff_mode(build),
+            &self.ovr,
+        )
     }
 }
 
@@ -123,7 +158,7 @@ impl Recalc for Recalculator<'_, '_> {
 
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
         let mut build = self.build.clone();
-        let mut env = crate::calc_env::init_env(&mut build, self.data, self.mode)?;
+        let mut env = self.init_env(&mut build)?;
         let Some(main) = env
             .skills
             .active_skills
@@ -150,7 +185,7 @@ impl Recalc for Recalculator<'_, '_> {
     ) -> Result<HashMap<Sym, OutVal>> {
         use crate::calc_skill_mods::{ModsInput, Owner};
         let mut build = self.build.clone();
-        let mut env = crate::calc_env::init_env(&mut build, self.data, self.mode)?;
+        let mut env = self.init_env(&mut build)?;
         let data = self.data;
         let weapons = [
             ext.player_actor.weapon_data[0].clone().unwrap_or_default(),

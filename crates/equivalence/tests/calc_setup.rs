@@ -8,6 +8,7 @@
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::calc_env::CalcMode;
+use engine::calc_override::{Allocation, Override};
 use engine::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
@@ -574,8 +575,12 @@ fn items_setup_matches_upstream() {
         )
         .truthy();
         let config = inputs(&get(&env, "configInput"));
+        let no_override = Override::default();
+        let allocation = Allocation::new(&spec, &no_override, &[]);
         let input = ItemsInput {
             spec: &spec,
+            alloc: &allocation.nodes,
+            ovr: &no_override,
             tab: &tab,
             socket_groups: &groups,
             node_mods: &node_mods,
@@ -609,7 +614,7 @@ fn items_setup_matches_upstream() {
             mode: BuffMode::new(Some("EFFECTIVE")),
         };
         let (mut base, enemy_base) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
-        calc_setup::allocation_mods(&spec, &mut base);
+        allocation.add_mods(&mut base);
         if energy_blade {
             base.conditions
                 .insert(engine::mods::Sym::new("AffectedByEnergyBlade"), true);
