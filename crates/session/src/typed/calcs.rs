@@ -36,7 +36,7 @@ const SKILL_SELECT: &str = r##"{"#": [3, "SkillSelect", 1, "^xC8C8C8", {"#": [{"
 ]}}]}]}"##;
 
 /// `buffModeDropList`
-const BUFF_MODES: [(&str, &str); 4] = [
+pub(super) const BUFF_MODES: [(&str, &str); 4] = [
     ("Unbuffed", "UNBUFFED"),
     ("Buffed", "BUFFED"),
     ("In Combat", "COMBAT"),

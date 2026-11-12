@@ -71,7 +71,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/SharedItemSetListControl.lua" = { status = "todo" }
 "Classes/SkillListControl.lua" = { status = "todo" }
 "Classes/SkillSetListControl.lua" = { status = "todo" }
-"Classes/SkillsTab.lua" = { status = "partial", port = "web/src/ui/SkillsTab.tsx crates/engine/src/skills.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/SkillsTab.lua" = { status = "partial", port = "web/src/ui/SkillsTab.tsx crates/engine/src/skills.rs crates/session/src/typed/skills.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/SliderControl.lua" = { status = "todo" }
 "Classes/TextListControl.lua" = { status = "todo" }
 "Classes/TimelessJewelListControl.lua" = { status = "todo" }
