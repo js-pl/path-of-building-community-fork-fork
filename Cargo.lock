@@ -30,10 +30,21 @@ name = "equivalence"
 version = "0.0.0"
 dependencies = [
  "engine",
+ "gamedata",
  "importer",
  "lua",
+ "miniz_oxide",
  "serde_json",
  "upstream",
+]
+
+[[package]]
+name = "gamedata"
+version = "0.0.0"
+dependencies = [
+ "engine",
+ "importer",
+ "lua",
 ]
 
 [[package]]
