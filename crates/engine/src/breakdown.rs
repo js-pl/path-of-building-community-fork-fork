@@ -293,6 +293,8 @@ pub struct Breakdown {
     pub reservations: Option<Vec<Reservation>>,
     pub damage_types: Option<Vec<Row>>,
     pub mod_list: Option<Vec<ModEntry>>,
+    /// The breakdown the Calcs tab shows for this one (`breakdownSource`)
+    pub breakdown_source: Option<String>,
 }
 
 impl Breakdown {

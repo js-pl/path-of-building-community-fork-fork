@@ -447,6 +447,13 @@ impl<'a> Perform<'a> {
         self.sd(i, k).and_then(ModValue::as_number)
     }
 
+    pub(crate) fn sd_str(&self, i: usize, k: &str) -> Option<String> {
+        match self.sd(i, k)? {
+            ModValue::Str(s) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+
     pub(crate) fn sd_truthy(&self, i: usize, k: &str) -> bool {
         self.sd(i, k).is_some_and(ModValue::truthy)
     }

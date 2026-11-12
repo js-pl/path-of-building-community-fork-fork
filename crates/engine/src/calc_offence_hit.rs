@@ -13,6 +13,8 @@ use crate::calc_defence::{DMG_TYPES, armour_reduction_f, hit_chance, is_elementa
 use crate::calc_offence::{Off, OutMap, Pass, dmg_index, get_num, set_num};
 use crate::calc_perform::{Perform, new_mod};
 use crate::mods::{Cfg, Mod, ModType, ModValue, Sym};
+use crate::breakdown::{Breakdown, Breakdowns, Cell, Chain, Row, color, f, multi_chain};
+use crate::sf;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -64,6 +66,16 @@ impl<'a> Perform<'a> {
             }
             (None, Some(v)) => self.c.set_out_val(o.actor, k, v),
             (None, None) => self.c.clear_out(o.actor, k),
+        }
+    }
+
+    /// The current pass's breakdown key (`MainHand.<k>` for the main
+    /// hand's)
+    pub(crate) fn pkey(o: &Off, k: &str) -> String {
+        match o.passes[o.pass].weapon {
+            Some(0) => format!("MainHand.{k}"),
+            Some(_) => format!("OffHand.{k}"),
+            None => k.to_string(),
         }
     }
 
@@ -146,6 +158,7 @@ impl<'a> Perform<'a> {
     ) {
         let sym = Sym::new(stat);
         let (mh, oh) = (&o.hands[0], &o.hands[1]);
+        let mut lines: Vec<String> = Vec::new();
         let num = |m: &OutMap, k: &str| get_num(m, k);
         let or = || {
             mh.get(&sym)
@@ -188,13 +201,30 @@ impl<'a> Perform<'a> {
                         let off = num(oh, c).unwrap_or(f64::NAN)
                             * num(oh, "HitChance").unwrap_or(f64::NAN);
                         if mode == Combine::Chance {
-                            if self.sd_truthy(o.skill, "doubleHitsWhenDualWielding") {
-                                Some(OutVal::Num(a * (main / 10000.0) + b * (off / 10000.0)))
+                            let double = self.sd_truthy(o.skill, "doubleHitsWhenDualWielding");
+                            let (mp, op, what) = if double {
+                                (main / 10000.0, off / 10000.0, ["chance of main hand", "chance of  off hand"])
                             } else {
-                                let mp = main / (main + off);
-                                let op = off / (main + off);
-                                Some(OutVal::Num(a * mp + b * op))
+                                (
+                                    main / (main + off),
+                                    off / (main + off),
+                                    [
+                                        "portion of instances created by main hand",
+                                        "portion of instances created by off hand",
+                                    ],
+                                )
+                            };
+                            let v = a * mp + b * op;
+                            for (hand, x, p, w) in [("Main", a, mp, what[0]), ("Off", b, op, what[1])] {
+                                lines.push(format!("Contribution from {hand} Hand:"));
+                                lines.push(sf!("%.1f", x));
+                                lines.push(sf!(&format!("x %.3f ^8({w})"), p));
+                                lines.push(sf!("= %.1f", x * p));
                             }
+                            lines.push("Total:".into());
+                            lines.push(sf!("%.1f + %.1f", a * mp, b * op));
+                            lines.push(sf!("= %.1f", v));
+                            Some(OutVal::Num(v))
                         } else {
                             let max = m_max(a, b);
                             let min = m_min(a, b);
@@ -204,10 +234,40 @@ impl<'a> Perform<'a> {
                                 self.go(o, &stack).unwrap_or(1.0)
                                     / self.go(o, &format!("{stack}Max")).unwrap_or(1.0),
                             );
-                            Some(OutVal::Num(max * stacks + min * (1.0 - stacks)))
+                            let v = max * stacks + min * (1.0 - stacks);
+                            lines.push(String::new());
+                            lines.push(sf!("%.2f%% of ailment stacks use maximum damage", stacks * 100.0));
+                            lines.push(sf!(
+                                "Max Damage comes from %s",
+                                if a >= b { "Main Hand" } else { "Off Hand" }
+                            ));
+                            lines.push(sf!("= %.1f", max * stacks));
+                            if stacks < 1.0 {
+                                lines.push(sf!(
+                                    "%.2f%% of ailment stacks use non-maximum damage",
+                                    (1.0 - stacks) * 100.0
+                                ));
+                                lines.push(sf!("= %.1f", min * (1.0 - stacks)));
+                            }
+                            lines.push(String::new());
+                            lines.push("Total:".into());
+                            if stacks < 1.0 {
+                                lines.push(sf!("%.1f + %.1f", max * stacks, min * (1.0 - stacks)));
+                            }
+                            lines.push(sf!("= %.1f", v));
+                            Some(OutVal::Num(v))
                         }
                     }
-                    _ => or(),
+                    _ => {
+                        if mode == Combine::ChanceAilment {
+                            let main = mh.get(&sym).is_some_and(OutVal::truthy);
+                            lines.push(sf!(
+                                "All ailment stacks comes from %s",
+                                if main { "Main Hand" } else { "Off Hand" }
+                            ));
+                        }
+                        or()
+                    }
                 },
                 Combine::Or => unreachable!(),
             }
@@ -215,6 +275,11 @@ impl<'a> Perform<'a> {
         match value {
             Some(v) => self.c.set_out_val(o.actor, stat, v),
             None => self.c.clear_out(o.actor, stat),
+        }
+        if !lines.is_empty()
+            && let Some(b) = self.bd(o.actor)
+        {
+            b.entry(stat).lines.extend(lines);
         }
     }
 
@@ -246,6 +311,10 @@ impl<'a> Perform<'a> {
                     },
                 ) {
                     continue;
+                }
+                if let Some(b) = self.bd(actor) {
+                    let p = if n == 0 { "MainHand." } else { "OffHand." };
+                    b.map.retain(|k, _| !k.starts_with(p));
                 }
                 let mut source = self.weapon(actor, n).cloned().unwrap_or_default();
                 let typed = matches!(source.get("type"), Some(ModValue::Str(t)) if &**t != "None");
@@ -301,6 +370,8 @@ impl<'a> Perform<'a> {
             self.c
                 .flag(list, None, &["Condition:OffHandAccuracyIsMainHandAccuracy"])?;
         let mut stored_accuracy: Option<(f64, f64)> = None;
+        let bd = self.has_bd(actor);
+        let mut trauma_bd: Vec<String> = Vec::new();
         for p in 0..o.passes.len() {
             o.pass = p;
             let label = o.passes[p].label;
@@ -326,6 +397,37 @@ impl<'a> Perform<'a> {
                 .more(list, Some(&bug), &["Accuracy", "AccuracyVsEnemy"])?;
             let mut accuracy = m_max(0.0, (base * (1.0 + inc / 100.0) * more).floor());
             let mut accuracy_vs = m_max(0.0, (base_vs * (1.0 + inc_vs / 100.0) * more_vs).floor());
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                let chain = |l: &mut Vec<String>, label, base, inc: f64, more, total| {
+                    multi_chain(
+                        l,
+                        Chain {
+                            label,
+                            base: Some(f("%g ^8(base)", base)),
+                            factors: vec![
+                                f("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                                f("%.2f ^8(more/less)", more),
+                            ],
+                            total: Some(sf!("= %g", total)),
+                            ..Chain::default()
+                        },
+                    );
+                };
+                chain(&mut l, None, base, inc, more, accuracy);
+                if accuracy != accuracy_vs {
+                    l.push(String::new());
+                    chain(
+                        &mut l,
+                        Some("Effective Accuracy vs Enemy"),
+                        base_vs,
+                        inc_vs,
+                        more_vs,
+                        accuracy_vs,
+                    );
+                }
+                b.set_lines(Self::pkey(o, "Accuracy"), l);
+            }
             if off_hand_acc && label == "Main Hand" {
                 stored_accuracy = Some((accuracy, accuracy_vs));
             } else if off_hand_acc
@@ -334,6 +436,13 @@ impl<'a> Perform<'a> {
             {
                 accuracy = a;
                 accuracy_vs = v;
+                if let Some(b) = self.bd(actor) {
+                    let l = vec![format!(
+                        "Using Main Hand Accuracy due to Mastery: {}",
+                        crate::pat::num(a)
+                    )];
+                    b.set_lines(Self::pkey(o, "Accuracy"), l);
+                }
             }
             self.set_po(o, "Accuracy", accuracy);
             let acc_hit = if !o.is_attack
@@ -344,7 +453,23 @@ impl<'a> Perform<'a> {
                 100.0
             } else {
                 let evasion = m_max(round(self.c.val(edb, "Evasion", None)?, 0.0), 0.0);
-                hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?
+                let h = hit_chance(evasion, accuracy_vs) * self.c.calc_mod(list, c, &["HitChance"])?;
+                if bd {
+                    let num = crate::pat::num;
+                    let note = if self.input.config.contains_key("enemyLevel") {
+                        " ^8(overridden from the Configuration tab"
+                    } else {
+                        " ^8(can be overridden in the Configuration tab)"
+                    };
+                    let l = vec![
+                        format!("Enemy level: {}{note}", num(self.env.enemy_level)),
+                        format!("Enemy evasion: {}", num(evasion)),
+                        format!("Approximate hit chance: {}%", num(h)),
+                    ];
+                    let k = Self::pkey(o, "AccuracyHitChance");
+                    self.bd(actor).unwrap().set_lines(k, l);
+                }
+                h
             };
             self.set_po(o, "AccuracyHitChance", acc_hit);
             let mut block = m_max(
@@ -357,6 +482,21 @@ impl<'a> Perform<'a> {
             }
             self.set_po(o, "enemyBlockChance", block);
             self.set_po(o, "HitChance", acc_hit * (1.0 - block / 100.0));
+            if block > 0.0
+                && let Some(b) = self.bd(actor)
+            {
+                let num = crate::pat::num;
+                let mut l = Vec::new();
+                if acc_hit < 100.0 {
+                    l.push(format!("Accuracy Hit Chance: {}%", num(acc_hit)));
+                }
+                l.push(format!("Enemy Block Chance: {}%", num(block)));
+                l.push(format!(
+                    "Approximate hit chance: {}%",
+                    num(acc_hit * (1.0 - block / 100.0))
+                ));
+                b.set_lines(Self::pkey(o, "HitChance"), l);
+            }
             if block > 0.0 && !o.is_attack {
                 self.c
                     .set_out_val(actor, "enemyHasSpellBlock", OutVal::Bool(true));
@@ -446,11 +586,32 @@ impl<'a> Perform<'a> {
                     let rate_before = per_attack * (hit / 100.0) * before_inc / repeats;
                     let mut trauma = rate_before * (1.0 + inc / 100.0)
                         / (1.0 / duration - rate_before * inc_per / 100.0);
-                    if trauma < 0.0 || inc_per * trauma > inc_cap {
+                    let shown = trauma;
+                    let invalid = trauma < 0.0 || inc_per * trauma > inc_cap;
+                    if invalid {
                         trauma = per_attack * (hit / 100.0) * cap / repeats * duration;
                     }
                     if self.has_flag(i, "bothWeaponAttack") {
                         trauma /= 2.0;
+                    }
+                    if bd {
+                        trauma_bd = trauma_lines(TraumaBd {
+                            inc_per,
+                            inc,
+                            base_time,
+                            more,
+                            action,
+                            before_inc,
+                            per_attack,
+                            hit,
+                            duration,
+                            repeats,
+                            rate_before,
+                            shown,
+                            invalid,
+                            cap,
+                            trauma,
+                        });
                     }
                     self.c.add(
                         list,
@@ -513,7 +674,60 @@ impl<'a> Perform<'a> {
                     speed = m_min(speed, tick * repeats);
                 }
                 self.set_po(o, "Speed", speed);
-                self.set_po(o, "Time", if speed == 0.0 { 0.0 } else { 1.0 / speed });
+                let time = if speed == 0.0 { 0.0 } else { 1.0 / speed };
+                self.set_po(o, "Time", time);
+                if bd {
+                    let act = if self.has_flag(i, "totem") {
+                        self.po(o, "TotemActionSpeed")
+                    } else {
+                        None
+                    }
+                    .or_else(|| self.has_flag(i, "selfCast").then_some(action))
+                    .unwrap_or(1.0);
+                    let cast_rate = self.po(o, "CastRate").unwrap_or(f64::NAN);
+                    let mut l = Vec::new();
+                    multi_chain(
+                        &mut l,
+                        Chain {
+                            base: Some(f("%.2f ^8(base)", 1.0 / base_time)),
+                            factors: vec![
+                                f("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                                f("%.2f ^8(more/less)", more),
+                                f("%.2f ^8(action speed modifier)", act),
+                            ],
+                            total: Some(sf!("= %.2f ^8casts per second", cast_rate)),
+                            ..Chain::default()
+                        },
+                    );
+                    if let Some(cd) = self.po(o, "Cooldown")
+                        && 1.0 / cd < cast_rate
+                    {
+                        l.push("\n".into());
+                        l.push(sf!("1 / %.2f ^8(skill cooldown)", cd));
+                        if repeats > 1.0 {
+                            l.push(sf!("x %d ^8(repeat count)", repeats));
+                        }
+                        l.push(sf!("= %.2f ^8(casts per second)", repeats / cd));
+                        l.push("\n".into());
+                        l.push(sf!("= %.2f ^8(lower of cast rates)", speed));
+                    }
+                    let b = self.bd(actor).unwrap();
+                    b.set_lines(Self::pkey(o, "Speed"), l);
+                    let attack_time = self.c.calc_mod(list, sc, &["SkillAttackTime"])?;
+                    if attack_time > 0.0 {
+                        let mut l = Vec::new();
+                        multi_chain(
+                            &mut l,
+                            Chain {
+                                base: Some(f("%.2f ^8(base)", 1.0 / (speed * attack_time))),
+                                factors: vec![f("%.2f ^8(total modifier)", attack_time)],
+                                total: Some(sf!("= %.2f ^8seconds per attack", time)),
+                                ..Chain::default()
+                            },
+                        );
+                        self.bd(actor).unwrap().set_lines(Self::pkey(o, "Time"), l);
+                    }
+                }
             }
             self.hit_time(o, false)?;
         }
@@ -534,6 +748,9 @@ impl<'a> Perform<'a> {
         self.sd_set(i, "dpsMultiplier", dps_mult);
         if self.c.flag(list, None, &["TriggeredBySnipe"])? {
             self.set_flag(i, "channelRelease", true);
+        }
+        if let Some(b) = self.bd(actor) {
+            b.set_lines("SustainableTrauma", trauma_bd);
         }
         // `Flag(...) and Sum(...)`: nil without the flag
         if self.c.flag(list, None, &["HasTrauma"])? {
@@ -568,6 +785,7 @@ impl<'a> Perform<'a> {
                     Mod::new("Condition:OneSecondAttackTime", FlagT, true, None),
                 );
             }
+            let both = self.has_flag(i, "bothWeaponAttack");
             if self.c.flag(list, None, &["UseOffhandAttackSpeed"])?
                 && !self.has_flag(i, "forceMainHand")
             {
@@ -577,10 +795,63 @@ impl<'a> Perform<'a> {
                         None => self.c.clear_out(actor, k),
                     }
                 }
+                if let Some(b) = self.bd(actor) {
+                    let speed = get_num(&o.hands[1], "Speed").unwrap_or(f64::NAN);
+                    let l = vec!["Use Offhand Weapon Attack Speed:".into(), sf!("= %.2f", speed)];
+                    b.set_lines("Speed", l);
+                }
+            } else if both && let Some(b) = self.bd(actor) {
+                let l = vec![
+                    "Both weapons:".into(),
+                    sf!(
+                        "2 / (1 / %.2f + 1 / %.2f)",
+                        get_num(&o.hands[0], "Speed").unwrap_or(f64::NAN),
+                        get_num(&o.hands[1], "Speed").unwrap_or(f64::NAN)
+                    ),
+                    sf!("= %.2f", speed),
+                ];
+                b.set_lines("Speed", l);
+            }
+            if bd {
+                let w1 = self.has_flag(i, "weapon1Attack");
+                let hit = self.c.out(actor, "HitChance").unwrap_or(f64::NAN);
+                let b = self.bd(actor).unwrap();
+                if both {
+                    let l = vec![
+                        "Both weapons:".into(),
+                        sf!(
+                            "%.2f%% ^8(main hand)",
+                            get_num(&o.hands[0], "HitChance").unwrap_or(f64::NAN)
+                        ),
+                        sf!(
+                            "%.2f%% ^8(off hand)",
+                            get_num(&o.hands[1], "HitChance").unwrap_or(f64::NAN)
+                        ),
+                        sf!("= %.2f%% ^8(average)", hit),
+                    ];
+                    b.set_lines("HitChance", l);
+                } else {
+                    let h = if w1 { "MainHand" } else { "OffHand" };
+                    let hand = |b: &Breakdowns, k: &str| b.get(&format!("{h}.{k}")).cloned();
+                    match hand(b, "HitChance").or_else(|| hand(b, "AccuracyHitChance")) {
+                        Some(x) => b.set("HitChance", x),
+                        None => {
+                            b.map.remove("HitChance");
+                        }
+                    }
+                    if b.get("Speed").is_none()
+                        && let Some(x) = hand(b, "Speed")
+                    {
+                        b.set("Speed", x);
+                    }
+                }
             }
             // the global output
             o.pass = usize::MAX;
             self.hit_time(o, true)?;
+        }
+        if bd {
+            self.hit_speed_breakdown(o)?;
         }
         // Grab quantity multiplier
         let q = m_max(self.c.base(list, sc, &["QuantityMultiplier"])?, 1.0);
@@ -588,6 +859,54 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "QuantityMultiplier", q);
         }
         o.quantity_multiplier = q;
+        Ok(())
+    }
+
+    /// The breakdowns of `HitTime` and `HitSpeed`
+    fn hit_speed_breakdown(&mut self, o: &Off) -> Result<()> {
+        let (i, actor) = (o.skill, o.actor);
+        let out = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+        let on_death = self.sd_truthy(i, "triggeredOnDeath");
+        let hit_speed = out(self, "HitSpeed");
+        let hit_time = out(self, "HitTime");
+        let cooldown = self.c.out(actor, "Cooldown");
+        if self.sd_num(i, "hitTimeOverride").is_some() && !on_death {
+            let l = vec![
+                sf!("1 / %.2f ^8(hit time override)", hit_time),
+                sf!("= %.2f", hit_speed),
+            ];
+            self.bd(actor).unwrap().set_lines("HitSpeed", l);
+        } else if let Some(m) = self.sd_num(i, "hitTimeMultiplier")
+            && let Some(time) = self.c.out(actor, "Time")
+            && !on_death
+        {
+            let mut l = Vec::new();
+            if m.floor() != m {
+                l.push(sf!(
+                    "^x5CF0BBNOTE: First stage has a %.2fx channel time multiplier",
+                    m - m.floor()
+                ));
+            }
+            l.push(if o.is_attack {
+                sf!("%.2f ^8(attack time)", time)
+            } else {
+                sf!("%.2f ^8(cast time)", time)
+            });
+            l.push(sf!("x %.2f ^8(channel time multiplier)", m));
+            l.push(sf!("= %.2f", hit_time));
+            let first = match cooldown {
+                Some(cd) if self.sd_truthy(i, "triggered") => sf!(
+                    "1 / min(%.2f, %.2f) ^8min(hit time, cooldown)",
+                    hit_time,
+                    cd
+                ),
+                Some(cd) => sf!("1 / (%.2f + %.2f) ^8(hit time + cooldown)", hit_time, cd),
+                None => sf!("1 / %.2f ^8(hit time)", hit_time),
+            };
+            let b = self.bd(actor).unwrap();
+            b.set_lines("HitTime", l);
+            b.set_lines("HitSpeed", vec![first, sf!("= %.2f", hit_speed)]);
+        }
         Ok(())
     }
 
@@ -638,6 +957,123 @@ impl<'a> Perform<'a> {
         }
         Ok(())
     }
+}
+
+/// `IntimidatingHitEffect` and `RallyingHitEffect`
+fn hit_effect_lines(avg: f64, up: f64, hit: f64) -> Vec<String> {
+    vec![
+        sf!("1 + (%.2f ^8(average exerted damage)", avg),
+        sf!("x %.2f) ^8(uptime %%)", up / 100.0),
+        sf!("= %.2f", hit),
+    ]
+}
+
+/// The values of the sustainable trauma's breakdown
+struct TraumaBd {
+    inc_per: f64,
+    inc: f64,
+    base_time: f64,
+    more: f64,
+    action: f64,
+    before_inc: f64,
+    per_attack: f64,
+    hit: f64,
+    duration: f64,
+    repeats: f64,
+    rate_before: f64,
+    shown: f64,
+    invalid: bool,
+    cap: f64,
+    trauma: f64,
+}
+
+fn trauma_lines(t: TraumaBd) -> Vec<String> {
+    let mut l = Vec::new();
+    let repeats = |l: &mut Vec<String>| {
+        if t.repeats != 1.0 {
+            l.push(sf!("/ %.2f ^8(repeats)", t.repeats));
+        }
+    };
+    if t.inc_per == 0.0 {
+        multi_chain(
+            &mut l,
+            Chain {
+                label: Some("Trauma"),
+                base: Some(f(
+                    "%.2f ^8(attack speed)",
+                    t.before_inc * (1.0 + t.inc / 100.0),
+                )),
+                factors: vec![
+                    f("%.2f ^8(trauma per attack)", t.per_attack),
+                    f("%.2f ^8(chance to hit)", t.hit / 100.0),
+                    f("%.2f ^8(duration)", t.duration),
+                ],
+                no_total: true,
+                ..Chain::default()
+            },
+        );
+        repeats(&mut l);
+    } else {
+        multi_chain(
+            &mut l,
+            Chain {
+                label: Some("Attack Speed before increased Attack Speed"),
+                base: Some(f("%.2f ^8(base)", 1.0 / t.base_time)),
+                factors: vec![
+                    f("%.2f ^8(more/less)", t.more),
+                    f("%.2f ^8(action speed modifier)", t.action),
+                ],
+                total: Some(sf!("= %.2f ^8attacks per second", t.before_inc)),
+                ..Chain::default()
+            },
+        );
+        l.push(String::new());
+        multi_chain(
+            &mut l,
+            Chain {
+                label: Some("Trauma per second before increased Attack Speed"),
+                base: Some(f("%.2f ^8(base)", t.before_inc)),
+                factors: vec![
+                    f("%.2f ^8(trauma per attack)", t.per_attack),
+                    f("%.2f ^8(chance to hit)", t.hit / 100.0),
+                ],
+                no_total: true,
+                ..Chain::default()
+            },
+        );
+        repeats(&mut l);
+        l.push(sf!("= %.2f ^8trauma per second", t.rate_before));
+        l.push(String::new());
+        l.push("Trauma".into());
+        l.push(sf!("%.2f ^8(base)", t.rate_before));
+        l.push(sf!("x %.2f ^8(increased/reduced)", 1.0 + t.inc / 100.0));
+        l.push(sf!(
+            "/ %.4f ^8(1 / duration - trauma per second * increased attack speed per trauma / 100)",
+            1.0 / t.duration - t.rate_before * t.inc_per / 100.0
+        ));
+    }
+    let neg = if t.invalid { color::NEGATIVE } else { "" };
+    l.push(sf!(&format!("= {neg}%d ^8trauma"), t.shown));
+    if t.invalid {
+        l.push(String::new());
+        l.push("Attack Speed exceeds cap; Recalculating".into());
+        multi_chain(
+            &mut l,
+            Chain {
+                base: Some(f("%.2f ^8(base)", t.cap)),
+                factors: vec![
+                    f("%.2f ^8(trauma per attack)", t.per_attack),
+                    f("%.2f ^8(chance to hit)", t.hit / 100.0),
+                    f("%.2f ^8(duration)", t.duration),
+                ],
+                no_total: true,
+                ..Chain::default()
+            },
+        );
+        repeats(&mut l);
+        l.push(sf!("= %d ^8trauma", t.trauma));
+    }
+    l
 }
 
 /// The warcries that exert attacks: name, output prefix, exert count stat,
@@ -808,6 +1244,21 @@ impl<'a> Perform<'a> {
                 self.set_go(o, ratio, up);
                 let g = self.go(o, "GlobalWarcryUptimeRatio").unwrap_or(0.0);
                 self.set_go(o, "GlobalWarcryUptimeRatio", g + up);
+                if let Some(b) = self.bd(actor) {
+                    let mut l = vec![
+                        sf!("(%d ^8(number of exerts)", count),
+                        sf!("/ %.2f) ^8(attacks per second)", speed),
+                    ];
+                    if cast > 0.0 {
+                        l.push(sf!("/ (%.2f ^8(warcry cooldown)", cooldown));
+                        l.push(sf!("+ %.2f) ^8(warcry casttime)", cast));
+                    } else {
+                        l.push(sf!("/ %.2f ^8(average warcry cooldown)", cooldown));
+                    }
+                    l.push(sf!("* %d ^8(stored uses)", stored));
+                    l.push(sf!("= %d%%", up));
+                    b.set_lines(ratio, l);
+                }
             }
             let up = self.go(o, ratio).unwrap_or(f64::NAN);
             let mul = |p: &mut Self, o: &Off, k: &str, by: f64| {
@@ -824,19 +1275,47 @@ impl<'a> Perform<'a> {
                     let avg = 2.0 * (1.0 - dd / 100.0);
                     self.set_go(o, "IntimidatingAvgDmg", avg);
                     let hit = 1.0 + avg * up / 100.0;
+                    if let Some(b) = self.bd(actor) {
+                        b.set_lines(
+                            "IntimidatingAvgDmg",
+                            vec![
+                                "Average Intimidating Cry Damage:".into(),
+                                sf!(
+                                    "%.2f%% ^8(base double damage increase to hit 100%%)",
+                                    (1.0 - dd / 100.0) * 100.0
+                                ),
+                                sf!("x %d ^8(double damage multiplier)", 2.0),
+                                sf!("= %.2f", avg),
+                            ],
+                        );
+                        b.set_lines("IntimidatingHitEffect", hit_effect_lines(avg, up, hit));
+                    }
                     self.set_go(o, "IntimidatingHitEffect", hit);
                     self.set_go(o, "IntimidatingMaxHitEffect", 1.0 + avg);
                     mul(self, o, "TheoreticalOffensiveWarcryEffect", hit);
                     mul(self, o, "TheoreticalMaxOffensiveWarcryEffect", 1.0 + avg);
                 }
                 "Rallying Cry" => {
-                    let avg = m_min(self.c.base(pdb, c, &["Multiplier:NearbyAlly"])?, 5.0)
-                        * (self
-                            .c
-                            .base(pdb, None, &["RallyingExertMoreDamagePerAlly"])?
-                            / 100.0);
+                    let allies = m_min(self.c.base(pdb, c, &["Multiplier:NearbyAlly"])?, 5.0);
+                    let per = self
+                        .c
+                        .base(pdb, None, &["RallyingExertMoreDamagePerAlly"])?
+                        / 100.0;
+                    let avg = allies * per;
                     self.set_go(o, "RallyingAvgDmg", avg);
                     let hit = 1.0 + avg * up / 100.0;
+                    if let Some(b) = self.bd(actor) {
+                        b.set_lines(
+                            "RallyingAvgDmg",
+                            vec![
+                                "Average Rallying Cry Damage:".into(),
+                                sf!("%.2f ^8(average damage multiplier per ally)", per),
+                                sf!("x %d ^8(number of nearby allies (max=5))", allies),
+                                sf!("= %.2f", avg),
+                            ],
+                        );
+                        b.set_lines("RallyingHitEffect", hit_effect_lines(avg, up, hit));
+                    }
                     self.set_go(o, "RallyingHitEffect", hit);
                     self.set_go(o, "RallyingMaxHitEffect", 1.0 + avg);
                     mul(self, o, "OffensiveWarcryEffect", hit);
@@ -879,6 +1358,19 @@ impl<'a> Perform<'a> {
             ratio = m_max(ratio, self.go(o, r).unwrap_or(0.0));
         }
         self.set_go(o, "ExertedAttackUptimeRatio", ratio);
+        if self.has_bd(actor) {
+            let mut l = vec!["Maximum of:".to_string()];
+            for (_, _, _, r, _, _) in EXERTING_CRIES {
+                if let Some(v) = self.go(o, r) {
+                    let name = &r[..r.find("Up").unwrap_or(r.len())];
+                    l.push(sf!("%d%% ^8(%s Cry Uptime)", v, name));
+                }
+            }
+            l.push(sf!("= %d%%", ratio));
+            self.bd(actor)
+                .unwrap()
+                .set_lines("ExertedAttackUptimeRatio", l);
+        }
         if ratio > 0.0
             && self
                 .c
@@ -973,6 +1465,16 @@ impl<'a> Perform<'a> {
                 )?;
             self.set_go(o, "ExertedAttackAvgDmg", avg);
             self.set_go(o, "ExertedAttackHitEffect", avg * ratio / 100.0);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines(
+                    "ExertedAttackHitEffect",
+                    vec![
+                        sf!("(%.2f ^8(average exerted damage)", avg),
+                        sf!("x %.2f) ^8(uptime %%)", ratio / 100.0),
+                        sf!("= %.2f", avg * ratio / 100.0),
+                    ],
+                );
+            }
             self.set_go(o, "ExertedAttackMaxHitEffect", avg);
             self.c.set_out_val(
                 actor,
@@ -1055,6 +1557,19 @@ impl<'a> Perform<'a> {
             self.set_go(o, &format!("PactOf{key}CastTime"), cast);
             self.set_go(o, &format!("{key}EmpoweredCount"), count);
             self.set_go(o, &format!("{key}UpTimeRatio"), uptime);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines(
+                    format!("{key}UpTimeRatio"),
+                    vec![
+                        sf!("(%.2f ^8(number of Empowered)", count),
+                        sf!("/ %.2f) ^8(casts per second)", speed),
+                        sf!("/ (%.2f ^8(pact cooldown)", cooldown),
+                        sf!("+ %.2f) ^8(pact cast time)", cast),
+                        sf!("* %.2f ^8(stored uses)", stored),
+                        sf!("= %.2f%%", uptime),
+                    ],
+                );
+            }
             if let Some(ModValue::Record(r)) = self
                 .c
                 .list(jl, jcc, &[&format!("{key}PactDamage")])?
@@ -1110,11 +1625,19 @@ impl<'a> Perform<'a> {
                     let m =
                         1.0 + self.c.base(jl, jcc, &["KtashPactSoulGainPrevention"])? * em / 100.0;
                     let tick = self.misc_data("ServerTickRate");
-                    self.set_go(
-                        o,
-                        "SoulGainPreventionDuration",
-                        m_max((d * m * tick).ceil(), 1.0) / tick,
-                    );
+                    let nd = m_max((d * m * tick).ceil(), 1.0) / tick;
+                    self.set_go(o, "SoulGainPreventionDuration", nd);
+                    if let Some(b) = self.bd(actor) {
+                        b.set_lines(
+                            "SoulGainPreventionDuration",
+                            vec![
+                                sf!("%.3fs ^8(before Pact of K'Tash)", d),
+                                sf!("x %.4f ^8(average Pact modifier)", m),
+                                "rounded up to nearest server tick".into(),
+                                sf!("= %.3fs", nd),
+                            ],
+                        );
+                    }
                 }
             }
             self.c.set_out_val(actor, &calculated, OutVal::Bool(true));
@@ -1185,6 +1708,24 @@ impl<'a> Perform<'a> {
             self.set_go(o, "FistOfWarUptimeRatio", up);
             self.set_go(o, "AvgFistOfWarDamage", mult);
             let avg = 1.0 + mult * (up / 100.0);
+            if let Some(b) = self.bd(o.actor) {
+                b.set_lines(
+                    "FistOfWarUptimeRatio",
+                    vec![
+                        sf!("min( (1 / %.2f) ^8(second per attack)", speed),
+                        sf!("/ %.2f, 1) ^8(fist of war cooldown)", cd),
+                        sf!("= %d%%", up),
+                    ],
+                );
+                b.set_lines(
+                    "AvgFistOfWarDamageEffect",
+                    vec![
+                        sf!("1 + (%.2f ^8(fist of war damage multiplier)", mult),
+                        sf!("x %.2f) ^8(fist of war uptime ratio)", up / 100.0),
+                        sf!("= %.2f", avg),
+                    ],
+                );
+            }
             self.set_go(o, "AvgFistOfWarDamageEffect", avg);
             self.set_go(o, "MaxFistOfWarDamageEffect", 1.0 + mult);
             let aoe = self.c.base(list, None, &["FistOfWarIncAoE"])?;
@@ -1270,6 +1811,18 @@ impl<'a> Perform<'a> {
                 };
                 self.set_po(o, "PreEffectiveCritChance", v);
                 self.set_po(o, "CritChance", v);
+                if mode.as_deref() == Some("AVERAGE")
+                    && let Some(b) = self.bd(actor)
+                {
+                    b.set_lines(
+                        Self::pkey(o, "CritChance"),
+                        vec![
+                            "100%".into(),
+                            sf!("/ %d ^8(number of repeats)", repeats),
+                            sf!("= %.2f%% average critical strike chance", v),
+                        ],
+                    );
+                }
             }
         } else {
             let mut crit_override = self.c.override_num(list, c, &["CritChance"])?;
@@ -1291,12 +1844,13 @@ impl<'a> Perform<'a> {
             let mut base_crit = crit_override
                 .or_else(|| self.src_num(o, "CritChance"))
                 .unwrap_or(0.0);
-            if self.c.flag(list, c, &["BaseCritFromMainHand"])? {
-                base_crit = self.weapon_num(actor, 0, "CritChance").unwrap_or(f64::NAN);
-            } else if self
+            let from_main = self.c.flag(list, c, &["BaseCritFromMainHand"])?;
+            let from_parent = self
                 .c
-                .flag(list, c, &["AttackCritIsEqualToParentMainHand"])?
-            {
+                .flag(list, c, &["AttackCritIsEqualToParentMainHand"])?;
+            if from_main {
+                base_crit = self.weapon_num(actor, 0, "CritChance").unwrap_or(f64::NAN);
+            } else if from_parent {
                 let parent = self.c.actors.actors[actor].parent;
                 if let Some(c) = parent.and_then(|p| self.weapon_num(p, 0, "CritChance")) {
                     base_crit = c;
@@ -1330,6 +1884,7 @@ impl<'a> Perform<'a> {
                 }
                 let mut crit =
                     round((base_crit + base) * (1.0 + inc / 100.0) * more * 100.0, 0.0) / 100.0;
+                let pre_cap = crit;
                 let cap = match self.c.override_num(list, None, &["CritChanceCap"])? {
                     Some(v) => v,
                     None => self.c.base(list, c, &["CritChanceCap"])?,
@@ -1339,6 +1894,7 @@ impl<'a> Perform<'a> {
                     crit = m_max(crit, 0.0);
                 }
                 self.set_po(o, "PreEffectiveCritChance", crit);
+                let pre_effective = crit;
                 let mut rolls = 0.0;
                 if effective && self.c.flag(list, c, &["CritChanceLucky"])? {
                     rolls += 1.0;
@@ -1354,9 +1910,12 @@ impl<'a> Perform<'a> {
                     };
                 }
                 self.set_po(o, "PreBifurcateCritChance", crit);
+                let pre_bifurcate = crit;
                 if effective && self.c.flag(list, c, &["BifurcateCrit"])? {
                     crit = (1.0 - (1.0 - crit / 100.0).powf(2.0)) * 100.0;
                 }
+                let pre_skill_use = crit;
+                let mut pre_hit_check = crit;
                 if effective {
                     if self.c.flag(list, sc, &["Every3UseCrit"])? {
                         crit = (2.0 * crit + 100.0) / 3.0;
@@ -1364,9 +1923,96 @@ impl<'a> Perform<'a> {
                     if self.c.flag(list, sc, &["Every5UseCrit"])? {
                         crit = (4.0 * crit + 100.0) / 5.0;
                     }
+                    pre_hit_check = crit;
                     crit = crit * self.po(o, "AccuracyHitChance").unwrap_or(f64::NAN) / 100.0;
                 }
                 self.set_po(o, "CritChance", crit);
+                if crit != base_crit && self.has_bd(actor) {
+                    let from = if from_main {
+                        " from main weapon"
+                    } else if from_parent {
+                        " from parent main weapon"
+                    } else {
+                        ""
+                    };
+                    let mut l = vec![if base != 0.0 {
+                        sf!("(%g + %g) ^8(base%s)", base_crit, base, from)
+                    } else {
+                        sf!("%g ^8(base%s)", base_crit + base, from)
+                    }];
+                    if inc != 0.0 {
+                        l.push(sf!("x %.2f", 1.0 + inc / 100.0) + " ^8(increased/reduced)");
+                    }
+                    if more != 1.0 {
+                        l.push(sf!("x %.2f", more) + " ^8(more/less)");
+                    }
+                    l.push(sf!("= %.2f%% ^8(crit chance)", pre_effective));
+                    if pre_cap > 100.0 {
+                        let over = pre_cap - 100.0;
+                        l.push(sf!(
+                            "Crit is overcapped by %.2f%% (%d%% increased Critical Strike Chance)",
+                            over,
+                            over / more / (base_crit + base) * 100.0
+                        ));
+                    }
+                    let pre = l.clone();
+                    let acc = self.po(o, "AccuracyHitChance").unwrap_or(f64::NAN);
+                    if effective {
+                        if rolls != 0.0 {
+                            if self.c.flag(list, sc, &["Unexciting"])? {
+                                l.push("Crit Chance is Unexciting:".into());
+                                l.push(sf!(
+                                    "(3 x %.4f^ 2) - (2 x %.4f^ 3)",
+                                    pre_effective / 100.0,
+                                    pre_effective / 100.0
+                                ));
+                            } else {
+                                l.push("Crit Chance is Lucky:".into());
+                                l.push(sf!(
+                                    "1 - (1 - %.4f)^ %d",
+                                    pre_effective / 100.0,
+                                    rolls + 1.0
+                                ));
+                            }
+                            l.push(sf!("= %.2f%%", pre_bifurcate));
+                        }
+                        if self.c.flag(list, c, &["BifurcateCrit"])? {
+                            l.push("Critical Strike Bifurcates:".into());
+                            l.push(sf!(
+                                "1 - (1 - %.4f) x (1 - %.4f)",
+                                pre_bifurcate / 100.0,
+                                pre_bifurcate / 100.0
+                            ));
+                            l.push(sf!("= %.2f%%", pre_skill_use));
+                        }
+                        let e3 = self.c.flag(list, sc, &["Every3UseCrit"])?;
+                        let e5 = self.c.flag(list, sc, &["Every5UseCrit"])?;
+                        if e3 {
+                            l.push(sf!(
+                                "+ %.2f%% ^8(crit every 3rd use)",
+                                (2.0 * pre_skill_use + 100.0) / 3.0 - pre_skill_use
+                            ));
+                        }
+                        if e5 {
+                            l.push(sf!(
+                                "+ %.2f%% ^8(crit every 5th use)",
+                                (4.0 * pre_skill_use + 100.0) / 5.0 - pre_skill_use
+                            ));
+                        }
+                        if e3 || e5 {
+                            l.push(sf!("= %.2f%%", pre_hit_check));
+                        }
+                    }
+                    if effective && acc < 100.0 {
+                        l.push("Crit confirmation roll:".into());
+                        l.push(sf!("%.2f%%", pre_hit_check));
+                        l.push(sf!("x %.2f ^8(chance to hit)", acc / 100.0));
+                        l.push(sf!("= %.2f%%", crit));
+                    }
+                    let b = self.bd(actor).unwrap();
+                    b.set_lines(Self::pkey(o, "PreEffectiveCritChance"), pre);
+                    b.set_lines(Self::pkey(o, "CritChance"), l);
+                }
             }
         }
         if self.po_val(o, "CritEffect").is_none() {
@@ -1379,8 +2025,23 @@ impl<'a> Perform<'a> {
                 }
                 if effective {
                     let enemy_inc = 1.0 + self.c.inc(edb, None, &["SelfCritMultiplier"])? / 100.0;
-                    extra += self.c.base(edb, None, &["SelfCritMultiplier"])? / 100.0;
+                    let enemy_base = self.c.base(edb, None, &["SelfCritMultiplier"])?;
+                    extra += enemy_base / 100.0;
                     extra = round(extra * enemy_inc, 2.0);
+                    if enemy_inc != 1.0 && self.has_bd(actor) {
+                        let own = self.c.base(list, c, &["CritMultiplier"])?;
+                        let l = vec![
+                            sf!("%d%% ^8(additional extra damage)", (enemy_base + own) / 100.0),
+                            sf!(
+                                "x %.2f ^8(increased/reduced extra crit damage taken by enemy)",
+                                enemy_inc
+                            ),
+                            sf!("= %d%% ^8(extra crit damage)", extra * 100.0),
+                        ];
+                        self.bd(actor)
+                            .unwrap()
+                            .set_lines(Self::pkey(o, "CritMultiplier"), l);
+                    }
                 }
                 let crit_override = self.c.override_num(list, c, &["CritChance"])?;
                 if effective
@@ -1404,6 +2065,19 @@ impl<'a> Perform<'a> {
                         0.0
                     };
                     self.set_po(o, "CritBifurcates", 1.0 + conditional);
+                    if let Some(b) = self.bd(actor) {
+                        let mut l = vec![
+                            sf!("%.2f%% ^8(pre-bifurcate crit chance)", pre),
+                            sf!("x %.2f%%", pre),
+                        ];
+                        if use_chance < 1.0 {
+                            l.push(sf!("x %.2f%% ^8(uses that can bifurcate)", use_chance * 100.0));
+                        }
+                        l.push(sf!("= %.2f%% ^8(chance both crit rolls succeed)", multi_chance));
+                        l.push(sf!("/ %.2f%% ^8(effective crit chance)", effective_crit));
+                        l.push(sf!("= %.2f ^8(crit Bifurcates effect)", 1.0 + conditional));
+                        b.set_lines(Self::pkey(o, "CritBifurcates"), l);
+                    }
                     extra += conditional * extra;
                     let hit = self.mf("Hit");
                     self.c.add(
@@ -1423,7 +2097,24 @@ impl<'a> Perform<'a> {
             }
             let pct = self.po(o, "CritChance").unwrap_or(f64::NAN) / 100.0;
             let multi = self.po(o, "CritMultiplier").unwrap_or(f64::NAN);
-            self.set_po(o, "CritEffect", 1.0 - pct + pct * multi);
+            let effect = 1.0 - pct + pct * multi;
+            self.set_po(o, "CritEffect", effect);
+            if effect != 1.0
+                && let Some(b) = self.bd(actor)
+            {
+                b.set_lines(
+                    Self::pkey(o, "CritEffect"),
+                    vec![
+                        sf!("(1 - %.4f) ^8(portion of damage from non-crits)", pct),
+                        sf!(
+                            "+ [ (%.4f x %g) ^8(portion of damage from crits)",
+                            pct,
+                            multi
+                        ),
+                        sf!("= %.3f", effect),
+                    ],
+                );
+            }
             let v = (self.c.base(list, c, &["CritMultiplier"])? - 50.0)
                 * self.c.base(list, c, &["CritMultiplierAppliesToDegen"])?
                 / 10000.0;
@@ -1483,11 +2174,26 @@ impl<'a> Perform<'a> {
         t: &str,
         type_flags: u32,
     ) -> Result<(f64, f64)> {
-        let (min, max) = self.calc_damage_raw(o, cfg, conv, t, type_flags)?;
+        let (min, max) = self.calc_damage_raw(o, cfg, conv, t, type_flags, None, None)?;
+        Ok((round(min, 0.0), round(max, 0.0)))
+    }
+
+    /// `calcDamage` with a breakdown: the rows of its `damageTypes` table
+    pub(crate) fn calc_damage_bd(
+        &self,
+        o: &Off,
+        cfg: &Cfg,
+        conv: &crate::calc_offence::ConversionTable,
+        t: &str,
+        type_flags: u32,
+        rows: &mut Vec<Row>,
+    ) -> Result<(f64, f64)> {
+        let (min, max) = self.calc_damage_raw(o, cfg, conv, t, type_flags, Some(rows), None)?;
         Ok((round(min, 0.0), round(max, 0.0)))
     }
 
     /// `calcDamage` with `convDst`: converted paths stay fractional
+    #[allow(clippy::too_many_arguments)]
     fn calc_damage_raw(
         &self,
         o: &Off,
@@ -1495,6 +2201,8 @@ impl<'a> Perform<'a> {
         conv: &crate::calc_offence::ConversionTable,
         t: &str,
         type_flags: u32,
+        mut rows: Option<&mut Vec<Row>>,
+        conv_dst: Option<usize>,
     ) -> Result<(f64, f64)> {
         let list = o.list;
         let flags = type_flags | type_flag(t);
@@ -1506,14 +2214,34 @@ impl<'a> Perform<'a> {
             }
             let conv_mult = conv[oi].total[ti];
             if conv_mult > 0.0 {
-                let (min, max) = self.calc_damage_raw(o, cfg, conv, other, flags)?;
+                let (min, max) =
+                    self.calc_damage_raw(o, cfg, conv, other, flags, rows.as_deref_mut(), Some(ti))?;
                 add_min += min * conv_mult;
                 add_max += max * conv_mult;
             }
         }
         let base_min = self.po(o, &format!("{t}MinBase")).unwrap_or(f64::NAN);
         let base_max = self.po(o, &format!("{t}MaxBase")).unwrap_or(f64::NAN);
+        let num = crate::pat::num;
+        let range = |a: f64, b: f64| format!("{} to {}", num(a), num(b));
+        let dst = |d: usize, of: &[f64; 5], fmt: &str| sf!(fmt, of[d] * 100.0, DMG_TYPES[d]);
+        let added = (add_min != 0.0 || add_max != 0.0)
+            .then(|| range(round(add_min, 0.0), round(add_max, 0.0)));
         if base_min == 0.0 && base_max == 0.0 {
+            if let Some(rows) = rows
+                && let Some(a) = added
+            {
+                let mut row: Row = vec![
+                    ("source", t.into()),
+                    ("convSrc", a.clone().into()),
+                    ("total", a.into()),
+                ];
+                if let Some(d) = conv_dst {
+                    row.push(("convDst", dst(d, &conv[ti].conversion, "%d%% to %s").into()));
+                    row.push(("gainDst", dst(d, &conv[ti].gain, "%d%% gained as %s").into()));
+                }
+                rows.push(row);
+            }
             return Ok((add_min, add_max));
         }
         let c = Some(cfg);
@@ -1528,6 +2256,37 @@ impl<'a> Perform<'a> {
         let more_max = self.c.more(list, c, &[&max_name])?;
         let inc_min = 1.0 + self.c.inc(list, c, &[&min_name])? / 100.0;
         let inc_max = 1.0 + self.c.inc(list, c, &[&max_name])? / 100.0;
+        if let Some(rows) = rows {
+            let x = |v: f64| Cell::from((v != 1.0).then(|| format!("x {}", num(v))));
+            let mut row: Row = vec![
+                ("source", t.into()),
+                ("base", range(base_min, base_max).into()),
+                ("inc", x(inc)),
+                ("more", x(more)),
+                ("convSrc", added.into()),
+                (
+                    "total",
+                    range(
+                        round(base_min * inc * more + add_min, 0.0),
+                        round(base_max * inc * more + add_max, 0.0),
+                    )
+                    .into(),
+                ),
+            ];
+            if let Some(d) = conv_dst {
+                let c = conv[ti].conversion[d] > 0.0;
+                let g = conv[ti].gain[d] > 0.0;
+                row.push((
+                    "convDst",
+                    Cell::from(c.then(|| dst(d, &conv[ti].conversion, "%d%% to %s"))),
+                ));
+                row.push((
+                    "gainDst",
+                    Cell::from(g.then(|| dst(d, &conv[ti].gain, "%d%% gained as %s"))),
+                ));
+            }
+            rows.push(row);
+        }
         Ok((
             ((base_min * inc * more) * generic_min + add_min) * more_min * inc_min,
             ((base_max * inc * more) * generic_max + add_max) * more_max * inc_max,
@@ -1660,6 +2419,46 @@ impl<'a> Perform<'a> {
                     + added_max * effectiveness * added_mult;
                 self.set_po(o, &format!("{min_n}Base"), base_min);
                 self.set_po(o, &format!("{max_n}Base"), base_max);
+                if self.has_bd(actor) {
+                    let mut l = Vec::new();
+                    if base_min != 0.0 && base_max != 0.0 {
+                        l.push("Base damage:".to_string());
+                        let mut plus = "";
+                        let (a, b) = (self.src_num(o, &min_n), self.src_num(o, &max_n));
+                        if a.unwrap_or(0.0) != 0.0 || b.unwrap_or(0.0) != 0.0 {
+                            let from = if self.src_val(o, "type").is_some() {
+                                "weapon"
+                            } else {
+                                "skill"
+                            };
+                            let arg = |v: Option<f64>| v.map_or(crate::breakdown::Arg::Str("nil"), crate::breakdown::Arg::Num);
+                            l.push(crate::breakdown::lua_format(
+                                "%d to %d ^8(base damage from %s)",
+                                &[arg(a), arg(b), from.into()],
+                            ));
+                            if base_mult != 1.0 {
+                                l.push(sf!("x %.2f ^8(base damage multiplier)", base_mult));
+                            }
+                            plus = "+ ";
+                        }
+                        if added_min != 0.0 || added_max != 0.0 {
+                            l.push(sf!("%s%d to %d ^8(added damage)", plus, added_min, added_max));
+                            if effectiveness != 1.0 {
+                                l.push(sf!("x %.2f ^8(damage effectiveness)", effectiveness));
+                            }
+                            if added_mult != 1.0 {
+                                l.push(sf!("x %.2f ^8(added damage multiplier)", added_mult));
+                            }
+                        }
+                        l.push(sf!("= %.1f to %.1f", base_min, base_max));
+                    }
+                    let b = Breakdown {
+                        lines: l,
+                        damage_types: Some(Vec::new()),
+                        ..Breakdown::default()
+                    };
+                    self.bd(actor).unwrap().set(Self::pkey(o, t), b);
+                }
             }
             self.hit_damage(o, hit_rate)?;
             let _ = (calcs_mode, actor, db);
@@ -1675,9 +2474,10 @@ impl<'a> Perform<'a> {
         let effective = self.env.mode.effective;
         let pdb = self.pdb();
         let (mut total_hit_min, mut total_hit_max, mut total_hit_avg) = (0.0, 0.0, 0.0);
-        let mut total_crit_avg = 0.0;
+        let (mut total_crit_min, mut total_crit_max, mut total_crit_avg) = (0.0, 0.0, 0.0);
         let ghost_reaver = self.c.flag(list, None, &["GhostReaver"])?;
         let mut ghost_reaver_leech = 0.0;
+        let bd = self.has_bd(actor);
         for k in [
             "LifeLeech",
             "LifeLeechInstant",
@@ -1710,17 +2510,32 @@ impl<'a> Perform<'a> {
             for (ti, t) in DMG_TYPES.iter().enumerate() {
                 let t = *t;
                 let (mut hit_min, mut hit_max, mut hit_avg) = (0.0, 0.0, 0.0);
+                let bd_key = (pass == 2 && bd).then(|| Self::pkey(o, t));
                 if self.has_flag(i, "hit") && o.can_deal[ti] {
-                    let (mn, mx) = self.calc_damage(o, &cfg, &conv, t, 0)?;
+                    let (mn, mx) = match &bd_key {
+                        Some(k) => {
+                            let mut rows = Vec::new();
+                            let r = self.calc_damage_bd(o, &cfg, &conv, t, 0, &mut rows)?;
+                            let b = self.bd(actor).unwrap().existing(k)?;
+                            b.damage_types.get_or_insert_with(Vec::new).extend(rows);
+                            r
+                        }
+                        None => self.calc_damage(o, &cfg, &conv, t, 0)?,
+                    };
                     hit_min = mn;
                     hit_max = mx;
                     let conv_mult = conv[ti].mult;
-                    let warcry = if self.c.flag(list, None, &["Condition:WarcryMaxHit"])? {
+                    let max_hit = self.c.flag(list, None, &["Condition:WarcryMaxHit"])?;
+                    let warcry = if max_hit {
                         self.go(o, "MaxOffensiveWarcryEffect")
                     } else {
                         self.go(o, "OffensiveWarcryEffect")
                     }
                     .unwrap_or(f64::NAN);
+                    if let Some(k) = &bd_key {
+                        let l = self.hit_damage_lines(o, mn, mx, conv_mult, max_hit);
+                        self.bd(actor).unwrap().existing(k)?.lines.extend(l);
+                    }
                     let all = conv_mult
                         * self.po(o, "ScaledDamageEffect").unwrap_or(f64::NAN)
                         * self.po(o, "RuthlessBlowHitEffect").unwrap_or(f64::NAN)
@@ -1772,13 +2587,24 @@ impl<'a> Perform<'a> {
                         not_lucky * (1.0 - lucky_chance.abs()) + avg_unlucky * lucky_chance.abs()
                     };
                     if (hit_min != 0.0 || hit_max != 0.0) && effective {
-                        let eff_mult = self.hit_eff_mult(o, &cfg, t, pass, hit_avg, crit)?;
+                        let (eff_mult, eff_bd) =
+                            self.hit_eff_mult(o, &cfg, t, pass, hit_avg, crit, bd_key.is_some())?;
                         hit_min *= eff_mult;
                         hit_max *= eff_mult;
                         hit_avg *= eff_mult;
                         if self.calcs_mode() {
                             self.set_po(o, &format!("{t}EffMult"), eff_mult);
                         }
+                        if let (Some(k), Some(l)) = (&bd_key, eff_bd) {
+                            let b = self.bd(actor).unwrap();
+                            b.existing(k)?
+                                .push(sf!("x %.3f ^8(effective DPS modifier)", eff_mult));
+                            b.set_lines(Self::pkey(o, &format!("{t}EffMult")), l);
+                        }
+                    }
+                    if let Some(k) = &bd_key {
+                        let l = sf!("= %d to %d", hit_min, hit_max);
+                        self.bd(actor).unwrap().existing(k)?.push(l);
                     }
                     // Leech for this damage type
                     let (mut life, mut es, mut mana) = (0.0, 0.0, 0.0);
@@ -1838,10 +2664,15 @@ impl<'a> Perform<'a> {
                     if es > 0.0 && !no_es {
                         es_total += hit_avg * es / 100.0;
                     }
+                } else if let Some(b) = self.bd(actor) {
+                    let l = vec![format!("You can't deal {t} damage")];
+                    b.set_lines(Self::pkey(o, t), l);
                 }
                 if pass == 1 {
                     self.set_po(o, &format!("{t}CritAverage"), hit_avg);
                     total_crit_avg += hit_avg;
+                    total_crit_min += hit_min;
+                    total_crit_max += hit_max;
                 } else {
                     if self.calcs_mode() {
                         self.set_po(o, &format!("{t}Min"), hit_min);
@@ -1910,6 +2741,10 @@ impl<'a> Perform<'a> {
         for t in DMG_TYPES {
             let avg = pv(self, o, &format!("{t}HitAverage"));
             if avg > 0.0 {
+                if let Some(b) = self.bd(actor) {
+                    let l = sf!("Portion of total damage: %d%%", avg / total_hit_avg * 100.0);
+                    b.entry(&Self::pkey(o, t)).push(l);
+                }
                 self.c.add(
                     list,
                     Mod::new(
@@ -2091,6 +2926,111 @@ impl<'a> Perform<'a> {
             "TotalDPS",
             avg_damage * speed * dps_mult * o.quantity_multiplier,
         );
+        if bd {
+            let hit_chance = pv(self, o, "HitChance");
+            if pv(self, o, "CritEffect") != 1.0 {
+                let damage_rolls = self.po(o, "DamageRolls").unwrap_or(0.0);
+                let crit_rolls = self.po(o, "CritDamageRolls").unwrap_or(0.0);
+                let rolls = damage_rolls.abs() + 2.0;
+                let rolls_crit = crit_rolls.abs() + 2.0;
+                let crit_lucky = self.c.flag(list, sc, &["CritLucky"])?;
+                let mut l = Vec::new();
+                if damage_rolls > 0.0 {
+                    l.push(sf!(
+                        "(1/%d) x %d + (%d/%d) x %d = %.1f ^8(average from non-crits)",
+                        rolls,
+                        total_hit_min,
+                        rolls - 1.0,
+                        rolls,
+                        total_hit_max,
+                        total_hit_avg
+                    ));
+                }
+                if damage_rolls < 0.0 {
+                    l.push(sf!(
+                        "(%d/%d) x %d + (1/%d) x %d = %.1f ^8(average from non-crits)",
+                        rolls - 1.0,
+                        rolls,
+                        total_hit_min,
+                        rolls,
+                        total_hit_max,
+                        total_hit_avg
+                    ));
+                }
+                if damage_rolls > 0.0 || crit_rolls > 0.0 || crit_lucky {
+                    l.push(sf!(
+                        "(1/%d) x %d + (%d/%d) x %d = %.1f ^8(average from crits)",
+                        rolls_crit,
+                        total_crit_min,
+                        rolls_crit - 1.0,
+                        rolls_crit,
+                        total_crit_max,
+                        total_crit_avg
+                    ));
+                    l.push(String::new());
+                }
+                if damage_rolls < 0.0 && !crit_lucky {
+                    l.push(sf!(
+                        "(%d/%d) x %d + (1/%d) x %d = %.1f ^8(average from crits)",
+                        rolls - 1.0,
+                        rolls,
+                        total_crit_min,
+                        rolls,
+                        total_crit_max,
+                        total_crit_avg
+                    ));
+                    l.push(String::new());
+                }
+                l.push(sf!(
+                    "%.1f x (1 - %.4f) ^8(damage from non-crits)",
+                    total_hit_avg,
+                    crit / 100.0
+                ));
+                l.push(sf!(
+                    "+ %.1f x %.4f ^8(damage from crits)",
+                    total_crit_avg,
+                    crit / 100.0
+                ));
+                l.push(sf!("= %.1f", avg_hit));
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines(Self::pkey(o, "AverageHit"), l);
+            }
+            if hit_chance < 100.0 {
+                let l = vec![
+                    sf!("%s:", o.passes[o.pass].label),
+                    sf!("%.1f ^8(average hit)", avg_hit),
+                    sf!("x %.2f ^8(chance to hit)", hit_chance / 100.0),
+                    sf!("= %.1f", avg_damage),
+                ];
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines(Self::pkey(o, "AverageDamage"), l);
+            }
+            let burst = self.go(o, "AverageBurstDamage").unwrap_or(f64::NAN);
+            if burst > 0.0 {
+                let mut l = vec![sf!("%.1f ^8(average hit)", avg_hit)];
+                if hit_chance < 100.0 {
+                    l.push(sf!("x %.2f ^8(chance to hit)", hit_chance / 100.0));
+                }
+                if repeat_penalty < 1.0 {
+                    l.push(sf!("x %.2f ^8(number of repeats)", burst_hits - 1.0));
+                    l.push(sf!("x %.2f ^8(repeat penalty)", repeat_penalty));
+                    l.push(sf!("= %.1f ^8(repeat damage total)", burst - avg_damage));
+                    l.push(String::new());
+                    l.push(sf!("+ %.1f ^8(first hit)", avg_hit));
+                    if hit_chance < 100.0 {
+                        l.push(sf!("x %.2f ^8(chance to hit)", hit_chance / 100.0));
+                    }
+                } else {
+                    l.push(sf!("x %.2f ^8(number of hits)", burst_hits));
+                }
+                l.push(sf!("= %.1f ^8(total burst damage)", burst));
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines("AverageBurstDamage", l);
+            }
+        }
         // PvP
         for f in [
             "isPvP",
@@ -2119,8 +3059,10 @@ impl<'a> Perform<'a> {
         pass: u32,
         hit_avg: f64,
         crit: f64,
-    ) -> Result<f64> {
+        bd: bool,
+    ) -> Result<(f64, Option<Vec<String>>)> {
         let (i, list, edb) = (o.skill, o.list, o.edb);
+        let mut source_res = t;
         let c = Some(cfg);
         let mut resist;
         let mut pen = 0.0;
@@ -2231,6 +3173,7 @@ impl<'a> Perform<'a> {
                         }
                     }
                 }
+                source_res = used;
                 if is_elemental(used) {
                     pen = self.c.base(
                         list,
@@ -2285,22 +3228,261 @@ impl<'a> Perform<'a> {
         let mut eff = (1.0 + taken_inc / 100.0) * taken_more;
         let use_chance = use_resist(self, t)?;
         let cannot = is_elemental(t) && self.c.flag(list, c, &["CannotElePenIgnore"])?;
+        let mut effective_resist = resist;
         if cannot {
-            let r = if invert > 0.0 {
+            effective_resist = if invert > 0.0 {
                 resist - 2.0 * invert * resist
             } else {
                 resist
             };
-            eff *= 1.0 - r / 100.0;
+            eff *= 1.0 - effective_resist / 100.0;
         } else if use_chance > 0.0 {
-            let r = if invert > 0.0 {
+            effective_resist = if invert > 0.0 {
                 ((resist - pen) * (1.0 - invert) + (-resist - pen) * invert) * use_chance
             } else {
                 (resist - pen) * use_chance
             };
-            eff *= 1.0 - r / 100.0;
+            eff *= 1.0 - effective_resist / 100.0;
         }
-        Ok(eff)
+        if !(bd && pass == 2) {
+            return Ok((eff, None));
+        }
+        let source = if self.c.flag(
+            self.pdb(),
+            None,
+            &[&format!("Enemy{source_res}ResistEqualToYours")],
+        )? {
+            format!("Your {source_res} Resistance")
+        } else {
+            source_res.to_string()
+        };
+        if eff == 1.0 && source == t && invert <= 0.0 {
+            return Ok((eff, None));
+        }
+        let l = crate::breakdown::eff_mult(crate::breakdown::EffMult {
+            damage_type: t,
+            resist,
+            pen: if cannot { 0.0 } else { pen },
+            taken: taken_inc,
+            mult: eff,
+            taken_more,
+            source_res: Some(&source),
+            use_res: use_chance > 0.0,
+            invert_chance: Some(invert),
+            effective_resist: Some(effective_resist),
+        });
+        Ok((eff, Some(l)))
+    }
+
+    /// `breakdown.leech(...)` of a pool
+    fn leech_breakdown(&self, o: &Off, pool: &str, hit_rate: f64) -> Result<Vec<String>> {
+        let actor = o.actor;
+        let g = |k: &str| self.c.out(actor, &format!("{pool}{k}")).unwrap_or(f64::NAN);
+        let (instant, instant_rate, instances) = (g("LeechInstant"), g("LeechInstantRate"), g("LeechInstances"));
+        let size = self.c.out(actor, pool).unwrap_or(f64::NAN);
+        let max = self.c.out(actor, &format!("Max{pool}LeechRate")).unwrap_or(f64::NAN);
+        let (dur, proportion) = (g("LeechDuration"), g("LeechInstantProportion"));
+        let base = self.misc_data("LeechRateBase");
+        let rate_mod = self.c.calc_mod(o.db, None, &[&format!("{pool}LeechRate")])?;
+        let mut l = Vec::new();
+        let instant_line = |l: &mut Vec<String>| {
+            l.push(if proportion != 1.0 {
+                sf!(
+                    "Instant Leech: %.1f ^8(%d%% x %.1f)",
+                    instant,
+                    proportion * 100.0,
+                    dur * size * base / (1.0 - proportion)
+                )
+            } else {
+                sf!("Instant Leech: %.1f", instant)
+            });
+        };
+        let pool_lines = |l: &mut Vec<String>| {
+            l.push(sf!("%d ^8(size of leech destination pool)", size));
+            l.push(sf!(
+                "x %.2f ^8(base leech rate is %d%% per second)",
+                base,
+                100.0 * base
+            ));
+            if rate_mod != 1.0 {
+                l.push(sf!("x %.2f ^8(leech rate modifier)", rate_mod));
+            }
+        };
+        if self.sd_truthy(o.skill, "showAverage") {
+            if instant > 0.0 {
+                instant_line(&mut l);
+            }
+            if instances > 0.0 {
+                l.push("Total leeched per instance:".into());
+                pool_lines(&mut l);
+                l.push(sf!("x %.2fs ^8(instance duration)", dur));
+                l.push(sf!("= %.1f", size * base * rate_mod * dur));
+            }
+        } else {
+            if instant_rate > 0.0 {
+                instant_line(&mut l);
+                l.push(sf!(
+                    "Instant Leech per second: %.1f ^8(%.1f x %.2f)",
+                    instant_rate,
+                    instant,
+                    hit_rate
+                ));
+            }
+            if instances > 0.0 {
+                l.push("Rate per instance:".into());
+                pool_lines(&mut l);
+                let per = size * base * rate_mod;
+                l.push(sf!("= %.1f ^8per second", per));
+                l.push("Maximum leech rate against one target:".into());
+                l.push(sf!("%.1f", per));
+                l.push(sf!("x %.2f ^8(average instances)", instances));
+                let total = per * instances;
+                l.push(sf!("= %.1f ^8per second", total));
+                if total <= max {
+                    l.push(sf!("Time to reach max: %.1fs", dur));
+                }
+                l.push(sf!("Leech rate cap: %.1f", max));
+                if total > max {
+                    l.push(sf!("Time to reach cap: %.1fs", dur / total * max));
+                }
+            }
+        }
+        Ok(l)
+    }
+
+    /// The crit chance and average damage breakdowns of an attack after
+    /// its passes
+    fn combine_crit_breakdowns(&mut self, o: &Off) {
+        let (i, actor) = (o.skill, o.actor);
+        let both = self.has_flag(i, "bothWeaponAttack");
+        let w1 = self.has_flag(i, "weapon1Attack");
+        let double = self.sd_truthy(i, "doubleHitsWhenDualWielding");
+        let out = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+        let (crit, pre) = (out(self, "CritChance"), out(self, "PreEffectiveCritChance"));
+        let avg = out(self, "AverageDamage");
+        let source = if w1 {
+            "MainHand.CritChance"
+        } else {
+            "OffHand.CritChance"
+        };
+        let hands = [
+            ("Main Hand", "MainHand", &o.hands[0]),
+            ("Off Hand", "OffHand", &o.hands[1]),
+        ];
+        let b = self.bd(actor).unwrap();
+        for (k, total) in [("PreEffectiveCritChance", pre), ("CritChance", crit)] {
+            if both {
+                let mut l = vec!["Both weapons:".to_string()];
+                for (label, prefix, h) in hands {
+                    l.push(format!("{label}:"));
+                    match b.get(&format!("{prefix}.{k}")) {
+                        Some(x) => l.extend(x.lines.iter().cloned()),
+                        None => l.push(sf!("%.2f%%", get_num(h, k).unwrap_or(f64::NAN))),
+                    }
+                }
+                l.push(sf!("= %.2f%% ^8(average)", total));
+                b.set(
+                    k,
+                    Breakdown {
+                        lines: l,
+                        breakdown_source: Some(source.into()),
+                        ..Breakdown::default()
+                    },
+                );
+            } else {
+                let hand = format!("{}.{k}", if w1 { "MainHand" } else { "OffHand" });
+                match b.map.get_mut(&hand) {
+                    Some(x) => {
+                        x.breakdown_source = Some(source.into());
+                        let x = x.clone();
+                        b.set(k, x);
+                    }
+                    None => {
+                        b.map.remove(k);
+                    }
+                }
+            }
+        }
+        if both {
+            let (m, f) = (
+                get_num(&o.hands[0], "AverageDamage").unwrap_or(f64::NAN),
+                get_num(&o.hands[1], "AverageDamage").unwrap_or(f64::NAN),
+            );
+            let l = vec![
+                "Both weapons:".to_string(),
+                if double {
+                    sf!("%.1f + %.1f ^8(skill hits with both weapons at once)", m, f)
+                } else {
+                    sf!("(%.1f + %.1f) / 2 ^8(skill alternates weapons)", m, f)
+                },
+                sf!("= %.1f", avg),
+            ];
+            b.set_lines("AverageDamage", l);
+        }
+    }
+
+    /// The lines of a damage type's breakdown after its `damageTypes` table
+    fn hit_damage_lines(&self, o: &Off, min: f64, max: f64, conv_mult: f64, max_hit: bool) -> Vec<String> {
+        let po = |k: &str| self.po(o, k).unwrap_or(f64::NAN);
+        let go = |k: &str| self.go(o, k).unwrap_or(f64::NAN);
+        let mut l = vec![
+            "Hit damage:".to_string(),
+            sf!("%d to %d ^8(total damage)", min, max),
+        ];
+        if conv_mult != 1.0 {
+            l.push(sf!(
+                "x %g ^8(%g%% converted to other damage types)",
+                conv_mult,
+                (1.0 - conv_mult) * 100.0
+            ));
+        }
+        let (dd, td) = (po("DoubleDamageEffect"), po("TripleDamageEffect"));
+        if dd != 0.0 {
+            if td != 0.0 {
+                l.push(sf!(
+                    "x %.2f ^8(1 + %.2f + %.2f multiplier from %.1f%% chance to deal double damage and %d%% chance to deal triple damage)",
+                    1.0 + dd + td,
+                    dd,
+                    td,
+                    po("DoubleDamageChance"),
+                    po("TripleDamageChance")
+                ));
+            } else {
+                l.push(sf!(
+                    "x %.2f ^8(multiplier from %d%% chance to deal double damage)",
+                    1.0 + dd,
+                    po("DoubleDamageChance")
+                ));
+            }
+        } else if td != 0.0 {
+            l.push(sf!(
+                "x %.2f ^8(multiplier from %d%% chance to deal triple damage)",
+                1.0 + td,
+                po("TripleDamageChance")
+            ));
+        }
+        let ruthless = po("RuthlessBlowHitEffect");
+        if ruthless != 1.0 {
+            l.push(sf!("x %.2f ^8(ruthless blow effect modifier)", ruthless));
+        }
+        let fist = po("FistOfWarDamageEffect");
+        if fist != 1.0 {
+            l.push(sf!("x %.2f ^8(fist of war effect modifier)", fist));
+        }
+        let (warcry, max_warcry) = (go("OffensiveWarcryEffect"), go("MaxOffensiveWarcryEffect"));
+        if warcry != 1.0 && !max_hit {
+            l.push(sf!(
+                "x %.2f ^8(aggregated warcry exerted effect modifier)",
+                warcry
+            ));
+        }
+        if max_warcry != 1.0 && max_hit {
+            l.push(sf!(
+                "x %.2f ^8(aggregated max warcry exerted effect modifier)",
+                max_warcry
+            ));
+        }
+        l
     }
 }
 
@@ -2348,6 +3530,9 @@ impl<'a> Perform<'a> {
             ] {
                 self.combine_stat(o, k, Combine::Dps, None);
             }
+            if self.has_bd(actor) {
+                self.combine_crit_breakdowns(o);
+            }
         }
         if self.calcs_mode() {
             let (k, unit) = if self.sd_truthy(i, "showAverage") {
@@ -2367,6 +3552,38 @@ impl<'a> Perform<'a> {
             );
         }
         let g = |p: &Self, k: &str| p.c.out(actor, k).unwrap_or(f64::NAN);
+        if self.has_bd(actor) {
+            let mut l = vec![];
+            let what = if o.is_attack {
+                "attack"
+            } else if self.sd_truthy(i, "triggered") {
+                "trigger"
+            } else {
+                "cast"
+            };
+            let avg = if o.is_attack || what == "trigger" {
+                "%.1f ^8(average damage)"
+            } else {
+                "%.1f ^8(average hit)"
+            };
+            l.push(sf!(avg, g(self, "AverageDamage")));
+            l.push(match self.c.out(actor, "HitSpeed") {
+                Some(h) => sf!("x %.2f ^8(hit rate)", h),
+                None => sf!(&format!("x %.2f ^8({what} rate)"), g(self, "Speed")),
+            });
+            let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            if dps_mult != 1.0 {
+                l.push(sf!("x %g ^8(DPS multiplier for this skill)", dps_mult));
+            }
+            if o.quantity_multiplier > 1.0 {
+                l.push(sf!(
+                    "x %g ^8(quantity multiplier for this skill)",
+                    o.quantity_multiplier
+                ));
+            }
+            l.push(sf!("= %.1f", g(self, "TotalDPS")));
+            self.bd(actor).unwrap().set_lines("TotalDPS", l);
+        }
         if self.mods(i).minion.is_some() {
             let speed = self.c.out(actor, "HitSpeed").unwrap_or(g(self, "Speed"));
             let v = g(self, "SummonedMinionsPerCast")
@@ -2427,6 +3644,25 @@ impl<'a> Perform<'a> {
             } else {
                 let v = g(self, &format!("{pool}LeechRate")) + g(self, &format!("{pool}OnHitRate"));
                 self.c.set_out(actor, &format!("{pool}LeechGainRate"), v);
+            }
+        }
+        if self.has_bd(actor) {
+            let speed = self
+                .c
+                .out(actor, "HitSpeed")
+                .unwrap_or(g(self, "Speed"));
+            let hit_rate = g(self, "HitChance") / 100.0
+                * speed
+                * self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+            for (pool, flag) in [
+                ("Life", "leechLife"),
+                ("EnergyShield", "leechES"),
+                ("Mana", "leechMana"),
+            ] {
+                if self.has_flag(i, flag) {
+                    let l = self.leech_breakdown(o, pool, hit_rate)?;
+                    self.bd(actor).unwrap().set_lines(format!("{pool}Leech"), l);
+                }
             }
         }
         self.offence_ailments(o)

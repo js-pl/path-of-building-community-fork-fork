@@ -197,6 +197,7 @@ fn typed_breakdown(b: &Breakdown, tab: &ItemsTab) -> J {
         ("label", &b.label),
         ("footer", &b.footer),
         ("source", &b.source),
+        ("breakdownSource", &b.breakdown_source),
     ] {
         if let Some(v) = v {
             m.insert(k.into(), json!(v));
@@ -298,6 +299,9 @@ fn compare(
 /// The translated breakdowns the typed ones are compared with: those of
 /// the actor's before `calcs.triggers`, and the late ones
 fn filtered(all: BTreeMap<String, J>, before: &BTreeSet<String>) -> BTreeMap<String, J> {
+    if std::env::var("BD_ALL").is_ok() {
+        return all;
+    }
     all.into_iter()
         .filter(|(k, _)| before.contains(k) || LATE.contains(&k.as_str()))
         .collect()
@@ -432,7 +436,7 @@ fn breakdowns_match_upstream() {
         }
         if !fail.is_empty() {
             let n = fail.len();
-            fail.truncate(if filter.is_empty() { 20 } else { 500 });
+            fail.truncate(if filter.is_empty() && std::env::var("BD_ALL").is_err() { 20 } else { 5000 });
             failures.push(format!(
                 "{id}: {n} differences\n    {}",
                 fail.join("\n    ")
