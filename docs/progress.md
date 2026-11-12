@@ -72,7 +72,7 @@ What remains for the full migration, in order:
    `CalcTriggers.lua` (only the configurations the corpus and variants
    reach are ported; a variants test per trigger support would cover
    them), overcapped lightning
-   resistance's mana, Cryogenesis' added damage redirection, the party
+   resistance's mana, the party
    tab. `CalcSections.lua` (which breakdown each cell shows) belongs to
    the session API.
 2. A variants test per trigger support and per helmet focus, and of
@@ -273,6 +273,18 @@ which is steadier than the ms on a shared machine), after each change:
   browser keeps Rust's own allocator, so fewer allocations still count
   there.
 
+Full node power (`--power-depth 0`, every node, combined offence and
+defence) on the same sample: typed 18.4 s, the translation 361 s
+(19.6x). Before Cryogenesis' added damage redirection and the
+non-unique jewel functions of `ModParser.lua`
+(`nonUniqueJewelsTransformDamage`, `nonUniqueJewelsGrantAttribute`)
+were ported, a node at some depth failed with `not ported` on most
+builds, and the session's `nodePower` answered with the translation
+after the failed typed run, so it measured no speedup. The session's
+`nodePower` on gen-0001: typed 4.3 s, translated 26.9 s; with Full DPS
+14.1 s and 69.6 s. Of the corpus only gen-0028 (Intuitive Leap) still
+falls back.
+
 Where the time goes now (perf, node power of gen-0049): `perform` about
 half (the offence a quarter), `init_env` a third (`calc_tree::setup`,
 the skills' mod lists), and `Sym::new` a fifth: the queries take their
@@ -302,8 +314,7 @@ a skip:
 - Tawhoa's Chosen, mirages of skills with minions
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`)
-- Overcapped lightning resistance's
-  mana, added damage redirection (Cryogenesis)
+- Overcapped lightning resistance's mana
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)

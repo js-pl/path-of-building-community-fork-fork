@@ -101,6 +101,7 @@ pub enum NodeFilter {
     NotKeystoneSocketOrClassStart,
     Notable,
     Normal,
+    NotableOrNormal,
     Tattoo,
 }
 
@@ -114,6 +115,7 @@ impl NodeFilter {
             }
             NodeFilter::Notable => n.typ == Notable,
             NodeFilter::Normal => n.typ == Normal,
+            NodeFilter::NotableOrNormal => matches!(n.typ, Notable | Normal),
             NodeFilter::Tattoo => n.is_tattoo,
         }
     }
@@ -324,6 +326,41 @@ impl RadiusFunc {
             "jewelOtherWrapper" => RadiusFunc::Other(Box::new(RadiusFunc::new(
                 arg(f, 0).ok_or("jewelOtherWrapper without a function")?,
             )?)),
+            // `ModParser.lua`'s non-unique jewel lines: functions of
+            // timeless jewels' nodes do nothing
+            "nonUniqueJewelsTransformDamage" => {
+                let dst = format!("{}Damage", first_to_upper(&arg_str(f, 0)?));
+                RadiusFunc::Other(Box::new(simple_conv(
+                    &[
+                        "PhysicalDamage",
+                        "FireDamage",
+                        "ColdDamage",
+                        "LightningDamage",
+                        "ChaosDamage",
+                        "ElementalDamage",
+                    ],
+                    &dst,
+                    ModType::Inc,
+                    true,
+                    None,
+                    None,
+                )))
+            }
+            "nonUniqueJewelsGrantAttribute" => {
+                let value = match arg(f, 0) {
+                    Some(ModValue::Str(s)) => pat::to_number(s),
+                    Some(ModValue::Number(n)) => Some(*n),
+                    _ => None,
+                }
+                .ok_or("nonUniqueJewelsGrantAttribute: value")?;
+                let attr = first_to_upper(&arg_str(f, 1)?);
+                let name = pat::capture(&attr, "^(%a%l%l)")
+                    .ok_or("nonUniqueJewelsGrantAttribute: attribute")?;
+                RadiusFunc::Other(Box::new(node_mods(
+                    NodeFilter::NotableOrNormal,
+                    &[(&name, ModType::Base, value, 0, 0)],
+                )))
+            }
             "jewelThresholdMulti" => match arg(f, 0) {
                 Some(ModValue::List(l)) => {
                     RadiusFunc::Multi(l.iter().map(RadiusFunc::new).collect::<Result<_>>()?)

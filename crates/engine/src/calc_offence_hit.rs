@@ -2438,10 +2438,49 @@ impl<'a> Perform<'a> {
             self.run_skill_func(o, "postCritFunc")?;
             let cfg = self.pcfg(o);
             let c = Some(&cfg);
-            if self.c.flag(list, c, &["AllAddedDamageAsLightning"])?
-                || self.c.flag(list, c, &["AllAddedDamageAsCold"])?
-            {
-                return Err("not ported: added damage redirection".into());
+            // Cryogenesis: added damage of other types as lightning or cold,
+            // but Elemental Hit's own
+            let redirect = if self.c.flag(list, c, &["AllAddedDamageAsLightning"])? {
+                Some("Lightning")
+            } else if self.c.flag(list, c, &["AllAddedDamageAsCold"])? {
+                Some("Cold")
+            } else {
+                None
+            };
+            if let Some(to) = redirect {
+                for t in DMG_TYPES.iter().filter(|t| **t != to) {
+                    for end in ["Min", "Max"] {
+                        let old = format!("{t}{end}");
+                        let found = self.c.tabulate(list, Some(Base), c, &[&old])?;
+                        let name = crate::mods::Sym::new(&format!("{to}{end}"));
+                        for (_, m) in found {
+                            let source = m.source.as_deref().unwrap_or("");
+                            if crate::pat::find(source, "ElementalHit").is_some() {
+                                continue;
+                            }
+                            let mut tags = vec![crate::mods::Tag {
+                                kind: crate::mods::TagKind::Other {
+                                    kind: crate::mods::Sym::new("Cryogenesis Added Damage"),
+                                    fields: Default::default(),
+                                },
+                                global_limit: None,
+                            }];
+                            tags.extend(m.tags.iter().cloned());
+                            let new = crate::mods::Mod {
+                                name,
+                                typ: Base,
+                                value: m.value.clone(),
+                                flags: m.flags,
+                                keyword_flags: m.keyword_flags,
+                                source: m.source.clone(),
+                                source_slot: None,
+                                tags: tags.into(),
+                                unreached_tags: Vec::new(),
+                            };
+                            self.c.convert_mod(list, crate::mods::Sym::new(&old), new);
+                        }
+                    }
+                }
             }
             // Calculate base hit damage
             let level_field = |p: &Self, k: &str| p.effect_level(i).and_then(|l| l.field(k));

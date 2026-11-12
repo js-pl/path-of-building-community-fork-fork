@@ -23,6 +23,8 @@ pub struct Options {
     pub all: bool,
     pub reps: usize,
     pub power_reps: usize,
+    /// Node power's `nodePowerMaxDepth`; `None` for every node
+    pub power_depth: Option<f64>,
     /// Nodes added and removed in the calculator's overrides
     pub overrides: usize,
     pub translation: bool,
@@ -36,6 +38,7 @@ impl Default for Options {
             all: false,
             reps: 5,
             power_reps: 1,
+            power_depth: Some(1.0),
             overrides: 3,
             translation: true,
             power: true,
@@ -246,7 +249,7 @@ fn typed(data: &TypedData, xml: &str, opts: &Options, row: &mut Row) -> Result<(
     if opts.power {
         let p = PowerOptions {
             stat: None,
-            max_depth: Some(1.0),
+            max_depth: opts.power_depth,
             cluster_nodes: vec![],
         };
         row.typed[7] = Some(time(
@@ -327,7 +330,10 @@ fn translated(
     if opts.power {
         let t = tab.as_table().ok_or("calcsTab")?;
         t.set_str("powerStat", Value::Nil);
-        t.set_str("nodePowerMaxDepth", Value::Number(1.0));
+        t.set_str(
+            "nodePowerMaxDepth",
+            opts.power_depth.map_or(Value::Nil, Value::Number),
+        );
         let ltree = get(&get(&build, "spec"), "tree");
         let lt = ltree.as_table().ok_or("tree")?;
         let full_map = get(&ltree, "clusterNodeMap");
