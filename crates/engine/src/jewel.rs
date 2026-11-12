@@ -809,7 +809,7 @@ impl RadiusFunc {
                 let _ = WAND;
                 for m in node.mod_list {
                     let value = m.value.as_number();
-                    let with = |m: &Mod, v: f64, flags: u32, tags: Vec<Tag>| Mod {
+                    let with = |m: &Mod, v: f64, flags: u32, tags: crate::mods::Tags| Mod {
                         value: ModValue::Number(v),
                         flags,
                         tags,

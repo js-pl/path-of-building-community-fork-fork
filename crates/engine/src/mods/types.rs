@@ -1,7 +1,7 @@
 //! Modifiers: what `modLib.createMod` builds in upstream (`Modules/ModTools.lua`).
 
 use super::sym::Sym;
-use super::tag::Tag;
+use super::tag::{Tag, Tags};
 use std::rc::Rc;
 
 /// How a mod combines with others of its name.
@@ -131,7 +131,7 @@ pub struct Mod {
     /// The item slot a mod from an item comes from (`sourceSlot`)
     pub source_slot: Option<Rc<str>>,
     /// Conditions and scaling, applied in order by `EvalMod`
-    pub tags: Vec<Tag>,
+    pub tags: Tags,
     /// Tags after a gap in upstream's tag list (`mod[2]` without `mod[1]`),
     /// by index: upstream's `ipairs` never reaches them, so they have no
     /// effect, but they are kept

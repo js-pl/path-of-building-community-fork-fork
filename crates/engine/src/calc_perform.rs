@@ -196,12 +196,10 @@ pub(crate) fn new_mod(
     source: Option<&str>,
     flags: u32,
     keyword_flags: u32,
-    tags: Vec<Tag>,
+    tags: impl Into<crate::mods::Tags>,
 ) -> Mod {
     let mut m = Mod::new(name, typ, value, source).flags(flags, keyword_flags);
-    for t in tags {
-        m = m.tag(t);
-    }
+    m.tags = tags.into();
     m
 }
 

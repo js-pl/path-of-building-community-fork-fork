@@ -271,7 +271,7 @@ impl Converter<'_> {
                 Value::Nil => None,
                 x => Some(text(&x)?),
             },
-            tags,
+            tags: tags.into(),
             unreached_tags,
         })
     }
