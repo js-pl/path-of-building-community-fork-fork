@@ -91,9 +91,21 @@ fn session() -> Session {
 fn typed_session_matches_translated() {
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    commands_match(data, &mut d);
-    calcs_match(data, &mut d);
-    tree_edits_match(&mut d);
+    // `SESSION_PHASES=calcs,tree` runs only these
+    let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
+    let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
+    if run("commands") {
+        commands_match(data, &mut d);
+    }
+    if run("calcs") {
+        calcs_match(data, &mut d);
+    }
+    if run("tree") {
+        tree_edits_match(&mut d);
+    }
+    if run("skills") {
+        skills_edits_match(&mut d);
+    }
 }
 
 /// `loadXml`, `loadCode`, `state` and `outputs`
@@ -357,6 +369,11 @@ fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
     );
 }
 
+/// A build's seed, so that a filtered run takes its steps
+fn seed(id: &str) -> u64 {
+    id.bytes().fold(0u64, |h, b| h.wrapping_mul(31).wrapping_add(b as u64))
+}
+
 /// A small deterministic random number generator for edit sequences
 struct Lcg(u64);
 
@@ -380,7 +397,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (k, (id, path)) in corpus().into_iter().enumerate() {
+    for (id, path) in corpus() {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -405,7 +422,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
             .filter_map(|n| n["id"].as_u64())
             .filter(|&i| i < 0x10000)
             .collect();
-        let mut rng = Lcg(k as u64 + 1);
+        let mut rng = Lcg(seed(&id) + 1);
         let mut out = Vec::new();
         let compare = |d: &mut Dispatcher, reqs: &[J], step: &str, out: &mut Vec<String>| {
             for req in reqs {
@@ -530,4 +547,160 @@ fn tree_edits_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// Random sequences of Skills tab edits and skill selections (main socket
+/// group, groups enabled, in Full DPS, slots, gems added, renamed,
+/// levelled and removed, groups added and removed, the sidebar's and the
+/// Calcs tab's skill controls) give the translation's skills, sidebar,
+/// outputs, Calcs tab and controls after each step
+fn skills_edits_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    let gems = answer(d.translated_request(r#"{"cmd":"gemList"}"#), "gemList");
+    let gem_names: Vec<String> = gems["ok"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|g| g["name"].as_str().map(String::from))
+        .collect();
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 7);
+        let mut out = Vec::new();
+        let compare = |d: &mut Dispatcher, req: &J, label: &str, out: &mut Vec<String>| {
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed");
+            let tr = answer(d.translated_request(&r), "translated");
+            let n = out.len();
+            diff(&typed, &tr, &format!("{label} {r}"), out);
+            if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{label} {r}:\ntyped {typed}\ntranslated {tr}");
+            }
+            typed
+        };
+        compare(d, &json!({"cmd": "skills"}), "start", &mut out);
+        compare(d, &json!({"cmd": "gemList"}), "start", &mut out);
+        for step in 0..steps_per_build {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let groups = skills["ok"]["groups"].as_array().cloned().unwrap_or_default();
+            let slots = skills["ok"]["slots"].as_array().cloned().unwrap_or_default();
+            let n = groups.len().max(1);
+            let g = rng.below(n) + 1;
+            let gem_count = groups.get(g - 1).map_or(0, |x| x["gems"].as_array().map_or(0, Vec::len));
+            let pick_gem = |rng: &mut Lcg| json!(gem_names[rng.below(gem_names.len())]);
+            let req = match rng.below(12) {
+                0 => json!({"cmd": "setMainSocketGroup", "index": g}),
+                1 => json!({"cmd": "setSocketGroup", "index": g, "enabled": rng.below(2) == 0}),
+                2 => json!({"cmd": "setSocketGroup", "index": g, "includeInFullDPS": rng.below(2) == 0}),
+                3 => {
+                    let slot = if slots.is_empty() || rng.below(3) == 0 {
+                        json!("")
+                    } else {
+                        slots[rng.below(slots.len())].clone()
+                    };
+                    json!({"cmd": "setSocketGroup", "index": g, "slot": slot})
+                }
+                4 => json!({"cmd": "setGem", "group": g, "gem": rng.below(gem_count.max(1)) + 1,
+                    "level": rng.below(21) + 1, "quality": rng.below(24)}),
+                5 => json!({"cmd": "setGem", "group": g, "gem": gem_count + 1, "name": pick_gem(&mut rng)}),
+                6 => json!({"cmd": "setGem", "group": g, "gem": rng.below(gem_count.max(1)) + 1, "name": pick_gem(&mut rng)}),
+                7 if gem_count > 0 => json!({"cmd": "removeGem", "group": g, "gem": rng.below(gem_count) + 1}),
+                8 => json!({"cmd": "addSocketGroup", "label": if rng.below(2) == 0 { "" } else { "New" }}),
+                9 if groups.len() > 1 => json!({"cmd": "removeSocketGroup", "index": g}),
+                10 => json!({"cmd": "control", "path": "build.mainSkill", "sel": rng.below(3) + 1}),
+                _ => {
+                    compare(d, &json!({"cmd": "calcs"}), "before", &mut out);
+                    match rng.below(4) {
+                        0 => json!({"cmd": "control", "path": "calcs.mainSocketGroup", "sel": g}),
+                        1 => json!({"cmd": "control", "path": "calcs.mode", "sel": rng.below(4) + 1}),
+                        2 => json!({"cmd": "control", "path": "calcs.mainSkill", "sel": rng.below(3) + 1}),
+                        _ => json!({"cmd": "control", "path": "build.mainSkillPart", "sel": rng.below(3) + 1}),
+                    }
+                }
+            };
+            let label = format!("step {step}");
+            let r = req.to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label} {r}: {e}");
+                skipped.push(format!("{id}: {r}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            let tr = answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            times[1] += t.elapsed();
+            let _ = (typed, tr);
+            for f in ["skills", "state", "outputs", "calcs"] {
+                compare(d, &json!({"cmd": f}), &format!("{label} {r}"), &mut out);
+            }
+            let paths = ["calcs.mainSocketGroup", "calcs.mainSkill", "calcs.mode", "calcs.mainSkillPart", "build.mainSkill"];
+            compare(d, &json!({"cmd": "controls", "paths": paths}), &format!("{label} {r}"), &mut out);
+            steps += 1;
+            if !out.is_empty() {
+                break;
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} skills edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// Replays `SESSION_SEQ` (a JSON array of requests) on the builds of
+/// `SESSION_FILTER`, comparing `skills`, `state` and `outputs` after each;
+/// for narrowing down a difference
+#[test]
+#[ignore]
+fn replay_sequence() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let seq: Vec<J> = serde_json::from_str(&std::env::var("SESSION_SEQ").unwrap()).unwrap();
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()), "load");
+        for req in &seq {
+            let r = req.to_string();
+            eprintln!("{id} {r}: typed {}", answer(d.request(&r), "typed"));
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            for f in ["skills", "state", "outputs"] {
+                let q = json!({ "cmd": f }).to_string();
+                let (t, tr) = (answer(d.request(&q), f), answer(d.translated_request(&q), f));
+                let mut out = Vec::new();
+                diff(&t, &tr, f, &mut out);
+                out.truncate(4);
+                if !out.is_empty() {
+                    eprintln!("  {}", out.join("\n  "));
+                }
+            }
+        }
+    }
 }

@@ -6,7 +6,10 @@
 mod calcs;
 pub mod display_stats;
 mod sidebar;
+mod skills;
 mod tree;
+
+pub use skills::{GemEdit, GroupEdit};
 
 use engine::build::{Build, LoadContext};
 use engine::calc_env::{CalcData, CalcMode};
@@ -172,8 +175,20 @@ impl<'d> TypedSession<'d> {
             ui: Ui::default(),
             controls: Controls::default(),
         };
+        s.update_display_labels(true);
         s.refresh_controls()?;
         Ok(s)
+    }
+
+    /// The sidebar's calculation of a main skill the typed engine leaves
+    /// outputs out of
+    pub(super) fn check_main(&self) -> Result<()> {
+        match &self.main.sidebar {
+            Some(s) if s.main_copy => Err(format!(
+                "{NOT_PORTED}: the gem outputs of Saviour's mirage as the main skill"
+            )),
+            _ => Ok(()),
+        }
     }
 
     /// `controls`: the sidebar's and the Calcs tab's controls, `None`

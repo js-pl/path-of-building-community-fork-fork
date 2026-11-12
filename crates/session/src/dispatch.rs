@@ -160,6 +160,54 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.select_mastery(id, effect))
             }
             "resetTree" => self.edit(json, |s| s.reset_tree()),
+            "skills" => self.typed.as_ref()?.skills().ok().map(ok),
+            "gemList" => Some(ok(self.typed.as_ref()?.gem_list())),
+            "setMainSocketGroup" => {
+                let i = req["index"].as_f64()?;
+                self.edit(json, |s| s.set_main_socket_group(i))
+            }
+            "setSocketGroup" => {
+                let i = req["index"].as_f64()?;
+                let e = crate::typed::GroupEdit {
+                    label: req["label"].as_str().map(String::from),
+                    enabled: req["enabled"].as_bool(),
+                    include_in_full_dps: req["includeInFullDPS"].as_bool(),
+                    slot: req["slot"].as_str().map(String::from),
+                };
+                self.edit(json, |s| s.set_socket_group(i, e))
+            }
+            "addSocketGroup" => {
+                let label = req["label"].as_str().map(String::from);
+                self.edit(json, |s| s.add_socket_group(label))
+            }
+            "removeSocketGroup" => {
+                let i = req["index"].as_f64()?;
+                self.edit(json, |s| s.remove_socket_group(i))
+            }
+            "setGem" => {
+                let (g, k) = (req["group"].as_f64()?, req["gem"].as_f64()?);
+                let e = crate::typed::GemEdit {
+                    name: req["name"].as_str().map(String::from),
+                    level: req["level"].as_f64(),
+                    quality: req["quality"].as_f64(),
+                    quality_id: req["qualityId"].as_str().map(String::from),
+                    enabled: req["enabled"].as_bool(),
+                    count: req["count"].as_f64(),
+                };
+                self.edit(json, |s| s.set_gem(g, k, e))
+            }
+            "removeGem" => {
+                let (g, k) = (req["group"].as_f64()?, req["gem"].as_f64()?);
+                self.edit(json, |s| s.remove_gem(g, k))
+            }
+            "selectSkillSet" => {
+                let id = req["id"].as_f64();
+                self.edit(json, |s| s.select_skill_set(id))
+            }
+            "control" => {
+                let req = req.clone();
+                self.edit(json, |s| s.control(&req))
+            }
             "controls" => {
                 let paths: Vec<&str> = req["paths"]
                     .as_array()?

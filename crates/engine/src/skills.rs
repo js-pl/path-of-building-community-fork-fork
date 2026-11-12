@@ -61,6 +61,10 @@ pub struct GemInstance {
     pub explode_source: Option<ExplodeSource>,
     /// Whether the gem's colour matches its socket's (`matchesSocket`)
     pub matches_socket: bool,
+    /// A gem added in the Skills tab that has no data yet (`new`)
+    pub new: bool,
+    /// `qualityId`, which the engine API's `setGem` sets
+    pub quality_id: Option<String>,
 }
 
 /// What makes enemies explode on kill: an item, by id, or a passive node
@@ -98,6 +102,9 @@ pub struct SocketGroup {
     pub no_supports: bool,
     /// For the explosion group (`source = "Explode"`)
     pub explode_sources: Vec<ExplodeSource>,
+    /// `displayLabel`, which the sidebar's calculation sets on the groups
+    /// it uses
+    pub display_label: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -189,7 +196,7 @@ pub fn validate_gem_level(gem: &mut GemInstance) {
     }
     if !has(gem.level) {
         // Any level, the first upstream's `next` finds
-        gem.level = effect.levels.keys().next().map(|&l| l as f64);
+        gem.level = effect.first_level.map(|l| l as f64);
     }
 }
 
@@ -283,7 +290,7 @@ impl Skills {
     }
 
     /// `SetActiveSkillSet(id)`
-    fn set_active_skill_set(&mut self, id: f64, data: &SkillData) {
+    pub fn set_active_skill_set(&mut self, id: f64, data: &SkillData) {
         if self.skill_set_order_list.is_empty() {
             self.skill_set_order_list.push(1.0);
             self.new_skill_set(1.0);
@@ -449,6 +456,10 @@ pub fn find_skill_gem(name_spec: &str, data: &SkillData) -> Result<Rc<Gem>, Stri
 pub fn process_socket_group(group: &mut SocketGroup, data: &SkillData) {
     for gem in &mut group.gem_list {
         gem.color = "^8".into();
+        let prev_default_level = match &gem.gem {
+            Some(g) => Some(g.natural_max_level),
+            None => gem.new.then_some(20.0),
+        };
         gem.gem = None;
         gem.granted_effect = None;
         if let Some(id) = gem.gem_id.clone() {
@@ -495,7 +506,14 @@ pub fn process_socket_group(group: &mut SocketGroup, data: &SkillData) {
         let Some(effect) = gem.effect().cloned() else {
             continue;
         };
+        gem.new = false;
         gem.color = color_code(data, effect.color);
+        if let (Some(prev), Some(g)) = (prev_default_level, &gem.gem)
+            && g.natural_max_level != prev
+        {
+            gem.level = Some(g.natural_max_level);
+            gem.natural_max_level = Some(g.natural_max_level);
+        }
         validate_gem_level(gem);
         if let Some(g) = gem.gem.clone() {
             let req_level = gem

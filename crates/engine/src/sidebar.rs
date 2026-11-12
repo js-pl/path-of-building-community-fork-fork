@@ -70,6 +70,13 @@ pub struct Sidebar {
     pub minion_aspects: [bool; 3],
     /// `env.grantedPassives`
     pub granted_passives: BTreeSet<u32>,
+    /// Whether each socket group's slot is in use (`group.slotEnabled`)
+    pub slot_enabled: Vec<bool>,
+    /// The player's `AdditionalRingSlot` flag, which shows the third ring
+    pub additional_ring_slot: bool,
+    /// Whether Saviour's mirage replaced the main skill, whose gem level
+    /// and quality outputs are not ported
+    pub main_copy: bool,
 }
 
 fn num(v: Option<&ModValue>) -> Option<f64> {
@@ -144,5 +151,8 @@ pub(crate) fn collect(p: &Perform) -> Result<Sidebar> {
             None => [false; 3],
         },
         granted_passives: p.env.setup.tree.granted_passives.clone(),
+        slot_enabled: p.env.skills.slot_enabled.clone(),
+        additional_ring_slot: p.c.flag(p.c.db(PLAYER), None, &["AdditionalRingSlot"])?,
+        main_copy: p.main_copy.is_some(),
     })
 }

@@ -37,6 +37,13 @@ impl Default for Drop {
     }
 }
 
+impl SkillSelect {
+    /// The minion drop-down's entry
+    pub(super) fn minion_entry(&self, i: usize) -> Option<MinionEntry> {
+        self.minion_entries.get(i).cloned()
+    }
+}
+
 impl Drop {
     pub(super) fn json(&self) -> J {
         json!({
@@ -72,7 +79,7 @@ impl Edit {
 
 /// An entry of the minion drop-down: an item set or a minion, or text
 #[derive(Clone, Debug, PartialEq)]
-enum MinionEntry {
+pub(super) enum MinionEntry {
     ItemSet(f64),
     Minion(String),
     Text,
@@ -86,7 +93,7 @@ pub struct Controls {
     class: Drop,
     ascend: Drop,
     secondary: Drop,
-    skill_select: SkillSelect,
+    pub(super) skill_select: SkillSelect,
 }
 
 /// The skill selection controls of the sidebar or the Calcs tab
@@ -384,26 +391,6 @@ fn list_of(v: Option<&OutVal>) -> Option<Vec<String>> {
 }
 
 /// `group.displayLabel`
-fn display_label(g: &SocketGroup) -> String {
-    if let Some(l) = &g.label
-        && engine::pat::is_match(l, "%S")
-    {
-        return l.clone();
-    }
-    let names: Vec<&str> = g
-        .gem_list
-        .iter()
-        .filter(|gem| gem.enabled)
-        .filter_map(|gem| gem.effect())
-        .filter(|e| !e.support)
-        .map(|e| e.name.as_str())
-        .collect();
-    if names.is_empty() {
-        "<No active skills>".into()
-    } else {
-        names.join(", ")
-    }
-}
 
 impl TypedSession<'_> {
     fn sidebar(&self) -> Result<&Sidebar> {
@@ -413,7 +400,7 @@ impl TypedSession<'_> {
             .ok_or_else(|| "no sidebar calculation".into())
     }
 
-    fn groups(&self) -> &[SocketGroup] {
+    pub(super) fn groups(&self) -> &[SocketGroup] {
         self.build
             .skills
             .as_ref()
@@ -629,7 +616,10 @@ impl TypedSession<'_> {
         let groups = self.groups();
         let env_main = sb.main_socket_group;
         c.socket_group.sel = main_group;
-        c.socket_group.list = groups.iter().map(display_label).collect();
+        c.socket_group.list = groups
+            .iter()
+            .map(|g| g.display_label.clone().unwrap_or_default())
+            .collect();
         if groups.is_empty() {
             c.socket_group.list = vec!["<No skills added yet>".into()];
             for d in [

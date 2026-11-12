@@ -162,6 +162,24 @@ impl<'a> Perform<'a> {
         e.granted_effect.level(e.level?)
     }
 
+    /// `SkillsTab:ProcessSocketGroup` clears the cost of a triggered
+    /// granted skill's level on the shared skill data
+    /// (`grantedEffect.levels[level].cost = {}`), which every skill of that
+    /// effect and level then has
+    fn cost_cleared(&self, i: usize) -> bool {
+        let e = &self.skill(i).active_effect;
+        let Some(level) = e.level else {
+            return false;
+        };
+        self.env.groups.iter().flat_map(|g| &g.gem_list).any(|g| {
+            g.triggered
+                && g.level == Some(level)
+                && g.granted_effect
+                    .as_ref()
+                    .is_some_and(|ge| ge.id == e.granted_effect.id)
+        })
+    }
+
     pub(crate) fn weapon_num(&self, actor: usize, n: usize, k: &str) -> Option<f64> {
         self.weapon(actor, n)?.get(k)?.as_number()
     }
@@ -2847,10 +2865,13 @@ impl<'a> Perform<'a> {
             let hybrid_life = self.c.base(list, c, &["HybridManaAndLifeCost_Life"])? / 100.0;
             let mut costs = costs();
             let idx = |costs: &[Cost], r: &str| costs.iter().position(|x| x.resource == r).unwrap();
-            let level_cost: Vec<(String, f64)> = self
-                .effect_level(i)
-                .map(|l| l.cost.clone())
-                .unwrap_or_default();
+            let level_cost: Vec<(String, f64)> = if self.cost_cleared(i) {
+                Vec::new()
+            } else {
+                self.effect_level(i)
+                    .map(|l| l.cost.clone())
+                    .unwrap_or_default()
+            };
             for k in 0..costs.len() {
                 let resource = costs[k].resource;
                 let skill_cost =
