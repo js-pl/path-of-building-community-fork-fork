@@ -189,3 +189,46 @@ fn build_codes_decode() {
         Some(xml)
     );
 }
+
+/// Node power, the heat map's command, gives the translation's JSON:
+/// combined offence and defence and Full DPS, on a build
+/// (`SESSION_POWER=<substring>` picks others; it is slow on the translation)
+#[test]
+fn node_power_matches_translated() {
+    let data = data();
+    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
+    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
+    let filter = std::env::var("SESSION_POWER").ok();
+    let mut failures = Vec::new();
+    for (id, path) in corpus() {
+        let sample = id == "gen-0001";
+        if !filter.as_deref().map_or(sample, |f| id.contains(f)) {
+            continue;
+        }
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id}: not loaded typed");
+        for index in [1, 2] {
+            let req = json!({"cmd": "nodePower", "index": index}).to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&req), "typed nodePower");
+            let tt = t.elapsed();
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&req), "translated nodePower");
+            eprintln!(
+                "{id} stat {index}: typed {tt:.1?}, translated {:.1?}",
+                t.elapsed()
+            );
+            let mut out = Vec::new();
+            diff(&typed, &tr, "nodePower", &mut out);
+            if !out.is_empty() {
+                out.truncate(8);
+                failures.push(format!("{id} stat {index}:\n  {}", out.join("\n  ")));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

@@ -139,6 +139,10 @@ impl<'d> Dispatcher<'d> {
             }
             "state" => self.typed.as_ref()?.state().ok().map(ok),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
+            "nodePower" => {
+                let index = req["index"].as_f64().unwrap_or(1.0);
+                self.typed.as_ref()?.node_power(index).ok().map(ok)
+            }
             _ => None,
         }
     }

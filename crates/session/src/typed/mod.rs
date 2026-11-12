@@ -243,3 +243,57 @@ fn out_val(v: &engine::actor::OutVal) -> J {
         OutVal::Item(n) => json!({ "$item": &**n }),
     }
 }
+
+impl TypedSession<'_> {
+    /// `nodePower`: `CalcsTab:PowerBuilder` with the tree tab's power stat
+    /// of this index (1-based), as the heat map shows it
+    pub fn node_power(&self, index: f64) -> Result<J> {
+        use engine::power::{PowerOptions, node_power, power_stats};
+        let stat = power_stats()
+            .into_iter()
+            .filter(|s| !s.ignore_for_nodes)
+            .nth((index as usize).wrapping_sub(1));
+        let combined = stat.as_ref().is_none_or(|s| s.stat.is_none());
+        let data = self.data.calc_data();
+        let calc = engine::calculator::MiscCalculator::new(&self.build, &data)?;
+        let opts = PowerOptions {
+            stat,
+            max_depth: None,
+            cluster_nodes: Vec::new(),
+        };
+        let p = node_power(&calc, &opts)?;
+        let opt = |v: Option<f64>| v.map_or(J::Null, num);
+        let mut nodes = Map::new();
+        for (id, n) in &p.nodes {
+            let w = &n.power;
+            if w.single_stat.is_none() && w.offence.is_none() && w.defence.is_none() {
+                continue;
+            }
+            let mut o = Map::new();
+            for (k, v) in [
+                ("single", w.single_stat),
+                ("offence", w.offence),
+                ("defence", w.defence),
+                ("path", w.path_power),
+            ] {
+                if let Some(v) = v {
+                    o.insert(k.into(), num(v));
+                }
+            }
+            nodes.insert(id.to_string(), J::Object(o));
+        }
+        let m = &p.max;
+        let max = [
+            ("single", m.single_stat),
+            ("offence", m.offence),
+            ("defence", m.defence),
+            ("offencePerPoint", m.offence_per_point),
+            ("defencePerPoint", m.defence_per_point),
+        ];
+        let max: Map<String, J> = max
+            .iter()
+            .map(|(k, v)| (k.to_string(), opt(Some(*v))))
+            .collect();
+        Ok(json!({ "combined": combined, "max": object(max), "nodes": object(nodes) }))
+    }
+}
