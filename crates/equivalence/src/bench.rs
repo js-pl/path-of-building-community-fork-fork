@@ -125,7 +125,7 @@ pub fn run(opts: &Options) -> Vec<Row> {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", lua_err(e)));
-    let mut data = TypedData::load(&host);
+    let mut data = TypedData::load();
     let mut rows = Vec::new();
     for (id, xml) in builds(opts) {
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));

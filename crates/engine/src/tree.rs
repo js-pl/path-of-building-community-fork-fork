@@ -243,7 +243,7 @@ fn create_mod(name: &str, typ: ModType, value: ModValue, source: &str) -> Mod {
         keyword_flags: 0,
         source: Some(source.into()),
         source_slot: None,
-        tags: vec![],
+        tags: Default::default(),
         unreached_tags: vec![],
     }
 }

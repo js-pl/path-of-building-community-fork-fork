@@ -79,7 +79,7 @@ pub struct SpecNode {
     pub path: Option<Option<Rc<PathStep>>>,
     pub distance_to_class_start: Option<f64>,
     /// Stats the spec set, instead of the tree's
-    pub stats: Option<NodeStats>,
+    pub stats: Option<Rc<NodeStats>>,
     pub all_mastery_options: Option<bool>,
     /// Set when processing the spec's stats found an unknown line
     pub unknown: bool,
@@ -512,11 +512,11 @@ impl<'t> PassiveSpec<'t> {
             }
         }
         self.nodes[i].unknown |= unknown;
-        self.nodes[i].stats = Some(NodeStats {
+        self.nodes[i].stats = Some(Rc::new(NodeStats {
             sd: lines,
             mods,
             mod_list,
-        });
+        }));
         Ok(())
     }
 

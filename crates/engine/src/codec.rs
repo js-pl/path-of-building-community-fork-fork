@@ -283,6 +283,15 @@ impl<T: Codec> Codec for Rc<T> {
     }
 }
 
+impl Codec for crate::mods::Tags {
+    fn put(&self, w: &mut Writer) {
+        (**self).put(w)
+    }
+    fn get(r: &mut Reader) -> Result<Self> {
+        Vec::get(r).map(Self::from)
+    }
+}
+
 impl<T: Codec> Codec for Vec<T> {
     fn put(&self, w: &mut Writer) {
         w.uint(self.len() as u64);

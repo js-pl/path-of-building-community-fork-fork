@@ -552,7 +552,7 @@ fn new_mod(name: &str, typ: ModType, value: ModValue, source: &str, tags: Vec<Ta
         keyword_flags: 0,
         source: Some(source.into()),
         source_slot: None,
-        tags,
+        tags: tags.into(),
         unreached_tags: vec![],
     }
 }
@@ -2867,7 +2867,7 @@ impl Item {
         let mut mods = Vec::new();
         'mods: for base_mod in base_list.iter() {
             let mut m = base_mod.clone();
-            for tag in &mut m.tags {
+            for tag in m.tags.iter_mut() {
                 if let TagKind::Other { kind, fields } = &tag.kind
                     && (*kind == slot_number || *kind == in_slot)
                     && fields.get("num").and_then(ModValue::as_number) != slot.map(|n| n as f64)

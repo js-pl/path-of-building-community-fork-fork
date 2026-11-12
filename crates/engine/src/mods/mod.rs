@@ -14,5 +14,5 @@ pub mod types;
 pub use build::record;
 pub use store::{Actors, Cfg, Mods, Query, Row, Store, StoreId, Stores};
 pub use sym::Sym;
-pub use tag::{Names, Tag, TagKind};
+pub use tag::{Names, Tag, TagKind, Tags};
 pub use types::{Func, Mod, ModType, ModValue, Record};

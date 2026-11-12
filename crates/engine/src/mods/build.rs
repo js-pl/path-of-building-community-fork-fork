@@ -56,7 +56,7 @@ impl Mod {
             keyword_flags: 0,
             source: source.map(Rc::from),
             source_slot: None,
-            tags: vec![],
+            tags: Default::default(),
             unreached_tags: vec![],
         }
     }
