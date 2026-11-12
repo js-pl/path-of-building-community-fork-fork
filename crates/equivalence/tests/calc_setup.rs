@@ -14,7 +14,7 @@ use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use engine::mods::{Mod, ModValue, Mods, Store, Sym};
-use equivalence::{corpus, mod_parser, typed_json, upstream_src};
+use equivalence::{corpus, mod_parser_preloaded, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -236,10 +236,7 @@ fn base_dbs_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
+    let parser = mod_parser_preloaded();
     let data = equivalence::game_data().setup;
     let mut failures = Vec::new();
     let mut compared = 0;
@@ -311,10 +308,7 @@ fn initial_node_mods_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
+    let parser = mod_parser_preloaded();
     let item_data = equivalence::game_data().items;
     let mut trees = Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
     let mut failures = Vec::new();
@@ -442,10 +436,7 @@ fn items_setup_matches_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
+    let parser = mod_parser_preloaded();
     let ldata = host.global("data");
     let engine::game_data::GameData {
         items: item_data,

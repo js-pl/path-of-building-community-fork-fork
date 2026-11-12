@@ -5,9 +5,8 @@
 
 use crate::item_data::ItemData;
 use crate::mod_parser::ModParser;
-use crate::mods::convert::get;
+use crate::mods::ModValue;
 use crate::pat::{self, gsub_fn, gsub_fn_n, is_match, num, to_number};
-use lua::Value;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -384,22 +383,18 @@ pub fn apply_range(
         return Ok(test_line);
     }
     let mut precision = None;
-    let (list, extra) = parser.parse(test_line.as_bytes());
-    if let (Value::Table(t), false) = (&list, extra.truthy()) {
-        for m in t.array() {
-            let mut sub = m.clone();
-            let value = get(&m, "value");
-            if value.as_table().is_some() && get(&value, "mod").truthy() {
-                sub = get(&value, "mod");
-            }
-            if let Value::Number(_) = get(&sub, "value") {
-                let name = lua::to_string(&get(&sub, "name"))
-                    .to_str_lossy()
-                    .into_owned();
-                let typ = lua::to_string(&get(&sub, "type"))
-                    .to_str_lossy()
-                    .into_owned();
-                if let Some(&p) = data.high_precision_mods.get(&(name, typ)) {
+    if let (Some(list), None) = parser.parse(test_line.as_bytes()) {
+        for m in &list {
+            let sub = match &m.value {
+                ModValue::Record(r) => match r.get("mod") {
+                    Some(ModValue::Mod(inner)) => inner,
+                    _ => m,
+                },
+                _ => m,
+            };
+            if let ModValue::Number(_) = sub.value {
+                let key = (sub.name.as_str().to_string(), sub.typ.name().to_string());
+                if let Some(&p) = data.high_precision_mods.get(&key) {
                     precision = Some(p);
                 }
             }

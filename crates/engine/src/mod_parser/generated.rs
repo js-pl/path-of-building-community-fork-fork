@@ -4,9 +4,11 @@
 
 #![allow(unused_mut, unused_variables, non_snake_case, clippy::all)]
 
+use super::val::*;
 use super::{Ctx, Port};
-use crate::rt::*;
-use lua::Value;
+
+/// The fields of `data` the closures read
+pub const DATA_FIELDS: &[&str] = &["nonDamagingAilmentTypeList"];
 
 pub(super) const PORTS: &[Port] = &[
     Port {
@@ -5987,7 +5989,7 @@ pub(super) const PORTS: &[Port] = &[
 ];
 
 // preFlagList["^enemies (%a+) by you take "] (ModParser.lua:1255)
-fn f0000(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0000(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -5998,13 +6000,13 @@ fn f0000(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"Condition")),
                         (
                             sb(b"var"),
-                            first(gsub_fn(&l_cond.clone(), &sb(b"^%a"), &mut upper_fn, &nil())),
+                            first(gsub_case(&l_cond.clone(), &sb(b"^%a"), true, &nil())),
                         ),
                     ],
                     vec![],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
             (sb(b"modSuffix"), sb(b"Taken")),
         ],
         vec![],
@@ -6012,7 +6014,7 @@ fn f0000(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // preFlagList["^enemies (%a+) by "] (ModParser.lua:1258)
-fn f0001(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0001(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -6023,20 +6025,20 @@ fn f0001(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"Condition")),
                         (
                             sb(b"var"),
-                            first(gsub_fn(&l_cond.clone(), &sb(b"^%a"), &mut upper_fn, &nil())),
+                            first(gsub_case(&l_cond.clone(), &sb(b"^%a"), true, &nil())),
                         ),
                     ],
                     vec![],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
         ],
         vec![],
     )];
 }
 
 // preFlagList["^enemies (%a+) by you have "] (ModParser.lua:1261)
-fn f0002(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0002(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -6047,20 +6049,20 @@ fn f0002(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"Condition")),
                         (
                             sb(b"var"),
-                            first(gsub_fn(&l_cond.clone(), &sb(b"^%a"), &mut upper_fn, &nil())),
+                            first(gsub_case(&l_cond.clone(), &sb(b"^%a"), true, &nil())),
                         ),
                     ],
                     vec![],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
         ],
         vec![],
     )];
 }
 
 // preFlagList["^while a pinnacle atlas boss is in your presence, enemies you've hit recently have "] (ModParser.lua:1264)
-fn f0003(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0003(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -6087,14 +6089,14 @@ fn f0003(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     ],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
         ],
         vec![],
     )];
 }
 
 // preFlagList["^while a unique enemy is in your presence, enemies you've hit recently have "] (ModParser.lua:1267)
-fn f0004(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0004(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -6121,14 +6123,14 @@ fn f0004(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     ],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
         ],
         vec![],
     )];
 }
 
 // preFlagList["^enemies you've hit recently have "] (ModParser.lua:1270)
-fn f0005(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0005(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![
@@ -6142,14 +6144,14 @@ fn f0005(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![],
                 ),
             ),
-            (sb(b"applyToEnemy"), Value::Bool(true)),
+            (sb(b"applyToEnemy"), V::Bool(true)),
         ],
         vec![],
     )];
 }
 
 // preFlagList["^hits against enemies (%a+) by you have "] (ModParser.lua:1273)
-fn f0006(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0006(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cond = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6160,7 +6162,7 @@ fn f0006(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"actor"), sb(b"enemy")),
                     (
                         sb(b"var"),
-                        first(gsub_fn(&l_cond.clone(), &sb(b"^%a"), &mut upper_fn, &nil())),
+                        first(gsub_case(&l_cond.clone(), &sb(b"^%a"), true, &nil())),
                     ),
                 ],
                 vec![],
@@ -6171,7 +6173,7 @@ fn f0006(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per brand, up to a maximum of (%d+)%%"] (ModParser.lua:1346)
-fn f0007(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0007(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6191,7 +6193,7 @@ fn f0007(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) rage"] (ModParser.lua:1352)
-fn f0008(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0008(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6210,7 +6212,7 @@ fn f0008(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per mana burn, up to a maximum of (%d+)%%"] (ModParser.lua:1355)
-fn f0009(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0009(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6220,7 +6222,7 @@ fn f0009(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"ManaBurnStacks")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6230,7 +6232,7 @@ fn f0009(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) player levels"] (ModParser.lua:1357)
-fn f0010(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0010(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6249,7 +6251,7 @@ fn f0010(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% (%a+) effect on enemy"] (ModParser.lua:1359)
-fn f0011(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0011(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_effectName = arg(a, 2);
@@ -6277,7 +6279,7 @@ fn f0011(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if (%d+) (%a+) items are equipped"] (ModParser.lua:1375)
-fn f0012(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0012(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_effectName = arg(a, 2);
@@ -6304,7 +6306,7 @@ fn f0012(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (.+) eye jewel affecting you, up to a maximum of %+?(%d+)%%"] (ModParser.lua:1403)
-fn f0013(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0013(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_type = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -6317,12 +6319,12 @@ fn f0013(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"var"),
                         concat(
-                            &first(gsub_fn(&l_type.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                            &first(gsub_case(&l_type.clone(), &sb(b"^%l"), true, &nil())),
                             &sb(b"EyeJewel"),
                         ),
                     ),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6332,7 +6334,7 @@ fn f0013(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each poison on you up to a maximum of (%d+)%%"] (ModParser.lua:1413)
-fn f0014(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0014(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6342,7 +6344,7 @@ fn f0014(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"PoisonStack")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6352,7 +6354,7 @@ fn f0014(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per poison on you, up to (%d+) per second"] (ModParser.lua:1414)
-fn f0015(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0015(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6362,7 +6364,7 @@ fn f0015(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"PoisonStack")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6372,7 +6374,7 @@ fn f0015(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each poison you have inflicted recently, up to a maximum of (%d+)%%"] (ModParser.lua:1417)
-fn f0016(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0016(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6392,7 +6394,7 @@ fn f0016(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each time you have shocked a non%-shocked enemy recently, up to a maximum of (%d+)%%"] (ModParser.lua:1418)
-fn f0017(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0017(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6402,7 +6404,7 @@ fn f0017(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"ShockedNonShockedEnemyRecently")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6412,7 +6414,7 @@ fn f0017(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per enemy killed recently, up to (%d+)%%"] (ModParser.lua:1420)
-fn f0018(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0018(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6422,7 +6424,7 @@ fn f0018(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"EnemyKilledRecently")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6432,7 +6434,7 @@ fn f0018(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) rampage kills"] (ModParser.lua:1421)
-fn f0019(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0019(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6443,7 +6445,7 @@ fn f0019(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"var"), sb(b"Rampage")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), div(&n(1000.0), &l_num.clone())),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6453,7 +6455,7 @@ fn f0019(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per minion, up to ?a? ?m?a?x?i?m?u?m? ?o?f? (%d+)%%"] (ModParser.lua:1422)
-fn f0020(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0020(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6463,7 +6465,7 @@ fn f0020(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"SummonedMinion")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6473,7 +6475,7 @@ fn f0020(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each enemy you or your minions have killed recently, up to (%d+)%%"] (ModParser.lua:1425)
-fn f0021(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0021(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6492,7 +6494,7 @@ fn f0021(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         ),
                     ),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6502,7 +6504,7 @@ fn f0021(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each enemy you or your minions have killed recently, up to (%d+)%% per second"] (ModParser.lua:1426)
-fn f0022(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0022(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6521,7 +6523,7 @@ fn f0022(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         ),
                     ),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6531,7 +6533,7 @@ fn f0022(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each (%d+) total mana y?o?u? ?h?a?v?e? ?spent recently"] (ModParser.lua:1427)
-fn f0023(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0023(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6550,7 +6552,7 @@ fn f0023(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each (%d+) total mana you have spent recently, up to (%d+)%%"] (ModParser.lua:1428)
-fn f0024(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0024(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -6563,7 +6565,7 @@ fn f0024(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"var"), sb(b"ManaSpentRecently")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6573,7 +6575,7 @@ fn f0024(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) mana spent recently, up to (%d+)%%"] (ModParser.lua:1429)
-fn f0025(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0025(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -6586,7 +6588,7 @@ fn f0025(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"var"), sb(b"ManaSpentRecently")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6596,7 +6598,7 @@ fn f0025(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per nearby enemy, up to %+?(%d+)%%"] (ModParser.lua:1432)
-fn f0026(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0026(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6606,7 +6608,7 @@ fn f0026(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyEnemies")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6616,7 +6618,7 @@ fn f0026(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per second you've been stationary, up to a maximum of (%d+)%%"] (ModParser.lua:1466)
-fn f0027(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0027(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6626,7 +6628,7 @@ fn f0027(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"StationarySeconds")),
                     (sb(b"limit"), first(vec![tonumber(&l_num.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6636,7 +6638,7 @@ fn f0027(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% of maximum mana they reserve"] (ModParser.lua:1469)
-fn f0028(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0028(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6655,7 +6657,7 @@ fn f0028(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each (%d+)%% of life reserved"] (ModParser.lua:1470)
-fn f0029(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0029(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6674,7 +6676,7 @@ fn f0029(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) strength"] (ModParser.lua:1471)
-fn f0030(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0030(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6693,7 +6695,7 @@ fn f0030(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) dexterity"] (ModParser.lua:1473)
-fn f0031(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0031(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6712,7 +6714,7 @@ fn f0031(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) intelligence"] (ModParser.lua:1474)
-fn f0032(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0032(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6731,7 +6733,7 @@ fn f0032(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) omniscience"] (ModParser.lua:1475)
-fn f0033(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0033(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6750,7 +6752,7 @@ fn f0033(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) total attributes"] (ModParser.lua:1476)
-fn f0034(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0034(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6772,7 +6774,7 @@ fn f0034(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) of your lowest attribute"] (ModParser.lua:1477)
-fn f0035(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0035(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6791,7 +6793,7 @@ fn f0035(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) reserved life"] (ModParser.lua:1478)
-fn f0036(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0036(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6810,7 +6812,7 @@ fn f0036(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) unreserved maximum mana"] (ModParser.lua:1479)
-fn f0037(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0037(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6829,7 +6831,7 @@ fn f0037(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) unreserved maximum mana, up to (%d+)%%"] (ModParser.lua:1480)
-fn f0038(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0038(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -6842,7 +6844,7 @@ fn f0038(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"stat"), sb(b"ManaUnreserved")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6852,7 +6854,7 @@ fn f0038(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour"] (ModParser.lua:1481)
-fn f0039(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0039(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6871,7 +6873,7 @@ fn f0039(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating"] (ModParser.lua:1482)
-fn f0040(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0040(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6890,7 +6892,7 @@ fn f0040(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating, up to (%d+)%%"] (ModParser.lua:1483)
-fn f0041(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0041(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -6903,7 +6905,7 @@ fn f0041(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"stat"), sb(b"Evasion")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -6913,7 +6915,7 @@ fn f0041(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum energy shield"] (ModParser.lua:1484)
-fn f0042(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0042(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6932,7 +6934,7 @@ fn f0042(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) player maximum energy shield"] (ModParser.lua:1485)
-fn f0043(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0043(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6952,7 +6954,7 @@ fn f0043(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum life"] (ModParser.lua:1486)
-fn f0044(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0044(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6971,7 +6973,7 @@ fn f0044(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) of maximum life or maximum mana, whichever is lower"] (ModParser.lua:1487)
-fn f0045(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0045(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -6990,7 +6992,7 @@ fn f0045(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) player maximum life"] (ModParser.lua:1488)
-fn f0046(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0046(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7010,7 +7012,7 @@ fn f0046(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum mana"] (ModParser.lua:1489)
-fn f0047(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0047(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7029,7 +7031,7 @@ fn f0047(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum mana, up to (%d+)%%"] (ModParser.lua:1490)
-fn f0048(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0048(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -7042,7 +7044,7 @@ fn f0048(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"stat"), sb(b"Mana")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -7052,7 +7054,7 @@ fn f0048(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum mana, up to a maximum of (%d+)%%"] (ModParser.lua:1491)
-fn f0049(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0049(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -7065,7 +7067,7 @@ fn f0049(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"stat"), sb(b"Mana")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -7075,7 +7077,7 @@ fn f0049(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) accuracy rating"] (ModParser.lua:1493)
-fn f0050(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0050(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7094,7 +7096,7 @@ fn f0050(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% block chance"] (ModParser.lua:1494)
-fn f0051(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0051(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7113,7 +7115,7 @@ fn f0051(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% chance to block on equipped shield"] (ModParser.lua:1495)
-fn f0052(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0052(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7132,7 +7134,7 @@ fn f0052(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% chance to block attack damage"] (ModParser.lua:1496)
-fn f0053(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0053(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7151,7 +7153,7 @@ fn f0053(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% chance to block spell damage"] (ModParser.lua:1497)
-fn f0054(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0054(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7170,7 +7172,7 @@ fn f0054(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) of the lowest of armour and evasion rating"] (ModParser.lua:1498)
-fn f0055(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0055(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7189,7 +7191,7 @@ fn f0055(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) energy shield on equipped gloves"] (ModParser.lua:1499)
-fn f0056(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0056(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7208,7 +7210,7 @@ fn f0056(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum energy shield on helmet"] (ModParser.lua:1500)
-fn f0057(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0057(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7227,7 +7229,7 @@ fn f0057(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum energy shield on equipped helmet"] (ModParser.lua:1501)
-fn f0058(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0058(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7246,7 +7248,7 @@ fn f0058(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) energy shield on equipped helmet"] (ModParser.lua:1502)
-fn f0059(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0059(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7265,7 +7267,7 @@ fn f0059(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) energy shield on equipped boots"] (ModParser.lua:1503)
-fn f0060(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0060(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7284,7 +7286,7 @@ fn f0060(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) energy shield on equipped body armour"] (ModParser.lua:1504)
-fn f0061(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0061(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7303,7 +7305,7 @@ fn f0061(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum energy shield on equipped shield"] (ModParser.lua:1505)
-fn f0062(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0062(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7322,7 +7324,7 @@ fn f0062(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) maximum energy shield on shield"] (ModParser.lua:1506)
-fn f0063(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0063(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7341,7 +7343,7 @@ fn f0063(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on equipped gloves"] (ModParser.lua:1507)
-fn f0064(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0064(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7360,7 +7362,7 @@ fn f0064(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on equipped helmet"] (ModParser.lua:1508)
-fn f0065(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0065(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7379,7 +7381,7 @@ fn f0065(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion on equipped boots"] (ModParser.lua:1509)
-fn f0066(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0066(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7398,7 +7400,7 @@ fn f0066(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion on boots"] (ModParser.lua:1510)
-fn f0067(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0067(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7417,7 +7419,7 @@ fn f0067(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on equipped boots"] (ModParser.lua:1511)
-fn f0068(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0068(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7436,7 +7438,7 @@ fn f0068(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on body armour"] (ModParser.lua:1512)
-fn f0069(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0069(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7455,7 +7457,7 @@ fn f0069(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on equipped body armour"] (ModParser.lua:1513)
-fn f0070(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0070(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7474,7 +7476,7 @@ fn f0070(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) evasion rating on equipped shield"] (ModParser.lua:1514)
-fn f0071(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0071(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7493,7 +7495,7 @@ fn f0071(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on gloves"] (ModParser.lua:1515)
-fn f0072(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0072(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7512,7 +7514,7 @@ fn f0072(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on equipped gloves"] (ModParser.lua:1516)
-fn f0073(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0073(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7531,7 +7533,7 @@ fn f0073(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on equipped helmet"] (ModParser.lua:1517)
-fn f0074(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0074(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7550,7 +7552,7 @@ fn f0074(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on equipped boots"] (ModParser.lua:1518)
-fn f0075(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0075(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7569,7 +7571,7 @@ fn f0075(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on equipped body armour"] (ModParser.lua:1519)
-fn f0076(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0076(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7588,7 +7590,7 @@ fn f0076(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour on equipped shield"] (ModParser.lua:1520)
-fn f0077(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0077(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7607,7 +7609,7 @@ fn f0077(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour or evasion rating on shield"] (ModParser.lua:1521)
-fn f0078(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0078(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7632,7 +7634,7 @@ fn f0078(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) armour or evasion rating on equipped shield"] (ModParser.lua:1522)
-fn f0079(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0079(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7657,7 +7659,7 @@ fn f0079(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% cold resistance"] (ModParser.lua:1523)
-fn f0080(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0080(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7676,7 +7678,7 @@ fn f0080(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% fire resistance"] (ModParser.lua:1524)
-fn f0081(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0081(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7695,7 +7697,7 @@ fn f0081(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% lightning resistance"] (ModParser.lua:1525)
-fn f0082(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0082(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7714,7 +7716,7 @@ fn f0082(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% chaos resistance"] (ModParser.lua:1526)
-fn f0083(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0083(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7733,7 +7735,7 @@ fn f0083(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% cold resistance above 75%%"] (ModParser.lua:1527)
-fn f0084(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0084(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7752,7 +7754,7 @@ fn f0084(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% lightning resistance above 75%%"] (ModParser.lua:1528)
-fn f0085(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0085(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7771,7 +7773,7 @@ fn f0085(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% fire resistance above 75%%"] (ModParser.lua:1529)
-fn f0086(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0086(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7790,7 +7792,7 @@ fn f0086(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% fire, cold, or lightning resistance above 75%%"] (ModParser.lua:1530)
-fn f0087(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0087(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7819,7 +7821,7 @@ fn f0087(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+) devotion"] (ModParser.lua:1531)
-fn f0088(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0088(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7839,7 +7841,7 @@ fn f0088(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% missing fire resistance, up to a maximum of (%d+)%%"] (ModParser.lua:1532)
-fn f0089(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0089(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -7862,7 +7864,7 @@ fn f0089(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% missing cold resistance, up to a maximum of (%d+)%%"] (ModParser.lua:1533)
-fn f0090(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0090(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -7885,7 +7887,7 @@ fn f0090(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per (%d+)%% missing fire, cold, or lightning resistance, up to a maximum of (%d+)%%"] (ModParser.lua:1534)
-fn f0091(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0091(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -7918,7 +7920,7 @@ fn f0091(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each remaining chain, up to (%d+)%%"] (ModParser.lua:1561)
-fn f0092(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0092(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_limit = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7938,7 +7940,7 @@ fn f0092(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["with (%d+) or more strength"] (ModParser.lua:1565)
-fn f0093(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0093(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7957,7 +7959,7 @@ fn f0093(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["with at least (%d+) strength"] (ModParser.lua:1566)
-fn f0094(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0094(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7976,7 +7978,7 @@ fn f0094(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? you have at least (%d+) strength"] (ModParser.lua:1567)
-fn f0095(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0095(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -7995,7 +7997,7 @@ fn f0095(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? you have at least (%d+) dexterity"] (ModParser.lua:1568)
-fn f0096(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0096(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8014,7 +8016,7 @@ fn f0096(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? you have at least (%d+) intelligence"] (ModParser.lua:1569)
-fn f0097(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0097(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8033,7 +8035,7 @@ fn f0097(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? strength is below (%d+)"] (ModParser.lua:1570)
-fn f0098(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0098(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8043,7 +8045,7 @@ fn f0098(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"Str")),
                     (sb(b"threshold"), sub(&l_num.clone(), &n(1.0))),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8053,7 +8055,7 @@ fn f0098(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? dexterity is below (%d+)"] (ModParser.lua:1571)
-fn f0099(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0099(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8063,7 +8065,7 @@ fn f0099(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"Dex")),
                     (sb(b"threshold"), sub(&l_num.clone(), &n(1.0))),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8073,7 +8075,7 @@ fn f0099(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? intelligence is below (%d+)"] (ModParser.lua:1572)
-fn f0100(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0100(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8083,7 +8085,7 @@ fn f0100(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"Int")),
                     (sb(b"threshold"), sub(&l_num.clone(), &n(1.0))),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8093,7 +8095,7 @@ fn f0100(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["at least (%d+) intelligence"] (ModParser.lua:1573)
-fn f0101(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0101(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8112,7 +8114,7 @@ fn f0101(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? you have at least (%d+) maximum energy shield"] (ModParser.lua:1576)
-fn f0102(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0102(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8131,7 +8133,7 @@ fn f0102(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["w?h?i[lf]e? you have at least (%d+) devotion"] (ModParser.lua:1581)
-fn f0103(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0103(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8150,7 +8152,7 @@ fn f0103(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while you have at least (%d+) rage"] (ModParser.lua:1582)
-fn f0104(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0104(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8169,7 +8171,7 @@ fn f0104(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while you have at least (%d+) nearby all[yi]e?s?"] (ModParser.lua:1587)
-fn f0105(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0105(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8188,7 +8190,7 @@ fn f0105(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if you have a (%a+) (%a+) in (%a+) slot"] (ModParser.lua:1598)
-fn f0106(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0106(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_rarity = arg(a, 1);
     let mut l_item = arg(a, 2);
@@ -8202,32 +8204,21 @@ fn f0106(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"var"),
                         concat(
-                            &first(gsub_fn(
-                                &l_rarity.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_rarity.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"ItemIn"),
                                 &concat(
-                                    &first(gsub_fn(
-                                        &l_item.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                    &first(gsub_case(&l_item.clone(), &sb(b"^%l"), true, &nil())),
                                     &concat(&sb(b" "), &{
                                         let v = {
-                                            let v = Value::Bool(eq(&l_slot.clone(), &sb(b"right")));
+                                            let v = V::Bool(eq(&l_slot.clone(), &sb(b"right")));
                                             if v.truthy() { n(2.0) } else { v }
                                         };
                                         if v.truthy() {
                                             v
                                         } else {
                                             {
-                                                let v =
-                                                    Value::Bool(eq(&l_slot.clone(), &sb(b"left")));
+                                                let v = V::Bool(eq(&l_slot.clone(), &sb(b"left")));
                                                 if v.truthy() { n(1.0) } else { v }
                                             }
                                         }
@@ -8245,7 +8236,7 @@ fn f0106(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while holding a (%w+)"] (ModParser.lua:1601)
-fn f0107(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0107(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_gear = arg(a, 1);
     return vec![tbl(
@@ -8273,7 +8264,7 @@ fn f0107(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while holding a (%w+) or (%w+)"] (ModParser.lua:1604)
-fn f0108(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0108(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_g1 = arg(a, 1);
     let mut l_g2 = arg(a, 2);
@@ -8302,7 +8293,7 @@ fn f0108(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if equipped ([%a%s]+) has an ([%a%s]+) modifier"] (ModParser.lua:1633)
-fn f0109(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0109(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_itemSlotName = arg(a, 1);
     let mut l_conditionSubstring = arg(a, 2);
@@ -8323,7 +8314,7 @@ fn f0109(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if both equipped ([%a%s]+) have a?n? ?([%a%s]+) modifiers?"] (ModParser.lua:1634)
-fn f0110(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0110(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_itemSlotName = arg(a, 1);
     let mut l_conditionSubstring = arg(a, 2);
@@ -8342,7 +8333,7 @@ fn f0110(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             &sub(&len(&l_itemSlotName.clone()), &n(1.0)),
                         )]),
                     ),
-                    (sb(b"bothSlots"), Value::Bool(true)),
+                    (sb(b"bothSlots"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8352,7 +8343,7 @@ fn f0110(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if both equipped left and right ([%a%s]+) have a?n? ?([%a%s]+) modifiers?"] (ModParser.lua:1635)
-fn f0111(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0111(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_itemSlotName = arg(a, 1);
     let mut l_conditionSubstring = arg(a, 2);
@@ -8371,7 +8362,7 @@ fn f0111(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             &sub(&len(&l_itemSlotName.clone()), &n(1.0)),
                         )]),
                     ),
-                    (sb(b"bothSlots"), Value::Bool(true)),
+                    (sb(b"bothSlots"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8381,7 +8372,7 @@ fn f0111(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if there are no ([%a%s]+) modifiers on equipped ([%a%s]+)"] (ModParser.lua:1637)
-fn f0112(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0112(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_conditionSubstring = arg(a, 1);
     let mut l_itemSlotName = arg(a, 2);
@@ -8393,7 +8384,7 @@ fn f0112(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"ItemCondition")),
                     (sb(b"searchCond"), l_conditionSubstring.clone()),
                     (sb(b"itemSlot"), l_itemSlotName.clone()),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8403,7 +8394,7 @@ fn f0112(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if there are no (%a+) modifiers on other equipped items"] (ModParser.lua:1638)
-fn f0113(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0113(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_conditionSubstring = arg(a, 1);
     return vec![tbl(
@@ -8414,9 +8405,9 @@ fn f0113(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"ItemCondition")),
                     (sb(b"searchCond"), l_conditionSubstring.clone()),
                     (sb(b"itemSlot"), sb(b"{SlotName}")),
-                    (sb(b"allSlots"), Value::Bool(true)),
-                    (sb(b"excludeSelf"), Value::Bool(true)),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"allSlots"), V::Bool(true)),
+                    (sb(b"excludeSelf"), V::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8426,7 +8417,7 @@ fn f0113(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if equipped shield has at least (%d+)%% chance to block"] (ModParser.lua:1649)
-fn f0114(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0114(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8445,7 +8436,7 @@ fn f0114(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if you have (%d+) primordial items socketed or equipped"] (ModParser.lua:1650)
-fn f0115(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0115(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8464,7 +8455,7 @@ fn f0115(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["after channelling for (%d+) seconds?"] (ModParser.lua:1682)
-fn f0116(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0116(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8483,7 +8474,7 @@ fn f0116(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if you've been channelling for at least (%d+) seconds?"] (ModParser.lua:1683)
-fn f0117(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0117(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8502,7 +8493,7 @@ fn f0117(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while you have at least (%d+) crab barriers"] (ModParser.lua:1700)
-fn f0118(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0118(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8521,7 +8512,7 @@ fn f0118(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while you have at least (%d+) fortification"] (ModParser.lua:1701)
-fn f0119(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0119(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8540,7 +8531,7 @@ fn f0119(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while you have at least (%d+) total endurance, frenzy and power charges"] (ModParser.lua:1702)
-fn f0120(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0120(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8559,7 +8550,7 @@ fn f0120(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["with at least one (%w+) grafted to you"] (ModParser.lua:1752)
-fn f0121(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0121(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_graft = arg(a, 1);
     return vec![tbl(
@@ -8584,7 +8575,7 @@ fn f0121(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["while at least (%d+) enemies are nearby"] (ModParser.lua:1778)
-fn f0122(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0122(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8603,7 +8594,7 @@ fn f0122(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if you[' ]h?a?ve killed at least (%d) enemies recently"] (ModParser.lua:1806)
-fn f0123(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0123(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8622,7 +8613,7 @@ fn f0123(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each skill you've used recently, up to (%d+)%%"] (ModParser.lua:1852)
-fn f0124(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0124(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8632,7 +8623,7 @@ fn f0124(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"SkillUsedRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8642,7 +8633,7 @@ fn f0124(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each second you've been affected by a warcry buff, up to a maximum of (%d+)%%"] (ModParser.lua:1862)
-fn f0125(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0125(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8652,7 +8643,7 @@ fn f0125(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"AffectedByWarcryBuffDuration")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8662,7 +8653,7 @@ fn f0125(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each of your mines detonated recently, up to (%d+)%%"] (ModParser.lua:1863)
-fn f0126(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0126(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8672,7 +8663,7 @@ fn f0126(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"MineDetonatedRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8682,7 +8673,7 @@ fn f0126(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["[fp][oe]r ?e?a?c?h? mine detonated recently, up to (%d+)%%"] (ModParser.lua:1864)
-fn f0127(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0127(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8692,7 +8683,7 @@ fn f0127(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"MineDetonatedRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8702,7 +8693,7 @@ fn f0127(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["[fp][oe]r ?e?a?c?h? mine detonated recently, up to (%d+)%% per second"] (ModParser.lua:1865)
-fn f0128(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0128(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8712,7 +8703,7 @@ fn f0128(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"MineDetonatedRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8722,7 +8713,7 @@ fn f0128(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each of your traps triggered recently, up to (%d+)%%"] (ModParser.lua:1867)
-fn f0129(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0129(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8732,7 +8723,7 @@ fn f0129(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"TrapTriggeredRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8742,7 +8733,7 @@ fn f0129(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each trap triggered recently, up to (%d+)%%"] (ModParser.lua:1868)
-fn f0130(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0130(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8752,7 +8743,7 @@ fn f0130(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"TrapTriggeredRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8762,7 +8753,7 @@ fn f0130(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each trap triggered recently, up to (%d+)%% per second"] (ModParser.lua:1869)
-fn f0131(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0131(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8772,7 +8763,7 @@ fn f0131(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"TrapTriggeredRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8782,7 +8773,7 @@ fn f0131(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if you[' ]h?a?ve spent (%d+) total mana recently"] (ModParser.lua:1890)
-fn f0132(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0132(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8801,7 +8792,7 @@ fn f0132(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for %d+ seconds after spending a total of (%d+) mana"] (ModParser.lua:1892)
-fn f0133(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0133(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8820,7 +8811,7 @@ fn f0133(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each hit you've taken recently up to a maximum of (%d+)%%"] (ModParser.lua:1914)
-fn f0134(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0134(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8830,7 +8821,7 @@ fn f0134(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"BeenHitRecently")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8840,7 +8831,7 @@ fn f0134(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each nearby enemy, up to (%d+)%%"] (ModParser.lua:1916)
-fn f0135(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0135(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8850,7 +8841,7 @@ fn f0135(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyEnemies")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8860,7 +8851,7 @@ fn f0135(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["for each nearby enemy, up to a maximum of (%d+)%%"] (ModParser.lua:1917)
-fn f0136(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0136(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8870,7 +8861,7 @@ fn f0136(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyEnemies")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -8880,7 +8871,7 @@ fn f0136(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["against enemies affected by (%d+) or more poisons"] (ModParser.lua:1970)
-fn f0137(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0137(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8900,7 +8891,7 @@ fn f0137(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["against enemies affected by at least (%d+) poisons"] (ModParser.lua:1971)
-fn f0138(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0138(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8920,7 +8911,7 @@ fn f0138(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["against enemies affected by (%d+) spider's webs"] (ModParser.lua:1999)
-fn f0139(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0139(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8940,7 +8931,7 @@ fn f0139(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["if (%d+)%% of curse duration expired"] (ModParser.lua:2002)
-fn f0140(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0140(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8960,7 +8951,7 @@ fn f0140(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["against enemies with (%w+) exposure"] (ModParser.lua:2003)
-fn f0141(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0141(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_element = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8988,7 +8979,7 @@ fn f0141(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // modTagList["per poison affecting enemy, up to %+([%d%.]+)%%"] (ModParser.lua:2009)
-fn f0142(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0142(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(
         vec![(
@@ -8999,7 +8990,7 @@ fn f0142(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"actor"), sb(b"enemy")),
                     (sb(b"var"), sb(b"PoisonStack")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -9009,7 +9000,7 @@ fn f0142(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill have a (%d+)%% chance to explode, dealing a (.+) of their maximum life as (.+) damage"] (ModParser.lua:2134)
-fn f0143(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0143(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9018,7 +9009,7 @@ fn f0143(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill have ?a? ?(%d+)%% chance to explode, dealing (%d+)%% of their maximum life as (.+) damage"] (ModParser.lua:2137)
-fn f0144(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0144(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9027,7 +9018,7 @@ fn f0144(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you or your totems kill have (%d+)%% chance to explode, dealing (%d+)%% of their maximum life as (.+) damage"] (ModParser.lua:2140)
-fn f0145(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0145(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9036,7 +9027,7 @@ fn f0145(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill while using pride have (%d+)%% chance to explode, dealing a (.+) of their maximum life as (.+) damage"] (ModParser.lua:2143)
-fn f0146(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0146(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9056,7 +9047,7 @@ fn f0146(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill during effect have a (%d+)%% chance to explode, dealing a (.+) of their maximum life as damage of a random element"] (ModParser.lua:2146)
-fn f0147(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0147(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9075,7 +9066,7 @@ fn f0147(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill while affected by glorious madness have a (%d+)%% chance to explode, dealing a (.+) of their life as (.+) damage"] (ModParser.lua:2149)
-fn f0148(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0148(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9095,7 +9086,7 @@ fn f0148(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies killed with attack hits have a (%d+)%% chance to explode, dealing a (.+) of their life as (.+) damage"] (ModParser.lua:2152)
-fn f0149(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0149(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9104,7 +9095,7 @@ fn f0149(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies killed with wand hits have a (%d+)%% chance to explode, dealing a (.+) of their life as (.+) damage"] (ModParser.lua:2155)
-fn f0150(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0150(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9124,7 +9115,7 @@ fn f0150(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cursed enemies you or your minions kill have a (%d+)%% chance to explode, dealing a (.+) of their maximum life as (.+) damage"] (ModParser.lua:2158)
-fn f0151(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0151(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -9145,7 +9136,7 @@ fn f0151(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you kill explode, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2161)
-fn f0152(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0152(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9153,7 +9144,7 @@ fn f0152(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies killed explode dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2164)
-fn f0153(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0153(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9161,7 +9152,7 @@ fn f0153(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies on fungal ground you kill explode, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2167)
-fn f0154(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0154(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9181,7 +9172,7 @@ fn f0154(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies killed with attack or spell hits explode, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2170)
-fn f0155(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0155(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9189,7 +9180,7 @@ fn f0155(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shocked enemies you kill explode, dealing (%d+)%% of their life as (.+) damage which cannot shock"] (ModParser.lua:2173)
-fn f0156(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0156(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9209,7 +9200,7 @@ fn f0156(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ignited enemies you kill explode, dealing (%d+)%% of their life as (.+) damage which cannot ignite"] (ModParser.lua:2176)
-fn f0157(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0157(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9229,7 +9220,7 @@ fn f0157(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bleeding enemies you kill explode, dealing (%d+)%% of their maximum life as (.+) damage"] (ModParser.lua:2179)
-fn f0158(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0158(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9249,7 +9240,7 @@ fn f0158(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["burning enemies you kill have a (%d+)%% chance to explode, dealing a (.+) of their maximum life as (.+) damage"] (ModParser.lua:2182)
-fn f0159(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0159(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9269,7 +9260,7 @@ fn f0159(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies killed near corpses affected by your curses explode, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2187)
-fn f0160(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0160(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9297,7 +9288,7 @@ fn f0160(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies taunted by your warcries explode on death, dealing (%d+)%% of their maximum life as (.+) damage"] (ModParser.lua:2190)
-fn f0161(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0161(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9324,7 +9315,7 @@ fn f0161(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["totems explode on death, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2193)
-fn f0162(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0162(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9332,7 +9323,7 @@ fn f0162(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby corpses explode when you warcry, dealing (%d+)%% of their life as (.+) damage"] (ModParser.lua:2196)
-fn f0163(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0163(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_amount = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -9340,7 +9331,7 @@ fn f0163(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) rage regenerated for every (%d+) mana regeneration per second"] (ModParser.lua:2200)
-fn f0164(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0164(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -9364,7 +9355,7 @@ fn f0164(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%w+) recovery from regeneration is not applied"] (ModParser.lua:2204)
-fn f0165(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0165(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_type = arg(a, 1);
     return vec![tbl(vec![], {
@@ -9381,7 +9372,7 @@ fn f0165(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% less damage taken for every (%d+)%% life recovery per second from leech"] (ModParser.lua:2205)
-fn f0166(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0166(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -9405,7 +9396,7 @@ fn f0166(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%w+) recovery from non%-instant leech is not applied"] (ModParser.lua:2208)
-fn f0167(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0167(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_type = arg(a, 1);
     return vec![tbl(vec![], {
@@ -9422,7 +9413,7 @@ fn f0167(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% additional physical damage reduction for every (%d+)%% life recovery per second from leech"] (ModParser.lua:2209)
-fn f0168(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0168(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -9453,7 +9444,7 @@ fn f0168(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["chance to evade hits is based off of (%d+)%% of your ward instead of your evasion rating"] (ModParser.lua:2216)
-fn f0169(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0169(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"EvadeChanceBasedOnWard")]))];
@@ -9468,7 +9459,7 @@ fn f0169(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["physical damage reduction from hits is based off of (%d+)%% of your ward instead of your armour"] (ModParser.lua:2220)
-fn f0170(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0170(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"PhysicalReductionBasedOnWard")]))];
@@ -9483,7 +9474,7 @@ fn f0170(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum chance to dodge spell hits is (%d+)%%"] (ModParser.lua:2224)
-fn f0171(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0171(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9498,7 +9489,7 @@ fn f0171(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased blind effect"] (ModParser.lua:2250)
-fn f0172(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0172(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9518,7 +9509,7 @@ fn f0172(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of blind from melee weapons"] (ModParser.lua:2251)
-fn f0173(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0173(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9538,7 +9529,7 @@ fn f0173(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% chance to block spell damage for each (%d+)%% overcapped chance to block attack damage"] (ModParser.lua:2252)
-fn f0174(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0174(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -9562,7 +9553,7 @@ fn f0174(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of physical, cold and lightning damage converted to fire damage"] (ModParser.lua:2266)
-fn f0175(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0175(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -9587,7 +9578,7 @@ fn f0175(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills cost %+(%d+) rage"] (ModParser.lua:2290)
-fn f0176(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0176(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9597,7 +9588,7 @@ fn f0176(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries cost %+(%d+)%% of life"] (ModParser.lua:2291)
-fn f0177(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0177(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9607,13 +9598,13 @@ fn f0177(c: &Ctx, a: &[Value]) -> Vec<Value> {
             n(1.0),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"Life")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -9623,7 +9614,7 @@ fn f0177(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["vaal skills used during effect have (%d+)%% reduced soul gain prevention duration"] (ModParser.lua:2292)
-fn f0178(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0178(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9641,7 +9632,7 @@ fn f0178(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Vaal")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Vaal"))),
                 ],
                 vec![],
             ),
@@ -9651,7 +9642,7 @@ fn f0178(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["vaal volcanic fissure and vaal molten strike have (%d+)%% reduced soul gain prevention duration"] (ModParser.lua:2293)
-fn f0179(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0179(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9666,14 +9657,14 @@ fn f0179(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Volcanic Fissure"), sb(b"Molten Strike")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Vaal")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Vaal"))),
                 ],
                 vec![],
             ),
@@ -9683,7 +9674,7 @@ fn f0179(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["vaal skills can store %+(%d+) uses?"] (ModParser.lua:2294)
-fn f0180(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0180(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -9694,7 +9685,7 @@ fn f0180(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Vaal")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Vaal"))),
                 ],
                 vec![],
             ),
@@ -9704,7 +9695,7 @@ fn f0180(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits that deal elemental damage remove exposure to those elements and inflict exposure to other elements exposure inflicted this way applies (%-%d+)%% to resistances"] (ModParser.lua:2298)
-fn f0181(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0181(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -9805,7 +9796,7 @@ fn f0181(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you hit with elemental damage temporarily get (%+%d+)%% resistance to those elements and (%-%d+)%% resistance to other elements"] (ModParser.lua:2304)
-fn f0182(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0182(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_plus = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_minus = arg(a, 2);
@@ -9850,7 +9841,7 @@ fn f0182(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 vec![
                                     (sb(b"type"), sb(b"Condition")),
                                     (sb(b"var"), sb(b"HitByFireDamage")),
-                                    (sb(b"neg"), Value::Bool(true)),
+                                    (sb(b"neg"), V::Bool(true)),
                                 ],
                                 vec![],
                             ),
@@ -9911,7 +9902,7 @@ fn f0182(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 vec![
                                     (sb(b"type"), sb(b"Condition")),
                                     (sb(b"var"), sb(b"HitByColdDamage")),
-                                    (sb(b"neg"), Value::Bool(true)),
+                                    (sb(b"neg"), V::Bool(true)),
                                 ],
                                 vec![],
                             ),
@@ -9973,7 +9964,7 @@ fn f0182(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![
                                 (sb(b"type"), sb(b"Condition")),
                                 (sb(b"var"), sb(b"HitByLightningDamage")),
-                                (sb(b"neg"), Value::Bool(true)),
+                                (sb(b"neg"), V::Bool(true)),
                             ],
                             vec![],
                         ),
@@ -10000,7 +9991,7 @@ fn f0182(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["modifiers to critical strike multiplier also apply to damage over time multiplier for ailments from critical strikes at (%d+)%% of their value"] (ModParser.lua:2325)
-fn f0183(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0183(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10014,7 +10005,7 @@ fn f0183(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to cold damage over time multiplier for each (%d+)%% overcapped cold resistance"] (ModParser.lua:2327)
-fn f0184(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0184(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_val = arg(a, 2);
@@ -10038,7 +10029,7 @@ fn f0184(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you can inflict bleeding on an enemy up to (%d+) times?"] (ModParser.lua:2334)
-fn f0185(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0185(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -10052,7 +10043,7 @@ fn f0185(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your minions spread caustic ground on death, dealing (%d+)%% of their maximum life as chaos damage per second"] (ModParser.lua:2338)
-fn f0186(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0186(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -10083,7 +10074,7 @@ fn f0186(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your minions spread burning ground on death, dealing (%d+)%% of their maximum life as fire damage per second"] (ModParser.lua:2342)
-fn f0187(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0187(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -10114,7 +10105,7 @@ fn f0187(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) grasping vines each second while stationary"] (ModParser.lua:2347)
-fn f0188(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0188(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10127,7 +10118,7 @@ fn f0188(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"StationarySeconds")),
                     (sb(b"limit"), n(10.0)),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10144,7 +10135,7 @@ fn f0188(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["all damage inflicts poison against enemies affected by at least (%d+) grasping vines"] (ModParser.lua:2350)
-fn f0189(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0189(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -10200,7 +10191,7 @@ fn f0189(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% of damage from blocked hits"] (ModParser.lua:2374)
-fn f0190(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0190(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10210,11 +10201,11 @@ fn f0190(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain no (.+) from equipped (.+)"] (ModParser.lua:2382)
-fn f0191(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0191(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_stat = arg(a, 1);
     let mut l_slot = arg(a, 2);
-    if (Value::Bool(eq(&l_slot.clone(), &sb(b"shield")))).truthy() {
+    if (V::Bool(eq(&l_slot.clone(), &sb(b"shield")))).truthy() {
         l_slot = sb(b"Weapon 2");
     }
     return vec![tbl(vec![], {
@@ -10224,10 +10215,10 @@ fn f0191(c: &Ctx, a: &[Value]) -> Vec<Value> {
             &concat(
                 &first(gsub(
                     &first(vec![str_sub(
-                        &first(gsub_fn(
+                        &first(gsub_case(
                             &concat(&sb(b" "), &l_stat.clone()),
                             &sb(b"%W%l"),
-                            &mut upper_fn,
+                            true,
                             &nil(),
                         )),
                         &n(2.0),
@@ -10240,10 +10231,10 @@ fn f0191(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 &concat(
                     &sb(b"From"),
                     &first(vec![str_sub(
-                        &first(gsub_fn(
+                        &first(gsub_case(
                             &concat(&sb(b" "), &l_slot.clone()),
                             &sb(b"%W%l"),
-                            &mut upper_fn,
+                            true,
                             &nil(),
                         )),
                         &n(2.0),
@@ -10257,7 +10248,7 @@ fn f0191(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["auras from your skills have (%d+)%% more effect on you"] (ModParser.lua:2400)
-fn f0192(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0192(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10271,7 +10262,7 @@ fn f0192(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["auras from your skills have (%d+)%% increased effect on you"] (ModParser.lua:2401)
-fn f0193(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0193(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10285,7 +10276,7 @@ fn f0193(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage taken bypasses ward"] (ModParser.lua:2404)
-fn f0194(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0194(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10295,7 +10286,7 @@ fn f0194(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ward has a (%d+)%% chance to not break"] (ModParser.lua:2405)
-fn f0195(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0195(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10309,7 +10300,7 @@ fn f0195(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["damage taken bypasses unbroken ward if the hit deals less damage than (%d+)%% of ward"] (ModParser.lua:2406)
-fn f0196(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0196(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10323,7 +10314,7 @@ fn f0196(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum energy shield is (%d+)"] (ModParser.lua:2407)
-fn f0197(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0197(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10333,7 +10324,7 @@ fn f0197(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while not on full life, sacrifice ([%d%.]+)%% of mana per second to recover that much life"] (ModParser.lua:2408)
-fn f0198(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0198(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -10344,7 +10335,7 @@ fn f0198(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"FullLife")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10365,7 +10356,7 @@ fn f0198(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"FullLife")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10375,7 +10366,7 @@ fn f0198(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased maximum energy shield"] (ModParser.lua:2412)
-fn f0199(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0199(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10390,7 +10381,7 @@ fn f0199(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of armour also applies to chaos damage taken from hits"] (ModParser.lua:2420)
-fn f0200(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0200(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10404,7 +10395,7 @@ fn f0200(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["armour also applies to chaos damage taken from hits"] (ModParser.lua:2421)
-fn f0201(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0201(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10418,7 +10409,7 @@ fn f0201(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum damage reduction for any damage type is (%d+)%%"] (ModParser.lua:2422)
-fn f0202(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0202(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10432,7 +10423,7 @@ fn f0202(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of maximum mana is converted to twice that much armour"] (ModParser.lua:2426)
-fn f0203(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0203(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10442,7 +10433,7 @@ fn f0203(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arcane surge also grants (%d+)%% increased life regeneration rate to you"] (ModParser.lua:2431)
-fn f0204(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0204(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10456,7 +10447,7 @@ fn f0204(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to effect of flasks applied to you also applies to effect of arcane surge on you at (%d+)%% of their value"] (ModParser.lua:2432)
-fn f0205(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0205(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10470,7 +10461,7 @@ fn f0205(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you have shepherd of souls if at least (%d+) corrupted items are equipped"] (ModParser.lua:2438)
-fn f0206(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0206(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10490,7 +10481,7 @@ fn f0206(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you have everlasting sacrifice if at least (%d+) corrupted items are equipped"] (ModParser.lua:2441)
-fn f0207(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0207(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10510,7 +10501,7 @@ fn f0207(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+) to (%d+) attack physical damage to melee skills per (%d+) dexterity while you are unencumbered"] (ModParser.lua:2444)
-fn f0208(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0208(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -10521,8 +10512,8 @@ fn f0208(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             first(vec![tonumber(&l_min.clone())]),
             nil(),
-            field(&c.value("ModFlag"), "Melee"),
-            field(&c.value("KeywordFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Melee")),
+            c.index("KeywordFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -10544,8 +10535,8 @@ fn f0208(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             first(vec![tonumber(&l_max.clone())]),
             nil(),
-            field(&c.value("ModFlag"), "Melee"),
-            field(&c.value("KeywordFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Melee")),
+            c.index("KeywordFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -10567,7 +10558,7 @@ fn f0208(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+) to (%d+) fire damage to attacks for every (%d+)%% your light radius is above base value"] (ModParser.lua:2448)
-fn f0209(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0209(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -10578,7 +10569,7 @@ fn f0209(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             first(vec![tonumber(&l_min.clone())]),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -10593,7 +10584,7 @@ fn f0209(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             first(vec![tonumber(&l_max.clone())]),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -10608,7 +10599,7 @@ fn f0209(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more attack damage if accuracy rating is higher than maximum life"] (ModParser.lua:2452)
-fn f0210(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0210(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -10616,7 +10607,7 @@ fn f0210(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             sb(b"Damage"),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -10637,7 +10628,7 @@ fn f0210(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             sb(b"Damage"),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -10658,7 +10649,7 @@ fn f0210(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to defend with double your armour for each time you've been hit by an enemy recently, up to (%d+)%%"] (ModParser.lua:2457)
-fn f0211(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0211(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_numChance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_cap = arg(a, 2);
@@ -10720,7 +10711,7 @@ fn f0211(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourMax")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10728,7 +10719,7 @@ fn f0211(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourAvg")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10746,7 +10737,7 @@ fn f0211(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to defend with (%d+)%% of armour for each time you've been hit by an enemy recently, up to (%d+)%%"] (ModParser.lua:2462)
-fn f0212(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0212(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_numChance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_numArmourMultiplier = arg(a, 2);
@@ -10818,7 +10809,7 @@ fn f0212(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourMax")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10826,7 +10817,7 @@ fn f0212(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourAvg")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10844,7 +10835,7 @@ fn f0212(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to defend with double armour"] (ModParser.lua:2468)
-fn f0213(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0213(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_numChance = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -10896,7 +10887,7 @@ fn f0213(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourMax")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10904,7 +10895,7 @@ fn f0213(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourAvg")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -10914,7 +10905,7 @@ fn f0213(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% chance to treat enemy monster elemental resistance values as inverted"] (ModParser.lua:2474)
-fn f0214(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0214(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10929,7 +10920,7 @@ fn f0214(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased accuracy rating at close range"] (ModParser.lua:2478)
-fn f0215(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0215(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10950,7 +10941,7 @@ fn f0215(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more accuracy rating at close range"] (ModParser.lua:2479)
-fn f0216(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0216(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10971,7 +10962,7 @@ fn f0216(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased accuracy rating against unique enemies"] (ModParser.lua:2480)
-fn f0217(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0217(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -10993,7 +10984,7 @@ fn f0217(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more accuracy rating against unique enemies"] (ModParser.lua:2481)
-fn f0218(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0218(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11015,7 +11006,7 @@ fn f0218(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to defend with (%d+)%% of armour"] (ModParser.lua:2482)
-fn f0219(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0219(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_numChance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_numArmourMultiplier = arg(a, 2);
@@ -11078,7 +11069,7 @@ fn f0219(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourMax")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11086,7 +11077,7 @@ fn f0219(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"ArmourAvg")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11096,7 +11087,7 @@ fn f0219(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["defend with (%d+)%% of armour while not on low energy shield"] (ModParser.lua:2487)
-fn f0220(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0220(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11109,7 +11100,7 @@ fn f0220(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"LowEnergyShield")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11119,7 +11110,7 @@ fn f0220(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased armour and energy shield from equipped body armour if equipped helmet, gloves and boots all have armour and energy shield"] (ModParser.lua:2490)
-fn f0221(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0221(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11181,7 +11172,7 @@ fn f0221(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["brands have (%d+)%% increased area of effect if (%d+)%% of attached duration expired"] (ModParser.lua:2500)
-fn f0222(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0222(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11199,7 +11190,7 @@ fn f0222(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Brand")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Brand"))),
                 ],
                 vec![],
             ),
@@ -11209,7 +11200,7 @@ fn f0222(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["exerted attacks deal (%d+)%% increased damage"] (ModParser.lua:2506)
-fn f0223(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0223(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11218,7 +11209,7 @@ fn f0223(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
         ]));
         v
@@ -11226,7 +11217,7 @@ fn f0223(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["exerted attacks have (%d+)%% chance to deal double damage"] (ModParser.lua:2507)
-fn f0224(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0224(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11235,7 +11226,7 @@ fn f0224(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
         ]));
         v
@@ -11243,7 +11234,7 @@ fn f0224(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants (%d+) passive skill points?"] (ModParser.lua:2509)
-fn f0225(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0225(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11253,7 +11244,7 @@ fn f0225(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles gain damage as they travel farther, dealing up to (%d+)%% increased damage with hits to targets"] (ModParser.lua:2511)
-fn f0226(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0226(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11263,8 +11254,8 @@ fn f0226(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Hit"),
-                field(&c.value("ModFlag"), "Projectile"),
+                c.index("ModFlag", &sb(b"Hit")),
+                c.index("ModFlag", &sb(b"Projectile")),
             ])]),
             tbl(
                 vec![
@@ -11288,7 +11279,7 @@ fn f0226(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poison you inflict with critical strikes deals (%d+)%% more damage"] (ModParser.lua:2517)
-fn f0227(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0227(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11298,7 +11289,7 @@ fn f0227(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -11312,7 +11303,7 @@ fn f0227(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more damage while there is at most one rare or unique enemy nearby"] (ModParser.lua:2521)
-fn f0228(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0228(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11335,7 +11326,7 @@ fn f0228(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% reduced damage taken while there are at least two rare or unique enemies nearby"] (ModParser.lua:2522)
-fn f0229(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0229(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11359,7 +11350,7 @@ fn f0229(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% less damage taken while there are at least two rare or unique enemies nearby"] (ModParser.lua:2523)
-fn f0230(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0230(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11383,7 +11374,7 @@ fn f0230(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot be stunned while you have at least (%d+) rage"] (ModParser.lua:2572)
-fn f0231(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0231(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11403,7 +11394,7 @@ fn f0231(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% less damage taken per (%d+) rage, up to a maximum of (%d+)%%"] (ModParser.lua:2573)
-fn f0232(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0232(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -11420,7 +11411,7 @@ fn f0232(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"var"), sb(b"Rage")),
                     (sb(b"div"), l_div.clone()),
                     (sb(b"limit"), neg(&first(vec![tonumber(&l_limit.clone())]))),
-                    (sb(b"limitNegTotal"), Value::Bool(true)),
+                    (sb(b"limitNegTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11430,7 +11421,7 @@ fn f0232(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lose ([%d%.]+)%% of life per second per rage while you are not losing rage"] (ModParser.lua:2576)
-fn f0233(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0233(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11459,7 +11450,7 @@ fn f0233(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've warcried recently, you and nearby allies have (%d+)%% increased attack speed"] (ModParser.lua:2577)
-fn f0234(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0234(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11474,7 +11465,7 @@ fn f0234(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"INC"),
                         l_num.clone(),
                         nil(),
-                        field(&c.value("ModFlag"), "Attack"),
+                        c.index("ModFlag", &sb(b"Attack")),
                     ])),
                 )],
                 vec![],
@@ -11492,7 +11483,7 @@ fn f0234(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% increased armour per (%d+) power for 8 seconds when you warcry, up to a maximum of (%d+)%%"] (ModParser.lua:2578)
-fn f0235(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0235(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -11526,7 +11517,7 @@ fn f0235(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["exerted attacks deal (%d+)%% more attack damage if a warcry sacrificed rage recently"] (ModParser.lua:2587)
-fn f0236(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0236(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11535,7 +11526,7 @@ fn f0236(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
         ]));
         v
@@ -11543,7 +11534,7 @@ fn f0236(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["deal (%d+)%% less damage"] (ModParser.lua:2588)
-fn f0237(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0237(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11553,7 +11544,7 @@ fn f0237(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you have (%d+) fortification"] (ModParser.lua:2596)
-fn f0238(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0238(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11567,7 +11558,7 @@ fn f0238(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've impaled an enemy recently, you and nearby allies have %+(%d+) to armour"] (ModParser.lua:2599)
-fn f0239(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0239(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11594,7 +11585,7 @@ fn f0239(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you and allies affected by your placed banners regenerate ([%d%.]+)%% of life per second for each stage"] (ModParser.lua:2601)
-fn f0240(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0240(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11632,7 +11623,7 @@ fn f0240(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you and allies near your banner regenerate ([%d%.]+)%% of life per second for each valour consumed for that banner"] (ModParser.lua:2604)
-fn f0241(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0241(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11670,7 +11661,7 @@ fn f0241(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies near your totems take (%d+)%% increased physical and fire damage"] (ModParser.lua:2608)
-fn f0242(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0242(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -11700,7 +11691,7 @@ fn f0242(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["every (%d+) seconds, gain (%d+)%% of physical damage as extra fire damage for (%d+) seconds"] (ModParser.lua:2612)
-fn f0243(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0243(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_frequency = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -11724,7 +11715,7 @@ fn f0243(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more damage for each endurance charge lost recently, up to (%d+)%%"] (ModParser.lua:2615)
-fn f0244(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0244(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -11739,7 +11730,7 @@ fn f0244(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"EnduranceChargesLostRecently")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11749,7 +11740,7 @@ fn f0244(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more damage if you've lost an endurance charge in the past 8 seconds"] (ModParser.lua:2621)
-fn f0245(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0245(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11770,7 +11761,7 @@ fn f0245(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you attack with a non%-vaal slam or strike skill near an enemy"] (ModParser.lua:2622)
-fn f0246(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0246(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -11778,7 +11769,7 @@ fn f0246(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain %+(%d+) life when you hit a bleeding enemy"] (ModParser.lua:2640)
-fn f0249(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0249(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11787,7 +11778,7 @@ fn f0249(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"ActorCondition")),
@@ -11802,7 +11793,7 @@ fn f0249(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased blink arrow and mirror arrow cooldown recovery speed"] (ModParser.lua:2641)
-fn f0250(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0250(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11817,7 +11808,7 @@ fn f0250(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Blink Arrow"), sb(b"Mirror Arrow")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -11827,7 +11818,7 @@ fn f0250(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% more damage for each remaining chain"] (ModParser.lua:2652)
-fn f0251(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0251(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11836,7 +11827,7 @@ fn f0251(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -11850,7 +11841,7 @@ fn f0251(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits and ailments for each remaining chain"] (ModParser.lua:2653)
-fn f0252(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0252(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11861,8 +11852,8 @@ fn f0252(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -11874,7 +11865,7 @@ fn f0252(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
@@ -11884,7 +11875,7 @@ fn f0252(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits and ailments for each remaining chain, up to a maximum of (%d+)%%"] (ModParser.lua:2654)
-fn f0253(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0253(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -11897,8 +11888,8 @@ fn f0253(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -11912,7 +11903,7 @@ fn f0253(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
@@ -11922,7 +11913,7 @@ fn f0253(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits and ailments for each remaining chain, up to (%d+)%%"] (ModParser.lua:2657)
-fn f0254(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0254(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -11935,8 +11926,8 @@ fn f0254(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -11950,7 +11941,7 @@ fn f0254(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
@@ -11960,7 +11951,7 @@ fn f0254(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage for each remaining chain"] (ModParser.lua:2660)
-fn f0255(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0255(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11969,7 +11960,7 @@ fn f0255(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -11983,7 +11974,7 @@ fn f0255(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles gain damage as they travel farther, dealing up to (%d+)%% more damage with hits and ailments"] (ModParser.lua:2662)
-fn f0256(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0256(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -11994,8 +11985,8 @@ fn f0256(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -12019,7 +12010,7 @@ fn f0256(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased mirage archer duration"] (ModParser.lua:2663)
-fn f0257(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0257(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12029,7 +12020,7 @@ fn f0257(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%-%+]%d+) to maximum number of summoned mirage archers"] (ModParser.lua:2664)
-fn f0258(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0258(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12043,7 +12034,7 @@ fn f0258(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%-%+]%d+) to maximum number of sacred wisps"] (ModParser.lua:2665)
-fn f0259(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0259(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12053,7 +12044,7 @@ fn f0259(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% increased area of effect for %d+ seconds"] (ModParser.lua:2667)
-fn f0260(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0260(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12074,7 +12065,7 @@ fn f0260(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% increased elemental damage for %d+ seconds"] (ModParser.lua:2668)
-fn f0261(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0261(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12095,7 +12086,7 @@ fn f0261(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["for each element you've been hit by damage of recently, (%d+)%% increased damage of that element"] (ModParser.lua:2669)
-fn f0262(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0262(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -12141,7 +12132,7 @@ fn f0262(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["for each element you've been hit by damage of recently, (%d+)%% reduced damage taken of that element"] (ModParser.lua:2674)
-fn f0263(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0263(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -12187,7 +12178,7 @@ fn f0263(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased area of effect while you don't have convergence"] (ModParser.lua:2682)
-fn f0264(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0264(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12198,7 +12189,7 @@ fn f0264(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                     (sb(b"var"), sb(b"Convergence")),
                 ],
                 vec![],
@@ -12209,7 +12200,7 @@ fn f0264(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["exposure you inflict applies an extra (%-?%d+)%% to the affected resistance"] (ModParser.lua:2683)
-fn f0265(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0265(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12219,7 +12210,7 @@ fn f0265(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased golem damage per summoned golem"] (ModParser.lua:2785)
-fn f0266(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0266(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12236,7 +12227,7 @@ fn f0266(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                 ],
                 vec![],
             ),
@@ -12253,7 +12244,7 @@ fn f0266(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shocks from your hits always increase damage taken by at least (%d+)%%"] (ModParser.lua:2786)
-fn f0267(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0267(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12263,7 +12254,7 @@ fn f0267(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["chills from your hits always reduce action speed by at least (%d+)%%"] (ModParser.lua:2787)
-fn f0268(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0268(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12273,7 +12264,7 @@ fn f0268(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more damage with ignites you inflict with hits for which the highest damage type is fire"] (ModParser.lua:2788)
-fn f0269(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0269(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -12282,7 +12273,7 @@ fn f0269(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Ignite"),
+            c.index("KeywordFlag", &sb(b"Ignite")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -12297,7 +12288,7 @@ fn f0269(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more effect of cold ailments you inflict with hits for which the highest damage type is cold"] (ModParser.lua:2792)
-fn f0270(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0270(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -12332,7 +12323,7 @@ fn f0270(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more effect of lightning ailments you inflict with hits if the highest damage type is lightning"] (ModParser.lua:2797)
-fn f0271(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0271(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -12367,7 +12358,7 @@ fn f0271(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your chills can reduce action speed by up to a maximum of (%d+)%%"] (ModParser.lua:2802)
-fn f0272(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0272(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12377,7 +12368,7 @@ fn f0272(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["primal aegis can take (%d+) elemental damage per allocated notable passive skill"] (ModParser.lua:2846)
-fn f0273(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0273(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12398,7 +12389,7 @@ fn f0273(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Buff")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -12408,7 +12399,7 @@ fn f0273(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more attack and movement speed per challenger charge"] (ModParser.lua:2860)
-fn f0274(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0274(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -12416,7 +12407,7 @@ fn f0274(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
             tbl(
                 vec![
@@ -12443,7 +12434,7 @@ fn f0274(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% chance to block from equipped shield instead of the shield's value"] (ModParser.lua:2864)
-fn f0275(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0275(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12464,7 +12455,7 @@ fn f0275(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["deal (%d+)%% more damage with hits and ailments to rare and unique enemies for each second they've ever been in your presence, up to a maximum of (%d+)%%"] (ModParser.lua:2867)
-fn f0276(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0276(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -12477,8 +12468,8 @@ fn f0276(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -12503,7 +12494,7 @@ fn f0276(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["deal (%d+)%% more damage with hits and ailments to rare and unique enemies for every (%d+) seconds they've ever been in your presence, up to a maximum of (%d+)%%"] (ModParser.lua:2870)
-fn f0277(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0277(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -12517,8 +12508,8 @@ fn f0277(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -12544,7 +12535,7 @@ fn f0277(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more damage with hits and ailments against enemies that are on low life while you are wielding an axe"] (ModParser.lua:2873)
-fn f0278(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0278(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12555,8 +12546,8 @@ fn f0278(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -12579,7 +12570,7 @@ fn f0278(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["retaliation skills have (%d+)%% increased speed"] (ModParser.lua:2876)
-fn f0279(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0279(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -12589,10 +12580,7 @@ fn f0279(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -12603,14 +12591,11 @@ fn f0279(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -12620,7 +12605,7 @@ fn f0279(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants armour equal to (%d+)%% of your reserved life to you and nearby allies"] (ModParser.lua:2881)
-fn f0280(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0280(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12644,7 +12629,7 @@ fn f0280(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants armour equal to (%d+)%% of your reserved mana to you and nearby allies"] (ModParser.lua:2882)
-fn f0281(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0281(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12668,7 +12653,7 @@ fn f0281(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants maximum energy shield equal to (%d+)%% of your reserved mana to you and nearby allies"] (ModParser.lua:2883)
-fn f0282(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0282(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12692,7 +12677,7 @@ fn f0282(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% chance to block attack damage for %d seconds? every %d seconds"] (ModParser.lua:2885)
-fn f0283(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0283(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12713,7 +12698,7 @@ fn f0283(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've attacked recently, you and nearby allies have %+(%d+)%% chance to block attack damage"] (ModParser.lua:2887)
-fn f0284(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0284(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12740,7 +12725,7 @@ fn f0284(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've cast a spell recently, you and nearby allies have %+(%d+)%% chance to block spell damage"] (ModParser.lua:2888)
-fn f0285(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0285(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12767,7 +12752,7 @@ fn f0285(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while there is at least one nearby ally, you and nearby allies deal (%d+)%% more damage"] (ModParser.lua:2889)
-fn f0286(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0286(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12795,7 +12780,7 @@ fn f0286(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["linked targets and allies in your link beams have %+(%d+)%% to all maximum elemental resistances"] (ModParser.lua:2891)
-fn f0287(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0287(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -12803,7 +12788,7 @@ fn f0287(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (sb(b"onlyAllies"), Value::Bool(true)),
+                    (sb(b"onlyAllies"), V::Bool(true)),
                     (
                         sb(b"mod"),
                         first(c.mod_(vec![
@@ -12814,7 +12799,7 @@ fn f0287(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 vec![
                                     (sb(b"type"), sb(b"Condition")),
                                     (sb(b"var"), sb(b"AffectedByLink")),
-                                    (sb(b"neg"), Value::Bool(true)),
+                                    (sb(b"neg"), V::Bool(true)),
                                 ],
                                 vec![],
                             ),
@@ -12846,7 +12831,7 @@ fn f0287(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![
                                 (sb(b"type"), sb(b"GlobalEffect")),
                                 (sb(b"effectType"), sb(b"Global")),
-                                (sb(b"unscalable"), Value::Bool(true)),
+                                (sb(b"unscalable"), V::Bool(true)),
                             ],
                             vec![],
                         ),
@@ -12860,7 +12845,7 @@ fn f0287(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage from hits is taken from your sentinel of radiance's life before you"] (ModParser.lua:2896)
-fn f0288(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0288(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12874,7 +12859,7 @@ fn f0288(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you can inflict %+(%d+) hallowing flame on enemies"] (ModParser.lua:2897)
-fn f0289(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0289(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12888,7 +12873,7 @@ fn f0289(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of (%a+) damage as extra (%a+) damage for each of your hallowing flames that have been removed by an allied hit recently, up to (%d+)%%"] (ModParser.lua:2898)
-fn f0290(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0290(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_fromType = arg(a, 2);
@@ -12898,20 +12883,10 @@ fn f0290(c: &Ctx, a: &[Value]) -> Vec<Value> {
         let mut v = vec![];
         v.extend(c.mod_(vec![
             concat(
-                &first(gsub_fn(
-                    &l_fromType.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                )),
+                &first(gsub_case(&l_fromType.clone(), &sb(b"^%l"), true, &nil())),
                 &concat(
                     &sb(b"DamageGainAs"),
-                    &first(gsub_fn(
-                        &l_destType.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_destType.clone(), &sb(b"^%l"), true, &nil())),
                 ),
             ),
             sb(b"BASE"),
@@ -12941,7 +12916,7 @@ fn f0290(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased magnitude of hallowing flame you inflict"] (ModParser.lua:2899)
-fn f0291(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0291(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -12955,7 +12930,7 @@ fn f0291(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you and your totems regenerate ([%d%.]+)%% of life per second for each summoned totem"] (ModParser.lua:2901)
-fn f0292(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0292(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -12982,14 +12957,14 @@ fn f0292(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![],
             ),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Totem"),
+            c.index("KeywordFlag", &sb(b"Totem")),
         ]));
         v
     })];
 }
 
 // specialModList["enemies take (%d+)%% increased damage for each of your brands attached to them"] (ModParser.lua:2905)
-fn f0293(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0293(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13020,14 +12995,14 @@ fn f0293(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-damaging ailments have (%d+)%% reduced effect on you while you have arcane surge"] (ModParser.lua:2906)
-fn f0294(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0294(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l_mods = tbl(vec![], vec![]);
-    for (t1, t2) in ipairs(&field(&c.value("data"), "nonDamagingAilmentTypeList")) {
+    for (t1, t2) in ipairs(&c.index("data", &sb(b"nonDamagingAilmentTypeList"))) {
         let mut l_i = t1;
         let mut l_ailment = t2;
         set_index(
-            &l_mods.clone(),
+            &mut l_mods,
             l_i.clone(),
             first(c.mod_(vec![
                 concat(&sb(b"Self"), &concat(&l_ailment.clone(), &sb(b"Effect"))),
@@ -13047,7 +13022,7 @@ fn f0294(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["brands have (%d+)%% more activation frequency if (%d+)%% of attached duration expired"] (ModParser.lua:2914)
-fn f0295(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0295(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13068,7 +13043,7 @@ fn f0295(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arcane surge a?l?s?o? ?grants (%d+)%% more spell damage to you"] (ModParser.lua:2915)
-fn f0296(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0296(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13078,7 +13053,7 @@ fn f0296(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-critical strikes penetrate (%d+)%% of enemy elemental resistances"] (ModParser.lua:2918)
-fn f0297(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0297(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13090,7 +13065,7 @@ fn f0297(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"CriticalStrike")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13100,7 +13075,7 @@ fn f0297(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground you create applies (%d+)%% increased damage taken to enemies"] (ModParser.lua:2919)
-fn f0298(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0298(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13131,7 +13106,7 @@ fn f0298(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased critical strike chance per point of strength or intelligence, whichever is lower"] (ModParser.lua:2925)
-fn f0299(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0299(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -13161,7 +13136,7 @@ fn f0299(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                     (sb(b"var"), sb(b"IntHigherThanStr")),
                 ],
                 vec![],
@@ -13172,7 +13147,7 @@ fn f0299(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more attack damage for each non%-instant spell you've cast in the past 8 seconds, up to a maximum of (%d+)%%"] (ModParser.lua:2930)
-fn f0300(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0300(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -13183,13 +13158,13 @@ fn f0300(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"CastLast8Seconds")),
                     (sb(b"limit"), l_max.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13199,7 +13174,7 @@ fn f0300(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your offerings have (%d+)%% reduced effect on you"] (ModParser.lua:2942)
-fn f0301(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0301(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13241,7 +13216,7 @@ fn f0301(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your offerings have (%d+)%% increased effect on you"] (ModParser.lua:2943)
-fn f0302(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0302(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13279,7 +13254,7 @@ fn f0302(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've consumed a corpse recently, you and your minions have (%d+)%% increased area of effect"] (ModParser.lua:2944)
-fn f0303(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0303(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -13317,7 +13292,7 @@ fn f0303(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["with at least one nearby corpse, you and nearby allies deal (%d+)%% more damage"] (ModParser.lua:2945)
-fn f0304(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0304(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13345,7 +13320,7 @@ fn f0304(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["with at least one nearby corpse, nearby enemies deal (%d+)%% reduced damage"] (ModParser.lua:2946)
-fn f0305(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0305(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13373,7 +13348,7 @@ fn f0305(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["for each nearby corpse, you and nearby allies regenerate ([%d%.]+)%% of energy shield per second, up to ([%d%.]+)%% per second"] (ModParser.lua:2947)
-fn f0306(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0306(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -13398,7 +13373,7 @@ fn f0306(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyCorpse")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13408,7 +13383,7 @@ fn f0306(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["for each nearby corpse, you and nearby allies regenerate (%d+) mana per second, up to (%d+) per second"] (ModParser.lua:2948)
-fn f0307(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0307(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -13429,7 +13404,7 @@ fn f0307(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyCorpse")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13439,7 +13414,7 @@ fn f0307(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased attack and cast speed for each corpse consumed recently, up to a maximum of (%d+)%%"] (ModParser.lua:2949)
-fn f0308(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0308(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -13466,7 +13441,7 @@ fn f0308(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+)%% of energy shield over 2 seconds when you consume a corpse"] (ModParser.lua:2956)
-fn f0309(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0309(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13487,7 +13462,7 @@ fn f0309(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+)%% of mana over 2 seconds when you consume a corpse"] (ModParser.lua:2957)
-fn f0310(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0310(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13516,7 +13491,7 @@ fn f0310(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["corpses you spawn have (%d+)%% increased maximum life"] (ModParser.lua:2958)
-fn f0311(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0311(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13526,7 +13501,7 @@ fn f0311(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["corpses you spawn have (%d+)%% reduced maximum life"] (ModParser.lua:2959)
-fn f0312(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0312(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13536,7 +13511,7 @@ fn f0312(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions gain added physical damage equal to (%d+)%% of maximum energy shield on your equipped helmet"] (ModParser.lua:2960)
-fn f0313(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0313(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -13592,7 +13567,7 @@ fn f0313(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["when you kill an enemy, for each curse on that enemy, gain (%d+)%% of non%-chaos damage as extra chaos damage for 4 seconds"] (ModParser.lua:2966)
-fn f0314(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0314(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13620,7 +13595,7 @@ fn f0314(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby hindered enemies deal (%d+)%% reduced damage over time"] (ModParser.lua:2971)
-fn f0315(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0315(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13648,7 +13623,7 @@ fn f0315(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby chilled enemies deal (%d+)%% reduced damage with hits"] (ModParser.lua:2972)
-fn f0316(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0316(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13676,7 +13651,7 @@ fn f0316(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain spirit infusion every ?(%d?)%.?(%d?) seconds? while channelling a spell"] (ModParser.lua:2973)
-fn f0317(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0317(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l__ = arg(a, 1);
     return vec![tbl(vec![], {
@@ -13687,7 +13662,7 @@ fn f0317(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poisons you inflict during any flask effect have (%d+)%% chance to deal (%d+)%% more damage"] (ModParser.lua:2976)
-fn f0318(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0318(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -13702,7 +13677,7 @@ fn f0318(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -13716,7 +13691,7 @@ fn f0318(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if diamond flask charges are consumed, (%d+)%% increased critical strike chance"] (ModParser.lua:2979)
-fn f0319(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0319(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13727,16 +13702,16 @@ fn f0319(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Triggered")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Triggered"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13753,7 +13728,7 @@ fn f0319(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if bismuth flask charges are consumed, penetrate (%d+)%% elemental resistances"] (ModParser.lua:2982)
-fn f0320(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0320(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13764,16 +13739,16 @@ fn f0320(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Triggered")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Triggered"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13790,7 +13765,7 @@ fn f0320(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if amethyst flask charges are consumed, (%d+)%% of physical damage as extra chaos damage"] (ModParser.lua:2985)
-fn f0321(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0321(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13801,16 +13776,16 @@ fn f0321(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Triggered")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Triggered"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -13827,7 +13802,7 @@ fn f0321(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have (%d+)%% less accuracy rating while you have phasing"] (ModParser.lua:2989)
-fn f0322(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0322(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13854,7 +13829,7 @@ fn f0322(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have fire, cold and lightning exposure while you have phasing, applying %-(%d+)%% to those resistances"] (ModParser.lua:2991)
-fn f0323(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0323(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -13922,7 +13897,7 @@ fn f0323(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% chance to deal (%d+)%% more area damage"] (ModParser.lua:3002)
-fn f0324(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0324(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -13936,8 +13911,8 @@ fn f0324(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Area"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Area")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]);
             v
         }));
@@ -13946,7 +13921,7 @@ fn f0324(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you gain (%d+)%% increased damage for each trap"] (ModParser.lua:3009)
-fn f0325(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0325(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13967,7 +13942,7 @@ fn f0325(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you gain (%d+)%% increased area of effect for each mine"] (ModParser.lua:3010)
-fn f0326(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0326(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13988,7 +13963,7 @@ fn f0326(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["deal up to (%d+)%% more melee damage to enemies, based on proximity"] (ModParser.lua:3013)
-fn f0327(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0327(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -13998,8 +13973,8 @@ fn f0327(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Melee"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Melee")),
             ])]),
             tbl(
                 vec![
@@ -14014,7 +13989,7 @@ fn f0327(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% increased movement speed for 20 seconds when you kill an enemy"] (ModParser.lua:3020)
-fn f0328(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0328(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14035,7 +14010,7 @@ fn f0328(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% increased attack speed for 20 seconds when you kill a rare or unique enemy"] (ModParser.lua:3021)
-fn f0329(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0329(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14044,7 +14019,7 @@ fn f0329(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
             tbl(
                 vec![
@@ -14059,7 +14034,7 @@ fn f0329(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["kill enemies that have (%d+)%% or lower life when hit by your skills"] (ModParser.lua:3022)
-fn f0330(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0330(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14069,7 +14044,7 @@ fn f0330(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to gain (%d+)%% of non%-chaos damage with hits as extra chaos damage"] (ModParser.lua:3025)
-fn f0331(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0331(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_perc = arg(a, 2);
@@ -14088,7 +14063,7 @@ fn f0331(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot be stunned while you have ghost shrouds"] (ModParser.lua:3027)
-fn f0332(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0332(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14108,7 +14083,7 @@ fn f0332(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your action speed is at least (%d+)%% of base value"] (ModParser.lua:3028)
-fn f0333(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0333(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14118,7 +14093,7 @@ fn f0333(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemy monsters' action speed is at most (%d+)%% of base value"] (ModParser.lua:3029)
-fn f0334(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0334(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14142,7 +14117,7 @@ fn f0334(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["prevent %+(%d+)%% of suppressed spell damage while on full energy shield"] (ModParser.lua:3030)
-fn f0335(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0335(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14163,7 +14138,7 @@ fn f0335(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+)%% less damage from hits for (%d+) seconds"] (ModParser.lua:3032)
-fn f0336(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0336(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_duration = arg(a, 2);
@@ -14203,7 +14178,7 @@ fn f0336(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+)%% less damage over time for (%d+) seconds"] (ModParser.lua:3036)
-fn f0337(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0337(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_duration = arg(a, 2);
@@ -14243,7 +14218,7 @@ fn f0337(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["prevent %+(%d+)%% of suppressed spell damage per bark below maximum"] (ModParser.lua:3041)
-fn f0338(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0338(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14264,7 +14239,7 @@ fn f0338(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum effect of shock is (%d+)%% increased damage taken"] (ModParser.lua:3046)
-fn f0339(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0339(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14274,7 +14249,7 @@ fn f0339(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you can apply up to (%d+) shocks to each enemy"] (ModParser.lua:3047)
-fn f0340(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0340(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"ShockCanStack")]))];
@@ -14284,7 +14259,7 @@ fn f0340(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more elemental damage while unbound"] (ModParser.lua:3054)
-fn f0341(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0341(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14305,7 +14280,7 @@ fn f0341(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+)%% to all elemental resistances if you have an equipped helmet with no socketed gems"] (ModParser.lua:3060)
-fn f0342(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0342(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14318,7 +14293,7 @@ fn f0342(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"MultiplierThreshold")),
                     (sb(b"var"), sb(b"SocketedGemsInHelmet")),
                     (sb(b"threshold"), n(0.0)),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14335,7 +14310,7 @@ fn f0342(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased maximum life if you have equipped gloves with no socketed gems"] (ModParser.lua:3061)
-fn f0343(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0343(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14348,7 +14323,7 @@ fn f0343(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"MultiplierThreshold")),
                     (sb(b"var"), sb(b"SocketedGemsInGloves")),
                     (sb(b"threshold"), n(0.0)),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14365,7 +14340,7 @@ fn f0343(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased movement speed if you have equipped boots with no socketed gems"] (ModParser.lua:3062)
-fn f0344(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0344(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14378,7 +14353,7 @@ fn f0344(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"MultiplierThreshold")),
                     (sb(b"var"), sb(b"SocketedGemsInBoots")),
                     (sb(b"threshold"), n(0.0)),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14395,7 +14370,7 @@ fn f0344(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells you cast yourself gain added physical damage equal to (%d+)%% of life cost, if life cost is not higher than the maximum you could spend"] (ModParser.lua:3064)
-fn f0345(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0345(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -14407,7 +14382,7 @@ fn f0345(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"LifeCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14429,7 +14404,7 @@ fn f0345(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"LifeCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14447,7 +14422,7 @@ fn f0345(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["totems have (%d+)%% more life per maximum number of summoned totems"] (ModParser.lua:3077)
-fn f0346(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0346(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_n = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14468,7 +14443,7 @@ fn f0346(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while you have at least (%d+) hypnotic eye jewels socketed: arcane surge also grants (%d+)%% of damage taken recouped as mana to you arcane surge also grants (%d+)%% increased mana cost efficiency to you"] (ModParser.lua:3080)
-fn f0347(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0347(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_jewels = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_recoup = arg(a, 2);
@@ -14505,7 +14480,7 @@ fn f0347(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while you have at least (%d+) ghastly eye jewels socketed: unholy might you grant also causes target's damage to penetrate (%d+)%% chaos resistance unholy might you grant also applies (%d+)%% increased effect of withered"] (ModParser.lua:3086)
-fn f0348(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0348(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_jewels = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_pen = arg(a, 2);
@@ -14542,7 +14517,7 @@ fn f0348(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while you have at least (%d+) searching eye jewels socketed: targets affected by maim you inflict cannot deal critical strikes maim you inflict causes hits against the target to have (%d+)%% more critical strike chance"] (ModParser.lua:3092)
-fn f0349(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0349(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_jewels = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_crit = arg(a, 2);
@@ -14604,7 +14579,7 @@ fn f0349(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while you have at least (%d+) murderous eye jewels socketed: intimidate you inflict applies an extra %+(%d+)%% increased attack damage taken intimidate you inflict causes targets to deal (%d+)%% less damage"] (ModParser.lua:3099)
-fn f0350(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0350(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_jewels = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_attackDam = arg(a, 2);
@@ -14621,7 +14596,7 @@ fn f0350(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"INC"),
                         first(vec![tonumber(&l_attackDam.clone())]),
                         n(0.0),
-                        field(&c.value("ModFlag"), "Attack"),
+                        c.index("ModFlag", &sb(b"Attack")),
                         tbl(
                             vec![
                                 (sb(b"type"), sb(b"Condition")),
@@ -14677,7 +14652,7 @@ fn f0350(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["herald skills have (%d+)%% more buff effect for every (%d+)%% of maximum mana they reserve"] (ModParser.lua:3121)
-fn f0351(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0351(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_num1 = arg(a, 1);
     let mut l_num2 = arg(a, 2);
@@ -14698,7 +14673,7 @@ fn f0351(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Herald")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Herald"))),
                 ],
                 vec![],
             ),
@@ -14708,7 +14683,7 @@ fn f0351(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["herald skills and minions from herald skills deal (%d+)%% more damage for every (%d+)%% of maximum life those skills reserve"] (ModParser.lua:3122)
-fn f0352(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0352(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_num1 = arg(a, 1);
     let mut l_num2 = arg(a, 2);
@@ -14739,7 +14714,7 @@ fn f0352(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Herald")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Herald"))),
                 ],
                 vec![],
             ),
@@ -14759,7 +14734,7 @@ fn f0352(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Herald")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Herald"))),
                 ],
                 vec![],
             ),
@@ -14769,7 +14744,7 @@ fn f0352(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["unsealed spells gain (%d+)%% more damage each time their effects reoccur"] (ModParser.lua:3127)
-fn f0353(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0353(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14779,7 +14754,7 @@ fn f0353(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills gain added chaos damage equal to (%d+)%% of life cost, if life cost is not higher than the maximum you could spend"] (ModParser.lua:3128)
-fn f0354(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0354(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -14791,7 +14766,7 @@ fn f0354(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"LifeCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14813,7 +14788,7 @@ fn f0354(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"LifeCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -14831,7 +14806,7 @@ fn f0354(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["has (%d+) sockets?"] (ModParser.lua:3155)
-fn f0355(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0355(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14841,7 +14816,7 @@ fn f0355(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["has (%d+) abyssal sockets?"] (ModParser.lua:3156)
-fn f0356(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0356(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14851,7 +14826,7 @@ fn f0356(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["has (%d+)%% increased elemental damage"] (ModParser.lua:3158)
-fn f0357(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0357(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14861,7 +14836,7 @@ fn f0357(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["this weapon's critical strike chance is (%d+)%%"] (ModParser.lua:3160)
-fn f0358(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0358(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14881,7 +14856,7 @@ fn f0358(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon gain (%d+)%% of physical damage as extra cold or lightning damage"] (ModParser.lua:3170)
-fn f0359(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0359(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14890,7 +14865,7 @@ fn f0359(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -14901,7 +14876,7 @@ fn f0359(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -14911,7 +14886,7 @@ fn f0359(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon shock enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3173)
-fn f0360(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0360(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14920,7 +14895,7 @@ fn f0360(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -14931,7 +14906,7 @@ fn f0360(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -14941,7 +14916,7 @@ fn f0360(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon freeze enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3174)
-fn f0361(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0361(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14950,7 +14925,7 @@ fn f0361(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -14961,7 +14936,7 @@ fn f0361(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -14971,7 +14946,7 @@ fn f0361(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ignites inflicted with this weapon deal (%d+)%% more damage"] (ModParser.lua:3175)
-fn f0362(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0362(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -14981,7 +14956,7 @@ fn f0362(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Ignite"),
+            c.index("KeywordFlag", &sb(b"Ignite")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -14992,7 +14967,7 @@ fn f0362(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -15002,7 +14977,7 @@ fn f0362(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of leech from hits with this weapon is instant per enemy power"] (ModParser.lua:3189)
-fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0363(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -15011,7 +14986,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Hit")),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"Condition")),
@@ -15022,7 +14997,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                     ],
                     vec![],
                 ),
@@ -15039,7 +15014,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Hit")),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"Condition")),
@@ -15050,7 +15025,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                     ],
                     vec![],
                 ),
@@ -15068,7 +15043,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -15079,7 +15054,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -15096,7 +15071,7 @@ fn f0363(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of recovery applied instantly"] (ModParser.lua:3195)
-fn f0364(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0364(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15110,7 +15085,7 @@ fn f0364(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to [c?t?][a?r?][s?i?][t?g?]g?e?r? socketed spells when you spend at least (%d+) mana to use a skill"] (ModParser.lua:3213)
-fn f0365(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0365(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -15152,7 +15127,7 @@ fn f0365(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to [c?t?][a?r?][s?i?][t?g?]g?e?r? socketed spells when you spend at least (%d+) mana on an upfront cost to use or trigger a skill, with a ([%d%.]+) second cooldown"] (ModParser.lua:3218)
-fn f0366(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0366(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -15195,7 +15170,7 @@ fn f0366(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to [c?t?][a?r?][s?i?][t?g?]g?e?r? socketed spells when you spend at least (%d+) life on an upfront cost to use or trigger a skill, with a ([%d%.]+) second cooldown"] (ModParser.lua:3223)
-fn f0367(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0367(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -15238,7 +15213,7 @@ fn f0367(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of socketed gems"] (ModParser.lua:3230)
-fn f0368(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0368(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15266,12 +15241,12 @@ fn f0368(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+)%%? to (%a+) of socketed ?([%a%- ]*) gems"] (ModParser.lua:3231)
-fn f0369(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0369(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_property = arg(a, 2);
     let mut l_type = arg(a, 3);
-    if (Value::Bool(eq(&l_type.clone(), &sb(b"")))).truthy() {
+    if (V::Bool(eq(&l_type.clone(), &sb(b"")))).truthy() {
         l_type = sb(b"all");
     }
     return vec![tbl(vec![], {
@@ -15300,7 +15275,7 @@ fn f0369(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of socketed skill gems per socketed gem"] (ModParser.lua:3235)
-fn f0370(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0370(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15336,7 +15311,7 @@ fn f0370(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+)%% to quality of all skill gems"] (ModParser.lua:3236)
-fn f0371(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0371(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15358,7 +15333,7 @@ fn f0371(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of all elemental skill gems if the stars are aligned"] (ModParser.lua:3237)
-fn f0372(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0372(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15390,7 +15365,7 @@ fn f0372(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of all elemental support gems if the stars are aligned"] (ModParser.lua:3238)
-fn f0373(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0373(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15422,7 +15397,7 @@ fn f0373(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of socketed active skill gems per (%d+) player levels"] (ModParser.lua:3239)
-fn f0374(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0374(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -15460,7 +15435,7 @@ fn f0374(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of all (%a+) skill gems if (%d+) (%a+) items are equipped"] (ModParser.lua:3240)
-fn f0375(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0375(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_element = arg(a, 2);
@@ -15500,7 +15475,7 @@ fn f0375(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of all (%a+) skill gems if a?t? ?l?e?a?s?t? ?(%d+) (%a+) (%a+) items are equipped"] (ModParser.lua:3241)
-fn f0376(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0376(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_element = arg(a, 2);
@@ -15547,7 +15522,7 @@ fn f0376(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of all ?([%a%- ]*) support gems if (%d+) (%a+) items are equipped"] (ModParser.lua:3242)
-fn f0377(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0377(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_element = arg(a, 2);
@@ -15587,7 +15562,7 @@ fn f0377(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of socketed skill gems per (%d+) player levels"] (ModParser.lua:3243)
-fn f0378(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0378(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -15625,7 +15600,7 @@ fn f0378(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to level of socketed gems while there is a single gem socketed in this item"] (ModParser.lua:3244)
-fn f0379(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0379(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15652,7 +15627,7 @@ fn f0379(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"MultiplierThreshold")),
                     (sb(b"var"), sb(b"SocketedGemsIn{SlotName}")),
                     (sb(b"threshold"), n(1.0)),
-                    (sb(b"equals"), Value::Bool(true)),
+                    (sb(b"equals"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -15662,7 +15637,7 @@ fn f0379(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed gems fire (%d+) additional projectiles"] (ModParser.lua:3246)
-fn f0380(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0380(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15689,7 +15664,7 @@ fn f0380(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed skill gems get a (%d+)%% mana multiplier"] (ModParser.lua:3249)
-fn f0381(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0381(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15720,7 +15695,7 @@ fn f0381(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed skill gems get a (%d+)%% cost & reservation multiplier"] (ModParser.lua:3250)
-fn f0382(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0382(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15751,7 +15726,7 @@ fn f0382(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed gems gain (%d+)%% of physical damage as extra lightning damage"] (ModParser.lua:3262)
-fn f0383(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0383(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15782,7 +15757,7 @@ fn f0383(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed red gems get (%d+)%% physical damage as extra fire damage"] (ModParser.lua:3263)
-fn f0384(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0384(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15814,7 +15789,7 @@ fn f0384(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants level (%d+) snipe skill"] (ModParser.lua:3266)
-fn f0385(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0385(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -15851,7 +15826,7 @@ fn f0385(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed triggered bow skills deal (%d+)%% less damage"] (ModParser.lua:3270)
-fn f0386(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0386(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15876,10 +15851,7 @@ fn f0386(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Triggerable"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Triggerable"))),
                 ],
                 vec![],
             ),
@@ -15889,7 +15861,7 @@ fn f0386(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed vaal skills require (%d+)%% less souls per use"] (ModParser.lua:3271)
-fn f0387(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0387(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15913,7 +15885,7 @@ fn f0387(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Vaal")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Vaal"))),
                 ],
                 vec![],
             ),
@@ -15923,7 +15895,7 @@ fn f0387(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gems socketed in red sockets have [%+%-](%d+) to level"] (ModParser.lua:3291)
-fn f0389(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0389(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15952,7 +15924,7 @@ fn f0389(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gems socketed in green sockets have [%+%-](%d+)%% to quality"] (ModParser.lua:3292)
-fn f0390(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0390(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -15981,7 +15953,7 @@ fn f0390(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to fire resistance when socketed with a red gem"] (ModParser.lua:3293)
-fn f0391(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0391(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -16010,7 +15982,7 @@ fn f0391(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to cold resistance when socketed with a green gem"] (ModParser.lua:3294)
-fn f0392(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0392(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -16039,7 +16011,7 @@ fn f0392(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to lightning resistance when socketed with a blue gem"] (ModParser.lua:3295)
-fn f0393(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0393(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -16068,7 +16040,7 @@ fn f0393(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attack skills gain (%d+)%% of physical damage as extra fire damage per socketed red gem"] (ModParser.lua:3297)
-fn f0394(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0394(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -16083,7 +16055,7 @@ fn f0394(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"BASE"),
                         l_num.clone(),
                         nil(),
-                        field(&c.value("ModFlag"), "Attack"),
+                        c.index("ModFlag", &sb(b"Attack")),
                     ])),
                 )],
                 vec![],
@@ -16106,7 +16078,7 @@ fn f0394(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage taken recouped as life per socketed red gem"] (ModParser.lua:3298)
-fn f0395(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0395(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -16138,7 +16110,7 @@ fn f0395(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+) (.+) damage when you ignite an enemy"] (ModParser.lua:3306)
-fn f0396(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0396(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmg = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16160,7 +16132,7 @@ fn f0396(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) (.+) damage taken on minion death"] (ModParser.lua:3309)
-fn f0397(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0397(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmg = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16182,7 +16154,7 @@ fn f0397(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+) (.+) damage when herald of thunder hits an enemy"] (ModParser.lua:3312)
-fn f0398(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0398(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmg = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16204,7 +16176,7 @@ fn f0398(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+) (.+) damage when you use a skill"] (ModParser.lua:3315)
-fn f0399(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0399(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmg = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16226,7 +16198,7 @@ fn f0399(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your skills deal you (%d+)%% of mana cost as (.+) damage"] (ModParser.lua:3318)
-fn f0400(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0400(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmgMult = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16248,7 +16220,7 @@ fn f0400(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your skills deal you (%d+)%% of mana spent on upfront skill mana costs as (.+) damage"] (ModParser.lua:3321)
-fn f0401(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0401(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmgMult = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16270,7 +16242,7 @@ fn f0401(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["when you attack, take (%d+)%% of life as (.+) damage for each warcry exerting the attack"] (ModParser.lua:3324)
-fn f0402(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0402(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_dmgMult = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_dmgType = arg(a, 2);
@@ -16292,14 +16264,14 @@ fn f0402(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants (%D+)"] (ModParser.lua:3328)
-fn f0403(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0403(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.granted_extra_skill(vec![l_skill.clone(), n(1.0)]);
 }
 
 // specialModList["grants level (%d+) (.+)"] (ModParser.lua:3329)
-fn f0404(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0404(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16307,7 +16279,7 @@ fn f0404(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants level (%d+) (.+), which will be used by shaper memory"] (ModParser.lua:3330)
-fn f0405(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0405(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16315,7 +16287,7 @@ fn f0405(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when equipped"] (ModParser.lua:3331)
-fn f0406(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0406(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16323,7 +16295,7 @@ fn f0406(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) on %a+"] (ModParser.lua:3332)
-fn f0407(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0407(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16331,7 +16303,7 @@ fn f0407(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["use level (%d+) (.+) on %a+"] (ModParser.lua:3333)
-fn f0408(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0408(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16339,7 +16311,7 @@ fn f0408(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when you attack"] (ModParser.lua:3334)
-fn f0409(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0409(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16347,7 +16319,7 @@ fn f0409(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when you deal a critical strike"] (ModParser.lua:3335)
-fn f0410(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0410(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16355,7 +16327,7 @@ fn f0410(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when hit"] (ModParser.lua:3336)
-fn f0411(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0411(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16363,7 +16335,7 @@ fn f0411(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when you kill an enemy"] (ModParser.lua:3337)
-fn f0412(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0412(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16371,7 +16343,7 @@ fn f0412(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? level (%d+) (.+) when you use a skill"] (ModParser.lua:3338)
-fn f0413(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0413(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16379,7 +16351,7 @@ fn f0413(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(.+) can trigger level (%d+) (.+)"] (ModParser.lua:3339)
-fn f0414(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0414(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_sourceSkill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -16392,7 +16364,7 @@ fn f0414(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you use a skill while you have a spirit charge"] (ModParser.lua:3340)
-fn f0415(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0415(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16400,7 +16372,7 @@ fn f0415(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you hit an enemy while cursed"] (ModParser.lua:3341)
-fn f0416(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0416(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16408,7 +16380,7 @@ fn f0416(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you hit a bleeding enemy"] (ModParser.lua:3342)
-fn f0417(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0417(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16416,7 +16388,7 @@ fn f0417(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you attack with this weapon"] (ModParser.lua:3343)
-fn f0418(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0418(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16424,7 +16396,7 @@ fn f0418(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you hit a rare or unique enemy"] (ModParser.lua:3344)
-fn f0419(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0419(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16432,7 +16404,7 @@ fn f0419(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you hit a rare or unique enemy and have no mark"] (ModParser.lua:3345)
-fn f0420(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0420(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16440,7 +16412,7 @@ fn f0420(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you hit a frozen enemy"] (ModParser.lua:3346)
-fn f0421(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0421(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16448,7 +16420,7 @@ fn f0421(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you kill a frozen enemy"] (ModParser.lua:3347)
-fn f0422(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0422(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16456,13 +16428,13 @@ fn f0422(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you consume a corpse"] (ModParser.lua:3348)
-fn f0423(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0423(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return vec![{
         let v = {
-            let v = Value::Bool(eq(&l_skill.clone(), &sb(b"summon phantasm skill")));
+            let v = V::Bool(eq(&l_skill.clone(), &sb(b"summon phantasm skill")));
             if v.truthy() {
                 first(c.trigger_extra_skill(vec![
                     sb(b"triggered summon phantasm skill"),
@@ -16481,7 +16453,7 @@ fn f0423(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you attack with a bow"] (ModParser.lua:3349)
-fn f0424(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0424(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16489,7 +16461,7 @@ fn f0424(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you block"] (ModParser.lua:3350)
-fn f0425(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0425(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16497,7 +16469,7 @@ fn f0425(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when animated guardian kills an enemy"] (ModParser.lua:3351)
-fn f0426(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0426(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16505,7 +16477,7 @@ fn f0426(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you lose cat's stealth"] (ModParser.lua:3352)
-fn f0427(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0427(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16513,7 +16485,7 @@ fn f0427(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when your trap is triggered"] (ModParser.lua:3353)
-fn f0428(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0428(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16521,7 +16493,7 @@ fn f0428(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on hit with this weapon"] (ModParser.lua:3354)
-fn f0429(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0429(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16529,7 +16501,7 @@ fn f0429(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on melee hit"] (ModParser.lua:3355)
-fn f0430(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0430(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16537,7 +16509,7 @@ fn f0430(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on melee hit while cursed"] (ModParser.lua:3356)
-fn f0431(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0431(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16545,7 +16517,7 @@ fn f0431(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on melee hit with this weapon"] (ModParser.lua:3357)
-fn f0432(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0432(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16553,7 +16525,7 @@ fn f0432(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) every [%d%.]+ seconds while phasing"] (ModParser.lua:3358)
-fn f0433(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0433(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16561,7 +16533,7 @@ fn f0433(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you gain avian's might or avian's flight"] (ModParser.lua:3359)
-fn f0434(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0434(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16569,7 +16541,7 @@ fn f0434(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on melee hit if you have at least (%d+) strength"] (ModParser.lua:3360)
-fn f0435(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0435(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16577,55 +16549,55 @@ fn f0435(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on critical strike with cleave or reave"] (ModParser.lua:3361)
-fn f0436(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0436(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"onCrit"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"onCrit"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["trigger level (%d+) (.+) on melee critical strike"] (ModParser.lua:3362)
-fn f0437(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0437(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"onCrit"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"onCrit"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["trigger level (%d+) (.+) on critical strike against marked unique enemy"] (ModParser.lua:3363)
-fn f0438(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0438(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"onCrit"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"onCrit"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["trigger level (%d+) (.+) on critical strike"] (ModParser.lua:3364)
-fn f0439(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0439(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"onCrit"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"onCrit"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["trigger level (%d+) (.+) when you take a critical strike from a unique enemy"] (ModParser.lua:3365)
-fn f0440(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0440(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16633,7 +16605,7 @@ fn f0440(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you suppress spell damage from a unique enemy"] (ModParser.lua:3366)
-fn f0441(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0441(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16641,7 +16613,7 @@ fn f0441(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you block damage from a unique enemy"] (ModParser.lua:3367)
-fn f0442(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0442(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16649,7 +16621,7 @@ fn f0442(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on taking a savage hit from a unique enemy"] (ModParser.lua:3368)
-fn f0443(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0443(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16657,7 +16629,7 @@ fn f0443(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when a totem dies while a unique enemy is in your presence"] (ModParser.lua:3369)
-fn f0444(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0444(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16665,7 +16637,7 @@ fn f0444(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you use a travel skill while a unique enemy is in your presence"] (ModParser.lua:3370)
-fn f0445(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0445(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16673,7 +16645,7 @@ fn f0445(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you reach maximum rage while a unique enemy is in your presence"] (ModParser.lua:3371)
-fn f0446(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0446(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16681,7 +16653,7 @@ fn f0446(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when you reach low life while a unique enemy is in your presence"] (ModParser.lua:3372)
-fn f0447(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0447(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16689,7 +16661,7 @@ fn f0447(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when energy shield recharge starts while a unique enemy is in your presence"] (ModParser.lua:3373)
-fn f0448(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0448(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16697,7 +16669,7 @@ fn f0448(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) when your ward breaks"] (ModParser.lua:3374)
-fn f0449(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0449(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16705,7 +16677,7 @@ fn f0449(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) once every second"] (ModParser.lua:3375)
-fn f0450(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0450(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16713,7 +16685,7 @@ fn f0450(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["triggers level (%d+) (.+)"] (ModParser.lua:3376)
-fn f0451(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0451(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16721,19 +16693,19 @@ fn f0451(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) on attack critical strike against a rare or unique enemy and y?o?u? ?have no mark"] (ModParser.lua:3377)
-fn f0452(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0452(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"onCrit"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"onCrit"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["triggers level (%d+) (.+) when equipped"] (ModParser.lua:3378)
-fn f0453(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0453(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16741,7 +16713,7 @@ fn f0453(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["triggers level (%d+) (.+) when allocated"] (ModParser.lua:3379)
-fn f0454(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0454(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16749,7 +16721,7 @@ fn f0454(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to attack with level (%d+) (.+) on melee hit"] (ModParser.lua:3380)
-fn f0455(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0455(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16762,7 +16734,7 @@ fn f0455(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) when animated weapon kills an enemy"] (ModParser.lua:3381)
-fn f0456(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0456(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16775,7 +16747,7 @@ fn f0456(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) on melee hit"] (ModParser.lua:3382)
-fn f0457(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0457(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16788,7 +16760,7 @@ fn f0457(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) [ow][nh]e?n? ?y?o?u? kill ?a?n? ?e?n?e?m?y?"] (ModParser.lua:3383)
-fn f0458(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0458(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16801,7 +16773,7 @@ fn f0458(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) when you use a socketed skill"] (ModParser.lua:3384)
-fn f0459(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0459(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16814,7 +16786,7 @@ fn f0459(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) when you gain avian's might or avian's flight"] (ModParser.lua:3385)
-fn f0460(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0460(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16827,7 +16799,7 @@ fn f0460(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) on critical strike with this weapon"] (ModParser.lua:3386)
-fn f0461(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0461(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16838,7 +16810,7 @@ fn f0461(c: &Ctx, a: &[Value]) -> Vec<Value> {
         tbl(
             vec![
                 (sb(b"triggerChance"), l_chance.clone()),
-                (sb(b"onCrit"), Value::Bool(true)),
+                (sb(b"onCrit"), V::Bool(true)),
             ],
             vec![],
         ),
@@ -16846,7 +16818,7 @@ fn f0461(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger level (%d+) (.+) when you or a nearby ally kill an enemy, or hit a rare or unique enemy"] (ModParser.lua:3387)
-fn f0462(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0462(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16859,7 +16831,7 @@ fn f0462(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to trigger (.+) when you kill an enemy"] (ModParser.lua:3388)
-fn f0463(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0463(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16871,7 +16843,7 @@ fn f0463(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to [ct][ar][si][tg]g?e?r? level (%d+) (.+) on %a+"] (ModParser.lua:3389)
-fn f0464(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0464(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -16884,7 +16856,7 @@ fn f0464(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attack with level (%d+) (.+) when you kill a bleeding enemy"] (ModParser.lua:3390)
-fn f0465(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0465(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16892,7 +16864,7 @@ fn f0465(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["triggers? level (%d+) (.+) when you kill a bleeding enemy"] (ModParser.lua:3391)
-fn f0466(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0466(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -16900,18 +16872,18 @@ fn f0466(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["curse enemies with (%D+) on %a+"] (ModParser.lua:3392)
-fn f0467(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0467(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["curse enemies with (%D+) on %a+, with (%d+)%% increased effect"] (ModParser.lua:3393)
-fn f0468(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0468(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -16921,13 +16893,10 @@ fn f0468(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"noSupports"), Value::Bool(true)),
-                    (sb(b"triggered"), Value::Bool(true)),
+                    (sb(b"noSupports"), V::Bool(true)),
+                    (sb(b"triggered"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -16942,10 +16911,10 @@ fn f0468(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"skillName"),
                         first(vec![str_sub(
-                            &first(gsub_fn(
+                            &first(gsub_case(
                                 &concat(&sb(b" "), &l_skill.clone()),
                                 &sb(b"%W%l"),
-                                &mut upper_fn,
+                                true,
                                 &nil(),
                             )),
                             &n(2.0),
@@ -16961,7 +16930,7 @@ fn f0468(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["curse enemies with (%D+) on %a+, with (%d+)%% reduced effect"] (ModParser.lua:3397)
-fn f0469(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0469(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -16971,13 +16940,10 @@ fn f0469(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"noSupports"), Value::Bool(true)),
-                    (sb(b"triggered"), Value::Bool(true)),
+                    (sb(b"noSupports"), V::Bool(true)),
+                    (sb(b"triggered"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -16992,10 +16958,10 @@ fn f0469(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"skillName"),
                         first(vec![str_sub(
-                            &first(gsub_fn(
+                            &first(gsub_case(
                                 &concat(&sb(b" "), &l_skill.clone()),
                                 &sb(b"%W%l"),
-                                &mut upper_fn,
+                                true,
                                 &nil(),
                             )),
                             &n(2.0),
@@ -17011,7 +16977,7 @@ fn f0469(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%d+%% chance to curse n?o?n?%-?c?u?r?s?e?d? ?enemies with (%D+) on %a+, with (%d+)%% increased effect"] (ModParser.lua:3401)
-fn f0470(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0470(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -17021,13 +16987,10 @@ fn f0470(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"noSupports"), Value::Bool(true)),
-                    (sb(b"triggered"), Value::Bool(true)),
+                    (sb(b"noSupports"), V::Bool(true)),
+                    (sb(b"triggered"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -17042,10 +17005,10 @@ fn f0470(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"skillName"),
                         first(vec![str_sub(
-                            &first(gsub_fn(
+                            &first(gsub_case(
                                 &concat(&sb(b" "), &l_skill.clone()),
                                 &sb(b"%W%l"),
-                                &mut upper_fn,
+                                true,
                                 &nil(),
                             )),
                             &n(2.0),
@@ -17061,7 +17024,7 @@ fn f0470(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%d+%% chance to curse n?o?n?%-?c?u?r?s?e?d? ?enemies with (%D+) on %a+"] (ModParser.lua:3405)
-fn f0471(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0471(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return vec![tbl(vec![], {
@@ -17071,13 +17034,10 @@ fn f0471(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"noSupports"), Value::Bool(true)),
-                    (sb(b"triggered"), Value::Bool(true)),
+                    (sb(b"noSupports"), V::Bool(true)),
+                    (sb(b"triggered"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -17087,7 +17047,7 @@ fn f0471(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["curse enemies with level (%d+) (%D+) on %a+, which can apply to hexproof enemies"] (ModParser.lua:3408)
-fn f0472(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0472(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -17096,8 +17056,8 @@ fn f0472(c: &Ctx, a: &[Value]) -> Vec<Value> {
         l_num.clone(),
         tbl(
             vec![
-                (sb(b"noSupports"), Value::Bool(true)),
-                (sb(b"ignoreHexproof"), Value::Bool(true)),
+                (sb(b"noSupports"), V::Bool(true)),
+                (sb(b"ignoreHexproof"), V::Bool(true)),
             ],
             vec![],
         ),
@@ -17105,118 +17065,118 @@ fn f0472(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["curse enemies with level (%d+) (.+) on %a+"] (ModParser.lua:3409)
-fn f0473(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0473(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         l_num.clone(),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? (.+) on %a+"] (ModParser.lua:3410)
-fn f0474(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0474(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? (.+) on %a+"] (ModParser.lua:3411)
-fn f0475(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0475(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? with (.+) on %a+"] (ModParser.lua:3412)
-fn f0476(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0476(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? (.+) when hit"] (ModParser.lua:3413)
-fn f0477(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0477(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? (.+) when hit"] (ModParser.lua:3414)
-fn f0478(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0478(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? with (.+) when hit"] (ModParser.lua:3415)
-fn f0479(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0479(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[ct][ar][si][tg]g?e?r?s? (.+) when your skills or minions kill"] (ModParser.lua:3416)
-fn f0480(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0480(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? (.+) when you take a critical strike"] (ModParser.lua:3417)
-fn f0481(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0481(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["[at][tr][ti][ag][cg][ke]r? with (.+) when you take a critical strike"] (ModParser.lua:3418)
-fn f0482(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0482(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["trigger (.+) on critical strike"] (ModParser.lua:3422)
-fn f0483(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0483(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
@@ -17224,8 +17184,8 @@ fn f0483(c: &Ctx, a: &[Value]) -> Vec<Value> {
         n(1.0),
         tbl(
             vec![
-                (sb(b"noSupports"), Value::Bool(true)),
-                (sb(b"onCrit"), Value::Bool(true)),
+                (sb(b"noSupports"), V::Bool(true)),
+                (sb(b"onCrit"), V::Bool(true)),
             ],
             vec![],
         ),
@@ -17233,18 +17193,18 @@ fn f0483(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["triggers? (.+) when you take a critical strike"] (ModParser.lua:3423)
-fn f0484(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0484(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return c.trigger_extra_skill(vec![
         l_skill.clone(),
         n(1.0),
-        tbl(vec![(sb(b"noSupports"), Value::Bool(true))], vec![]),
+        tbl(vec![(sb(b"noSupports"), V::Bool(true))], vec![]),
     ]);
 }
 
 // specialModList["socketed [%a+]* ?gems a?r?e? ?supported by level (%d+) (.+)"] (ModParser.lua:3424)
-fn f0485(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0485(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_support = arg(a, 2);
@@ -17252,7 +17212,7 @@ fn f0485(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed [%a+]* ?spells a?r?e? ?supported by level (%d+) (.+)"] (ModParser.lua:3425)
-fn f0486(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0486(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_support = arg(a, 2);
@@ -17260,7 +17220,7 @@ fn f0486(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills from equipped (.+) are supported by level (%d+) (.+)"] (ModParser.lua:3426)
-fn f0487(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0487(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_slot = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -17269,7 +17229,7 @@ fn f0487(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills socketed in your (.+) are supported by level (%d+) (.+)"] (ModParser.lua:3428)
-fn f0488(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0488(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_slot = arg(a, 1);
     let mut l_level = arg(a, 2);
@@ -17278,12 +17238,12 @@ fn f0488(c: &Ctx, a: &[Value]) -> Vec<Value> {
         l_support.clone(),
         l_level.clone(),
         l_slot.clone(),
-        Value::Bool(true),
+        V::Bool(true),
     ]);
 }
 
 // specialModList["skills granted by your passive tree are supported by level (%d+) (.+)"] (ModParser.lua:3429)
-fn f0489(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0489(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_level = arg(a, 1);
     let mut l_support = arg(a, 2);
@@ -17291,16 +17251,16 @@ fn f0489(c: &Ctx, a: &[Value]) -> Vec<Value> {
         l_support.clone(),
         l_level.clone(),
         sb(b"passive tree"),
-        Value::Bool(true),
+        V::Bool(true),
     ]);
 }
 
 // specialModList["socketed support gems can also support skills from y?o?u?r? ?e?q?u?i?p?p?e?d? ?([%a%s]+)"] (ModParser.lua:3430)
-fn f0490(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0490(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_itemSlotName = arg(a, 1);
     let mut l_targetItemSlotName = sb(b"Body Armour");
-    if (Value::Bool(eq(&l_itemSlotName.clone(), &sb(b"main hand")))).truthy() {
+    if (V::Bool(eq(&l_itemSlotName.clone(), &sb(b"main hand")))).truthy() {
         l_targetItemSlotName = sb(b"Weapon 1");
     }
     return vec![tbl(vec![], {
@@ -17318,7 +17278,7 @@ fn f0490(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["socketed projectile spells have %+([%d%.]+) seconds to cooldown"] (ModParser.lua:3438)
-fn f0491(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0491(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -17336,14 +17296,14 @@ fn f0491(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Spell")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Spell"))),
                 ],
                 vec![],
             ),
@@ -17353,7 +17313,7 @@ fn f0491(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) every (%d+) seconds"] (ModParser.lua:3441)
-fn f0492(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0492(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -17361,7 +17321,7 @@ fn f0492(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+), (.+) or (.+) every (%d+) seconds"] (ModParser.lua:3442)
-fn f0493(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0493(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill1 = arg(a, 2);
@@ -17374,12 +17334,9 @@ fn f0493(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"LIST"),
                 tbl(
                     vec![
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_skill1.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_skill1.clone())),
                         (sb(b"level"), l_num.clone()),
-                        (sb(b"triggered"), Value::Bool(true)),
+                        (sb(b"triggered"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -17389,12 +17346,9 @@ fn f0493(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"LIST"),
                 tbl(
                     vec![
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_skill2.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_skill2.clone())),
                         (sb(b"level"), l_num.clone()),
-                        (sb(b"triggered"), Value::Bool(true)),
+                        (sb(b"triggered"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -17405,12 +17359,9 @@ fn f0493(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill3.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill3.clone())),
                     (sb(b"level"), l_num.clone()),
-                    (sb(b"triggered"), Value::Bool(true)),
+                    (sb(b"triggered"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -17420,7 +17371,7 @@ fn f0493(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["trigger level (%d+) (.+) after spending a total of (%d+) mana"] (ModParser.lua:3448)
-fn f0494(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0494(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -17428,7 +17379,7 @@ fn f0494(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consumes a void charge to trigger level (%d+) (.+) when you fire arrows"] (ModParser.lua:3449)
-fn f0495(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0495(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -17436,7 +17387,7 @@ fn f0495(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consumes a void charge to trigger level (%d+) (.+) when you fire arrows with a non%-triggered skill"] (ModParser.lua:3450)
-fn f0496(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0496(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -17444,7 +17395,7 @@ fn f0496(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your hits treat cold resistance as (%d+)%% higher than actual value"] (ModParser.lua:3451)
-fn f0497(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0497(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -17454,14 +17405,14 @@ fn f0497(c: &Ctx, a: &[Value]) -> Vec<Value> {
             neg(&l_num.clone()),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Hit"),
+            c.index("KeywordFlag", &sb(b"Hit")),
         ]));
         v
     })];
 }
 
 // specialModList["increases and reductions to minion damage also affects? you at (%d+)%% of their value"] (ModParser.lua:3456)
-fn f0498(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0498(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"MinionDamageAppliesToPlayer")]))];
@@ -17475,7 +17426,7 @@ fn f0498(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to minion damage also affect dominating blow and absolution at (%d+)%% of their value"] (ModParser.lua:3457)
-fn f0499(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0499(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![
@@ -17487,7 +17438,7 @@ fn f0499(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Dominating Blow"), sb(b"Absolution")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -17503,7 +17454,7 @@ fn f0499(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Dominating Blow"), sb(b"Absolution")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -17513,7 +17464,7 @@ fn f0499(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to minion maximum life also apply to you at (%d+)%% of their value"] (ModParser.lua:3463)
-fn f0500(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0500(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"MinionLifeAppliesToPlayer")]))];
@@ -17527,7 +17478,7 @@ fn f0500(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to cast speed apply to attack speed at (%d+)%% of their value"] (ModParser.lua:3464)
-fn f0501(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0501(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"CastSpeedAppliesToAttacks")]))];
@@ -17541,7 +17492,7 @@ fn f0501(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to cast speed apply to attack speed"] (ModParser.lua:3465)
-fn f0502(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0502(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -17551,7 +17502,7 @@ fn f0502(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% arcane might"] (ModParser.lua:3469)
-fn f0503(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0503(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"SpellDamageAppliesToAttacks")]))];
@@ -17565,7 +17516,7 @@ fn f0503(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks have (%d+)%% arcane might"] (ModParser.lua:3470)
-fn f0504(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0504(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"SpellDamageAppliesToAttacks")]))];
@@ -17579,7 +17530,7 @@ fn f0504(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks have (%d+)%% arcane might while wielding a wand"] (ModParser.lua:3471)
-fn f0505(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0505(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![
@@ -17609,7 +17560,7 @@ fn f0505(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["retaliation skills have (%d+)%% arcane might"] (ModParser.lua:3472)
-fn f0506(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0506(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![
@@ -17617,10 +17568,7 @@ fn f0506(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -17632,10 +17580,7 @@ fn f0506(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -17645,7 +17590,7 @@ fn f0506(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to spell damage also apply to attacks at (%d+)%% of their value"] (ModParser.lua:3477)
-fn f0507(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0507(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"SpellDamageAppliesToAttacks")]))];
@@ -17659,7 +17604,7 @@ fn f0507(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to spell damage also apply to attack damage with retaliation skills at (%d+)%% of their value"] (ModParser.lua:3478)
-fn f0508(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0508(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![
@@ -17667,10 +17612,7 @@ fn f0508(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -17682,10 +17624,7 @@ fn f0508(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "Retaliation"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Retaliation"))),
                 ],
                 vec![],
             ),
@@ -17695,7 +17634,7 @@ fn f0508(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to maximum mana also apply to shock effect at (%d+)%% of their value"] (ModParser.lua:3483)
-fn f0509(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0509(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"ManaAppliesToShockEffect")]))];
@@ -17709,7 +17648,7 @@ fn f0509(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to (%a+) damage also apply to effect of auras from (%a+) skills at (%d+)%% of their value, up to a maximum of (%d+)%%"] (ModParser.lua:3484)
-fn f0510(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0510(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element = arg(a, 1);
     let mut l_skillElement = arg(a, 2);
@@ -17718,19 +17657,14 @@ fn f0510(c: &Ctx, a: &[Value]) -> Vec<Value> {
     return vec![tbl(vec![], {
         let mut v = vec![
             first(c.flag(vec![concat(
-                &first(gsub_fn(
-                    &l_element.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                )),
+                &first(gsub_case(&l_element.clone(), &sb(b"^%l"), true, &nil())),
                 &concat(
                     &sb(b"DamageAppliesTo"),
                     &concat(
-                        &first(gsub_fn(
+                        &first(gsub_case(
                             &l_skillElement.clone(),
                             &sb(b"^%l"),
-                            &mut upper_fn,
+                            true,
                             &nil(),
                         )),
                         &sb(b"AuraEffect"),
@@ -17742,20 +17676,15 @@ fn f0510(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     concat(
                         &concat(
                             &sb(b"Improved"),
-                            &first(gsub_fn(
-                                &l_element.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_element.clone(), &sb(b"^%l"), true, &nil())),
                         ),
                         &concat(
                             &sb(b"DamageAppliesTo"),
                             &concat(
-                                &first(gsub_fn(
+                                &first(gsub_case(
                                     &l_skillElement.clone(),
                                     &sb(b"^%l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b"AuraEffect"),
@@ -17771,19 +17700,14 @@ fn f0510(c: &Ctx, a: &[Value]) -> Vec<Value> {
         v.extend(c.mod_({
             let mut v = vec![
                 concat(
-                    &first(gsub_fn(
-                        &l_element.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_element.clone(), &sb(b"^%l"), true, &nil())),
                     &concat(
                         &sb(b"DamageAppliesTo"),
                         &concat(
-                            &first(gsub_fn(
+                            &first(gsub_case(
                                 &l_skillElement.clone(),
                                 &sb(b"^%l"),
-                                &mut upper_fn,
+                                true,
                                 &nil(),
                             )),
                             &sb(b"AuraEffectLimit"),
@@ -17800,7 +17724,7 @@ fn f0510(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["increases and reductions to armour also apply to energy shield recharge rate at (%d+)%% of their value"] (ModParser.lua:3502)
-fn f0511(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0511(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(
@@ -17816,7 +17740,7 @@ fn f0511(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["modifiers to maximum (%a+) resistance also apply to maximum (%a+) and (%a+) resistances"] (ModParser.lua:3504)
-fn f0512(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0512(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_resFrom = arg(a, 1);
     let mut l_resTo1 = arg(a, 2);
@@ -17824,20 +17748,10 @@ fn f0512(c: &Ctx, a: &[Value]) -> Vec<Value> {
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
             concat(
-                &first(gsub_fn(
-                    &l_resFrom.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                )),
+                &first(gsub_case(&l_resFrom.clone(), &sb(b"^%l"), true, &nil())),
                 &concat(
                     &sb(b"MaxResConvertTo"),
-                    &first(gsub_fn(
-                        &l_resTo1.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_resTo1.clone(), &sb(b"^%l"), true, &nil())),
                 ),
             ),
             sb(b"BASE"),
@@ -17845,20 +17759,10 @@ fn f0512(c: &Ctx, a: &[Value]) -> Vec<Value> {
         ]))];
         v.extend(c.mod_(vec![
             concat(
-                &first(gsub_fn(
-                    &l_resFrom.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                )),
+                &first(gsub_case(&l_resFrom.clone(), &sb(b"^%l"), true, &nil())),
                 &concat(
                     &sb(b"MaxResConvertTo"),
-                    &first(gsub_fn(
-                        &l_resTo2.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_resTo2.clone(), &sb(b"^%l"), true, &nil())),
                 ),
             ),
             sb(b"BASE"),
@@ -17869,7 +17773,7 @@ fn f0512(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["modifiers to (%a+) resistance also apply to (%a+) and (%a+) resistances at (%d+)%% of their value"] (ModParser.lua:3508)
-fn f0513(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0513(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_resFrom = arg(a, 1);
     let mut l_resTo1 = arg(a, 2);
@@ -17879,20 +17783,10 @@ fn f0513(c: &Ctx, a: &[Value]) -> Vec<Value> {
         let mut v = vec![first(c.mod_({
             let mut v = vec![
                 concat(
-                    &first(gsub_fn(
-                        &l_resFrom.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_resFrom.clone(), &sb(b"^%l"), true, &nil())),
                     &concat(
                         &sb(b"ResConvertTo"),
-                        &first(gsub_fn(
-                            &l_resTo1.clone(),
-                            &sb(b"^%l"),
-                            &mut upper_fn,
-                            &nil(),
-                        )),
+                        &first(gsub_case(&l_resTo1.clone(), &sb(b"^%l"), true, &nil())),
                     ),
                 ),
                 sb(b"BASE"),
@@ -17903,20 +17797,10 @@ fn f0513(c: &Ctx, a: &[Value]) -> Vec<Value> {
         v.extend(c.mod_({
             let mut v = vec![
                 concat(
-                    &first(gsub_fn(
-                        &l_resFrom.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_resFrom.clone(), &sb(b"^%l"), true, &nil())),
                     &concat(
                         &sb(b"ResConvertTo"),
-                        &first(gsub_fn(
-                            &l_resTo2.clone(),
-                            &sb(b"^%l"),
-                            &mut upper_fn,
-                            &nil(),
-                        )),
+                        &first(gsub_case(&l_resTo2.clone(), &sb(b"^%l"), true, &nil())),
                     ),
                 ),
                 sb(b"BASE"),
@@ -17929,7 +17813,7 @@ fn f0513(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of bow physical damage as extra damage of each element"] (ModParser.lua:3512)
-fn f0514(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0514(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -17938,14 +17822,14 @@ fn f0514(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Bow"),
+                c.index("ModFlag", &sb(b"Bow")),
             ])),
             first(c.mod_(vec![
                 sb(b"PhysicalDamageGainAsCold"),
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Bow"),
+                c.index("ModFlag", &sb(b"Bow")),
             ])),
         ];
         v.extend(c.mod_(vec![
@@ -17953,14 +17837,14 @@ fn f0514(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Bow"),
+            c.index("ModFlag", &sb(b"Bow")),
         ]));
         v
     })];
 }
 
 // specialModList["gain (%d+)%% of weapon physical damage as extra damage of each element"] (ModParser.lua:3517)
-fn f0515(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0515(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -17969,14 +17853,14 @@ fn f0515(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Weapon"),
+                c.index("ModFlag", &sb(b"Weapon")),
             ])),
             first(c.mod_(vec![
                 sb(b"PhysicalDamageGainAsCold"),
                 sb(b"BASE"),
                 l_num.clone(),
                 nil(),
-                field(&c.value("ModFlag"), "Weapon"),
+                c.index("ModFlag", &sb(b"Weapon")),
             ])),
         ];
         v.extend(c.mod_(vec![
@@ -17984,14 +17868,14 @@ fn f0515(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Weapon"),
+            c.index("ModFlag", &sb(b"Weapon")),
         ]));
         v
     })];
 }
 
 // specialModList["gain (%d+)%% of physical damage as extra damage of each element per spirit charge"] (ModParser.lua:3522)
-fn f0516(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0516(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -18037,7 +17921,7 @@ fn f0516(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of physical damage as extra damage of each element if (%d+) (%a+) items are equipped"] (ModParser.lua:3527)
-fn f0517(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0517(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -18107,7 +17991,7 @@ fn f0517(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of weapon physical damage as extra damage of an? r?a?n?d?o?m? ?element"] (ModParser.lua:3532)
-fn f0518(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0518(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18116,14 +18000,14 @@ fn f0518(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Weapon"),
+            c.index("ModFlag", &sb(b"Weapon")),
         ]));
         v
     })];
 }
 
 // specialModList["gain (%d+)%% of physical damage as extra damage of a random element"] (ModParser.lua:3533)
-fn f0519(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0519(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18137,7 +18021,7 @@ fn f0519(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for hits to deal (%d+)%% of physical damage as extra damage of a random element"] (ModParser.lua:3534)
-fn f0520(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0520(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_physPercent = arg(a, 2);
@@ -18153,7 +18037,7 @@ fn f0520(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of physical damage as a random element if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:3535)
-fn f0521(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0521(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -18171,15 +18055,10 @@ fn f0521(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -18197,7 +18076,7 @@ fn f0521(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+)%% of physical damage as extra damage of a random element while you are ignited"] (ModParser.lua:3536)
-fn f0522(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0522(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18218,7 +18097,7 @@ fn f0522(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of physical damage from hits with this weapon is converted to a random element"] (ModParser.lua:3537)
-fn f0523(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0523(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18239,7 +18118,7 @@ fn f0523(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of physical damage converted to a random element"] (ModParser.lua:3538)
-fn f0524(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0524(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18253,7 +18132,7 @@ fn f0524(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies convert (%d+)%% of their (%a+) damage to (%a+)"] (ModParser.lua:3539)
-fn f0525(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0525(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_damageFrom = arg(a, 2);
@@ -18268,20 +18147,10 @@ fn f0525(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_damageFrom.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_damageFrom.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_damageTo.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_damageTo.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -18296,7 +18165,7 @@ fn f0525(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies ignited by you have (%d+)%% of (%a+) damage they deal converted to (%a+)"] (ModParser.lua:3540)
-fn f0526(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0526(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_damageFrom = arg(a, 2);
@@ -18311,20 +18180,10 @@ fn f0526(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_damageFrom.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_damageFrom.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_damageTo.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_damageTo.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -18346,7 +18205,7 @@ fn f0526(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies shocked by you have (%d+)%% of (%a+) damage they deal converted to (%a+)"] (ModParser.lua:3541)
-fn f0527(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0527(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_damageFrom = arg(a, 2);
@@ -18361,20 +18220,10 @@ fn f0527(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_damageFrom.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_damageFrom.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_damageTo.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_damageTo.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -18396,7 +18245,7 @@ fn f0527(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies poisoned by you have (%d+)%% of (%a+) damage they deal converted to (%a+)"] (ModParser.lua:3542)
-fn f0528(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0528(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_damageFrom = arg(a, 2);
@@ -18411,20 +18260,10 @@ fn f0528(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_damageFrom.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_damageFrom.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_damageTo.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_damageTo.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -18446,7 +18285,7 @@ fn f0528(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shield crush and spectral shield throw gains (%d+) to (%d+) added lightning damage per (%d+) energy shield on shield"] (ModParser.lua:3544)
-fn f0529(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0529(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -18483,7 +18322,7 @@ fn f0529(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![sb(b"Spectral Shield Throw"), sb(b"Shield Crush")],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18519,7 +18358,7 @@ fn f0529(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![sb(b"Spectral Shield Throw"), sb(b"Shield Crush")],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18529,7 +18368,7 @@ fn f0529(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of shield crush and spectral shield throw physical damage converted to lightning damage"] (ModParser.lua:3548)
-fn f0530(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0530(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18549,7 +18388,7 @@ fn f0530(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![sb(b"Spectral Shield Throw"), sb(b"Shield Crush")],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18559,7 +18398,7 @@ fn f0530(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of exsanguinate and reap physical damage converted to fire damage"] (ModParser.lua:3551)
-fn f0531(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0531(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18576,7 +18415,7 @@ fn f0531(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Exsanguinate"), sb(b"Reap")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18586,7 +18425,7 @@ fn f0531(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%-(%d+)%% of toxic rain physical damage converted to chaos damage"] (ModParser.lua:3554)
-fn f0532(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0532(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18600,7 +18439,7 @@ fn f0532(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Toxic Rain")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18610,7 +18449,7 @@ fn f0532(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cobra lash and venom gyre have %-(%d+)%% of physical damage converted to chaos damage"] (ModParser.lua:3557)
-fn f0533(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0533(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18636,7 +18475,7 @@ fn f0533(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of consecrated path and purifying flame fire damage converted to chaos damage"] (ModParser.lua:3560)
-fn f0534(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0534(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18656,7 +18495,7 @@ fn f0534(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![sb(b"Consecrated Path"), sb(b"Purifying Flame")],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18666,7 +18505,7 @@ fn f0534(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of manabond and stormbind lightning damage converted to cold damage"] (ModParser.lua:3563)
-fn f0535(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0535(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18683,7 +18522,7 @@ fn f0535(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Manabond"), sb(b"Stormbind")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18693,7 +18532,7 @@ fn f0535(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["barrage and frenzy have (%d+)%% increased critical strike chance per endurance charge"] (ModParser.lua:3583)
-fn f0536(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0536(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18715,7 +18554,7 @@ fn f0536(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Barrage"), sb(b"Frenzy")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18725,7 +18564,7 @@ fn f0536(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-critical strikes deal (%d+)%% damage"] (ModParser.lua:3584)
-fn f0537(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0537(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18734,12 +18573,12 @@ fn f0537(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             add(&n(-100.0), &l_num.clone()),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"CriticalStrike")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18749,7 +18588,7 @@ fn f0537(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-critical strikes deal (%d+)%% less damage"] (ModParser.lua:3586)
-fn f0538(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0538(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18758,12 +18597,12 @@ fn f0538(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             neg(&l_num.clone()),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"CriticalStrike")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -18773,7 +18612,7 @@ fn f0538(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["critical strikes penetrate (%d+)%% of enemy elemental resistances while affected by zealotry"] (ModParser.lua:3589)
-fn f0539(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0539(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18801,7 +18640,7 @@ fn f0539(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+)%% to critical strike multiplier if you've shattered an enemy recently"] (ModParser.lua:3593)
-fn f0540(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0540(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18822,7 +18661,7 @@ fn f0540(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to gain a flask charge when you deal a critical strike"] (ModParser.lua:3594)
-fn f0541(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0541(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18836,7 +18675,7 @@ fn f0541(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["on non%-channelling attack, set a life flask with greater than %d+%% of maximum charges remaining to (%d+)%% for each charge removed this way, that attack gains %+(%d+)%% to damage over time multiplier"] (ModParser.lua:3598)
-fn f0542(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0542(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chargesConsumedPercent = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_damage = arg(a, 2);
@@ -18854,22 +18693,22 @@ fn f0542(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"percent"),
                         sub(&n(100.0), &l_chargesConsumedPercent.clone()),
                     ),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -18879,7 +18718,7 @@ fn f0542(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% increased critical strike chance against you"] (ModParser.lua:3610)
-fn f0543(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0543(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18889,7 +18728,7 @@ fn f0543(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["stuns from critical strikes have (%d+)%% increased duration"] (ModParser.lua:3611)
-fn f0544(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0544(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -18903,7 +18742,7 @@ fn f0544(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies take (%d+)%% increased damage for each type of ailment you have inflicted on them"] (ModParser.lua:3613)
-fn f0545(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0545(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19084,7 +18923,7 @@ fn f0545(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to deal double damage against enemies for each type of ailment you have inflicted on them"] (ModParser.lua:3624)
-fn f0546(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0546(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19211,7 +19050,7 @@ fn f0546(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased elemental damage with hits and ailments for each type of elemental ailment on enemy"] (ModParser.lua:3636)
-fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0547(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19222,8 +19061,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19241,8 +19080,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19260,8 +19099,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19279,8 +19118,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19298,8 +19137,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19317,8 +19156,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 nil(),
                 n(0.0),
                 first(vec![bor(&vec![
-                    field(&c.value("KeywordFlag"), "Hit"),
-                    field(&c.value("KeywordFlag"), "Ailment"),
+                    c.index("KeywordFlag", &sb(b"Hit")),
+                    c.index("KeywordFlag", &sb(b"Ailment")),
                 ])]),
                 tbl(
                     vec![
@@ -19337,8 +19176,8 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -19354,7 +19193,7 @@ fn f0547(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your shocks can increase damage taken by up to a maximum of (%d+)%%"] (ModParser.lua:3645)
-fn f0548(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0548(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19364,7 +19203,7 @@ fn f0548(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to maximum effect of shock"] (ModParser.lua:3646)
-fn f0549(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0549(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19374,7 +19213,7 @@ fn f0549(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your (%w+) damage can (%w+)"] (ModParser.lua:3647)
-fn f0550(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0550(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element = arg(a, 1);
     let mut l_ailment = arg(a, 2);
@@ -19392,7 +19231,7 @@ fn f0550(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your (%w+) damage cannot (%w+)"] (ModParser.lua:3650)
-fn f0551(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0551(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element = arg(a, 1);
     let mut l_ailment = arg(a, 2);
@@ -19410,7 +19249,7 @@ fn f0551(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you can inflict up to (%d+) ignites on an enemy"] (ModParser.lua:3705)
-fn f0552(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0552(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"IgniteCanStack")]))];
@@ -19420,7 +19259,7 @@ fn f0552(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies chilled by you take (%d+)%% increased burning damage"] (ModParser.lua:3707)
-fn f0553(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0553(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19452,7 +19291,7 @@ fn f0553(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["damaging ailments deal damage (%d+)%% faster"] (ModParser.lua:3708)
-fn f0554(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0554(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19465,7 +19304,7 @@ fn f0554(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["damaging ailments you inflict deal damage (%d+)%% faster while affected by malevolence"] (ModParser.lua:3709)
-fn f0555(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0555(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19511,7 +19350,7 @@ fn f0555(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased damage with damaging ailments you inflict while you are affected by the same ailment"] (ModParser.lua:3714)
-fn f0556(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0556(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19521,7 +19360,7 @@ fn f0556(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 l_num.clone(),
                 nil(),
                 n(0.0),
-                field(&c.value("KeywordFlag"), "Bleed"),
+                c.index("KeywordFlag", &sb(b"Bleed")),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"ActorCondition")),
@@ -19544,7 +19383,7 @@ fn f0556(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 l_num.clone(),
                 nil(),
                 n(0.0),
-                field(&c.value("KeywordFlag"), "Ignite"),
+                c.index("KeywordFlag", &sb(b"Ignite")),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"ActorCondition")),
@@ -19568,7 +19407,7 @@ fn f0556(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"ActorCondition")),
@@ -19590,7 +19429,7 @@ fn f0556(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ignited enemies burn (%d+)%% faster"] (ModParser.lua:3719)
-fn f0557(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0557(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19600,18 +19439,18 @@ fn f0557(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["base (%a+) duration is ([%d%.]+) seconds?"] (ModParser.lua:3722)
-fn f0558(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0558(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_ailment = arg(a, 1);
     let mut l_num = arg(a, 2);
     let mut l_ailmentName = {
         let v = {
             let v = {
-                let v = Value::Bool(eq(&l_ailment.clone(), &sb(b"bleeding")));
+                let v = V::Bool(eq(&l_ailment.clone(), &sb(b"bleeding")));
                 if v.truthy() {
                     v
                 } else {
-                    Value::Bool(eq(&l_ailment.clone(), &sb(b"bleed")))
+                    V::Bool(eq(&l_ailment.clone(), &sb(b"bleed")))
                 }
             };
             if v.truthy() { sb(b"Bleed") } else { v }
@@ -19621,11 +19460,11 @@ fn f0558(c: &Ctx, a: &[Value]) -> Vec<Value> {
         } else {
             {
                 let v = {
-                    let v = Value::Bool(eq(&l_ailment.clone(), &sb(b"ignite")));
+                    let v = V::Bool(eq(&l_ailment.clone(), &sb(b"ignite")));
                     if v.truthy() {
                         v
                     } else {
-                        Value::Bool(eq(&l_ailment.clone(), &sb(b"poison")))
+                        V::Bool(eq(&l_ailment.clone(), &sb(b"poison")))
                     }
                 };
                 if v.truthy() {
@@ -19654,7 +19493,7 @@ fn f0558(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ignited enemies burn (%d+)%% slower"] (ModParser.lua:3729)
-fn f0559(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0559(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19664,7 +19503,7 @@ fn f0559(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies ignited by an attack burn (%d+)%% faster"] (ModParser.lua:3730)
-fn f0560(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0560(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19673,14 +19512,14 @@ fn f0560(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["ignites you inflict with attacks deal damage (%d+)%% faster"] (ModParser.lua:3731)
-fn f0561(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0561(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19689,14 +19528,14 @@ fn f0561(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["ignites you inflict deal damage (%d+)%% faster"] (ModParser.lua:3732)
-fn f0562(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0562(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19706,7 +19545,7 @@ fn f0562(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for ignites inflicted with lightning strike or frost blades to deal (%d+)%% more damage"] (ModParser.lua:3733)
-fn f0563(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0563(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -19721,7 +19560,7 @@ fn f0563(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Ignite"),
+            c.index("KeywordFlag", &sb(b"Ignite")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -19729,7 +19568,7 @@ fn f0563(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Lightning Strike"), sb(b"Frost Blades")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -19739,7 +19578,7 @@ fn f0563(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for ignites inflicted with lightning arrow or ice shot to deal (%d+)%% more damage"] (ModParser.lua:3736)
-fn f0564(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0564(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -19754,7 +19593,7 @@ fn f0564(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Ignite"),
+            c.index("KeywordFlag", &sb(b"Ignite")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -19762,7 +19601,7 @@ fn f0564(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Lightning Arrow"), sb(b"Ice Shot")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -19772,7 +19611,7 @@ fn f0564(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for ignites inflicted with shock nova or storm call to deal (%d+)%% more damage"] (ModParser.lua:3739)
-fn f0565(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0565(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -19787,7 +19626,7 @@ fn f0565(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Ignite"),
+            c.index("KeywordFlag", &sb(b"Ignite")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -19795,7 +19634,7 @@ fn f0565(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Shock Nova"), sb(b"Storm Call")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -19805,7 +19644,7 @@ fn f0565(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies ignited by you during f?l?a?s?k? ?effect take (%d+)%% increased damage"] (ModParser.lua:3742)
-fn f0566(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0566(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19833,7 +19672,7 @@ fn f0566(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shock enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3752)
-fn f0567(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0567(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19847,7 +19686,7 @@ fn f0567(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["chill enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3753)
-fn f0568(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0568(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19861,7 +19700,7 @@ fn f0568(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict non%-damaging ailments as though dealing (%d+)%% more damage"] (ModParser.lua:3754)
-fn f0569(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0569(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19897,7 +19736,7 @@ fn f0569(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-damaging elemental ailments you inflict have (%d+)%% more effect"] (ModParser.lua:3762)
-fn f0570(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0570(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -19913,7 +19752,7 @@ fn f0570(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["immun[ei]t?y? to elemental ailments while on consecrated ground if you have at least (%d+) devotion"] (ModParser.lua:3770)
-fn f0571(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0571(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19940,7 +19779,7 @@ fn f0571(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["freeze enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3771)
-fn f0572(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0572(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19954,7 +19793,7 @@ fn f0572(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["freeze chilled enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3772)
-fn f0573(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0573(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19976,7 +19815,7 @@ fn f0573(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["manabond and stormbind freeze enemies as though dealing (%d+)%% more damage"] (ModParser.lua:3773)
-fn f0574(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0574(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -19991,7 +19830,7 @@ fn f0574(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Manabond"), sb(b"Stormbind")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20001,7 +19840,7 @@ fn f0574(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to inflict brittle on enemies when you block their damage"] (ModParser.lua:3774)
-fn f0575(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0575(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20011,7 +19850,7 @@ fn f0575(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to inflict sap on enemies when you block their damage"] (ModParser.lua:3775)
-fn f0576(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0576(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20021,7 +19860,7 @@ fn f0576(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to inflict scorch on enemies when you block their damage"] (ModParser.lua:3776)
-fn f0577(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0577(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20031,7 +19870,7 @@ fn f0577(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% chance to ignite, freeze, shock, and poison cursed enemies"] (ModParser.lua:3803)
-fn f0578(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0578(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -20093,7 +19932,7 @@ fn f0578(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with prismatic skills always ?i?n?f?l?i?c?t? (%w+)"] (ModParser.lua:3837)
-fn f0579(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0579(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_type = arg(a, 1);
     return vec![tbl(vec![], {
@@ -20109,13 +19948,13 @@ fn f0579(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             n(100.0),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
                     (
                         sb(b"skillType"),
-                        field(&c.value("SkillType"), "RandomElement"),
+                        c.index("SkillType", &sb(b"RandomElement")),
                     ),
                 ],
                 vec![],
@@ -20126,7 +19965,7 @@ fn f0579(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to sap enemies in chilling areas"] (ModParser.lua:3849)
-fn f0580(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0580(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20148,7 +19987,7 @@ fn f0580(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for cold snap and creeping frost to sap enemies in chilling areas"] (ModParser.lua:3850)
-fn f0581(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0581(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20163,7 +20002,7 @@ fn f0581(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Cold Snap"), sb(b"Creeping Frost")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20181,7 +20020,7 @@ fn f0581(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["drops burning ground while moving, dealing (%d+) fire damage per second for %d+ seconds"] (ModParser.lua:3851)
-fn f0582(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0582(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20191,7 +20030,7 @@ fn f0582(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take (%d+) fire damage per second while flame%-touched"] (ModParser.lua:3852)
-fn f0583(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0583(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20212,7 +20051,7 @@ fn f0583(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased duration of ailments of types you haven't inflicted recently"] (ModParser.lua:3856)
-fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0584(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -20224,7 +20063,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![
                         (sb(b"type"), sb(b"Condition")),
                         (sb(b"var"), sb(b"FrozenEnemyRecently")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -20237,7 +20076,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![
                         (sb(b"type"), sb(b"Condition")),
                         (sb(b"var"), sb(b"FrozenEnemyRecently")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -20250,7 +20089,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![
                         (sb(b"type"), sb(b"Condition")),
                         (sb(b"var"), sb(b"IgnitedEnemyRecently")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -20263,7 +20102,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![
                         (sb(b"type"), sb(b"Condition")),
                         (sb(b"var"), sb(b"ShockedEnemyRecently")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -20276,7 +20115,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     vec![
                         (sb(b"type"), sb(b"Condition")),
                         (sb(b"var"), sb(b"CausedBleedingRecently")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -20290,7 +20129,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"PoisonedEnemyRecently")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20300,7 +20139,7 @@ fn f0584(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies permanently take (%d+)%% increased damage for each second they've ever been frozen by you, up to a maximum of (%d+)%%"] (ModParser.lua:3866)
-fn f0585(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0585(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -20341,7 +20180,7 @@ fn f0585(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies permanently take (%d+)%% increased damage for each second they've ever been chilled by you, up to a maximum of (%d+)%%"] (ModParser.lua:3867)
-fn f0586(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0586(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -20382,7 +20221,7 @@ fn f0586(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["modifiers to chance to suppress spell damage also apply to chance to avoid elemental ailments at (%d+)%% of their value"] (ModParser.lua:3868)
-fn f0587(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0587(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -20396,7 +20235,7 @@ fn f0587(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["modifiers to chance to suppress spell damage also apply to chance to defend with (%d+)%% of armour at (%d+)%% of their value"] (ModParser.lua:3872)
-fn f0588(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0588(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_armourPercentage = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_effectiveness = arg(a, 2);
@@ -20427,7 +20266,7 @@ fn f0588(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of non%-damaging ailments inflicted by summoned skitterbots"] (ModParser.lua:3884)
-fn f0589(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0589(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20441,7 +20280,7 @@ fn f0589(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["melee critical strikes have (%d+)%% chance to cause bleeding"] (ModParser.lua:3890)
-fn f0590(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0590(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20450,7 +20289,7 @@ fn f0590(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Melee"),
+            c.index("ModFlag", &sb(b"Melee")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20464,7 +20303,7 @@ fn f0590(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bleeding you inflict deals damage (%d+)%% faster"] (ModParser.lua:3894)
-fn f0591(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0591(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20474,7 +20313,7 @@ fn f0591(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bleeding you inflict on non%-bleeding enemies deals (%d+)%% more damage"] (ModParser.lua:3895)
-fn f0592(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0592(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20484,7 +20323,7 @@ fn f0592(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Bleed"),
+            c.index("KeywordFlag", &sb(b"Bleed")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20498,7 +20337,7 @@ fn f0592(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for bleeding inflicted with this weapon to deal (%d+)%% more damage"] (ModParser.lua:3898)
-fn f0593(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0593(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -20513,7 +20352,7 @@ fn f0593(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Bleed"),
+            c.index("KeywordFlag", &sb(b"Bleed")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20524,7 +20363,7 @@ fn f0593(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -20534,7 +20373,7 @@ fn f0593(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for bleeding inflicted with cobra lash or venom gyre to deal (%d+)%% more damage"] (ModParser.lua:3901)
-fn f0594(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0594(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -20549,7 +20388,7 @@ fn f0594(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Bleed"),
+            c.index("KeywordFlag", &sb(b"Bleed")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -20566,7 +20405,7 @@ fn f0594(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bleeding you inflict deals damage (%d+)%% faster per frenzy charge"] (ModParser.lua:3904)
-fn f0595(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0595(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20587,7 +20426,7 @@ fn f0595(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["rain of arrows and toxic rain deal (%d+)%% more damage with bleeding"] (ModParser.lua:3905)
-fn f0596(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0596(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20597,7 +20436,7 @@ fn f0596(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Bleed"),
+            c.index("KeywordFlag", &sb(b"Bleed")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -20605,7 +20444,7 @@ fn f0596(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Rain of Arrows"), sb(b"Toxic Rain")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20615,7 +20454,7 @@ fn f0596(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of impales inflicted by hits that also inflict bleeding"] (ModParser.lua:3909)
-fn f0597(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0597(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20625,14 +20464,14 @@ fn f0597(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Hit"),
+            c.index("KeywordFlag", &sb(b"Hit")),
         ]));
         v
     })];
 }
 
 // specialModList["(%d+)%% chance for blade vortex and blade blast to impale enemies on hit"] (ModParser.lua:3912)
-fn f0598(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0598(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20647,7 +20486,7 @@ fn f0598(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Blade Vortex"), sb(b"Blade Blast")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20657,7 +20496,7 @@ fn f0598(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance on hitting an enemy for all impales on that enemy to last for an additional hit"] (ModParser.lua:3914)
-fn f0599(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0599(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20671,7 +20510,7 @@ fn f0599(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles gain impale effect as they travel farther, causing impales they inflict to have up to (%d+)%% increased effect"] (ModParser.lua:3917)
-fn f0600(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0600(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20680,7 +20519,7 @@ fn f0600(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"DistanceRamp")),
@@ -20703,7 +20542,7 @@ fn f0600(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased damage with bleeding inflicted on poisoned enemies"] (ModParser.lua:3919)
-fn f0601(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0601(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20713,7 +20552,7 @@ fn f0601(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Bleed"),
+            c.index("KeywordFlag", &sb(b"Bleed")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"ActorCondition")),
@@ -20728,7 +20567,7 @@ fn f0601(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your chaos damage has (%d+)%% chance to poison enemies"] (ModParser.lua:3963)
-fn f0602(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0602(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20738,7 +20577,7 @@ fn f0602(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["melee critical strikes have (%d+)%% chance to poison the enemy"] (ModParser.lua:3966)
-fn f0603(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0603(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20747,7 +20586,7 @@ fn f0603(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Melee"),
+            c.index("ModFlag", &sb(b"Melee")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20761,7 +20600,7 @@ fn f0603(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["critical strikes with daggers have a (%d+)%% chance to poison the enemy"] (ModParser.lua:3967)
-fn f0604(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0604(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20770,7 +20609,7 @@ fn f0604(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Dagger"),
+            c.index("ModFlag", &sb(b"Dagger")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20784,7 +20623,7 @@ fn f0604(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["traps and mines have a (%d+)%% chance to poison on hit"] (ModParser.lua:3972)
-fn f0605(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0605(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20797,8 +20636,8 @@ fn f0605(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 n(0.0),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Trap"),
-                field(&c.value("KeywordFlag"), "Mine"),
+                c.index("KeywordFlag", &sb(b"Trap")),
+                c.index("KeywordFlag", &sb(b"Mine")),
             ])]);
             v
         }));
@@ -20807,7 +20646,7 @@ fn f0605(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poisons you inflict deal damage (%d+)%% faster"] (ModParser.lua:3973)
-fn f0606(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0606(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20817,7 +20656,7 @@ fn f0606(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for poisons inflicted with this weapon to deal (%d+)%% more damage"] (ModParser.lua:3974)
-fn f0607(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0607(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -20832,7 +20671,7 @@ fn f0607(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20843,7 +20682,7 @@ fn f0607(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -20853,7 +20692,7 @@ fn f0607(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for poisons inflicted with blast rain or artillery balls?i?s?ta to deal (%d+)%% more damage"] (ModParser.lua:3977)
-fn f0608(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0608(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -20868,7 +20707,7 @@ fn f0608(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -20885,7 +20724,7 @@ fn f0608(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for poisons inflicted with freezing pulse and eye of winter to deal (%d+)%% more damage"] (ModParser.lua:3980)
-fn f0609(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0609(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_more = arg(a, 2);
@@ -20900,7 +20739,7 @@ fn f0609(c: &Ctx, a: &[Value]) -> Vec<Value> {
             ),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -20908,7 +20747,7 @@ fn f0609(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Freezing Pulse"), sb(b"Eye of Winter")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20918,7 +20757,7 @@ fn f0609(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poisons you inflict on non%-poisoned enemies deal (%d+)%% increased damage"] (ModParser.lua:3984)
-fn f0610(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0610(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20928,7 +20767,7 @@ fn f0610(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20942,7 +20781,7 @@ fn f0610(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poisons inflicted by sunder or ground slam on non%-poisoned enemies deal (%d+)%% increased damage"] (ModParser.lua:3987)
-fn f0611(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0611(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20952,7 +20791,7 @@ fn f0611(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Poison"),
+            c.index("KeywordFlag", &sb(b"Poison")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -20967,7 +20806,7 @@ fn f0611(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Sunder"), sb(b"Ground Slam")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -20977,7 +20816,7 @@ fn f0611(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["poisons on you expire (%d+)%% slower"] (ModParser.lua:3990)
-fn f0612(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0612(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -20991,7 +20830,7 @@ fn f0612(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to inflict an additional poison on the same target when you inflict poison"] (ModParser.lua:3991)
-fn f0613(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0613(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21005,7 +20844,7 @@ fn f0613(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict (%d+) additional poisons? on the same target when you inflict poisons? with this weapon"] (ModParser.lua:3992)
-fn f0614(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0614(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21026,7 +20865,7 @@ fn f0614(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot poison enemies with at least (%d+) poisons? on them"] (ModParser.lua:3993)
-fn f0615(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0615(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21036,7 +20875,7 @@ fn f0615(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["prevent %+(%d+)%% of suppressed spell damage"] (ModParser.lua:3999)
-fn f0616(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0616(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21050,7 +20889,7 @@ fn f0616(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["prevent %+(%d+)%% of suppressed spell damage per hit suppressed recently"] (ModParser.lua:4000)
-fn f0617(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0617(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21071,7 +20910,7 @@ fn f0617(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["prevent %+(%d+)%% of suppressed spell damage if you have not suppressed spell damage recently"] (ModParser.lua:4003)
-fn f0618(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0618(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21083,7 +20922,7 @@ fn f0618(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"SuppressedRecently")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -21093,7 +20932,7 @@ fn f0618(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from suppressed critical strikes"] (ModParser.lua:4012)
-fn f0619(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0619(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21107,7 +20946,7 @@ fn f0619(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["+(%d+)%% chance to suppress spell damage if your e?q?u?i?p?p?e?d? ?boots, helmet and gloves have evasion"] (ModParser.lua:4013)
-fn f0620(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0620(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21145,7 +20984,7 @@ fn f0620(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["+(%d+)%% chance to suppress spell damage for each dagger you're wielding"] (ModParser.lua:4022)
-fn f0621(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0621(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -21177,7 +21016,7 @@ fn f0621(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your curses have (%d+)%% increased effect if (%d+)%% of curse duration expired"] (ModParser.lua:4037)
-fn f0622(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0622(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21199,7 +21038,7 @@ fn f0622(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Hex")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Hex"))),
                 ],
                 vec![],
             ),
@@ -21209,7 +21048,7 @@ fn f0622(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-aura hexes expire upon reaching (%d+)%% of base effect non%-aura hexes gain (%d+)%% increased effect per second"] (ModParser.lua:4040)
-fn f0623(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0623(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_limit = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -21225,22 +21064,22 @@ fn f0623(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"actor"), sb(b"enemy")),
                     (sb(b"var"), sb(b"CurseDurationExpired")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Hex")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Hex"))),
                 ],
                 vec![],
             ),
@@ -21250,7 +21089,7 @@ fn f0623(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies cursed by you have malediction if (%d+)%% of curse duration expired"] (ModParser.lua:4043)
-fn f0624(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0624(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21287,7 +21126,7 @@ fn f0624(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies cursed by you are hindered if (%d+)%% of curse duration expired"] (ModParser.lua:4046)
-fn f0625(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0625(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21324,7 +21163,7 @@ fn f0625(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["aura buffs from skills have (%d+)%% increased effect on you for each herald affecting you"] (ModParser.lua:4052)
-fn f0626(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0626(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21345,7 +21184,7 @@ fn f0626(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["aura buffs from skills have (%d+)%% increased effect on you for each herald affecting you, up to (%d+)%%"] (ModParser.lua:4053)
-fn f0627(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0627(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21370,7 +21209,7 @@ fn f0627(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["auras from your skills have (%d+)%% increased effect on you for each herald affecting you, up to (%d+)%%"] (ModParser.lua:4056)
-fn f0628(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0628(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21395,7 +21234,7 @@ fn f0628(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased area of effect per power charge, up to a maximum of (%d+)%%"] (ModParser.lua:4059)
-fn f0629(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0629(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21420,7 +21259,7 @@ fn f0629(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased area of effect per second you've been stationary, up to a maximum of (%d+)%%"] (ModParser.lua:4062)
-fn f0630(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0630(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21436,7 +21275,7 @@ fn f0630(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"var"), sb(b"StationarySeconds")),
                     (sb(b"globalLimit"), first(vec![tonumber(&l_limit.clone())])),
                     (sb(b"globalLimitKey"), sb(b"ExpansiveMight")),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -21446,7 +21285,7 @@ fn f0630(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased chaos damage per (%d+) maximum mana, up to a maximum of (%d+)%%"] (ModParser.lua:4065)
-fn f0631(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0631(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -21473,7 +21312,7 @@ fn f0631(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have %+(%d+)%% to damage over time multiplier per ghastly eye jewel affecting you, up to a maximum of %+(%d+)%%"] (ModParser.lua:4068)
-fn f0632(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0632(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21509,7 +21348,7 @@ fn f0632(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of arcane surge on you per hypnotic eye jewel affecting you, up to a maximum of (%d+)%%"] (ModParser.lua:4071)
-fn f0633(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0633(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21534,7 +21373,7 @@ fn f0633(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased main hand critical strike chance per murderous eye jewel affecting you, up to a maximum of (%d+)%%"] (ModParser.lua:4074)
-fn f0634(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0634(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21566,7 +21405,7 @@ fn f0634(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to off hand critical strike multiplier per murderous eye jewel affecting you, up to a maximum of %+(%d+)%%"] (ModParser.lua:4077)
-fn f0635(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0635(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -21598,7 +21437,7 @@ fn f0635(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of non%-curse auras from your skills on enemies"] (ModParser.lua:4091)
-fn f0636(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0636(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -21608,18 +21447,15 @@ fn f0636(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "AppliesCurse"),
-                    ),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"AppliesCurse"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -21641,7 +21477,7 @@ fn f0636(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you can apply an additional curse if (%d+) (%a+) items are equipped"] (ModParser.lua:4100)
-fn f0637(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0637(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_thresh = arg(a, 1);
     let mut l_influence = arg(a, 2);
@@ -21671,7 +21507,7 @@ fn f0637(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["curses on enemies in your chilling areas have (%d+)%% increased effect"] (ModParser.lua:4102)
-fn f0638(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0638(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21693,7 +21529,7 @@ fn f0638(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have an additional (%d+)%% chance to receive a critical strike"] (ModParser.lua:4104)
-fn f0639(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0639(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21713,7 +21549,7 @@ fn f0639(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have (%-%d+)%% to all resistances"] (ModParser.lua:4105)
-fn f0640(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0640(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -21743,7 +21579,7 @@ fn f0640(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies ignited or chilled by you have (%-%d+)%% to elemental resistances"] (ModParser.lua:4109)
-fn f0641(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0641(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21774,7 +21610,7 @@ fn f0641(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["reserves (%d+)%% of nearby enemy monsters' life"] (ModParser.lua:4112)
-fn f0642(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0642(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21798,7 +21634,7 @@ fn f0642(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemy monsters have at least (%d+)%% of life reserved"] (ModParser.lua:4113)
-fn f0643(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0643(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21822,7 +21658,7 @@ fn f0643(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your hits inflict decay, dealing (%d+) chaos damage per second for %d+ seconds"] (ModParser.lua:4114)
-fn f0644(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0644(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21843,7 +21679,7 @@ fn f0644(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict decay on enemies you curse with hex or mark skills, dealing (%d+) chaos damage per second for %d+ seconds"] (ModParser.lua:4115)
-fn f0645(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0645(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21872,7 +21708,7 @@ fn f0645(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict decay on enemies you curse with hex skills, dealing (%d+) chaos damage per second for %d+ seconds"] (ModParser.lua:4118)
-fn f0646(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0646(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21901,7 +21737,7 @@ fn f0646(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["temporal chains has (%d+)%% reduced effect on you"] (ModParser.lua:4121)
-fn f0647(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0647(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21922,7 +21758,7 @@ fn f0647(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-][%d%.]+) seconds to cat's stealth duration"] (ModParser.lua:4124)
-fn f0648(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0648(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21943,7 +21779,7 @@ fn f0648(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-][%d%.]+) seconds to cat's agility duration"] (ModParser.lua:4125)
-fn f0649(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0649(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21964,7 +21800,7 @@ fn f0649(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-][%d%.]+) seconds to avian's might duration"] (ModParser.lua:4126)
-fn f0650(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0650(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -21985,7 +21821,7 @@ fn f0650(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-][%d%.]+) seconds to avian's flight duration"] (ModParser.lua:4127)
-fn f0651(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0651(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22006,7 +21842,7 @@ fn f0651(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["marked enemy takes (%d+)%% increased damage"] (ModParser.lua:4130)
-fn f0652(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0652(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22034,7 +21870,7 @@ fn f0652(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["marked enemy has (%d+)%% reduced accuracy rating"] (ModParser.lua:4133)
-fn f0653(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0653(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22062,7 +21898,7 @@ fn f0653(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you are cursed with level (%d+) (%D+)"] (ModParser.lua:4136)
-fn f0654(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0654(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -22073,12 +21909,9 @@ fn f0654(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     (sb(b"level"), l_num.clone()),
-                    (sb(b"applyToPlayer"), Value::Bool(true)),
+                    (sb(b"applyToPlayer"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -22088,7 +21921,7 @@ fn f0654(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you are cursed with (%D+)"] (ModParser.lua:4137)
-fn f0655(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0655(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     return vec![tbl(vec![], {
@@ -22098,12 +21931,9 @@ fn f0655(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"applyToPlayer"), Value::Bool(true)),
+                    (sb(b"applyToPlayer"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -22113,7 +21943,7 @@ fn f0655(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you are cursed with (%D+), with (%d+)%% increased effect"] (ModParser.lua:4138)
-fn f0656(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0656(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -22123,12 +21953,9 @@ fn f0656(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                     (sb(b"level"), n(1.0)),
-                    (sb(b"applyToPlayer"), Value::Bool(true)),
+                    (sb(b"applyToPlayer"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -22143,10 +21970,10 @@ fn f0656(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"skillName"),
                         first(vec![str_sub(
-                            &first(gsub_fn(
+                            &first(gsub_case(
                                 &concat(&sb(b" "), &l_skill.clone()),
                                 &sb(b"%W%l"),
-                                &mut upper_fn,
+                                true,
                                 &nil(),
                             )),
                             &n(2.0),
@@ -22162,7 +21989,7 @@ fn f0656(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you consumed a corpse recently, you and nearby allies regenerate (%d+)%% of life per second"] (ModParser.lua:4144)
-fn f0657(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0657(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22189,7 +22016,7 @@ fn f0657(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you have blocked recently, you and nearby allies regenerate (%d+)%% of life per second"] (ModParser.lua:4145)
-fn f0658(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0658(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22216,7 +22043,7 @@ fn f0658(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% chance to block attack damage if you have not blocked recently"] (ModParser.lua:4148)
-fn f0659(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0659(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22228,7 +22055,7 @@ fn f0659(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"BlockedRecently")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -22238,7 +22065,7 @@ fn f0659(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% chance to block spell damage if you have not blocked recently"] (ModParser.lua:4149)
-fn f0660(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0660(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22250,7 +22077,7 @@ fn f0660(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"BlockedRecently")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -22260,7 +22087,7 @@ fn f0660(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%d%.]+)%% of evasion rating is regenerated as life per second while focus?sed"] (ModParser.lua:4163)
-fn f0661(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0661(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22289,7 +22116,7 @@ fn f0661(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby allies have (%d+)%% increased defences per (%d+) strength you have"] (ModParser.lua:4164)
-fn f0662(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0662(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -22300,7 +22127,7 @@ fn f0662(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (sb(b"onlyAllies"), Value::Bool(true)),
+                    (sb(b"onlyAllies"), V::Bool(true)),
                     (
                         sb(b"mod"),
                         first(c.mod_(vec![sb(b"Defences"), sb(b"INC"), l_num.clone()])),
@@ -22322,7 +22149,7 @@ fn f0662(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby allies have %+(%d+)%% to critical strike multiplier per (%d+) dexterity you have"] (ModParser.lua:4165)
-fn f0663(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0663(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -22333,7 +22160,7 @@ fn f0663(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (sb(b"onlyAllies"), Value::Bool(true)),
+                    (sb(b"onlyAllies"), V::Bool(true)),
                     (
                         sb(b"mod"),
                         first(c.mod_(vec![sb(b"CritMultiplier"), sb(b"BASE"), l_num.clone()])),
@@ -22355,7 +22182,7 @@ fn f0663(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby allies have (%d+)%% increased cast speed per (%d+) intelligence you have"] (ModParser.lua:4166)
-fn f0664(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0664(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -22366,7 +22193,7 @@ fn f0664(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (sb(b"onlyAllies"), Value::Bool(true)),
+                    (sb(b"onlyAllies"), V::Bool(true)),
                     (
                         sb(b"mod"),
                         first(c.mod_(vec![
@@ -22374,7 +22201,7 @@ fn f0664(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             sb(b"INC"),
                             l_num.clone(),
                             nil(),
-                            field(&c.value("ModFlag"), "Cast"),
+                            c.index("ModFlag", &sb(b"Cast")),
                         ])),
                     ),
                 ],
@@ -22394,7 +22221,7 @@ fn f0664(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground you create grants (%d+)%% increased accuracy rating to you and allies"] (ModParser.lua:4176)
-fn f0665(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0665(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22425,7 +22252,7 @@ fn f0665(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground created during effect applies (%d+)%% increased damage taken to enemies"] (ModParser.lua:4177)
-fn f0666(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0666(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22463,7 +22290,7 @@ fn f0666(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground you create while affected by zealotry causes enemies to take (%d+)%% increased damage"] (ModParser.lua:4178)
-fn f0667(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0667(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22502,7 +22329,7 @@ fn f0667(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you've warcried recently, you and nearby allies have (%d+)%% increased attack, cast and movement speed"] (ModParser.lua:4179)
-fn f0668(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0668(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -22546,7 +22373,7 @@ fn f0668(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased movement speed while on full life"] (ModParser.lua:4183)
-fn f0669(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0669(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22567,7 +22394,7 @@ fn f0669(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries grant arcane surge to you and allies, with (%d+)%% increased effect per (%d+) power, up to (%d+)%%"] (ModParser.lua:4185)
-fn f0670(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0670(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -22618,7 +22445,7 @@ fn f0670(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain arcane surge after spending a total of (%d+) mana"] (ModParser.lua:4189)
-fn f0671(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0671(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22646,7 +22473,7 @@ fn f0671(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain arcane surge after spending a total of (%d+) life"] (ModParser.lua:4192)
-fn f0672(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0672(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22674,7 +22501,7 @@ fn f0672(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies in your chilling areas take (%d+)%% increased lightning damage"] (ModParser.lua:4196)
-fn f0673(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0673(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22702,7 +22529,7 @@ fn f0673(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries count as having (%d+) additional nearby enemies"] (ModParser.lua:4197)
-fn f0674(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0674(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22716,7 +22543,7 @@ fn f0674(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies taunted by your warcries take (%d+)%% increased damage"] (ModParser.lua:4200)
-fn f0675(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0675(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22754,7 +22581,7 @@ fn f0675(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict withered for (%d+) seconds on hit if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:4207)
-fn f0676(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0676(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -22770,15 +22597,10 @@ fn f0676(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -22796,7 +22618,7 @@ fn f0676(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies take (%d+)%% increased elemental damage from your hits for each withered you have inflicted on them"] (ModParser.lua:4214)
-fn f0677(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0677(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22828,7 +22650,7 @@ fn f0677(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+) chaos damage per second for 3 seconds on kill"] (ModParser.lua:4220)
-fn f0678(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0678(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22849,7 +22671,7 @@ fn f0678(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+) life per second for each (%d+)%% uncapped fire resistance"] (ModParser.lua:4221)
-fn f0679(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0679(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_percent = arg(a, 2);
@@ -22873,7 +22695,7 @@ fn f0679(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+) life over 1 second for each spell you cast"] (ModParser.lua:4222)
-fn f0680(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0680(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22894,7 +22716,7 @@ fn f0680(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["and nearby allies regenerate (%d+) life per second"] (ModParser.lua:4223)
-fn f0681(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0681(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22921,7 +22743,7 @@ fn f0681(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased life regeneration rate"] (ModParser.lua:4224)
-fn f0682(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0682(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -22931,7 +22753,7 @@ fn f0682(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["every (%d+) seconds, regenerate life equal to (%d+)%% of armour and evasion rating over (%d+) second"] (ModParser.lua:4225)
-fn f0683(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0683(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_interval = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_percent = arg(a, 2);
@@ -23024,7 +22846,7 @@ fn f0683(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["every (%d+) seconds, regenerate energy shield equal to (%d+)%% of evasion rating over (%d+) second"] (ModParser.lua:4231)
-fn f0684(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0684(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_interval = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_percent = arg(a, 2);
@@ -23075,7 +22897,7 @@ fn f0684(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+)%% of life per second for each different ailment affecting you"] (ModParser.lua:4235)
-fn f0685(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0685(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -23187,7 +23009,7 @@ fn f0685(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["fire skills have a (%d+)%% chance to apply fire exposure on hit"] (ModParser.lua:4246)
-fn f0686(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0686(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23197,7 +23019,7 @@ fn f0686(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cold skills have a (%d+)%% chance to apply cold exposure on hit"] (ModParser.lua:4247)
-fn f0687(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0687(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23207,7 +23029,7 @@ fn f0687(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lightning skills have a (%d+)%% chance to apply lightning exposure on hit"] (ModParser.lua:4248)
-fn f0688(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0688(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23221,7 +23043,7 @@ fn f0688(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to inflict cold exposure on hit with cold damage"] (ModParser.lua:4249)
-fn f0689(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0689(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23231,7 +23053,7 @@ fn f0689(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%a+) exposure on hit if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:4290)
-fn f0690(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0690(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_exposureType = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -23262,10 +23084,10 @@ fn f0690(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
+                                &first(gsub_case(
                                     &first(c.first_to_upper(vec![l_curse.clone()])),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -23290,7 +23112,7 @@ fn f0690(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict (%a+) exposure on hit if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:4293)
-fn f0691(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0691(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_exposureType = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -23321,10 +23143,10 @@ fn f0691(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
+                                &first(gsub_case(
                                     &first(c.first_to_upper(vec![l_curse.clone()])),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -23349,7 +23171,7 @@ fn f0691(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict (%w+) exposure on hit, applying %-(%d+)%% to (%w+) resistance"] (ModParser.lua:4306)
-fn f0692(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0692(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element1 = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -23400,7 +23222,7 @@ fn f0692(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a unique enemy is in your presence, inflict (%w+) exposure on hit, applying %-(%d+)%% to (%w+) resistance"] (ModParser.lua:4310)
-fn f0693(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0693(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element1 = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -23466,7 +23288,7 @@ fn f0693(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a pinnacle atlas boss is in your presence, inflict (%w+) exposure on hit, applying %-(%d+)%% to (%w+) resistance"] (ModParser.lua:4314)
-fn f0694(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0694(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element1 = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -23532,7 +23354,7 @@ fn f0694(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inflict fire exposure on hit against enemies with (%d+) cinderflame, applying %-(%d+)%% to (%w+) resistance"] (ModParser.lua:4318)
-fn f0695(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0695(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_cinderflame = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -23596,7 +23418,7 @@ fn f0695(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["fire exposure you inflict applies an extra (%-?%d+)%% to fire resistance"] (ModParser.lua:4322)
-fn f0696(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0696(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23606,7 +23428,7 @@ fn f0696(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cold exposure you inflict applies an extra (%-?%d+)%% to cold resistance"] (ModParser.lua:4323)
-fn f0697(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0697(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23616,7 +23438,7 @@ fn f0697(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lightning exposure you inflict applies an extra (%-?%d+)%% to lightning resistance"] (ModParser.lua:4324)
-fn f0698(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0698(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23630,7 +23452,7 @@ fn f0698(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["exposure you inflict applies at least (%-%d+)%% to the affected resistance"] (ModParser.lua:4325)
-fn f0699(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0699(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23640,7 +23462,7 @@ fn f0699(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to gain a brine charge instead of an endurance charge"] (ModParser.lua:4332)
-fn f0700(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0700(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"CanGainBrineCharges")]))];
@@ -23654,7 +23476,7 @@ fn f0700(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+)%% life over one second when hit while sane"] (ModParser.lua:4336)
-fn f0701(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0701(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23666,7 +23488,7 @@ fn f0701(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"Insane")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -23683,7 +23505,7 @@ fn f0701(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you count as on low (%a+) while at (%d+)%% of maximum (%a+) or below"] (ModParser.lua:4339)
-fn f0702(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0702(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_resourceType = arg(a, 1);
     let mut l_numStr = arg(a, 2);
@@ -23693,10 +23515,10 @@ fn f0702(c: &Ctx, a: &[Value]) -> Vec<Value> {
             concat(
                 &sb(b"Low"),
                 &concat(
-                    &first(gsub_fn(
+                    &first(gsub_case(
                         &l_resourceType.clone(),
                         &sb(b"^%l"),
-                        &mut upper_fn,
+                        true,
                         &nil(),
                     )),
                     &sb(b"Percentage"),
@@ -23710,7 +23532,7 @@ fn f0702(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you count as on full (%a+) while at (%d+)%% of maximum (%a+) or above"] (ModParser.lua:4340)
-fn f0703(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0703(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_resourceType = arg(a, 1);
     let mut l_numStr = arg(a, 2);
@@ -23720,10 +23542,10 @@ fn f0703(c: &Ctx, a: &[Value]) -> Vec<Value> {
             concat(
                 &sb(b"Full"),
                 &concat(
-                    &first(gsub_fn(
+                    &first(gsub_case(
                         &l_resourceType.clone(),
                         &sb(b"^%l"),
-                        &mut upper_fn,
+                        true,
                         &nil(),
                     )),
                     &sb(b"Percentage"),
@@ -23737,7 +23559,7 @@ fn f0703(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more maximum life if you have at least (%d+) life masteries allocated"] (ModParser.lua:4341)
-fn f0704(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0704(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -23761,7 +23583,7 @@ fn f0704(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies are covered in ash if you haven't moved in the past (%d+) seconds"] (ModParser.lua:4347)
-fn f0705(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0705(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23790,7 +23612,7 @@ fn f0705(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%a%s]+) has (%d+)%% increased effect"] (ModParser.lua:4350)
-fn f0706(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0706(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_skill = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -23803,10 +23625,7 @@ fn f0706(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_skill.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_skill.clone())),
                 ],
                 vec![],
             ),
@@ -23816,7 +23635,7 @@ fn f0706(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["debuffs on you expire (%d+)%% faster"] (ModParser.lua:4351)
-fn f0707(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0707(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23830,7 +23649,7 @@ fn f0707(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["debuffs on you expire (%d+)%% slower"] (ModParser.lua:4352)
-fn f0708(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0708(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23844,7 +23663,7 @@ fn f0708(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["debuffs on you expire (%d+)%% faster while affected by haste"] (ModParser.lua:4353)
-fn f0709(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0709(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23865,7 +23684,7 @@ fn f0709(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["counterattacks have a (%d+)%% chance to debilitate on hit for (%d+) seconds?"] (ModParser.lua:4357)
-fn f0710(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0710(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23875,7 +23694,7 @@ fn f0710(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum (%d+) eaten souls"] (ModParser.lua:4364)
-fn f0711(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0711(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23885,7 +23704,7 @@ fn f0711(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d+) to maximum number of eaten souls"] (ModParser.lua:4365)
-fn f0712(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0712(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23895,7 +23714,7 @@ fn f0712(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased attack and cast speed if you've killed recently"] (ModParser.lua:4366)
-fn f0713(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0713(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -23903,7 +23722,7 @@ fn f0713(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Cast"),
+            c.index("ModFlag", &sb(b"Cast")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -23917,7 +23736,7 @@ fn f0713(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -23931,7 +23750,7 @@ fn f0713(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies maimed by you take (%d+)%% increased damage over time"] (ModParser.lua:4373)
-fn f0714(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0714(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23959,7 +23778,7 @@ fn f0714(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased defences while you have at least four linked targets"] (ModParser.lua:4374)
-fn f0715(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0715(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -23981,7 +23800,7 @@ fn f0715(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased movement speed while you have at least two linked targets"] (ModParser.lua:4376)
-fn f0716(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0716(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24003,7 +23822,7 @@ fn f0716(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["link skills have (%d+)%% increased buff effect if you have linked to a target recently"] (ModParser.lua:4377)
-fn f0717(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0717(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24014,7 +23833,7 @@ fn f0717(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Link")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Link"))),
                 ],
                 vec![],
             ),
@@ -24031,7 +23850,7 @@ fn f0717(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your linked minions take (%d+)%% less damage"] (ModParser.lua:4379)
-fn f0718(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0718(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24062,7 +23881,7 @@ fn f0718(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["traps and mines deal (%d+)%-(%d+) additional physical damage"] (ModParser.lua:4391)
-fn f0719(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0719(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -24076,8 +23895,8 @@ fn f0719(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 n(0.0),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Trap"),
-                field(&c.value("KeywordFlag"), "Mine"),
+                c.index("KeywordFlag", &sb(b"Trap")),
+                c.index("KeywordFlag", &sb(b"Mine")),
             ])]);
             v
         }))];
@@ -24090,8 +23909,8 @@ fn f0719(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 n(0.0),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Trap"),
-                field(&c.value("KeywordFlag"), "Mine"),
+                c.index("KeywordFlag", &sb(b"Trap")),
+                c.index("KeywordFlag", &sb(b"Mine")),
             ])]);
             v
         }));
@@ -24100,7 +23919,7 @@ fn f0719(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["traps and mines deal (%d+) to (%d+) additional physical damage"] (ModParser.lua:4392)
-fn f0720(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0720(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -24114,8 +23933,8 @@ fn f0720(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 n(0.0),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Trap"),
-                field(&c.value("KeywordFlag"), "Mine"),
+                c.index("KeywordFlag", &sb(b"Trap")),
+                c.index("KeywordFlag", &sb(b"Mine")),
             ])]);
             v
         }))];
@@ -24128,8 +23947,8 @@ fn f0720(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 n(0.0),
             ];
             v.extend(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Trap"),
-                field(&c.value("KeywordFlag"), "Mine"),
+                c.index("KeywordFlag", &sb(b"Trap")),
+                c.index("KeywordFlag", &sb(b"Mine")),
             ])]);
             v
         }));
@@ -24138,7 +23957,7 @@ fn f0720(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["each mine applies (%d+)%% increased damage taken to enemies near it, up to (%d+)%%"] (ModParser.lua:4393)
-fn f0721(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0721(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -24172,7 +23991,7 @@ fn f0721(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["each mine applies (%d+)%% reduced damage dealt to enemies near it, up to (%d+)%%"] (ModParser.lua:4394)
-fn f0722(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0722(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -24206,7 +24025,7 @@ fn f0722(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["stormblast, icicle and pyroclast mine have (%d+)%% increased aura effect"] (ModParser.lua:4395)
-fn f0723(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0723(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24216,7 +24035,7 @@ fn f0723(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Mine"),
+            c.index("KeywordFlag", &sb(b"Mine")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -24231,7 +24050,7 @@ fn f0723(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             ],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -24241,7 +24060,7 @@ fn f0723(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["can have up to (%d+) additional traps? placed at a time"] (ModParser.lua:4399)
-fn f0724(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0724(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24251,7 +24070,7 @@ fn f0724(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["can have (%d+) fewer traps placed at a time"] (ModParser.lua:4400)
-fn f0725(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0725(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24265,7 +24084,7 @@ fn f0725(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["can have up to (%d+) additional remote mines? placed at a time"] (ModParser.lua:4401)
-fn f0726(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0726(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24275,7 +24094,7 @@ fn f0726(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to throw up to (%d+) additional traps?"] (ModParser.lua:4404)
-fn f0727(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0727(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -24297,7 +24116,7 @@ fn f0727(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to throw up to (%d+) additional mines?"] (ModParser.lua:4406)
-fn f0728(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0728(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -24319,7 +24138,7 @@ fn f0728(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to throw up to (%d+) additional traps? or mines?"] (ModParser.lua:4407)
-fn f0729(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0729(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -24351,7 +24170,7 @@ fn f0729(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills which throw traps throw up to (%d+) additional traps?"] (ModParser.lua:4411)
-fn f0730(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0730(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24365,7 +24184,7 @@ fn f0730(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["can have up to (%d+) additional totems? summoned at a time"] (ModParser.lua:4413)
-fn f0731(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0731(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24375,7 +24194,7 @@ fn f0731(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attack skills can have (%d+) additional totems? summoned at a time"] (ModParser.lua:4414)
-fn f0732(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0732(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24385,14 +24204,14 @@ fn f0732(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Attack"),
+            c.index("KeywordFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["can [hs][au][vm][em]o?n? 1 additional siege ballista totem per (%d+) dexterity"] (ModParser.lua:4415)
-fn f0733(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0733(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24404,7 +24223,7 @@ fn f0733(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Siege Ballista")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -24422,7 +24241,7 @@ fn f0733(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["totems fire (%d+) additional projectiles"] (ModParser.lua:4416)
-fn f0734(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0734(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24432,14 +24251,14 @@ fn f0734(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Totem"),
+            c.index("KeywordFlag", &sb(b"Totem")),
         ]));
         v
     })];
 }
 
 // specialModList["([%d%.]+)%% of damage dealt by y?o?u?r? ?totems is leeched to you as life"] (ModParser.lua:4417)
-fn f0735(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0735(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24449,14 +24268,14 @@ fn f0735(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Totem"),
+            c.index("KeywordFlag", &sb(b"Totem")),
         ]));
         v
     })];
 }
 
 // specialModList["([%d%.]+)%% of damage dealt by y?o?u?r? ?mines is leeched to you as life"] (ModParser.lua:4418)
-fn f0736(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0736(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24466,14 +24285,14 @@ fn f0736(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Mine"),
+            c.index("KeywordFlag", &sb(b"Mine")),
         ]));
         v
     })];
 }
 
 // specialModList["you can cast (%d+) additional brands"] (ModParser.lua:4420)
-fn f0737(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0737(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24483,7 +24302,7 @@ fn f0737(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased damage while you are wielding a bow and have a totem"] (ModParser.lua:4421)
-fn f0738(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0738(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24511,7 +24330,7 @@ fn f0738(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["each totem applies (%d+)%% increased damage taken to enemies near it"] (ModParser.lua:4422)
-fn f0739(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0739(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24542,7 +24361,7 @@ fn f0739(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["totems gain %+(%d+)%% to (%w+) resistance"] (ModParser.lua:4423)
-fn f0740(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0740(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_resistance = arg(a, 2);
@@ -24564,7 +24383,7 @@ fn f0740(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["totems gain %+(%d+)%% to all elemental resistances"] (ModParser.lua:4424)
-fn f0741(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0741(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24578,7 +24397,7 @@ fn f0741(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions gain added resistances equal to (%d+)%% of your resistances"] (ModParser.lua:4429)
-fn f0742(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0742(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24592,7 +24411,7 @@ fn f0742(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% chance to poison enemies on hit"] (ModParser.lua:4432)
-fn f0743(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0743(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24612,7 +24431,7 @@ fn f0743(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased minion damage if you have hit recently"] (ModParser.lua:4433)
-fn f0744(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0744(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24639,7 +24458,7 @@ fn f0744(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased minion damage if you've used a minion skill recently"] (ModParser.lua:4434)
-fn f0745(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0745(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24666,7 +24485,7 @@ fn f0745(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal (%d+)%% increased damage if you have warcried recently"] (ModParser.lua:4435)
-fn f0746(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0746(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24698,7 +24517,7 @@ fn f0746(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal (%d+)%% increased damage if you've used a minion skill recently"] (ModParser.lua:4436)
-fn f0747(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0747(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24725,7 +24544,7 @@ fn f0747(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal (%d+)%% more damage while they are on low life"] (ModParser.lua:4437)
-fn f0748(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0748(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24756,7 +24575,7 @@ fn f0748(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% increased attack and cast speed if you or your minions have killed recently"] (ModParser.lua:4438)
-fn f0749(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0749(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24789,7 +24608,7 @@ fn f0749(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased minion attack speed per (%d+) dexterity"] (ModParser.lua:4439)
-fn f0750(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0750(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -24806,7 +24625,7 @@ fn f0750(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"INC"),
                         l_num.clone(),
                         nil(),
-                        field(&c.value("ModFlag"), "Attack"),
+                        c.index("ModFlag", &sb(b"Attack")),
                     ])),
                 )],
                 vec![],
@@ -24825,7 +24644,7 @@ fn f0750(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased minion movement speed per (%d+) dexterity"] (ModParser.lua:4440)
-fn f0751(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0751(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -24855,7 +24674,7 @@ fn f0751(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal (%d+)%% increased damage per (%d+) dexterity"] (ModParser.lua:4441)
-fn f0752(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0752(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -24885,7 +24704,7 @@ fn f0752(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% chance to deal double damage while they are on full life"] (ModParser.lua:4442)
-fn f0753(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0753(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24916,7 +24735,7 @@ fn f0753(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% chance to deal double damage per fortification on you"] (ModParser.lua:4443)
-fn f0754(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0754(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -24948,7 +24767,7 @@ fn f0754(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased golem damage for each type of golem you have summoned"] (ModParser.lua:4444)
-fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0755(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -24977,7 +24796,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                     ],
                     vec![],
                 ),
@@ -25007,7 +24826,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                     ],
                     vec![],
                 ),
@@ -25037,7 +24856,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                     ],
                     vec![],
                 ),
@@ -25067,7 +24886,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                     ],
                     vec![],
                 ),
@@ -25097,7 +24916,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                     ],
                     vec![],
                 ),
@@ -25128,7 +24947,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                 ],
                 vec![],
             ),
@@ -25138,7 +24957,7 @@ fn f0755(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["can summon up to (%d) additional golems? at a time"] (ModParser.lua:4452)
-fn f0756(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0756(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25148,7 +24967,7 @@ fn f0756(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d) to maximum number of sentinels of purity"] (ModParser.lua:4453)
-fn f0757(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0757(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25162,7 +24981,7 @@ fn f0757(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["if you have 3 primordial jewels, can summon up to (%d) additional golems? at a time"] (ModParser.lua:4454)
-fn f0758(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0758(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25184,7 +25003,7 @@ fn f0758(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["golems regenerate (%d)%% of their maximum life per second"] (ModParser.lua:4455)
-fn f0759(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0759(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25201,7 +25020,7 @@ fn f0759(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                 ],
                 vec![],
             ),
@@ -25211,7 +25030,7 @@ fn f0759(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned golems regenerate (%d)%% of their life per second"] (ModParser.lua:4456)
-fn f0760(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0760(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25228,7 +25047,7 @@ fn f0760(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                 ],
                 vec![],
             ),
@@ -25238,7 +25057,7 @@ fn f0760(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["golems summoned in the past 8 seconds deal (%d+)%% increased damage"] (ModParser.lua:4467)
-fn f0761(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0761(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25267,7 +25086,7 @@ fn f0761(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Golem")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Golem"))),
                 ],
                 vec![],
             ),
@@ -25277,7 +25096,7 @@ fn f0761(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["raised spectres fire (%d+) additional projectiles"] (ModParser.lua:4472)
-fn f0762(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0762(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25299,7 +25118,7 @@ fn f0762(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Raise Spectre")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -25309,7 +25128,7 @@ fn f0762(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain onslaught for 10 seconds when you cast socketed golem skill"] (ModParser.lua:4473)
-fn f0763(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0763(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25328,7 +25147,7 @@ fn f0763(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["raised zombies take ([%d%.]+)%% of their maximum life per second as fire damage"] (ModParser.lua:4476)
-fn f0764(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0764(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25358,7 +25177,7 @@ fn f0764(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Raise Zombie")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -25368,7 +25187,7 @@ fn f0764(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum number of summoned raging spirits is (%d+)"] (ModParser.lua:4477)
-fn f0765(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0765(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25382,7 +25201,7 @@ fn f0765(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum number of summoned phantasms is (%d+)"] (ModParser.lua:4478)
-fn f0766(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0766(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25396,14 +25215,14 @@ fn f0766(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal no non%-(%a+) damage"] (ModParser.lua:4487)
-fn f0767(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0767(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_dmgType = arg(a, 1);
-    return c.deal_no_non_damage_type(vec![l_dmgType.clone(), Value::Bool(true)]);
+    return c.deal_no_non_damage_type(vec![l_dmgType.clone(), V::Bool(true)]);
 }
 
 // specialModList["minions convert (%d+)%% of (.+) damage to (.+) damage"] (ModParser.lua:4488)
-fn f0768(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0768(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_source = arg(a, 2);
@@ -25418,20 +25237,10 @@ fn f0768(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_source.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_source.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_target.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_target.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -25446,7 +25255,7 @@ fn f0768(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned skeletons take ([%d%.]+)%% of their maximum life per second as fire damage"] (ModParser.lua:4492)
-fn f0769(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0769(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25476,7 +25285,7 @@ fn f0769(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Summon Skeletons")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -25486,7 +25295,7 @@ fn f0769(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned skeletons have (%d+)%% of physical damage converted to chaos damage"] (ModParser.lua:4494)
-fn f0770(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0770(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25508,7 +25317,7 @@ fn f0770(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Summon Skeletons")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -25518,7 +25327,7 @@ fn f0770(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned skeletons gain added chaos damage equal to (%d+)%% of maximum energy shield on your equipped shield"] (ModParser.lua:4495)
-fn f0771(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0771(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -25574,7 +25383,7 @@ fn f0771(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skeletons gain added chaos damage equal to (%d+)%% of maximum energy shield on your equipped shield"] (ModParser.lua:4499)
-fn f0772(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0772(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -25630,7 +25439,7 @@ fn f0772(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions convert (%d+)%% of (.+) damage to (.+) damage per (.+) socket"] (ModParser.lua:4503)
-fn f0773(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0773(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_source = arg(a, 2);
@@ -25646,20 +25455,10 @@ fn f0773(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_source.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_source.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_target.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_target.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -25674,12 +25473,7 @@ fn f0773(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (
                         sb(b"var"),
                         concat(
-                            &first(gsub_fn(
-                                &l_socketColor.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_socketColor.clone(), &sb(b"^%l"), true, &nil())),
                             &sb(b"SocketIn{SlotName}"),
                         ),
                     ),
@@ -25692,7 +25486,7 @@ fn f0773(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions convert (%d+)%% of (.+) damage to (.+) damage per socketed (%a+) gem"] (ModParser.lua:4506)
-fn f0774(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0774(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_source = arg(a, 2);
@@ -25700,17 +25494,17 @@ fn f0774(c: &Ctx, a: &[Value]) -> Vec<Value> {
     let mut l_colour = arg(a, 4);
     if ({
         let v = {
-            let v = Value::Bool(eq(&l_colour.clone(), &sb(b"red")));
+            let v = V::Bool(eq(&l_colour.clone(), &sb(b"red")));
             if v.truthy() {
                 v
             } else {
-                Value::Bool(eq(&l_colour.clone(), &sb(b"green")))
+                V::Bool(eq(&l_colour.clone(), &sb(b"green")))
             }
         };
         if v.truthy() {
             v
         } else {
-            Value::Bool(eq(&l_colour.clone(), &sb(b"blue")))
+            V::Bool(eq(&l_colour.clone(), &sb(b"blue")))
         }
     })
     .truthy()
@@ -25718,12 +25512,7 @@ fn f0774(c: &Ctx, a: &[Value]) -> Vec<Value> {
         let mut l_var = first({
             let a = {
                 let mut v = vec![sb(b"Socketed%sGemsIn{SlotName}")];
-                v.extend(gsub_fn(
-                    &l_colour.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                ));
+                v.extend(gsub_case(&l_colour.clone(), &sb(b"^%l"), true, &nil()));
                 v
             };
             vec![format(&a[0], &a[1..])]
@@ -25738,20 +25527,10 @@ fn f0774(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"mod"),
                         first(c.mod_(vec![
                             concat(
-                                &first(gsub_fn(
-                                    &l_source.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_source.clone(), &sb(b"^%l"), true, &nil())),
                                 &concat(
                                     &sb(b"DamageConvertTo"),
-                                    &first(gsub_fn(
-                                        &l_target.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                    &first(gsub_case(&l_target.clone(), &sb(b"^%l"), true, &nil())),
                                 ),
                             ),
                             sb(b"BASE"),
@@ -25775,7 +25554,7 @@ fn f0774(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have a (%d+)%% chance to impale on hit with attacks"] (ModParser.lua:4514)
-fn f0775(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0775(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25795,7 +25574,7 @@ fn f0775(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% chance to impale on attack hit per socketed ghastly eye jewel"] (ModParser.lua:4515)
-fn f0776(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0776(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25822,7 +25601,7 @@ fn f0776(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions from herald skills deal (%d+)%% more damage"] (ModParser.lua:4516)
-fn f0777(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0777(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25839,7 +25618,7 @@ fn f0777(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Herald")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Herald"))),
                 ],
                 vec![],
             ),
@@ -25849,7 +25628,7 @@ fn f0777(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% increased movement speed for each herald affecting you"] (ModParser.lua:4517)
-fn f0778(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0778(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25881,7 +25660,7 @@ fn f0778(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions deal (%d+)%% increased damage while you are affected by a herald"] (ModParser.lua:4518)
-fn f0779(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0779(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25913,7 +25692,7 @@ fn f0779(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% increased attack and cast speed while you are affected by a herald"] (ModParser.lua:4519)
-fn f0780(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0780(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25945,7 +25724,7 @@ fn f0780(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions have (%d+)%% increased critical strike chance per maximum power charge you have"] (ModParser.lua:4529)
-fn f0781(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0781(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -25977,7 +25756,7 @@ fn f0781(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned arbalists' projectiles pierce (%d+) additional targets"] (ModParser.lua:4539)
-fn f0782(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0782(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26004,7 +25783,7 @@ fn f0782(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned arbalists' projectiles chain %+(%d+) times"] (ModParser.lua:4544)
-fn f0783(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0783(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26031,7 +25810,7 @@ fn f0783(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned arbalists have (%d+)%% chance to inflict (.+) exposure on hit"] (ModParser.lua:4545)
-fn f0784(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0784(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
@@ -26039,7 +25818,7 @@ fn f0784(c: &Ctx, a: &[Value]) -> Vec<Value> {
         let mut v = vec![];
         v.extend(c.mod_(vec![
             concat(
-                &first(gsub_fn(&l_type.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                &first(gsub_case(&l_type.clone(), &sb(b"^%l"), true, &nil())),
                 &sb(b"ExposureChance"),
             ),
             sb(b"BASE"),
@@ -26057,7 +25836,7 @@ fn f0784(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned arbalists convert (%d+)%% of (.+) damage to (.+) damage"] (ModParser.lua:4548)
-fn f0785(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0785(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_source = arg(a, 2);
@@ -26072,20 +25851,10 @@ fn f0785(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(
-                                &l_source.clone(),
-                                &sb(b"^%l"),
-                                &mut upper_fn,
-                                &nil(),
-                            )),
+                            &first(gsub_case(&l_source.clone(), &sb(b"^%l"), true, &nil())),
                             &concat(
                                 &sb(b"DamageConvertTo"),
-                                &first(gsub_fn(
-                                    &l_target.clone(),
-                                    &sb(b"^%l"),
-                                    &mut upper_fn,
-                                    &nil(),
-                                )),
+                                &first(gsub_case(&l_target.clone(), &sb(b"^%l"), true, &nil())),
                             ),
                         ),
                         sb(b"BASE"),
@@ -26107,7 +25876,7 @@ fn f0785(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned arbalists have (%d+)%% chance to freeze, shock, and ignite"] (ModParser.lua:4551)
-fn f0786(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0786(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -26171,7 +25940,7 @@ fn f0786(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills chain %+(%d) times"] (ModParser.lua:4560)
-fn f0787(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0787(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26181,7 +25950,7 @@ fn f0787(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles chain %+(%d) times"] (ModParser.lua:4562)
-fn f0788(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0788(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26190,14 +25959,14 @@ fn f0788(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
         ]));
         v
     })];
 }
 
 // specialModList["arrows chain %+(%d) times"] (ModParser.lua:4563)
-fn f0789(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0789(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26207,14 +25976,14 @@ fn f0789(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
         ]));
         v
     })];
 }
 
 // specialModList["projectiles chain %+(%d) times while you have phasing"] (ModParser.lua:4567)
-fn f0790(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0790(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26223,7 +25992,7 @@ fn f0790(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -26237,7 +26006,7 @@ fn f0790(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles split towards %+(%d) targets"] (ModParser.lua:4569)
-fn f0791(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0791(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26247,7 +26016,7 @@ fn f0791(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) additional arrows"] (ModParser.lua:4571)
-fn f0792(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0792(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26257,14 +26026,14 @@ fn f0792(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
         ]));
         v
     })];
 }
 
 // specialModList["bow attacks fire (%d+) additional arrows"] (ModParser.lua:4573)
-fn f0793(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0793(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26274,14 +26043,14 @@ fn f0793(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
         ]));
         v
     })];
 }
 
 // specialModList["bow attacks fire (%d+) additional arrows if you haven't cast dash recently"] (ModParser.lua:4574)
-fn f0794(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0794(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26291,12 +26060,12 @@ fn f0794(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"CastDashRecently")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26306,7 +26075,7 @@ fn f0794(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills fire an additional projectile if (%d+) (%a+) items are equipped"] (ModParser.lua:4577)
-fn f0795(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0795(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_thresh = arg(a, 1);
     let mut l_influence = arg(a, 2);
@@ -26336,7 +26105,7 @@ fn f0795(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells [hf][ai][vr]e (%d+) additional projectiles"] (ModParser.lua:4579)
-fn f0796(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0796(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26345,14 +26114,14 @@ fn f0796(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Spell"),
+            c.index("ModFlag", &sb(b"Spell")),
         ]));
         v
     })];
 }
 
 // specialModList["attacks [hf][ai][vr]e (%d+) additional projectiles"] (ModParser.lua:4581)
-fn f0797(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0797(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26361,14 +26130,14 @@ fn f0797(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["attacks [hf][ai][vr]e (%d+) additional projectiles? when in off hand"] (ModParser.lua:4582)
-fn f0798(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0798(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26377,7 +26146,7 @@ fn f0798(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![(sb(b"type"), sb(b"SlotNumber")), (sb(b"num"), n(2.0))],
                 vec![],
@@ -26388,7 +26157,7 @@ fn f0798(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["caustic arrow and scourge arrow fire (%d+)%% more projectiles"] (ModParser.lua:4585)
-fn f0799(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0799(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26404,7 +26173,7 @@ fn f0799(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Caustic Arrow"), sb(b"Scourge Arrow")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26414,7 +26183,7 @@ fn f0799(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["essence drain and soulrend fire (%d+) additional projectiles"] (ModParser.lua:4586)
-fn f0800(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0800(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26430,7 +26199,7 @@ fn f0800(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Essence Drain"), sb(b"Soulrend")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26440,7 +26209,7 @@ fn f0800(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% reduced essence drain and soulrend projectile speed"] (ModParser.lua:4587)
-fn f0801(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0801(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26456,7 +26225,7 @@ fn f0801(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Essence Drain"), sb(b"Soulrend")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26466,7 +26235,7 @@ fn f0801(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles pierce (%d+) targets?"] (ModParser.lua:4591)
-fn f0802(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0802(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26476,7 +26245,7 @@ fn f0802(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles pierce (%d+) additional targets?"] (ModParser.lua:4592)
-fn f0803(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0803(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26486,7 +26255,7 @@ fn f0803(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles pierce (%d+) additional targets while you have phasing"] (ModParser.lua:4593)
-fn f0804(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0804(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26507,7 +26276,7 @@ fn f0804(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles pierce (%d+) additional targets if (%d+) (%a+) items are equipped"] (ModParser.lua:4594)
-fn f0805(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0805(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_num = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -26538,7 +26307,7 @@ fn f0805(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arrows pierce (%d+) additional targets"] (ModParser.lua:4598)
-fn f0806(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0806(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26548,14 +26317,14 @@ fn f0806(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
         ]));
         v
     })];
 }
 
 // specialModList["arrows pierce (%d+) targets?"] (ModParser.lua:4600)
-fn f0807(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0807(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26565,14 +26334,14 @@ fn f0807(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
         ]));
         v
     })];
 }
 
 // specialModList["arrows that pierce have (%d+)%% chance to [ic][na][fu][ls][ie]c?t? bleeding"] (ModParser.lua:4605)
-fn f0808(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0808(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26581,8 +26350,8 @@ fn f0808(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("ModFlag", &sb(b"Projectile")),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"StatThreshold")),
@@ -26597,7 +26366,7 @@ fn f0808(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arrows that pierce deal (%d+)%% increased damage"] (ModParser.lua:4606)
-fn f0809(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0809(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26606,8 +26375,8 @@ fn f0809(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("ModFlag", &sb(b"Projectile")),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"StatThreshold")),
@@ -26622,7 +26391,7 @@ fn f0809(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles gain (%d+)%% of non%-chaos damage as extra chaos damage per chain"] (ModParser.lua:4607)
-fn f0810(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0810(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26631,7 +26400,7 @@ fn f0810(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![(sb(b"type"), sb(b"PerStat")), (sb(b"stat"), sb(b"Chain"))],
                 vec![],
@@ -26642,7 +26411,7 @@ fn f0810(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles that have chained gain (%d+)%% of non%-chaos damage as extra chaos damage"] (ModParser.lua:4608)
-fn f0811(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0811(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26651,7 +26420,7 @@ fn f0811(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"StatThreshold")),
@@ -26666,20 +26435,17 @@ fn f0811(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles from attacks can fork (%d+) additional times?"] (ModParser.lua:4617)
-fn f0812(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0812(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![
             sb(b"ForkTwice"),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "RangedAttack"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"RangedAttack"))),
                 ],
                 vec![],
             ),
@@ -26689,14 +26455,11 @@ fn f0812(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Projectile"),
+            c.index("ModFlag", &sb(b"Projectile")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "RangedAttack"),
-                    ),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"RangedAttack"))),
                 ],
                 vec![],
             ),
@@ -26706,7 +26469,7 @@ fn f0812(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased critical strike chance with arrows that fork"] (ModParser.lua:4621)
-fn f0813(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0813(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26716,7 +26479,7 @@ fn f0813(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"StatThreshold")),
@@ -26730,7 +26493,7 @@ fn f0813(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"PierceCount")),
                     (sb(b"threshold"), n(0.0)),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26740,7 +26503,7 @@ fn f0813(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arrows that pierce have %+(%d+)%% to critical strike multiplier"] (ModParser.lua:4624)
-fn f0814(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0814(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26750,7 +26513,7 @@ fn f0814(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"StatThreshold")),
@@ -26765,7 +26528,7 @@ fn f0814(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills fire (%d+) additional projectiles for 4 seconds after you consume a total of 12 steel shards"] (ModParser.lua:4633)
-fn f0815(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0815(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26786,7 +26549,7 @@ fn f0815(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bow attacks sacrifice a random damageable minion to fire (%d+) additional arrows?"] (ModParser.lua:4634)
-fn f0816(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0816(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26796,7 +26559,7 @@ fn f0816(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -26814,19 +26577,16 @@ fn f0816(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Triggered")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Triggered"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "SummonsTotem"),
-                    ),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"SummonsTotem"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -26836,7 +26596,7 @@ fn f0816(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-projectile chaining lightning skills chain %+(%d+) times"] (ModParser.lua:4637)
-fn f0817(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0817(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26847,22 +26607,22 @@ fn f0817(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Chains")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Chains"))),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Lightning")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Lightning"))),
                 ],
                 vec![],
             ),
@@ -26872,7 +26632,7 @@ fn f0817(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arrows gain damage as they travel farther, dealing up to (%d+)%% increased damage with hits to targets"] (ModParser.lua:4638)
-fn f0818(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0818(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26881,8 +26641,8 @@ fn f0818(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("ModFlag", &sb(b"Hit")),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"DistanceRamp")),
@@ -26905,7 +26665,7 @@ fn f0818(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arrows gain critical strike chance as they travel farther, up to (%d+)%% increased critical strike chance"] (ModParser.lua:4639)
-fn f0819(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0819(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26915,7 +26675,7 @@ fn f0819(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Arrow"),
+            c.index("KeywordFlag", &sb(b"Arrow")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"DistanceRamp")),
@@ -26938,7 +26698,7 @@ fn f0819(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits to targets at the start of their movement, reducing to (%d+)%% as they travel farther"] (ModParser.lua:4640)
-fn f0820(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0820(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26948,8 +26708,8 @@ fn f0820(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Hit"),
-                field(&c.value("ModFlag"), "Projectile"),
+                c.index("ModFlag", &sb(b"Hit")),
+                c.index("ModFlag", &sb(b"Projectile")),
             ])]),
             tbl(
                 vec![
@@ -26973,7 +26733,7 @@ fn f0820(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits and ailments for each time they have chained"] (ModParser.lua:4641)
-fn f0821(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0821(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -26984,8 +26744,8 @@ fn f0821(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![(sb(b"type"), sb(b"PerStat")), (sb(b"stat"), sb(b"Chain"))],
@@ -26994,7 +26754,7 @@ fn f0821(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
@@ -27004,7 +26764,7 @@ fn f0821(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["projectiles deal (%d+)%% increased damage with hits and ailments for each enemy pierced"] (ModParser.lua:4642)
-fn f0822(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0822(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27015,8 +26775,8 @@ fn f0822(c: &Ctx, a: &[Value]) -> Vec<Value> {
             nil(),
             n(0.0),
             first(vec![bor(&vec![
-                field(&c.value("KeywordFlag"), "Hit"),
-                field(&c.value("KeywordFlag"), "Ailment"),
+                c.index("KeywordFlag", &sb(b"Hit")),
+                c.index("KeywordFlag", &sb(b"Ailment")),
             ])]),
             tbl(
                 vec![
@@ -27028,7 +26788,7 @@ fn f0822(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Projectile")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Projectile"))),
                 ],
                 vec![],
             ),
@@ -27038,7 +26798,7 @@ fn f0822(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased bonuses gained from equipped (.+)"] (ModParser.lua:4643)
-fn f0823(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0823(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_num = arg(a, 1);
     let mut l_slot = arg(a, 2);
@@ -27060,7 +26820,7 @@ fn f0823(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% reduced bonuses gained from equipped (.+)"] (ModParser.lua:4644)
-fn f0824(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0824(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_num = arg(a, 1);
     let mut l_slot = arg(a, 2);
@@ -27082,7 +26842,7 @@ fn f0824(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-vaal strike skills target (%d+) additional nearby enem[yi]e?s?"] (ModParser.lua:4646)
-fn f0825(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0825(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27095,7 +26855,7 @@ fn f0825(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"SkillType")),
                     (
                         sb(b"skillType"),
-                        field(&c.value("SkillType"), "MeleeSingleTarget"),
+                        c.index("SkillType", &sb(b"MeleeSingleTarget")),
                     ),
                 ],
                 vec![],
@@ -27103,8 +26863,8 @@ fn f0825(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Vaal")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Vaal"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -27114,7 +26874,7 @@ fn f0825(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) energy shield for each enemy you hit which is affected by a spider's web"] (ModParser.lua:4686)
-fn f0826(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0826(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27123,7 +26883,7 @@ fn f0826(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"MultiplierThreshold")),
@@ -27139,7 +26899,7 @@ fn f0826(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to gain (%d+) life on hit with attacks"] (ModParser.lua:4687)
-fn f0827(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0827(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_amount = arg(a, 2);
@@ -27150,8 +26910,8 @@ fn f0827(c: &Ctx, a: &[Value]) -> Vec<Value> {
             div(&mul(&l_amount.clone(), &l_chance.clone()), &n(100.0)),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27167,8 +26927,8 @@ fn f0827(c: &Ctx, a: &[Value]) -> Vec<Value> {
             first(vec![tonumber(&l_amount.clone())]),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27183,7 +26943,7 @@ fn f0827(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) life gained for each cursed enemy hit by your attacks"] (ModParser.lua:4691)
-fn f0828(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0828(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27193,8 +26953,8 @@ fn f0828(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27210,7 +26970,7 @@ fn f0828(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) life per cursed enemy hit with attacks"] (ModParser.lua:4692)
-fn f0829(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0829(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27220,8 +26980,8 @@ fn f0829(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27237,7 +26997,7 @@ fn f0829(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) life for each ignited enemy hit with attacks"] (ModParser.lua:4693)
-fn f0830(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0830(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27247,8 +27007,8 @@ fn f0830(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27264,7 +27024,7 @@ fn f0830(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) mana gained for each cursed enemy hit by your attacks"] (ModParser.lua:4694)
-fn f0831(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0831(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27274,8 +27034,8 @@ fn f0831(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27291,7 +27051,7 @@ fn f0831(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) mana per cursed enemy hit with attacks"] (ModParser.lua:4695)
-fn f0832(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0832(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27301,8 +27061,8 @@ fn f0832(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             first(vec![bor(&vec![
-                field(&c.value("ModFlag"), "Attack"),
-                field(&c.value("ModFlag"), "Hit"),
+                c.index("ModFlag", &sb(b"Attack")),
+                c.index("ModFlag", &sb(b"Hit")),
             ])]),
             tbl(
                 vec![
@@ -27318,7 +27078,7 @@ fn f0832(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) life per blinded enemy hit with this weapon"] (ModParser.lua:4696)
-fn f0833(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0833(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27327,7 +27087,7 @@ fn f0833(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"ActorCondition")),
@@ -27349,7 +27109,7 @@ fn f0833(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life on kill"] (ModParser.lua:4697)
-fn f0834(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0834(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27371,7 +27131,7 @@ fn f0834(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life on kill for each different type of mastery you have allocated"] (ModParser.lua:4698)
-fn f0835(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0835(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27400,7 +27160,7 @@ fn f0835(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life on killing a poisoned enemy"] (ModParser.lua:4699)
-fn f0836(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0836(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27431,7 +27191,7 @@ fn f0836(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life on killing a chilled enemy"] (ModParser.lua:4700)
-fn f0837(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0837(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27461,7 +27221,7 @@ fn f0837(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life when you kill a cursed enemy"] (ModParser.lua:4701)
-fn f0838(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0838(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27491,7 +27251,7 @@ fn f0838(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life per withered debuff on each enemy you kill"] (ModParser.lua:4702)
-fn f0839(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0839(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27522,7 +27282,7 @@ fn f0839(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions recover (%d+)%% of life on killing a poisoned enemy"] (ModParser.lua:4703)
-fn f0840(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0840(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27563,7 +27323,7 @@ fn f0840(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions recover (%d+)%% of their life when they block"] (ModParser.lua:4704)
-fn f0841(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0841(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27595,7 +27355,7 @@ fn f0841(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of mana when you kill a cursed enemy"] (ModParser.lua:4705)
-fn f0842(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0842(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27625,7 +27385,7 @@ fn f0842(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield when you kill a cursed enemy"] (ModParser.lua:4706)
-fn f0843(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0843(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27655,7 +27415,7 @@ fn f0843(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life on kill if you've spent life recently"] (ModParser.lua:4707)
-fn f0844(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0844(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27685,7 +27445,7 @@ fn f0844(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to recover all life when you kill an enemy"] (ModParser.lua:4708)
-fn f0845(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0845(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_chance = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -27733,7 +27493,7 @@ fn f0845(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lose (%d+)%% of life on kill"] (ModParser.lua:4712)
-fn f0846(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0846(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27755,7 +27515,7 @@ fn f0846(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) life gained on killing ignited enemies"] (ModParser.lua:4713)
-fn f0847(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0847(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27777,7 +27537,7 @@ fn f0847(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain (%d+) life per ignited enemy killed"] (ModParser.lua:4714)
-fn f0848(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0848(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27799,7 +27559,7 @@ fn f0848(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of mana on kill"] (ModParser.lua:4715)
-fn f0849(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0849(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27821,7 +27581,7 @@ fn f0849(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of mana on kill while you have a tincture active"] (ModParser.lua:4716)
-fn f0850(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0850(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27850,7 +27610,7 @@ fn f0850(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of mana on kill for each different type of mastery you have allocated"] (ModParser.lua:4717)
-fn f0851(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0851(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27879,7 +27639,7 @@ fn f0851(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lose (%d+)%% of mana on kill"] (ModParser.lua:4718)
-fn f0852(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0852(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27901,7 +27661,7 @@ fn f0852(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) mana gained on killing a frozen enemy"] (ModParser.lua:4719)
-fn f0853(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0853(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27923,7 +27683,7 @@ fn f0853(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield on kill"] (ModParser.lua:4720)
-fn f0854(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0854(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27945,7 +27705,7 @@ fn f0854(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield on kill for each different type of mastery you have allocated"] (ModParser.lua:4721)
-fn f0855(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0855(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27974,7 +27734,7 @@ fn f0855(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lose (%d+)%% of energy shield on kill"] (ModParser.lua:4722)
-fn f0856(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0856(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -27996,7 +27756,7 @@ fn f0856(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) energy shield gained on killing a shocked enemy"] (ModParser.lua:4723)
-fn f0857(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0857(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28018,7 +27778,7 @@ fn f0857(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) energy shield gained on kill per level"] (ModParser.lua:4724)
-fn f0858(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0858(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28036,7 +27796,7 @@ fn f0858(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of chaos damage t?a?k?e?n? ?does not bypass energy shield"] (ModParser.lua:4727)
-fn f0859(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0859(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28050,7 +27810,7 @@ fn f0859(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of physical damage is taken from mana before life"] (ModParser.lua:4732)
-fn f0860(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0860(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28064,7 +27824,7 @@ fn f0860(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions take (%d+)%% increased damage"] (ModParser.lua:4733)
-fn f0861(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0861(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28084,7 +27844,7 @@ fn f0861(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions take (%d+)%% reduced damage"] (ModParser.lua:4734)
-fn f0862(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0862(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28104,14 +27864,14 @@ fn f0862(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you and your minions take (%d+)%% reduced reflected (%w+) damage"] (ModParser.lua:4735)
-fn f0863(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0863(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type = arg(a, 2);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
             concat(
-                &first(gsub_fn(&l_type.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                &first(gsub_case(&l_type.clone(), &sb(b"^%l"), true, &nil())),
                 &sb(b"ReflectedDamageTaken"),
             ),
             sb(b"INC"),
@@ -28120,7 +27880,7 @@ fn f0863(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Global")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -28133,7 +27893,7 @@ fn f0863(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     sb(b"mod"),
                     first(c.mod_(vec![
                         concat(
-                            &first(gsub_fn(&l_type.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                            &first(gsub_case(&l_type.clone(), &sb(b"^%l"), true, &nil())),
                             &sb(b"ReflectedDamageTaken"),
                         ),
                         sb(b"INC"),
@@ -28142,7 +27902,7 @@ fn f0863(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![
                                 (sb(b"type"), sb(b"GlobalEffect")),
                                 (sb(b"effectType"), sb(b"Global")),
-                                (sb(b"unscalable"), Value::Bool(true)),
+                                (sb(b"unscalable"), V::Bool(true)),
                             ],
                             vec![],
                         ),
@@ -28156,7 +27916,7 @@ fn f0863(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% reduced reflected damage taken during effect"] (ModParser.lua:4739)
-fn f0864(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0864(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28168,7 +27928,7 @@ fn f0864(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Global")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -28178,7 +27938,7 @@ fn f0864(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you and your minions take (%d+)%% reduced reflected damage"] (ModParser.lua:4742)
-fn f0865(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0865(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -28189,7 +27949,7 @@ fn f0865(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Global")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -28208,7 +27968,7 @@ fn f0865(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![
                                 (sb(b"type"), sb(b"GlobalEffect")),
                                 (sb(b"effectType"), sb(b"Global")),
-                                (sb(b"unscalable"), Value::Bool(true)),
+                                (sb(b"unscalable"), V::Bool(true)),
                             ],
                             vec![],
                         ),
@@ -28222,7 +27982,7 @@ fn f0865(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot take reflected (%a+) damage if (%d+) (%a+) items are equipped"] (ModParser.lua:4748)
-fn f0866(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0866(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_element = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -28256,7 +28016,7 @@ fn f0866(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+) life when you block"] (ModParser.lua:4762)
-fn f0867(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0867(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28266,7 +28026,7 @@ fn f0867(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+) energy shield when you block spell damage"] (ModParser.lua:4763)
-fn f0868(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0868(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28280,7 +28040,7 @@ fn f0868(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+) energy shield when you suppress spell damage"] (ModParser.lua:4764)
-fn f0869(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0869(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28294,7 +28054,7 @@ fn f0869(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+) life when you suppress spell damage"] (ModParser.lua:4765)
-fn f0870(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0870(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28304,7 +28064,7 @@ fn f0870(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life when you block"] (ModParser.lua:4766)
-fn f0871(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0871(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28326,7 +28086,7 @@ fn f0871(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life when you block attack damage while wielding a staff"] (ModParser.lua:4767)
-fn f0872(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0872(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28355,7 +28115,7 @@ fn f0872(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of your maximum mana when you block"] (ModParser.lua:4768)
-fn f0873(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0873(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28377,7 +28137,7 @@ fn f0873(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield when you block"] (ModParser.lua:4769)
-fn f0874(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0874(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28399,7 +28159,7 @@ fn f0874(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield when you block spell damage while wielding a staff"] (ModParser.lua:4770)
-fn f0875(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0875(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28428,7 +28188,7 @@ fn f0875(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["replenishes energy shield by (%d+)%% of armour when you block"] (ModParser.lua:4771)
-fn f0876(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0876(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28450,7 +28210,7 @@ fn f0876(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover energy shield equal to (%d+)%% of armour when you block"] (ModParser.lua:4772)
-fn f0877(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0877(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28472,7 +28232,7 @@ fn f0877(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover energy shield equal to (%d+)%% of evasion rating when you block"] (ModParser.lua:4773)
-fn f0878(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0878(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28494,7 +28254,7 @@ fn f0878(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage taken while affected by clarity recouped as mana"] (ModParser.lua:4774)
-fn f0879(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0879(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28515,7 +28275,7 @@ fn f0879(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage taken while frozen recouped as life"] (ModParser.lua:4775)
-fn f0880(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0880(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28533,7 +28293,7 @@ fn f0880(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["damage taken recouped as (%a+) is also recouped as energy shield"] (ModParser.lua:4780)
-fn f0881(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0881(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_type = arg(a, 1);
     return vec![tbl(vec![], {
@@ -28550,7 +28310,7 @@ fn f0881(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%d%.]+)%% of physical damage prevented from hits in the past (%d+) seconds is regenerated as life per second"] (ModParser.lua:4783)
-fn f0882(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0882(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_duration = arg(a, 2);
@@ -28570,7 +28330,7 @@ fn f0882(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%d%.]+)%% of physical damage prevented from hits recently is regenerated as energy shield per second"] (ModParser.lua:4787)
-fn f0883(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0883(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28584,7 +28344,7 @@ fn f0883(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%d%.]+)%% of physical damage prevented recently is regenerated as energy shield per second if (%d+) (%a+) items are equipped"] (ModParser.lua:4788)
-fn f0884(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0884(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -28615,7 +28375,7 @@ fn f0884(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies' chaos resistance is (%d+)"] (ModParser.lua:4843)
-fn f0885(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0885(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28635,7 +28395,7 @@ fn f0885(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your maximum resistances are (%d+)%%"] (ModParser.lua:4846)
-fn f0886(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0886(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -28653,7 +28413,7 @@ fn f0886(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["fire resistance is (%d+)%%"] (ModParser.lua:4852)
-fn f0887(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0887(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28663,7 +28423,7 @@ fn f0887(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cold resistance is (%d+)%%"] (ModParser.lua:4853)
-fn f0888(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0888(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28673,7 +28433,7 @@ fn f0888(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["lightning resistance is (%d+)%%"] (ModParser.lua:4854)
-fn f0889(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0889(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28683,7 +28443,7 @@ fn f0889(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have (%d+)%% increased fire and cold resistances"] (ModParser.lua:4856)
-fn f0890(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0890(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -28713,7 +28473,7 @@ fn f0890(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain ward instead of (%d+)%% of armour and evasion rating from equipped body armour"] (ModParser.lua:4872)
-fn f0891(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0891(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(
@@ -28729,7 +28489,7 @@ fn f0891(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased armour per (%d+) reserved mana"] (ModParser.lua:4873)
-fn f0892(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0892(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_mana = arg(a, 2);
@@ -28753,7 +28513,7 @@ fn f0892(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot be stunned if you have at least (%d+) crab barriers"] (ModParser.lua:4878)
-fn f0893(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0893(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28773,7 +28533,7 @@ fn f0893(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot be stunned if (%d+) (%a+) items are equipped"] (ModParser.lua:4879)
-fn f0894(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0894(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_thresh = arg(a, 1);
     let mut l_influence = arg(a, 2);
@@ -28801,7 +28561,7 @@ fn f0894(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cannot be frozen if (%d+) (%a+) items are equipped"] (ModParser.lua:4886)
-fn f0895(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0895(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_thresh = arg(a, 1);
     let mut l_influence = arg(a, 2);
@@ -28829,7 +28589,7 @@ fn f0895(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you are unaffected by (.+) if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:4944)
-fn f0896(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0896(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_ailment = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -28839,12 +28599,7 @@ fn f0896(c: &Ctx, a: &[Value]) -> Vec<Value> {
             concat(
                 &sb(b"Self"),
                 &concat(
-                    &first(gsub_fn(
-                        &l_ailment.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_ailment.clone(), &sb(b"^%l"), true, &nil())),
                     &sb(b"Effect"),
                 ),
             ),
@@ -28858,15 +28613,10 @@ fn f0896(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -28882,7 +28632,7 @@ fn f0896(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Global")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -28892,7 +28642,7 @@ fn f0896(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["immun[ei]t?y? to (%a-)s? if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:4947)
-fn f0897(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0897(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_ailment = arg(a, 1);
     let mut l_curse = arg(a, 2);
@@ -28900,12 +28650,7 @@ fn f0897(c: &Ctx, a: &[Value]) -> Vec<Value> {
         let mut v = vec![];
         v.extend(c.flag(vec![
             concat(
-                &first(gsub_fn(
-                    &l_ailment.clone(),
-                    &sb(b"^%l"),
-                    &mut upper_fn,
-                    &nil(),
-                )),
+                &first(gsub_case(&l_ailment.clone(), &sb(b"^%l"), true, &nil())),
                 &sb(b"Immune"),
             ),
             tbl(
@@ -28916,15 +28661,10 @@ fn f0897(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -28942,7 +28682,7 @@ fn f0897(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["immun[ei]t?y? to curses while you have at least (%d+) rage"] (ModParser.lua:4978)
-fn f0898(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0898(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -28962,7 +28702,7 @@ fn f0898(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["unaffected by (.+) if (%d+) (%a+) items are equipped"] (ModParser.lua:4998)
-fn f0899(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0899(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_ailment = arg(a, 1);
     let mut l_thresh = arg(a, 2);
@@ -28973,12 +28713,7 @@ fn f0899(c: &Ctx, a: &[Value]) -> Vec<Value> {
             concat(
                 &sb(b"Self"),
                 &concat(
-                    &first(gsub_fn(
-                        &l_ailment.clone(),
-                        &sb(b"^%l"),
-                        &mut upper_fn,
-                        &nil(),
-                    )),
+                    &first(gsub_case(&l_ailment.clone(), &sb(b"^%l"), true, &nil())),
                     &sb(b"Effect"),
                 ),
             ),
@@ -29004,7 +28739,7 @@ fn f0899(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your movement speed is (%d+)%% of its base value"] (ModParser.lua:5002)
-fn f0900(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0900(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29018,7 +28753,7 @@ fn f0900(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["action speed cannot be modified to below (%d+)%% base value"] (ModParser.lua:5003)
-fn f0901(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0901(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29028,7 +28763,7 @@ fn f0901(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["action speed cannot be slowed below base value if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:5004)
-fn f0902(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0902(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_curse = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29045,15 +28780,10 @@ fn f0902(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -29071,7 +28801,7 @@ fn f0902(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["action speed cannot be modified to below base value if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:5007)
-fn f0903(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0903(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_curse = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29088,15 +28818,10 @@ fn f0903(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -29114,7 +28839,7 @@ fn f0903(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased maximum life and reduced fire resistance"] (ModParser.lua:5014)
-fn f0904(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0904(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![sb(b"Life"), sb(b"INC"), l_num.clone()]))];
@@ -29124,7 +28849,7 @@ fn f0904(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased maximum mana and reduced cold resistance"] (ModParser.lua:5018)
-fn f0905(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0905(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![sb(b"Mana"), sb(b"INC"), l_num.clone()]))];
@@ -29134,7 +28859,7 @@ fn f0905(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased global maximum energy shield and reduced lightning resistance"] (ModParser.lua:5022)
-fn f0906(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0906(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -29153,7 +28878,7 @@ fn f0906(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["stun threshold is based on (%d+)%% of your energy shield instead of life"] (ModParser.lua:5033)
-fn f0907(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0907(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(
@@ -29169,7 +28894,7 @@ fn f0907(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["stun threshold is based on (%d+)%% of your mana instead of life"] (ModParser.lua:5037)
-fn f0908(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0908(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(
@@ -29185,7 +28910,7 @@ fn f0908(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of your energy shield is added to your stun threshold"] (ModParser.lua:5041)
-fn f0909(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0909(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"AddESToStunThreshold")]))];
@@ -29199,7 +28924,7 @@ fn f0909(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased armour per second you've been stationary, up to a maximum of (%d+)%%"] (ModParser.lua:5045)
-fn f0910(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0910(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -29233,7 +28958,7 @@ fn f0910(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage from hits is taken from your r?a?i?s?e?d? ?spectres' life before you"] (ModParser.lua:5048)
-fn f0911(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0911(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29247,7 +28972,7 @@ fn f0911(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage from hits is taken from your nearest totem's life before you"] (ModParser.lua:5049)
-fn f0912(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0912(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29268,7 +28993,7 @@ fn f0912(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of damage from hits is taken from void spawns' life before you per void spawn"] (ModParser.lua:5050)
-fn f0913(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0913(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29289,7 +29014,7 @@ fn f0913(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%a+) resistance cannot be penetrated"] (ModParser.lua:5051)
-fn f0914(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0914(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_res = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29297,7 +29022,7 @@ fn f0914(c: &Ctx, a: &[Value]) -> Vec<Value> {
         v.extend(c.flag(vec![concat(
             &sb(b"EnemyCannotPen"),
             &concat(
-                &first(gsub_fn(&l_res.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                &first(gsub_case(&l_res.clone(), &sb(b"^%l"), true, &nil())),
                 &sb(b"Resistance"),
             ),
         )]));
@@ -29306,7 +29031,7 @@ fn f0914(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["intimidate enemies on hit if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:5086)
-fn f0915(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0915(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_curse = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29322,7 +29047,7 @@ fn f0915(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![],
             ),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -29331,15 +29056,10 @@ fn f0915(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -29357,7 +29077,7 @@ fn f0915(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover an additional (%d+)%% of flask's life recovery amount over 10 seconds if used while not on full life"] (ModParser.lua:5103)
-fn f0916(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0916(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29371,7 +29091,7 @@ fn f0916(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants level (%d+) (.+) curse aura during f?l?a?s?k? ?effect"] (ModParser.lua:5118)
-fn f0917(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0917(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_skill = arg(a, 2);
@@ -29383,8 +29103,8 @@ fn f0917(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"skillId"), {
-                        let v = index(
-                            &c.value("gemIdLookup"),
+                        let v = c.index(
+                            "gemIdLookup",
                             &first(gsub(&l_skill.clone(), &sb(b" skill"), &sb(b""), &nil())),
                         );
                         if v.truthy() { v } else { sb(b"Unknown") }
@@ -29406,7 +29126,7 @@ fn f0917(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shocks nearby enemies during f?l?a?s?k? ?effect, causing (%d+)%% increased damage taken"] (ModParser.lua:5119)
-fn f0918(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0918(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29427,7 +29147,7 @@ fn f0918(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["during f?l?a?s?k? ?effect, (%d+)%% reduced damage taken of each element for which your uncapped elemental resistance is lowest"] (ModParser.lua:5122)
-fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0919(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -29440,7 +29160,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"StatThreshold")),
                         (sb(b"stat"), sb(b"LightningResistTotal")),
                         (sb(b"thresholdStat"), sb(b"ColdResistTotal")),
-                        (sb(b"upper"), Value::Bool(true)),
+                        (sb(b"upper"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -29449,7 +29169,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"StatThreshold")),
                         (sb(b"stat"), sb(b"LightningResistTotal")),
                         (sb(b"thresholdStat"), sb(b"FireResistTotal")),
-                        (sb(b"upper"), Value::Bool(true)),
+                        (sb(b"upper"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -29463,7 +29183,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"StatThreshold")),
                         (sb(b"stat"), sb(b"ColdResistTotal")),
                         (sb(b"thresholdStat"), sb(b"LightningResistTotal")),
-                        (sb(b"upper"), Value::Bool(true)),
+                        (sb(b"upper"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -29472,7 +29192,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         (sb(b"type"), sb(b"StatThreshold")),
                         (sb(b"stat"), sb(b"ColdResistTotal")),
                         (sb(b"thresholdStat"), sb(b"FireResistTotal")),
-                        (sb(b"upper"), Value::Bool(true)),
+                        (sb(b"upper"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -29487,7 +29207,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"FireResistTotal")),
                     (sb(b"thresholdStat"), sb(b"LightningResistTotal")),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -29496,7 +29216,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"FireResistTotal")),
                     (sb(b"thresholdStat"), sb(b"ColdResistTotal")),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -29506,7 +29226,7 @@ fn f0919(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["during f?l?a?s?k? ?effect, damage penetrates (%d+)%% o?f? ?resistance of each element for which your uncapped elemental resistance is highest"] (ModParser.lua:5127)
-fn f0920(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0920(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -29579,7 +29299,7 @@ fn f0920(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["damage penetrates fire resistance equal to your overcapped fire resistance, up to a maximum of (%d+)%%"] (ModParser.lua:5133)
-fn f0921(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0921(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29592,7 +29312,7 @@ fn f0921(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PerStat")),
                     (sb(b"stat"), sb(b"FireResistOverCap")),
                     (sb(b"limit"), l_num.clone()),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -29602,7 +29322,7 @@ fn f0921(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of life when you kill an enemy during f?l?a?s?k? ?effect"] (ModParser.lua:5134)
-fn f0922(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0922(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29631,7 +29351,7 @@ fn f0922(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of mana when you kill an enemy during f?l?a?s?k? ?effect"] (ModParser.lua:5135)
-fn f0923(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0923(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29660,7 +29380,7 @@ fn f0923(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["recover (%d+)%% of energy shield when you kill an enemy during f?l?a?s?k? ?effect"] (ModParser.lua:5136)
-fn f0924(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0924(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29689,7 +29409,7 @@ fn f0924(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of maximum life taken as chaos damage per second"] (ModParser.lua:5137)
-fn f0925(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0925(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29711,7 +29431,7 @@ fn f0925(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["when hit during effect, (%d+)%% of life loss from damage taken occurs over 4 seconds instead"] (ModParser.lua:5143)
-fn f0926(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0926(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29732,7 +29452,7 @@ fn f0926(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% less flask charges gained from kills"] (ModParser.lua:5169)
-fn f0927(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0927(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29747,7 +29467,7 @@ fn f0927(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks gain (%d+) charges? every (%d+) seconds"] (ModParser.lua:5172)
-fn f0928(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0928(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29763,7 +29483,7 @@ fn f0928(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks gain a charge every (%d+) seconds"] (ModParser.lua:5175)
-fn f0929(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0929(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_div = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29778,7 +29498,7 @@ fn f0929(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a unique enemy is in your presence, flasks gain a charge every (%d+) seconds"] (ModParser.lua:5178)
-fn f0930(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0930(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_div = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29801,7 +29521,7 @@ fn f0930(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a pinnacle atlas boss is in your presence, flasks gain a charge every (%d+) seconds"] (ModParser.lua:5181)
-fn f0931(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0931(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_div = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29824,7 +29544,7 @@ fn f0931(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["utility flasks gain (%d+) charges? every (%d+) seconds"] (ModParser.lua:5184)
-fn f0932(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0932(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29840,7 +29560,7 @@ fn f0932(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["iron flasks gain (%d+) charges? when your ward breaks"] (ModParser.lua:5187)
-fn f0933(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0933(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29854,7 +29574,7 @@ fn f0933(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["life flasks gain (%d+) charges? every (%d+) seconds"] (ModParser.lua:5190)
-fn f0934(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0934(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29870,7 +29590,7 @@ fn f0934(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while on low life, life flasks gain (%d+) charges? every (%d+) seconds"] (ModParser.lua:5193)
-fn f0935(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0935(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29893,7 +29613,7 @@ fn f0935(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["mana flasks gain (%d+) charges? every (%d+) seconds"] (ModParser.lua:5196)
-fn f0936(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0936(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29909,7 +29629,7 @@ fn f0936(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks gain (%d+) charges? per empty flask slot every (%d+) seconds"] (ModParser.lua:5199)
-fn f0937(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0937(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -29925,7 +29645,7 @@ fn f0937(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks gain (%d+) charges? per second if you've hit a unique enemy recently"] (ModParser.lua:5202)
-fn f0938(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0938(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -29954,7 +29674,7 @@ fn f0938(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["passives? ?s?k?i?l?l?s? in radius of ([%a%s']+) can be allocated without being connected to your tree"] (ModParser.lua:5215)
-fn f0939(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0939(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -29973,10 +29693,7 @@ fn f0939(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"ImpossibleEscapeKeystones"),
             sb(b"LIST"),
             tbl(
-                vec![
-                    (sb(b"key"), l_name.clone()),
-                    (sb(b"value"), Value::Bool(true)),
-                ],
+                vec![(sb(b"key"), l_name.clone()), (sb(b"value"), V::Bool(true))],
                 vec![],
             ),
         ]));
@@ -29985,7 +29702,7 @@ fn f0939(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks applied to you have (%d+)%% increased effect"] (ModParser.lua:5236)
-fn f0940(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0940(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30006,7 +29723,7 @@ fn f0940(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks applied to you have (%d+)%% increased effect per level"] (ModParser.lua:5237)
-fn f0941(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0941(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30031,7 +29748,7 @@ fn f0941(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["equipped magic flasks have (%d+)%% increased effect on you if no flasks are adjacent to them"] (ModParser.lua:5238)
-fn f0942(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0942(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30045,7 +29762,7 @@ fn f0942(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a unique enemy is in your presence, flasks applied to you have (%d+)%% increased effect"] (ModParser.lua:5239)
-fn f0943(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0943(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30074,7 +29791,7 @@ fn f0943(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while a pinnacle atlas boss is in your presence, flasks applied to you have (%d+)%% increased effect"] (ModParser.lua:5240)
-fn f0944(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0944(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30103,7 +29820,7 @@ fn f0944(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["magic utility flasks applied to you have (%d+)%% increased effect"] (ModParser.lua:5241)
-fn f0945(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0945(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30124,7 +29841,7 @@ fn f0945(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flasks applied to you have (%d+)%% reduced effect"] (ModParser.lua:5242)
-fn f0946(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0946(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30145,7 +29862,7 @@ fn f0946(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures applied to you have (%d+)%% increased effect"] (ModParser.lua:5243)
-fn f0947(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0947(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30166,7 +29883,7 @@ fn f0947(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures applied to you have (%d+)%% increased effect if you've used a life flask recently"] (ModParser.lua:5244)
-fn f0948(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0948(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30194,7 +29911,7 @@ fn f0948(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures applied to you have (%d+)%% increased effect while affected by no flasks"] (ModParser.lua:5245)
-fn f0949(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0949(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30213,7 +29930,7 @@ fn f0949(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"UsingFlask")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -30223,7 +29940,7 @@ fn f0949(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures have (%d+)%% increased effect while at or above (%d+) stacks of mana burn"] (ModParser.lua:5246)
-fn f0950(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0950(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_threshold = arg(a, 2);
@@ -30256,7 +29973,7 @@ fn f0950(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures applied to you have (%d+)%% reduced mana burn rate"] (ModParser.lua:5247)
-fn f0951(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0951(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30277,7 +29994,7 @@ fn f0951(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures applied to you have (%d+)%% less mana burn rate"] (ModParser.lua:5248)
-fn f0952(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0952(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30298,7 +30015,7 @@ fn f0952(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["the first (%d+) mana burn applied to you have no effect"] (ModParser.lua:5249)
-fn f0953(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0953(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30319,7 +30036,7 @@ fn f0953(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tinctures deactivate when you have (%d+) or more mana burn"] (ModParser.lua:5250)
-fn f0954(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0954(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30329,7 +30046,7 @@ fn f0954(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased tincture cooldown recovery rate"] (ModParser.lua:5254)
-fn f0955(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0955(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30343,7 +30060,7 @@ fn f0955(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+) passive skills"] (ModParser.lua:5255)
-fn f0956(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0956(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30363,7 +30080,7 @@ fn f0956(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+) added passive skills are jewel sockets"] (ModParser.lua:5257)
-fn f0957(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0957(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30383,7 +30100,7 @@ fn f0957(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+) jewel socket passive skills"] (ModParser.lua:5258)
-fn f0958(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0958(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30403,7 +30120,7 @@ fn f0958(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+) small passive skills? which grants? nothing"] (ModParser.lua:5259)
-fn f0959(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0959(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30423,7 +30140,7 @@ fn f0959(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["added small passive skills have (%d+)%% increased effect"] (ModParser.lua:5261)
-fn f0960(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0960(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30443,7 +30160,7 @@ fn f0960(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["this jewel's socket has (%d+)%% increased effect per allocated passive skill between it and your class' starting location"] (ModParser.lua:5262)
-fn f0961(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0961(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30463,7 +30180,7 @@ fn f0961(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of jewel socket passive skills containing corrupted (m?r?ag?r?i?e?c?) jewels, if not from cluster jewels"] (ModParser.lua:5263)
-fn f0962(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0962(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_rarity = arg(a, 2);
@@ -30494,7 +30211,7 @@ fn f0962(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased effect of jewel socket passive skills containing corrupted (m?r?ag?r?i?e?c?) jewels"] (ModParser.lua:5264)
-fn f0963(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0963(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_rarity = arg(a, 2);
@@ -30525,7 +30242,7 @@ fn f0963(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["boneshatter has (%d+)%% chance to grant %+1 trauma"] (ModParser.lua:5271)
-fn f0964(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0964(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30537,7 +30254,7 @@ fn f0964(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Boneshatter")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -30547,7 +30264,7 @@ fn f0964(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["leftmost (%d+) magic utility flasks constantly apply their flask effects to you"] (ModParser.lua:5283)
-fn f0965(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0965(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30561,7 +30278,7 @@ fn f0965(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["rightmost (%d+) magic utility flasks constantly apply their flask effects to you"] (ModParser.lua:5284)
-fn f0966(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0966(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30575,7 +30292,7 @@ fn f0966(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["marauder: melee skills have (%d+)%% increased area of effect"] (ModParser.lua:5285)
-fn f0967(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0967(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30593,7 +30310,7 @@ fn f0967(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Melee")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Melee"))),
                 ],
                 vec![],
             ),
@@ -30603,7 +30320,7 @@ fn f0967(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["dexterity's accuracy bonus instead grants %+(%d+) to accuracy rating per dexterity"] (ModParser.lua:5290)
-fn f0968(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0968(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30617,7 +30334,7 @@ fn f0968(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased accuracy rating against marked enemy"] (ModParser.lua:5291)
-fn f0969(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0969(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30639,7 +30356,7 @@ fn f0969(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more accuracy rating against marked enemy"] (ModParser.lua:5292)
-fn f0970(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0970(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30661,7 +30378,7 @@ fn f0970(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) to accuracy against bleeding enemies"] (ModParser.lua:5293)
-fn f0971(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0971(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30683,7 +30400,7 @@ fn f0971(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries exert (%d+) additional attacks?"] (ModParser.lua:5296)
-fn f0972(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0972(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30693,7 +30410,7 @@ fn f0972(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["battlemage's cry exerts (%d+) additional attack"] (ModParser.lua:5297)
-fn f0973(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0973(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30707,7 +30424,7 @@ fn f0973(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["rallying cry exerts (%d+) additional attack"] (ModParser.lua:5298)
-fn f0974(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0974(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30721,7 +30438,7 @@ fn f0974(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries have (%d+)%% chance to exert (%d+) additional attacks?"] (ModParser.lua:5299)
-fn f0975(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0975(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_var = arg(a, 2);
@@ -30737,7 +30454,7 @@ fn f0975(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills deal (%d+)%% more damage for each warcry exerting them"] (ModParser.lua:5300)
-fn f0976(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0976(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30752,21 +30469,21 @@ fn f0976(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["deal no non%-(%a+) damage"] (ModParser.lua:5316)
-fn f0977(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0977(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_dmgType = arg(a, 1);
     return c.deal_no_non_damage_type(vec![l_dmgType.clone()]);
 }
 
 // specialModList["cannot deal non%-(%a+) damage"] (ModParser.lua:5317)
-fn f0978(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0978(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_dmgType = arg(a, 1);
     return c.deal_no_non_damage_type(vec![l_dmgType.clone()]);
 }
 
 // specialModList["attack skills cost life instead of (%d+)%% of mana cost"] (ModParser.lua:5323)
-fn f0979(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0979(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30775,14 +30492,14 @@ fn f0979(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["spells have an additional life cost equal to (%d+)%% of your maximum life"] (ModParser.lua:5327)
-fn f0980(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0980(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30795,14 +30512,14 @@ fn f0980(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"Life")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Spell")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Spell"))),
                 ],
                 vec![],
             ),
@@ -30812,7 +30529,7 @@ fn f0980(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells have added spell damage equal to (%d+)%% of physical damage of your equipped two handed weapon"] (ModParser.lua:5330)
-fn f0981(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0981(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"WeaponPhysAppliesToSpells")]))];
@@ -30833,7 +30550,7 @@ fn f0981(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells cost %+(%d+)%% of life"] (ModParser.lua:5334)
-fn f0982(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0982(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30846,14 +30563,14 @@ fn f0982(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"Life")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Spell")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Spell"))),
                 ],
                 vec![],
             ),
@@ -30863,7 +30580,7 @@ fn f0982(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%a%s]+) can affect hexproof enemies"] (ModParser.lua:5354)
-fn f0983(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0983(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -30874,17 +30591,14 @@ fn f0983(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"key"), sb(b"ignoreHexproof")),
-                    (sb(b"value"), Value::Bool(true)),
+                    (sb(b"value"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                 ],
                 vec![],
             ),
@@ -30894,7 +30608,7 @@ fn f0983(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hexes from socketed skills can apply (%d) additional curses"] (ModParser.lua:5357)
-fn f0984(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0984(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -30917,7 +30631,7 @@ fn f0984(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hexes from socketed skills ignore curse limit"] (ModParser.lua:5361)
-fn f0985(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0985(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -30940,7 +30654,7 @@ fn f0985(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["reserves (%d+)%% of life"] (ModParser.lua:5362)
-fn f0986(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0986(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30950,7 +30664,7 @@ fn f0986(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of cold damage taken as lightning"] (ModParser.lua:5363)
-fn f0987(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0987(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30964,7 +30678,7 @@ fn f0987(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of fire damage taken as lightning"] (ModParser.lua:5364)
-fn f0988(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0988(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -30978,7 +30692,7 @@ fn f0988(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of fire and lightning damage from hits taken as cold damage during effect"] (ModParser.lua:5365)
-fn f0989(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0989(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -31010,15 +30724,15 @@ fn f0989(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% of (%a+) and (%a+) damage from hits taken as (%a+) damage"] (ModParser.lua:5369)
-fn f0990(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0990(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_type1 = arg(a, 2);
     let mut l_type2 = arg(a, 3);
     let mut l_type3 = arg(a, 4);
-    let mut l_fromType1 = index(&c.value("dmgTypes"), &l_type1.clone());
-    let mut l_fromType2 = index(&c.value("dmgTypes"), &l_type2.clone());
-    let mut l_toType = index(&c.value("dmgTypes"), &l_type3.clone());
+    let mut l_fromType1 = c.index("dmgTypes", &l_type1.clone());
+    let mut l_fromType2 = c.index("dmgTypes", &l_type2.clone());
+    let mut l_toType = c.index("dmgTypes", &l_type3.clone());
     return vec![{
         let v = {
             let v = {
@@ -31054,7 +30768,7 @@ fn f0990(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["items and gems have (%d+)%% reduced attribute requirements"] (ModParser.lua:5378)
-fn f0991(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0991(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31068,7 +30782,7 @@ fn f0991(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["items and gems have (%d+)%% increased attribute requirements"] (ModParser.lua:5379)
-fn f0992(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0992(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31082,7 +30796,7 @@ fn f0992(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["mana reservation of herald skills is always (%d+)%%"] (ModParser.lua:5380)
-fn f0993(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0993(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31099,7 +30813,7 @@ fn f0993(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Herald")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Herald"))),
                 ],
                 vec![],
             ),
@@ -31109,7 +30823,7 @@ fn f0993(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%a%s]+) reserves no mana"] (ModParser.lua:5381)
-fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0994(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -31127,18 +30841,15 @@ fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31156,18 +30867,15 @@ fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31185,18 +30893,15 @@ fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31215,18 +30920,15 @@ fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -31236,7 +30938,7 @@ fn f0994(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%a%s]+) has no reservation"] (ModParser.lua:5387)
-fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0995(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -31254,18 +30956,15 @@ fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31283,18 +30982,15 @@ fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31312,18 +31008,15 @@ fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31342,18 +31035,15 @@ fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -31363,7 +31053,7 @@ fn f0995(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%a%s]+) has no reservation if cast as an aura"] (ModParser.lua:5393)
-fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0996(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -31381,25 +31071,22 @@ fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31417,25 +31104,22 @@ fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31453,25 +31137,22 @@ fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillId")),
-                        (
-                            sb(b"skillId"),
-                            index(&c.value("gemIdLookup"), &l_name.clone()),
-                        ),
+                        (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                     ],
                     vec![],
                 ),
                 tbl(
                     vec![
                         (sb(b"type"), sb(b"SkillType")),
-                        (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                        (sb(b"neg"), Value::Bool(true)),
+                        (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                        (sb(b"neg"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -31490,25 +31171,22 @@ fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Blessing")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Blessing"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -31518,7 +31196,7 @@ fn f0996(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["placed banners also grant (%d+)%% increased attack damage to you and allies"] (ModParser.lua:5407)
-fn f0997(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0997(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31533,7 +31211,7 @@ fn f0997(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"INC"),
                         l_num.clone(),
                         nil(),
-                        field(&c.value("ModFlag"), "Attack"),
+                        c.index("ModFlag", &sb(b"Attack")),
                     ])),
                 )],
                 vec![],
@@ -31548,7 +31226,7 @@ fn f0997(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Banner")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Banner"))),
                 ],
                 vec![],
             ),
@@ -31558,7 +31236,7 @@ fn f0997(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["banners also cause enemies to take (%d+)%% increased damage"] (ModParser.lua:5408)
-fn f0998(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0998(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31576,7 +31254,7 @@ fn f0998(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             vec![
                                 (sb(b"type"), sb(b"GlobalEffect")),
                                 (sb(b"effectType"), sb(b"AuraDebuff")),
-                                (sb(b"unscalable"), Value::Bool(true)),
+                                (sb(b"unscalable"), V::Bool(true)),
                             ],
                             vec![],
                         ),
@@ -31594,7 +31272,7 @@ fn f0998(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Banner")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Banner"))),
                 ],
                 vec![],
             ),
@@ -31604,7 +31282,7 @@ fn f0998(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["dread banner grants an additional %+(%d+) to maximum fortification when placing the banner"] (ModParser.lua:5409)
-fn f0999(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f0999(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31649,7 +31327,7 @@ fn f0999(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["aura skills other than ([%a%s]+) are disabled"] (ModParser.lua:5418)
-fn f1000(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1000(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -31658,18 +31336,15 @@ fn f1000(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Aura")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Aura"))),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (
-                        sb(b"skillType"),
-                        field(&c.value("SkillType"), "RemoteMined"),
-                    ),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"RemoteMined"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -31689,7 +31364,7 @@ fn f1000(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["travel skills other than ([%a%s]+) are disabled"] (ModParser.lua:5422)
-fn f1001(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1001(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_name = arg(a, 1);
     return vec![tbl(vec![], {
@@ -31698,7 +31373,7 @@ fn f1001(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Travel")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Travel"))),
                 ],
                 vec![],
             ),
@@ -31708,10 +31383,7 @@ fn f1001(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillId")),
-                    (
-                        sb(b"skillId"),
-                        index(&c.value("gemIdLookup"), &l_name.clone()),
-                    ),
+                    (sb(b"skillId"), c.index("gemIdLookup", &l_name.clone())),
                 ],
                 vec![],
             ),
@@ -31721,7 +31393,7 @@ fn f1001(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["strength's damage bonus instead grants (%d+)%% increased melee physical damage per (%d+) strength"] (ModParser.lua:5426)
-fn f1002(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1002(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_perStr = arg(a, 2);
@@ -31737,7 +31409,7 @@ fn f1002(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while in her embrace, take ([%d%.]+)%% of your total maximum life and energy shield as fire damage per second per level"] (ModParser.lua:5427)
-fn f1003(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1003(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -31793,7 +31465,7 @@ fn f1003(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["when you cast a spell, sacrifice all mana to gain added maximum lightning damage equal to (%d+)%% of sacrificed mana for 4 seconds"] (ModParser.lua:5432)
-fn f1004(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1004(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.flag(vec![sb(b"Condition:HaveManaStorm")]))];
@@ -31822,7 +31494,7 @@ fn f1004(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks with this weapon have added maximum lightning damage equal to (%d+)%% of your energy shield"] (ModParser.lua:5436)
-fn f1005(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1005(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31848,7 +31520,7 @@ fn f1005(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -31858,7 +31530,7 @@ fn f1005(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks with this weapon have added maximum lightning damage equal to (%d+)%% of your maximum energy shield"] (ModParser.lua:5439)
-fn f1006(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1006(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -31884,7 +31556,7 @@ fn f1006(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -31894,7 +31566,7 @@ fn f1006(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks with this weapon have added fire damage equal to (%d+)%% of player's maximum life"] (ModParser.lua:5442)
-fn f1007(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1007(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -31920,7 +31592,7 @@ fn f1007(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -31948,7 +31620,7 @@ fn f1007(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -31958,7 +31630,7 @@ fn f1007(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+)%% of your maximum energy shield as cold damage to attacks with this weapon"] (ModParser.lua:5446)
-fn f1008(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1008(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -31983,7 +31655,7 @@ fn f1008(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32010,7 +31682,7 @@ fn f1008(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32020,7 +31692,7 @@ fn f1008(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks with this weapon have added maximum lightning damage equal to (%d+)%% of player'?s? maximum energy shield"] (ModParser.lua:5450)
-fn f1009(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1009(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32047,7 +31719,7 @@ fn f1009(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32057,7 +31729,7 @@ fn f1009(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["adds (%d+)%% of your maximum mana as fire damage to attacks with this weapon"] (ModParser.lua:5453)
-fn f1010(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1010(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -32082,7 +31754,7 @@ fn f1010(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32109,7 +31781,7 @@ fn f1010(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32119,7 +31791,7 @@ fn f1010(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["gain added chaos damage equal to (%d+)%% of ward"] (ModParser.lua:5457)
-fn f1011(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1011(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -32153,7 +31825,7 @@ fn f1011(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while you have unbroken ward, your next non%-channelling attack you use yourself breaks your ward to gain added cold damage equal to (%d+)%% of ward"] (ModParser.lua:5461)
-fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1012(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -32171,15 +31843,15 @@ fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32187,7 +31859,7 @@ fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"WardNotBreak")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -32214,15 +31886,15 @@ fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Channel")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Channel"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32230,7 +31902,7 @@ fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"WardNotBreak")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -32247,7 +31919,7 @@ fn f1012(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells deal added chaos damage equal to (%d+)%% of your maximum life"] (ModParser.lua:5465)
-fn f1013(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1013(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -32265,7 +31937,7 @@ fn f1013(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Spell")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Spell"))),
                 ],
                 vec![],
             ),
@@ -32285,7 +31957,7 @@ fn f1013(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Spell")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Spell"))),
                 ],
                 vec![],
             ),
@@ -32295,7 +31967,7 @@ fn f1013(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attribute requirements can be satisfied by (%d+)%% of omniscience"] (ModParser.lua:5485)
-fn f1014(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1014(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -32309,7 +31981,7 @@ fn f1014(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["with a ghastly eye jewel socketed, minions have %+(%d+) to accuracy rating"] (ModParser.lua:5504)
-fn f1015(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1015(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32336,7 +32008,7 @@ fn f1015(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["with a ghastly eye jewel socketed, minions have (%d+)%% chance to gain unholy might on hit with spells"] (ModParser.lua:5505)
-fn f1016(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1016(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32372,7 +32044,7 @@ fn f1016(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["with a hypnotic eye jewel socketed, gain arcane surge on hit with spells"] (ModParser.lua:5508)
-fn f1017(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1017(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32398,7 +32070,7 @@ fn f1017(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your hits ignore enemy monster (%a+) resistances? if all equipped rings are (%a+) rings"] (ModParser.lua:5511)
-fn f1018(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1018(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_damageType = arg(a, 1);
     let mut l_baseType = arg(a, 2);
@@ -32432,7 +32104,7 @@ fn f1018(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcry skills' cooldown time is (%d+) seconds"] (ModParser.lua:5522)
-fn f1019(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1019(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32442,14 +32114,14 @@ fn f1019(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
         ]));
         v
     })];
 }
 
 // specialModList["non%-instant warcries you use yourself have no cooldown"] (ModParser.lua:5523)
-fn f1020(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1020(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32459,7 +32131,7 @@ fn f1020(c: &Ctx, a: &[Value]) -> Vec<Value> {
             n(0.0),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
@@ -32468,13 +32140,13 @@ fn f1020(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         tbl(
                             vec![],
                             vec![
-                                field(&c.value("SkillType"), "Instant"),
-                                field(&c.value("SkillType"), "Totem"),
-                                field(&c.value("SkillType"), "Triggered"),
+                                c.index("SkillType", &sb(b"Instant")),
+                                c.index("SkillType", &sb(b"Totem")),
+                                c.index("SkillType", &sb(b"Triggered")),
                             ],
                         ),
                     ),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -32484,7 +32156,7 @@ fn f1020(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["non%-instant warcries ignore their cooldown when used"] (ModParser.lua:5524)
-fn f1021(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1021(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32494,12 +32166,12 @@ fn f1021(c: &Ctx, a: &[Value]) -> Vec<Value> {
             n(0.0),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Instant")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Instant"))),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -32509,7 +32181,7 @@ fn f1021(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcry skills have (%+%d+) seconds to cooldown"] (ModParser.lua:5525)
-fn f1022(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1022(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32519,14 +32191,14 @@ fn f1022(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Warcry"),
+            c.index("KeywordFlag", &sb(b"Warcry")),
         ]));
         v
     })];
 }
 
 // specialModList["(%d+)%% increased total power counted by warcries"] (ModParser.lua:5526)
-fn f1023(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1023(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32536,7 +32208,7 @@ fn f1023(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["warcries have a minimum of (%d+) power"] (ModParser.lua:5527)
-fn f1024(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1024(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32546,7 +32218,7 @@ fn f1024(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["stance skills have (%+%d+) seconds to cooldown"] (ModParser.lua:5528)
-fn f1025(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1025(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32557,7 +32229,7 @@ fn f1025(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Stance")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Stance"))),
                 ],
                 vec![],
             ),
@@ -32567,7 +32239,7 @@ fn f1025(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+) rage per second for every (%d+) life recovery per second from regeneration"] (ModParser.lua:5533)
-fn f1026(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1026(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -32597,7 +32269,7 @@ fn f1026(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inherent loss of rage is (%d+)%% slower"] (ModParser.lua:5542)
-fn f1027(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1027(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32611,7 +32283,7 @@ fn f1027(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inherent loss of rage is (%d+)%% faster"] (ModParser.lua:5543)
-fn f1028(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1028(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32621,7 +32293,7 @@ fn f1028(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["inherent rage loss starts (%d+) seconds? later"] (ModParser.lua:5544)
-fn f1029(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1029(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32635,7 +32307,7 @@ fn f1029(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your critical strike multiplier is (%d+)%%"] (ModParser.lua:5545)
-fn f1030(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1030(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32645,7 +32317,7 @@ fn f1030(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["base critical strike chance for attacks with weapons is ([%d%.]+)%%"] (ModParser.lua:5546)
-fn f1031(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1031(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32659,7 +32331,7 @@ fn f1031(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["critical strike chance is (%d+)%% for hits with this weapon"] (ModParser.lua:5549)
-fn f1032(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1032(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32668,7 +32340,7 @@ fn f1032(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"OVERRIDE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -32679,7 +32351,7 @@ fn f1032(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32689,7 +32361,7 @@ fn f1032(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon have %+(%d+)%% to critical strike multiplier per enemy power"] (ModParser.lua:5550)
-fn f1033(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1033(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32698,7 +32370,7 @@ fn f1033(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -32709,7 +32381,7 @@ fn f1033(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32726,7 +32398,7 @@ fn f1033(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["maximum critical strike chance is (%d+)%%"] (ModParser.lua:5551)
-fn f1034(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1034(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32736,7 +32408,7 @@ fn f1034(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["allocates (.+) if you have the matching modifiers? on forbidden (.+)"] (ModParser.lua:5554)
-fn f1035(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1035(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_ascendancy = arg(a, 1);
     let mut l_side = arg(a, 2);
@@ -32758,7 +32430,7 @@ fn f1035(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["allocates (.+)"] (ModParser.lua:5555)
-fn f1036(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1036(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_passive = arg(a, 1);
     return vec![tbl(vec![], {
@@ -32769,7 +32441,7 @@ fn f1036(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["offering skills have (%d+)%% increased duration"] (ModParser.lua:5560)
-fn f1037(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1037(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32801,7 +32473,7 @@ fn f1037(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["offering skills have (%d+)%% reduced duration"] (ModParser.lua:5563)
-fn f1038(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1038(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32833,7 +32505,7 @@ fn f1038(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies have %-(%d+)%% to total physical damage reduction against your hits"] (ModParser.lua:5566)
-fn f1039(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1039(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32847,7 +32519,7 @@ fn f1039(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies you impale have %-(%d+)%% to total physical damage reduction against impale hits"] (ModParser.lua:5569)
-fn f1040(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1040(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32861,7 +32533,7 @@ fn f1040(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon overwhelm (%d+)%% physical damage reduction"] (ModParser.lua:5572)
-fn f1041(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1041(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32870,7 +32542,7 @@ fn f1041(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             neg(&l_num.clone()),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -32881,7 +32553,7 @@ fn f1041(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32891,7 +32563,7 @@ fn f1041(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["overwhelm (%d+)%% physical damage reduction"] (ModParser.lua:5575)
-fn f1042(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1042(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32905,7 +32577,7 @@ fn f1042(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% chance to ignore enemy physical damage reduction"] (ModParser.lua:5578)
-fn f1043(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1043(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32919,7 +32591,7 @@ fn f1043(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon have (%d+)%% chance to ignore enemy physical damage reduction"] (ModParser.lua:5582)
-fn f1044(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1044(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32928,7 +32600,7 @@ fn f1044(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -32939,7 +32611,7 @@ fn f1044(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32949,7 +32621,7 @@ fn f1044(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits with this weapon ignore enemy physical damage reduction"] (ModParser.lua:5585)
-fn f1045(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1045(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32958,7 +32630,7 @@ fn f1045(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             n(100.0),
             nil(),
-            field(&c.value("ModFlag"), "Hit"),
+            c.index("ModFlag", &sb(b"Hit")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
@@ -32969,7 +32641,7 @@ fn f1045(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                    (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                 ],
                 vec![],
             ),
@@ -32979,7 +32651,7 @@ fn f1045(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits against you overwhelm (%d+)%% of physical damage reduction"] (ModParser.lua:5588)
-fn f1046(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1046(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -32993,7 +32665,7 @@ fn f1046(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["impale damage dealt to enemies impaled by you overwhelms (%d+)%% physical damage reduction"] (ModParser.lua:5591)
-fn f1047(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1047(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33007,7 +32679,7 @@ fn f1047(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies are crushed while you have ?a?t? least (%d+) rage"] (ModParser.lua:5597)
-fn f1048(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1048(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33032,7 +32704,7 @@ fn f1048(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground around you while stationary if (%d+) (%a+) items are equipped"] (ModParser.lua:5631)
-fn f1049(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1049(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_thresh = arg(a, 1);
     let mut l_influence = arg(a, 2);
@@ -33060,7 +32732,7 @@ fn f1049(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% reduced enemy chance to block sword attacks"] (ModParser.lua:5641)
-fn f1050(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1050(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33069,14 +32741,14 @@ fn f1050(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Sword"),
+            c.index("ModFlag", &sb(b"Sword")),
         ]));
         v
     })];
 }
 
 // specialModList["skills supported by intensify have %+(%d) to maximum intensity"] (ModParser.lua:5643)
-fn f1051(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1051(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33090,7 +32762,7 @@ fn f1051(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["spells which can gain intensity have %+(%d) to maximum intensity"] (ModParser.lua:5644)
-fn f1052(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1052(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33104,7 +32776,7 @@ fn f1052(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["final repeat of spells has (%d+)%% increased area of effect"] (ModParser.lua:5645)
-fn f1053(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1053(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33113,13 +32785,13 @@ fn f1053(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Spell"),
+            c.index("ModFlag", &sb(b"Spell")),
             n(0.0),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"CastOnFrostbolt")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33139,7 +32811,7 @@ fn f1053(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hexes you inflict have ([%+%-]%d+) to maximum doom"] (ModParser.lua:5646)
-fn f1054(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1054(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33149,7 +32821,7 @@ fn f1054(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while stationary, gain (%d+)%% increased area of effect every second, up to a maximum of (%d+)%%"] (ModParser.lua:5647)
-fn f1055(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1055(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -33181,7 +32853,7 @@ fn f1055(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["fireball and rolling magma have (%d+)%% more area of effect"] (ModParser.lua:5650)
-fn f1056(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1056(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33205,7 +32877,7 @@ fn f1056(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attack skills have added lightning damage equal to (%d+)%% of maximum mana"] (ModParser.lua:5651)
-fn f1057(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1057(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -33213,7 +32885,7 @@ fn f1057(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             n(1.0),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PercentStat")),
@@ -33228,7 +32900,7 @@ fn f1057(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"BASE"),
             n(1.0),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PercentStat")),
@@ -33243,7 +32915,7 @@ fn f1057(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arc and crackling lance gains added cold damage equal to (%d+)%% of mana cost, if mana cost is not higher than the maximum you could spend"] (ModParser.lua:5655)
-fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1058(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -33255,7 +32927,7 @@ fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33274,7 +32946,7 @@ fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Arc"), sb(b"Crackling Lance")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33288,7 +32960,7 @@ fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33307,7 +32979,7 @@ fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Arc"), sb(b"Crackling Lance")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33317,7 +32989,7 @@ fn f1058(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["forbidden rite and dark pact gains added chaos damage equal to (%d+)%% of mana cost, if mana cost is not higher than the maximum you could spend"] (ModParser.lua:5659)
-fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1059(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -33329,7 +33001,7 @@ fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33348,7 +33020,7 @@ fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Forbidden Rite"), sb(b"Dark Bargain")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33362,7 +33034,7 @@ fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33381,7 +33053,7 @@ fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Forbidden Rite"), sb(b"Dark Bargain")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33391,7 +33063,7 @@ fn f1059(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills gain added chaos damage equal to (%d+)%% of mana cost, if mana cost is not higher than the maximum you could spend"] (ModParser.lua:5663)
-fn f1060(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1060(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -33403,7 +33075,7 @@ fn f1060(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33425,7 +33097,7 @@ fn f1060(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"PercentStat")),
                     (sb(b"stat"), sb(b"ManaCost")),
                     (sb(b"percent"), l_num.clone()),
-                    (sb(b"floor"), Value::Bool(true)),
+                    (sb(b"floor"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33443,7 +33115,7 @@ fn f1060(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["herald of thunder's storms hit enemies with (%d+)%% increased frequency"] (ModParser.lua:5667)
-fn f1061(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1061(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33453,7 +33125,7 @@ fn f1061(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["storms hit enemies with (%d+)%% increased frequency"] (ModParser.lua:5668)
-fn f1062(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1062(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33463,7 +33135,7 @@ fn f1062(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["your critical strikes have a (%d+)%% chance to deal double damage"] (ModParser.lua:5669)
-fn f1063(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1063(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33477,7 +33149,7 @@ fn f1063(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills supported by unleash have %+(%d) to maximum number of seals"] (ModParser.lua:5672)
-fn f1064(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1064(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33487,7 +33159,7 @@ fn f1064(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["left ring slot: skills supported by unleash have %+(%d) to maximum number of seals"] (ModParser.lua:5673)
-fn f1065(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1065(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33505,7 +33177,7 @@ fn f1065(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills supported by unleash have (%d+)%% increased seal gain frequency"] (ModParser.lua:5674)
-fn f1066(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1066(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33515,7 +33187,7 @@ fn f1066(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased critical strike chance with spells which remove the maximum number of seals"] (ModParser.lua:5675)
-fn f1067(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1067(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33525,7 +33197,7 @@ fn f1067(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["elusive on you reduces in effect (%d+)%% slower"] (ModParser.lua:5681)
-fn f1068(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1068(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33539,7 +33211,7 @@ fn f1068(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["elusive's effect on you is increased instead for the first (%d+) seconds"] (ModParser.lua:5682)
-fn f1069(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1069(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33553,7 +33225,7 @@ fn f1069(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["elusive is removed from you at (%d+)%% effect"] (ModParser.lua:5683)
-fn f1070(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1070(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33567,7 +33239,7 @@ fn f1070(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby enemies have (%a+) resistance equal to yours"] (ModParser.lua:5684)
-fn f1071(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1071(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_res = arg(a, 1);
     return vec![tbl(vec![], {
@@ -33575,7 +33247,7 @@ fn f1071(c: &Ctx, a: &[Value]) -> Vec<Value> {
         v.extend(c.flag(vec![concat(
             &sb(b"Enemy"),
             &concat(
-                &first(gsub_fn(&l_res.clone(), &sb(b"^%l"), &mut upper_fn, &nil())),
+                &first(gsub_case(&l_res.clone(), &sb(b"^%l"), true, &nil())),
                 &sb(b"ResistEqualToYours"),
             ),
         )]));
@@ -33584,7 +33256,7 @@ fn f1071(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["for each nearby corpse, regenerate ([%d%.]+)%% life per second, up to ([%d%.]+)%%"] (ModParser.lua:5685)
-fn f1072(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1072(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -33599,7 +33271,7 @@ fn f1072(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"NearbyCorpse")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33609,7 +33281,7 @@ fn f1072(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills gain a base life cost equal to (%d+)%% of base mana cost"] (ModParser.lua:5689)
-fn f1073(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1073(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33619,7 +33291,7 @@ fn f1073(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills gain a base energy shield cost equal to (%d+)%% of base mana cost"] (ModParser.lua:5692)
-fn f1074(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1074(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33633,7 +33305,7 @@ fn f1074(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills cost life instead of (%d+)%% of mana cost"] (ModParser.lua:5695)
-fn f1075(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1075(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33647,7 +33319,7 @@ fn f1075(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased cost of arc and crackling lance"] (ModParser.lua:5698)
-fn f1076(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1076(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33662,7 +33334,7 @@ fn f1076(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Arc"), sb(b"Crackling Lance")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33672,7 +33344,7 @@ fn f1076(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits overwhelm (%d+)%% of physical damage reduction while you have sacrificial zeal"] (ModParser.lua:5701)
-fn f1077(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1077(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33694,7 +33366,7 @@ fn f1077(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance for hits to ignore enemy physical damage reduction while you have sacrificial zeal"] (ModParser.lua:5704)
-fn f1078(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1078(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33716,7 +33388,7 @@ fn f1078(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% chance to ignore enemy physical damage reduction while you have sacrificial zeal"] (ModParser.lua:5707)
-fn f1079(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1079(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33738,7 +33410,7 @@ fn f1079(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions attacks overwhelm (%d+)%% physical damage reduction"] (ModParser.lua:5710)
-fn f1080(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1080(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33755,7 +33427,7 @@ fn f1080(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         tbl(
                             vec![
                                 (sb(b"type"), sb(b"SkillType")),
-                                (sb(b"skillType"), field(&c.value("SkillType"), "Attack")),
+                                (sb(b"skillType"), c.index("SkillType", &sb(b"Attack"))),
                             ],
                             vec![],
                         ),
@@ -33769,7 +33441,7 @@ fn f1080(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["minions hits have (%d+)%% chance to ignore enemy physical damage reduction"] (ModParser.lua:5713)
-fn f1081(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1081(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33793,7 +33465,7 @@ fn f1081(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["focus has (%d+)%% increased cooldown recovery rate"] (ModParser.lua:5716)
-fn f1082(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1082(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33814,7 +33486,7 @@ fn f1082(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["focus has (%d+)%% reduced cooldown recovery rate"] (ModParser.lua:5717)
-fn f1083(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1083(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33835,7 +33507,7 @@ fn f1083(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% more frozen legion and general's cry cooldown recovery rate"] (ModParser.lua:5718)
-fn f1084(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1084(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33850,7 +33522,7 @@ fn f1084(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Frozen Legion"), sb(b"General's Cry")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33860,7 +33532,7 @@ fn f1084(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flamethrower, seismic and lightning spire trap have (%d+)%% increased cooldown recovery rate"] (ModParser.lua:5719)
-fn f1085(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1085(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33882,7 +33554,7 @@ fn f1085(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             ],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33892,7 +33564,7 @@ fn f1085(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flamethrower, seismic and lightning spire trap have %-(%d+) cooldown uses?"] (ModParser.lua:5720)
-fn f1086(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1086(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33914,7 +33586,7 @@ fn f1086(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             ],
                         ),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33924,7 +33596,7 @@ fn f1086(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["right ring slot: shockwave has %+(%d+) to cooldown uses?"] (ModParser.lua:5721)
-fn f1087(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1087(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33949,7 +33621,7 @@ fn f1087(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flameblast starts with (%d+) additional stages"] (ModParser.lua:5722)
-fn f1088(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1088(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33963,7 +33635,7 @@ fn f1088(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Buff")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33973,7 +33645,7 @@ fn f1088(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["incinerate starts with (%d+) additional stages"] (ModParser.lua:5723)
-fn f1089(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1089(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -33987,7 +33659,7 @@ fn f1089(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Buff")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -33997,7 +33669,7 @@ fn f1089(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+([%d%.]+) seconds to flameblast and incinerate cooldown"] (ModParser.lua:5724)
-fn f1090(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1090(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -34024,7 +33696,7 @@ fn f1090(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Incinerate"), sb(b"Flameblast")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34040,7 +33712,7 @@ fn f1090(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Incinerate"), sb(b"Flameblast")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34050,7 +33722,7 @@ fn f1090(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% chance to deal double damage with attacks if attack time is longer than 1 second"] (ModParser.lua:5727)
-fn f1091(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1091(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34073,7 +33745,7 @@ fn f1091(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["elusive also grants %+(%d+)%% to critical strike multiplier for skills supported by nightblade"] (ModParser.lua:5730)
-fn f1092(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1092(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34087,7 +33759,7 @@ fn f1092(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["skills supported by nightblade have (%d+)%% increased effect of elusive"] (ModParser.lua:5731)
-fn f1093(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1093(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34101,7 +33773,7 @@ fn f1093(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hits have (%d+)%% chance to ignore enemy monster physical damage reduction"] (ModParser.lua:5736)
-fn f1094(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1094(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34115,7 +33787,7 @@ fn f1094(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["attacks you use yourself have (%d+)%% more attack speed"] (ModParser.lua:5739)
-fn f1095(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1095(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34124,21 +33796,21 @@ fn f1095(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"MORE"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             n(0.0),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillType")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                     (
                         sb(b"skillTypeList"),
                         tbl(
                             vec![],
                             vec![
-                                field(&c.value("SkillType"), "SummonsTotem"),
-                                field(&c.value("SkillType"), "RemoteMined"),
-                                field(&c.value("SkillType"), "Trapped"),
-                                field(&c.value("SkillType"), "Triggered"),
+                                c.index("SkillType", &sb(b"SummonsTotem")),
+                                c.index("SkillType", &sb(b"RemoteMined")),
+                                c.index("SkillType", &sb(b"Trapped")),
+                                c.index("SkillType", &sb(b"Triggered")),
                             ],
                         ),
                     ),
@@ -34148,7 +33820,7 @@ fn f1095(c: &Ctx, a: &[Value]) -> Vec<Value> {
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Condition")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                     (sb(b"var"), sb(b"usedByMirage")),
                 ],
                 vec![],
@@ -34159,7 +33831,7 @@ fn f1095(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["final repeat of attack skills deals (%d+)%% more damage"] (ModParser.lua:5745)
-fn f1096(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1096(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34169,14 +33841,14 @@ fn f1096(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num.clone(),
             nil(),
             n(0.0),
-            field(&c.value("KeywordFlag"), "Attack"),
+            c.index("KeywordFlag", &sb(b"Attack")),
         ]));
         v
     })];
 }
 
 // specialModList["viper strike and pestilent strike deal (%d+)%% increased attack damage per frenzy charge"] (ModParser.lua:5747)
-fn f1097(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1097(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34185,7 +33857,7 @@ fn f1097(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Multiplier")),
@@ -34200,7 +33872,7 @@ fn f1097(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Viper Strike"), sb(b"Pestilent Strike")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34210,7 +33882,7 @@ fn f1097(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shield charge and chain hook have (%d+)%% increased attack speed per (%d+) rampage kills"] (ModParser.lua:5748)
-fn f1098(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1098(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_inc = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -34221,14 +33893,14 @@ fn f1098(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_inc.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"Rampage")),
                     (sb(b"div"), l_num.clone()),
                     (sb(b"limit"), div(&n(1000.0), &l_num.clone())),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34239,7 +33911,7 @@ fn f1098(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Shield Charge"), sb(b"Chain Hook")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34249,7 +33921,7 @@ fn f1098(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["tectonic slam and infernal blow deal (%d+)%% increased attack damage per (%d+) armour"] (ModParser.lua:5749)
-fn f1099(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1099(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_inc = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -34260,7 +33932,7 @@ fn f1099(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_inc.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -34276,7 +33948,7 @@ fn f1099(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Tectonic Slam"), sb(b"Infernal Blow")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34286,7 +33958,7 @@ fn f1099(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["frozen sweep deals (%d+)%% less damage"] (ModParser.lua:5750)
-fn f1100(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1100(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34298,7 +33970,7 @@ fn f1100(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Frozen Sweep")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34308,7 +33980,7 @@ fn f1100(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ice trap and lightning trap damage penetrates (%d+)%% of enemy elemental resistances"] (ModParser.lua:5751)
-fn f1101(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1101(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![
@@ -34323,7 +33995,7 @@ fn f1101(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             sb(b"skillNameList"),
                             tbl(vec![], vec![sb(b"Ice Trap"), sb(b"Lightning Trap")]),
                         ),
-                        (sb(b"includeTransfigured"), Value::Bool(true)),
+                        (sb(b"includeTransfigured"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -34339,7 +34011,7 @@ fn f1101(c: &Ctx, a: &[Value]) -> Vec<Value> {
                             sb(b"skillNameList"),
                             tbl(vec![], vec![sb(b"Ice Trap"), sb(b"Lightning Trap")]),
                         ),
-                        (sb(b"includeTransfigured"), Value::Bool(true)),
+                        (sb(b"includeTransfigured"), V::Bool(true)),
                     ],
                     vec![],
                 ),
@@ -34356,7 +34028,7 @@ fn f1101(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Ice Trap"), sb(b"Lightning Trap")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34366,7 +34038,7 @@ fn f1101(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["volatile dead and cremation penetrate (%d+)%% fire resistance per (%d+) dexterity"] (ModParser.lua:5756)
-fn f1102(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1102(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_inc = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num = arg(a, 2);
@@ -34391,7 +34063,7 @@ fn f1102(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         sb(b"skillNameList"),
                         tbl(vec![], vec![sb(b"Volatile Dead"), sb(b"Cremation")]),
                     ),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34401,7 +34073,7 @@ fn f1102(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["regenerate (%d+) mana per second while any enemy is in your righteous fire or scorching ray"] (ModParser.lua:5757)
-fn f1103(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1103(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34422,7 +34094,7 @@ fn f1103(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to wave of conviction damage over time multiplier per ([%d%.]+) seconds of duration expired"] (ModParser.lua:5758)
-fn f1104(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1104(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34436,7 +34108,7 @@ fn f1104(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased quantity of items dropped by slain normal enemies"] (ModParser.lua:5761)
-fn f1105(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1105(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34450,7 +34122,7 @@ fn f1105(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased rarity of items dropped by slain magic enemies"] (ModParser.lua:5762)
-fn f1106(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1106(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34464,7 +34136,7 @@ fn f1106(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["while stationary, gain ([%d%.]+)%% of life regenerated per second every second, up to a maximum of (%d+)%%"] (ModParser.lua:5764)
-fn f1107(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1107(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_limit = arg(a, 2);
@@ -34479,7 +34151,7 @@ fn f1107(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"Multiplier")),
                     (sb(b"var"), sb(b"StationarySeconds")),
                     (sb(b"limit"), first(vec![tonumber(&l_limit.clone())])),
-                    (sb(b"limitTotal"), Value::Bool(true)),
+                    (sb(b"limitTotal"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34496,7 +34168,7 @@ fn f1107(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["life flasks gain (%d+) charges? every (%d+) seconds if you haven't used a life flask recently"] (ModParser.lua:5768)
-fn f1108(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1108(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -34510,7 +34182,7 @@ fn f1108(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"Condition")),
                     (sb(b"var"), sb(b"UsingLifeFlask")),
-                    (sb(b"neg"), Value::Bool(true)),
+                    (sb(b"neg"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34520,7 +34192,7 @@ fn f1108(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased decoy totem life"] (ModParser.lua:5772)
-fn f1109(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1109(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34541,7 +34213,7 @@ fn f1109(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased ice spear critical strike chance in second form"] (ModParser.lua:5773)
-fn f1110(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1110(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34553,7 +34225,7 @@ fn f1110(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Ice Spear")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34570,7 +34242,7 @@ fn f1110(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shock nova ring deals (%d+)%% increased damage"] (ModParser.lua:5774)
-fn f1111(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1111(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34582,7 +34254,7 @@ fn f1111(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Shock Nova")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34596,7 +34268,7 @@ fn f1111(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies affected by bear trap take (%d+)%% increased damage from trap or mine hits"] (ModParser.lua:5775)
-fn f1112(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1112(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34635,7 +34307,7 @@ fn f1112(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Bear Trap")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34645,7 +34317,7 @@ fn f1112(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["blade vortex has %+(%d+)%% to critical strike multiplier for each blade"] (ModParser.lua:5776)
-fn f1113(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1113(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34664,7 +34336,7 @@ fn f1113(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Blade Vortex")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34674,7 +34346,7 @@ fn f1113(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["burning arrow has (%d+)%% increased debuff effect"] (ModParser.lua:5777)
-fn f1114(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1114(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34695,7 +34367,7 @@ fn f1114(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["double strike has a (%d+)%% chance to deal double damage to bleeding enemies"] (ModParser.lua:5778)
-fn f1115(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1115(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34715,7 +34387,7 @@ fn f1115(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Double Strike")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34725,7 +34397,7 @@ fn f1115(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["frost bomb has (%d+)%% increased debuff duration"] (ModParser.lua:5779)
-fn f1116(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1116(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34746,7 +34418,7 @@ fn f1116(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["incinerate has %+(%d+) to maximum stages"] (ModParser.lua:5780)
-fn f1117(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1117(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34767,7 +34439,7 @@ fn f1117(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["perforate creates %+(%d+) spikes?"] (ModParser.lua:5781)
-fn f1118(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1118(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34781,7 +34453,7 @@ fn f1118(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["scourge arrow has (%d+)%% chance to poison per stage"] (ModParser.lua:5782)
-fn f1119(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1119(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34793,7 +34465,7 @@ fn f1119(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Scourge Arrow")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34810,7 +34482,7 @@ fn f1119(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["winter orb has %+(%d+) maximum stages"] (ModParser.lua:5783)
-fn f1120(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1120(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34824,7 +34496,7 @@ fn f1120(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["summoned holy relics have (%d+)%% increased buff effect"] (ModParser.lua:5784)
-fn f1121(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1121(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34836,7 +34508,7 @@ fn f1121(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Summon Holy Relic")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -34846,7 +34518,7 @@ fn f1121(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) to maximum virulence"] (ModParser.lua:5785)
-fn f1122(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1122(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34860,7 +34532,7 @@ fn f1122(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["winter orb has (%d+)%% increased area of effect per stage"] (ModParser.lua:5786)
-fn f1123(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1123(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34888,7 +34560,7 @@ fn f1123(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["wintertide brand has %+(%d+) to maximum stages"] (ModParser.lua:5787)
-fn f1124(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1124(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34909,7 +34581,7 @@ fn f1124(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["wave of conviction's exposure applies (%-%d+)%% elemental resistance"] (ModParser.lua:5788)
-fn f1125(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1125(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34939,7 +34611,7 @@ fn f1125(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["wave of conviction's exposure applies an extra (%-%d+)%% to elemental resistance"] (ModParser.lua:5789)
-fn f1126(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1126(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34969,7 +34641,7 @@ fn f1126(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arcane cloak spends an additional (%d+)%% of current mana"] (ModParser.lua:5790)
-fn f1127(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1127(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -34996,7 +34668,7 @@ fn f1127(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["arcane cloak grants life regeneration equal to (%d+)%% of mana spent per second"] (ModParser.lua:5791)
-fn f1128(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1128(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35043,7 +34715,7 @@ fn f1128(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["sigil of power's buff also grants (%d+)%% increased critical strike chance per stage"] (ModParser.lua:5794)
-fn f1129(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1129(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35075,7 +34747,7 @@ fn f1129(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["cobra lash chains (%d+) additional times"] (ModParser.lua:5795)
-fn f1130(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1130(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35102,7 +34774,7 @@ fn f1130(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["general's cry has ([%+%-]%d) to maximum number of mirage warriors"] (ModParser.lua:5796)
-fn f1131(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1131(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35116,7 +34788,7 @@ fn f1131(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["([%+%-]%d) to maximum blade flurry stages"] (ModParser.lua:5797)
-fn f1132(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1132(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -35134,7 +34806,7 @@ fn f1132(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["steelskin buff can take (%d+)%% increased amount of damage"] (ModParser.lua:5798)
-fn f1133(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1133(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35161,7 +34833,7 @@ fn f1133(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["hydrosphere has (%d+)%% increased pulse frequency"] (ModParser.lua:5799)
-fn f1134(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1134(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35171,7 +34843,7 @@ fn f1134(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["void sphere has (%d+)%% increased pulse frequency"] (ModParser.lua:5800)
-fn f1135(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1135(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35181,7 +34853,7 @@ fn f1135(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["shield crush central wave has (%d+)%% more area of effect"] (ModParser.lua:5801)
-fn f1136(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1136(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35193,7 +34865,7 @@ fn f1136(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Shield Crush")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35207,7 +34879,7 @@ fn f1136(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["storm rain has (%d+)%% increased beam frequency"] (ModParser.lua:5802)
-fn f1137(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1137(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35221,7 +34893,7 @@ fn f1137(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["voltaxic burst deals (%d+)%% increased damage per ([%d%.]+) seconds of duration"] (ModParser.lua:5803)
-fn f1138(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1138(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35235,7 +34907,7 @@ fn f1138(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["earthquake deals (%d+)%% increased damage per ([%d%.]+) seconds duration"] (ModParser.lua:5804)
-fn f1139(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1139(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35249,7 +34921,7 @@ fn f1139(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground from holy flame totem applies (%d+)%% increased damage taken to enemies"] (ModParser.lua:5805)
-fn f1140(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1140(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35280,7 +34952,7 @@ fn f1140(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["consecrated ground from purifying flame applies (%d+)%% increased damage taken to enemies"] (ModParser.lua:5806)
-fn f1141(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1141(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35298,7 +34970,7 @@ fn f1141(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Purifying Flame")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35308,7 +34980,7 @@ fn f1141(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["enemies drenched by hydrosphere have cold and lightning exposure, applying (%-%d+)%% to resistances"] (ModParser.lua:5807)
-fn f1142(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1142(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35335,7 +35007,7 @@ fn f1142(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["frost shield has %+(%d+) to maximum life per stage"] (ModParser.lua:5808)
-fn f1143(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1143(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35362,7 +35034,7 @@ fn f1143(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["flame wall grants (%d+) to (%d+) added fire damage to projectiles"] (ModParser.lua:5809)
-fn f1144(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1144(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_min = arg(a, 1);
     let mut l_max = arg(a, 2);
@@ -35408,7 +35080,7 @@ fn f1144(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["plague bearer buff grants %+(%d+)%% to poison damage over time multiplier while infecting"] (ModParser.lua:5810)
-fn f1145(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1145(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35438,7 +35110,7 @@ fn f1145(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased lightning trap lightning ailment effect"] (ModParser.lua:5811)
-fn f1146(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1146(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35456,7 +35128,7 @@ fn f1146(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Lightning Trap")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35466,7 +35138,7 @@ fn f1146(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["wild strike's beam chains an additional (%d+) times"] (ModParser.lua:5812)
-fn f1147(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1147(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35484,7 +35156,7 @@ fn f1147(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Wild Strike")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35498,7 +35170,7 @@ fn f1147(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["energy blades have (%d+)%% increased attack speed"] (ModParser.lua:5813)
-fn f1148(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1148(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35512,7 +35184,7 @@ fn f1148(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["ensnaring arrow has (%d+)%% increased debuff effect"] (ModParser.lua:5814)
-fn f1149(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1149(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35533,7 +35205,7 @@ fn f1149(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["unearth spawns corpses with ([%+%-]%d) level"] (ModParser.lua:5815)
-fn f1150(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1150(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35554,7 +35226,7 @@ fn f1150(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["explosive trap causes (%d+) additional smaller explosions"] (ModParser.lua:5818)
-fn f1151(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1151(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35581,7 +35253,7 @@ fn f1151(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["frozen sweep deals (%d+)%% increased damage"] (ModParser.lua:5819)
-fn f1152(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1152(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35593,7 +35265,7 @@ fn f1152(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Frozen Sweep")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35603,7 +35275,7 @@ fn f1152(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased attack speed with snipe"] (ModParser.lua:5820)
-fn f1153(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1153(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35612,7 +35284,7 @@ fn f1153(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"INC"),
             l_num.clone(),
             nil(),
-            field(&c.value("ModFlag"), "Attack"),
+            c.index("ModFlag", &sb(b"Attack")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
@@ -35626,7 +35298,7 @@ fn f1153(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) to maximum snipe stages"] (ModParser.lua:5821)
-fn f1154(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1154(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35640,7 +35312,7 @@ fn f1154(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Buff")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35650,7 +35322,7 @@ fn f1154(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["chain hook has %+([%d%.]+) metres? to radius per (%d+) rage"] (ModParser.lua:5822)
-fn f1155(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1155(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_rage = arg(a, 2);
@@ -35672,7 +35344,7 @@ fn f1155(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Chain Hook")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35682,7 +35354,7 @@ fn f1155(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+([%d%.]+) metres? to discharge radius"] (ModParser.lua:5823)
-fn f1156(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1156(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35694,7 +35366,7 @@ fn f1156(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Discharge")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -35704,7 +35376,7 @@ fn f1156(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased critical strike chance per 4%% quality"] (ModParser.lua:5826)
-fn f1157(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1157(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35718,7 +35390,7 @@ fn f1157(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants (%d+)%% increased accuracy per (%d+)%% quality"] (ModParser.lua:5827)
-fn f1158(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1158(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35742,7 +35414,7 @@ fn f1158(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["(%d+)%% increased attack speed per 8%% quality"] (ModParser.lua:5828)
-fn f1159(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1159(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35756,7 +35428,7 @@ fn f1159(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+) weapon range per 10%% quality"] (ModParser.lua:5829)
-fn f1160(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1160(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35770,7 +35442,7 @@ fn f1160(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+([%d%.]+) metres? to weapon range per 10%% quality"] (ModParser.lua:5830)
-fn f1161(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1161(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -35784,7 +35456,7 @@ fn f1161(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants (%d+)%% increased elemental damage per (%d+)%% quality"] (ModParser.lua:5831)
-fn f1162(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1162(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35808,7 +35480,7 @@ fn f1162(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants (%d+)%% increased area of effect per (%d+)%% quality"] (ModParser.lua:5832)
-fn f1163(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1163(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35832,7 +35504,7 @@ fn f1163(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+) to maximum life per (%d+)%% quality"] (ModParser.lua:5834)
-fn f1164(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1164(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35856,7 +35528,7 @@ fn f1164(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+) to maximum mana per (%d+)%% quality"] (ModParser.lua:5835)
-fn f1165(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1165(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35880,7 +35552,7 @@ fn f1165(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+) to strength per (%d+)%% quality"] (ModParser.lua:5836)
-fn f1166(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1166(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35904,7 +35576,7 @@ fn f1166(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+) to dexterity per (%d+)%% quality"] (ModParser.lua:5837)
-fn f1167(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1167(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35928,7 +35600,7 @@ fn f1167(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+) to intelligence per (%d+)%% quality"] (ModParser.lua:5838)
-fn f1168(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1168(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35952,7 +35624,7 @@ fn f1168(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+)%% to fire resistance per (%d+)%% quality"] (ModParser.lua:5839)
-fn f1169(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1169(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -35976,7 +35648,7 @@ fn f1169(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+)%% to cold resistance per (%d+)%% quality"] (ModParser.lua:5840)
-fn f1170(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1170(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -36000,7 +35672,7 @@ fn f1170(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["grants %+(%d+)%% to lightning resistance per (%d+)%% quality"] (ModParser.lua:5841)
-fn f1171(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1171(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_div = arg(a, 2);
@@ -36024,7 +35696,7 @@ fn f1171(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["%+(%d+)%% to quality"] (ModParser.lua:5842)
-fn f1172(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1172(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36034,7 +35706,7 @@ fn f1172(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["infernal blow debuff deals an additional (%d+)%% of damage per charge"] (ModParser.lua:5843)
-fn f1173(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1173(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36046,7 +35718,7 @@ fn f1173(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"SkillName")),
                     (sb(b"skillName"), sb(b"Infernal Blow")),
-                    (sb(b"includeTransfigured"), Value::Bool(true)),
+                    (sb(b"includeTransfigured"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -36056,7 +35728,7 @@ fn f1173(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["bathed in the blood of (%d+) sacrificed in the name of (.+)"] (ModParser.lua:5845)
-fn f1174(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1174(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36075,10 +35747,7 @@ fn f1174(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36093,7 +35762,7 @@ fn f1174(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["carved to glorify (%d+) new faithful converted by high templar (.+)"] (ModParser.lua:5848)
-fn f1175(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1175(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36112,10 +35781,7 @@ fn f1175(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36130,7 +35796,7 @@ fn f1175(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["commanded leadership over (%d+) warriors under (.+)"] (ModParser.lua:5851)
-fn f1176(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1176(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36149,10 +35815,7 @@ fn f1176(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36167,7 +35830,7 @@ fn f1176(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["commissioned (%d+) coins to commemorate (.+)"] (ModParser.lua:5854)
-fn f1177(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1177(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36186,10 +35849,7 @@ fn f1177(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36204,7 +35864,7 @@ fn f1177(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["denoted service of (%d+) dekhara in the akhara of (.+)"] (ModParser.lua:5857)
-fn f1178(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1178(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36223,10 +35883,7 @@ fn f1178(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36241,7 +35898,7 @@ fn f1178(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["remembrancing (%d+) songworthy deeds by the line of (.+)"] (ModParser.lua:5860)
-fn f1179(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1179(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36260,10 +35917,7 @@ fn f1179(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36278,7 +35932,7 @@ fn f1179(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["subjugating (%d+) souls in the thrall of (.+)"] (ModParser.lua:5863)
-fn f1180(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1180(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36297,10 +35951,7 @@ fn f1180(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36315,7 +35966,7 @@ fn f1180(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["binding (%d+) souls to phylacteries to sustain (.+)"] (ModParser.lua:5866)
-fn f1181(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1181(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_name = arg(a, 2);
@@ -36334,10 +35985,7 @@ fn f1181(c: &Ctx, a: &[Value]) -> Vec<Value> {
                                 (sb(b"id"), l_num.clone()),
                                 (
                                     sb(b"conqueror"),
-                                    index(
-                                        &c.value("conquerorList"),
-                                        &first(vec![lower(&l_name.clone())]),
-                                    ),
+                                    c.index("conquerorList", &first(vec![lower(&l_name.clone())])),
                                 ),
                             ],
                             vec![],
@@ -36352,7 +36000,7 @@ fn f1181(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["+(%d+) to maximum life per allocated journey tattoo of the body"] (ModParser.lua:5873)
-fn f1182(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1182(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -36377,7 +36025,7 @@ fn f1182(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["+(%d+) to maximum energy shield per allocated journey tattoo of the soul"] (ModParser.lua:5877)
-fn f1183(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1183(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -36402,7 +36050,7 @@ fn f1183(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["+(%d+) to maximum mana per allocated journey tattoo of the mind"] (ModParser.lua:5881)
-fn f1184(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1184(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(c.mod_(vec![
@@ -36427,7 +36075,7 @@ fn f1184(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["every (%d+) seconds, regenerate (%d+)%% of life over one second"] (ModParser.lua:5910)
-fn f1185(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1185(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_percent = arg(a, 2);
@@ -36461,7 +36109,7 @@ fn f1185(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["every (%d+) seconds, regenerate (%d+)%% of life over one second if (%d+) (%a+) items are equipped"] (ModParser.lua:5914)
-fn f1186(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1186(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_percent = arg(a, 2);
@@ -36525,7 +36173,7 @@ fn f1186(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["take no extra damage from critical strikes if you've cast (.-) in the past (%d+) seconds"] (ModParser.lua:5919)
-fn f1187(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1187(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l__ = arg(a, 0);
     let mut l_curse = arg(a, 1);
     return vec![tbl(vec![], {
@@ -36538,7 +36186,7 @@ fn f1187(c: &Ctx, a: &[Value]) -> Vec<Value> {
                 vec![
                     (sb(b"type"), sb(b"GlobalEffect")),
                     (sb(b"effectType"), sb(b"Global")),
-                    (sb(b"unscalable"), Value::Bool(true)),
+                    (sb(b"unscalable"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -36550,15 +36198,10 @@ fn f1187(c: &Ctx, a: &[Value]) -> Vec<Value> {
                         concat(
                             &sb(b"SelfCast"),
                             &first(gsub(
-                                &first(gsub_fn(
-                                    &first(gsub_fn(
-                                        &l_curse.clone(),
-                                        &sb(b"^%l"),
-                                        &mut upper_fn,
-                                        &nil(),
-                                    )),
+                                &first(gsub_case(
+                                    &first(gsub_case(&l_curse.clone(), &sb(b"^%l"), true, &nil())),
                                     &sb(b" %l"),
-                                    &mut upper_fn,
+                                    true,
                                     &nil(),
                                 )),
                                 &sb(b" "),
@@ -36576,7 +36219,7 @@ fn f1187(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from critical strikes while affected by determination"] (ModParser.lua:5926)
-fn f1188(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1188(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36597,7 +36240,7 @@ fn f1188(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from critical strikes"] (ModParser.lua:5929)
-fn f1189(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1189(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36611,7 +36254,7 @@ fn f1189(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% increased extra damage from critical strikes"] (ModParser.lua:5930)
-fn f1190(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1190(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36625,7 +36268,7 @@ fn f1190(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from critical strikes while you have no power charges"] (ModParser.lua:5931)
-fn f1191(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1191(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36638,7 +36281,7 @@ fn f1191(c: &Ctx, a: &[Value]) -> Vec<Value> {
                     (sb(b"type"), sb(b"StatThreshold")),
                     (sb(b"stat"), sb(b"PowerCharges")),
                     (sb(b"threshold"), n(0.0)),
-                    (sb(b"upper"), Value::Bool(true)),
+                    (sb(b"upper"), V::Bool(true)),
                 ],
                 vec![],
             ),
@@ -36648,7 +36291,7 @@ fn f1191(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from critical strikes by poisoned enemies"] (ModParser.lua:5932)
-fn f1192(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1192(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36670,7 +36313,7 @@ fn f1192(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["you take (%d+)%% reduced extra damage from critical strikes by cursed enemies"] (ModParser.lua:5933)
-fn f1193(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1193(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36692,7 +36335,7 @@ fn f1193(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["nearby allies have (%d+)%% chance to block attack damage per (%d+) strength you have"] (ModParser.lua:5934)
-fn f1194(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1194(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_block = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_str = arg(a, 2);
@@ -36703,7 +36346,7 @@ fn f1194(c: &Ctx, a: &[Value]) -> Vec<Value> {
             sb(b"LIST"),
             tbl(
                 vec![
-                    (sb(b"onlyAllies"), Value::Bool(true)),
+                    (sb(b"onlyAllies"), V::Bool(true)),
                     (
                         sb(b"mod"),
                         first(c.mod_(vec![sb(b"BlockChance"), sb(b"BASE"), l_block.clone()])),
@@ -36725,7 +36368,7 @@ fn f1194(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["physical skills have (%d+)%% increased duration per (%d+) intelligence"] (ModParser.lua:5937)
-fn f1195(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1195(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num1 = arg(a, 0);
     let mut l__ = arg(a, 1);
     let mut l_num2 = arg(a, 2);
@@ -36737,7 +36380,7 @@ fn f1195(c: &Ctx, a: &[Value]) -> Vec<Value> {
             l_num1.clone(),
             nil(),
             nil(),
-            field(&c.value("KeywordFlag"), "Physical"),
+            c.index("KeywordFlag", &sb(b"Physical")),
             tbl(
                 vec![
                     (sb(b"type"), sb(b"PerStat")),
@@ -36752,7 +36395,7 @@ fn f1195(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["y?o?u?r? ?maximum energy shield is equal to (%d+)%% of y?o?u?r? ?maximum life"] (ModParser.lua:5940)
-fn f1196(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1196(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![];
@@ -36774,7 +36417,7 @@ fn f1196(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 // specialModList["mana is increased by (%d+)%% of overcapped lightning resistance"] (ModParser.lua:5944)
-fn f1197(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn f1197(c: &Ctx, a: &[V]) -> Vec<V> {
     let mut l_num = arg(a, 0);
     return vec![tbl(vec![], {
         let mut v = vec![first(

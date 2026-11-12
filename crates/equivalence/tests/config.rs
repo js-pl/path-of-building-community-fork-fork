@@ -8,7 +8,7 @@
 use engine::config::{self, ConfigState, CustomBlock, Inputs, Val};
 use engine::mods::Mod;
 use engine::mods::convert::Converter;
-use equivalence::{corpus, mod_parser, typed_json, upstream_src};
+use equivalence::{corpus, mod_parser_preloaded, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use std::rc::Rc;
@@ -93,10 +93,7 @@ fn config_matches_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
+    let parser = mod_parser_preloaded();
     let data = equivalence::game_data().config;
     let mut failures = Vec::new();
     let mut compared = 0;

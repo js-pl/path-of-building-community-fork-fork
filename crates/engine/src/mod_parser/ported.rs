@@ -3,9 +3,9 @@
 //! upstream changes the closure, `ModParser::new` fails until the port is
 //! updated and the hash with it.
 
-use super::{Ctx, Port, closure};
-use crate::rt::*;
-use lua::Value;
+use super::ctx::closure;
+use super::val::*;
+use super::{Ctx, Port};
 
 pub(super) const PORTS: &[Port] = &[
     Port {
@@ -25,14 +25,14 @@ pub(super) const PORTS: &[Port] = &[
     },
 ];
 
-fn non_unique_item_conditions() -> [Value; 2] {
+fn non_unique_item_conditions() -> [V; 2] {
     let cond = |rarity: &str| {
         tbl(
             vec![
                 (s("type"), s("ItemCondition")),
                 (s("itemSlot"), s("{SlotName}")),
                 (s("rarityCond"), s(rarity)),
-                (s("neg"), Value::Bool(true)),
+                (s("neg"), V::Bool(true)),
             ],
             vec![],
         )
@@ -41,7 +41,7 @@ fn non_unique_item_conditions() -> [Value; 2] {
 }
 
 /// ModParser.lua:2611. The jewel function is a closure the calcs run.
-fn non_unique_jewels_transform_damage(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn non_unique_jewels_transform_damage(c: &Ctx, a: &[V]) -> Vec<V> {
     let (radius, dmg_type) = (arg(a, 1), arg(a, 2));
     let func = closure("nonUniqueJewelsTransformDamage", vec![dmg_type]);
     let v = tbl(
@@ -60,10 +60,10 @@ fn non_unique_jewels_transform_damage(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 /// ModParser.lua:2619. The jewel function is a closure the calcs run.
-fn non_unique_jewels_grant_attribute(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn non_unique_jewels_grant_attribute(c: &Ctx, a: &[V]) -> Vec<V> {
     let (radius, val, attr) = (arg(a, 1), arg(a, 2), arg(a, 3));
     let func = closure("nonUniqueJewelsGrantAttribute", vec![val, attr]);
-    let radius = first(gsub_fn(&radius, &s("^%l"), &mut upper_fn, &nil()));
+    let radius = first(gsub_case(&radius, &s("^%l"), true, &nil()));
     let v = tbl(
         vec![
             (s("radius"), radius),
@@ -80,9 +80,9 @@ fn non_unique_jewels_grant_attribute(c: &Ctx, a: &[Value]) -> Vec<Value> {
 }
 
 /// ModParser.lua:3228
-fn all_gems_property(c: &Ctx, a: &[Value]) -> Vec<Value> {
+fn all_gems_property(c: &Ctx, a: &[V]) -> Vec<V> {
     let (num, property, skill) = (arg(a, 0), arg(a, 2), arg(a, 3));
-    if index(&c.value("gemIdLookup"), &skill).truthy() {
+    if c.index("gemIdLookup", &skill).truthy() {
         let v = tbl(
             vec![
                 (s("keyword"), skill),
@@ -97,9 +97,9 @@ fn all_gems_property(c: &Ctx, a: &[Value]) -> Vec<Value> {
             vec![first(c.mod_(vec![s("GemProperty"), s("LIST"), v]))],
         )];
     }
-    let word_list = tbl(vec![], vec![]);
+    let mut word_list = tbl(vec![], vec![]);
     for caps in gmatch(&skill, &s("%S+")) {
-        t_insert(&word_list, nth(&caps, 0));
+        t_insert(&mut word_list, nth(&caps, 0));
     }
     let v = tbl(
         vec![

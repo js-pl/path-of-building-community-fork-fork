@@ -12,7 +12,7 @@
 
 use engine::spec::PassiveSpec;
 use engine::tree::{self, PassiveTree};
-use equivalence::{corpus, load_data, mod_parser, typed_json, upstream_src};
+use equivalence::{corpus, load_data, mod_parser_preloaded, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use std::collections::HashMap;
@@ -107,10 +107,8 @@ fn specs_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
+    let parser = mod_parser_preloaded();
     let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
     let (data, _) = load_data();
     let latest = lua::to_string(&host.global("latestTreeVersion")).to_string();
     let mut trees: HashMap<String, PassiveTree> = HashMap::new();

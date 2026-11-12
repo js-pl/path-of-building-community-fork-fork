@@ -6,10 +6,211 @@
 use super::tag::*;
 use super::*;
 use lua::rt;
-use lua::{Key, TableRef, Value};
+use lua::{Key, Value};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+
+/// A table key as conversion sees it
+pub enum DKey {
+    Str(String),
+    Int(i64),
+    Other(String),
+}
+
+/// What a dynamic value is
+pub enum Kind<'a, D> {
+    Nil,
+    Bool(bool),
+    Num(f64),
+    Str(Cow<'a, str>),
+    Table,
+    /// A closure made by ported code: its name and upvalues
+    Closure(Rc<str>, Vec<D>),
+    /// `getThreshold`'s closure: its attribute and the mod it builds
+    Threshold(D, D),
+    /// Already typed
+    Typed(ModValue),
+}
+
+/// Dynamic values upstream's mods come as: Lua values (the importer's data,
+/// the translated program) and the mod parser's closure values
+pub trait Dyn: Clone {
+    fn kind(&self) -> Kind<'_, Self>;
+    /// `t.k`, nil for non-tables
+    fn get(&self, k: &str) -> Self;
+    /// `t[i]`
+    fn get_i(&self, i: i64) -> Self;
+    /// `#t`
+    fn border(&self) -> usize;
+    /// Non-nil entries
+    fn len_pairs(&self) -> usize;
+    /// Entries in `pairs` order
+    fn entries(&self) -> Vec<(DKey, Self)>;
+    /// The Lua value, kept for tags whose evaluation needs it
+    fn lua(&self) -> Option<&Value> {
+        None
+    }
+
+    fn is_nil(&self) -> bool {
+        matches!(self.kind(), Kind::Nil)
+    }
+
+    fn truthy(&self) -> bool {
+        !matches!(self.kind(), Kind::Nil | Kind::Bool(false))
+    }
+
+    fn is_table(&self) -> bool {
+        matches!(self.kind(), Kind::Table)
+    }
+}
+
+impl Dyn for Value {
+    fn kind(&self) -> Kind<'_, Value> {
+        match self {
+            Value::Nil => Kind::Nil,
+            Value::Bool(b) => Kind::Bool(*b),
+            Value::Number(n) => Kind::Num(*n),
+            Value::Str(x) => Kind::Str(x.to_str_lossy()),
+            Value::Table(_) => Kind::Table,
+            Value::Func(f) => Kind::Typed(ModValue::Func(Rc::new(Func {
+                name: f.key.clone(),
+                args: vec![],
+            }))),
+            Value::Function(f) => Kind::Typed(ModValue::Func(Rc::new(Func {
+                name: f.name.clone(),
+                args: vec![],
+            }))),
+            // `getThreshold` closes over the mod it builds,
+            // `mod(name, type, value, "", ...)`
+            Value::Closure(c) if &*c.name == "getThreshold" => {
+                let attrib = c.upvalues.first().cloned().unwrap_or_default();
+                let mut mod_args = c
+                    .upvalues
+                    .get(1..4)
+                    .map(<[Value]>::to_vec)
+                    .unwrap_or_default();
+                mod_args.push(Value::str(""));
+                mod_args.extend(c.upvalues.iter().skip(4).cloned());
+                let base = lua::modlib::create_mod_args(&mod_args);
+                Kind::Threshold(attrib, Value::Table(base))
+            }
+            Value::Closure(c) => Kind::Closure(c.name.clone(), c.upvalues.clone()),
+        }
+    }
+
+    fn get(&self, k: &str) -> Value {
+        match self {
+            Value::Table(t) => t.get_str(k),
+            _ => Value::Nil,
+        }
+    }
+
+    fn get_i(&self, i: i64) -> Value {
+        match self {
+            Value::Table(t) => t.get_int(i),
+            _ => Value::Nil,
+        }
+    }
+
+    fn border(&self) -> usize {
+        match self {
+            Value::Table(t) => t.borrow().len(),
+            _ => 0,
+        }
+    }
+
+    fn len_pairs(&self) -> usize {
+        match self {
+            Value::Table(t) => t.borrow().len_pairs(),
+            _ => 0,
+        }
+    }
+
+    fn entries(&self) -> Vec<(DKey, Value)> {
+        match self {
+            Value::Table(t) => t
+                .entries()
+                .into_iter()
+                .map(|(k, v)| {
+                    let k = match k {
+                        Key::Str(s) => DKey::Str(s.to_str_lossy().into_owned()),
+                        Key::Int(i) => DKey::Int(i),
+                        k => DKey::Other(format!("{k:?}")),
+                    };
+                    (k, v)
+                })
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    fn lua(&self) -> Option<&Value> {
+        Some(self)
+    }
+}
+
+fn d_text<D: Dyn>(v: &D) -> Result<Rc<str>, String> {
+    match v.kind() {
+        Kind::Str(x) => Ok(x.into()),
+        _ => Err(format!("expected a string, got {}", describe(v))),
+    }
+}
+
+fn describe<D: Dyn>(v: &D) -> String {
+    match v.kind() {
+        Kind::Nil => "nil".into(),
+        Kind::Bool(b) => format!("{b}"),
+        Kind::Num(n) => format!("{n}"),
+        Kind::Str(s) => format!("{s:?}"),
+        Kind::Table => "a table".into(),
+        _ => "a function".into(),
+    }
+}
+
+fn d_sym<D: Dyn>(v: &D) -> Result<Sym, String> {
+    Ok(Sym::new(&d_text(v)?))
+}
+
+fn d_opt_sym<D: Dyn>(v: &D) -> Result<Option<Sym>, String> {
+    if v.is_nil() {
+        Ok(None)
+    } else {
+        d_sym(v).map(Some)
+    }
+}
+
+fn d_number<D: Dyn>(v: &D) -> Result<f64, String> {
+    match v.kind() {
+        Kind::Num(n) => Ok(n),
+        Kind::Str(s) => {
+            lua::str_to_number(s.as_bytes()).ok_or_else(|| format!("expected a number, got {s:?}"))
+        }
+        _ => Err(format!("expected a number, got {}", describe(v))),
+    }
+}
+
+fn d_opt_number<D: Dyn>(v: &D) -> Result<Option<f64>, String> {
+    if v.is_nil() {
+        Ok(None)
+    } else {
+        d_number(v).map(Some)
+    }
+}
+
+fn d_flags<D: Dyn>(v: &D) -> Result<u32, String> {
+    let n = d_number(v)?;
+    Ok(n.rem_euclid(4294967296.0) as u64 as u32)
+}
+
+/// `t[1..#t]`
+pub fn d_array<D: Dyn>(v: &D) -> Vec<D> {
+    if !v.is_table() {
+        return vec![];
+    }
+    (1..=v.border() as i64).map(|i| v.get_i(i)).collect()
+}
 
 pub fn s(x: &str) -> Value {
     Value::str(x)
@@ -51,14 +252,8 @@ pub fn opt_number(v: &Value) -> Result<Option<f64>, String> {
     }
 }
 
-fn flag(v: &Value) -> bool {
+fn flag<D: Dyn>(v: &D) -> bool {
     v.truthy()
-}
-
-/// `bit.band`'s view of a flags number
-fn flags(v: &Value) -> Result<u32, String> {
-    let n = number(v)?;
-    Ok(n.rem_euclid(4294967296.0) as u64 as u32)
 }
 
 /// The values of `t[1..]`
@@ -70,23 +265,23 @@ pub fn array(v: &Value) -> Vec<Value> {
 }
 
 /// `var`/`varList` style names; `pairs` order for the list
-fn names(one: &Value, list: &Value) -> Result<Option<Names>, String> {
-    if let Value::Table(t) = list {
+fn names<D: Dyn>(one: &D, list: &D) -> Result<Option<Names>, String> {
+    if list.is_table() {
         let mut out = Vec::new();
-        for (_, v) in t.entries() {
-            out.push(sym(&v)?);
+        for (_, v) in list.entries() {
+            out.push(d_sym(&v)?);
         }
         return Ok(Some(Names::List(out)));
     }
-    Ok(opt_sym(one)?.map(Names::One))
+    Ok(d_opt_sym(one)?.map(Names::One))
 }
 
 /// The keys of a table other than its array part
-fn keys(t: &TableRef) -> Vec<String> {
+fn keys<D: Dyn>(t: &D) -> Vec<String> {
     t.entries()
         .into_iter()
         .filter_map(|(k, _)| match k {
-            Key::Str(s) => Some(s.to_str_lossy().into_owned()),
+            DKey::Str(s) => Some(s),
             _ => None,
         })
         .collect()
@@ -97,7 +292,7 @@ thread_local! {
     pub static UNKNOWN: RefCell<std::collections::BTreeMap<String, usize>> = Default::default();
 }
 
-fn check_fields(t: &TableRef, what: &str, known: &[&str]) -> Result<(), String> {
+pub fn check_fields<D: Dyn>(t: &D, what: &str, known: &[&str]) -> Result<(), String> {
     for k in keys(t) {
         if !known.contains(&k.as_str()) {
             if std::env::var_os("MODS_SURVEY").is_some() {
@@ -130,50 +325,29 @@ impl Converter<'_> {
     /// A mod's flags. A few of upstream's skill mods pass a tag where the
     /// flags go; upstream fails on the queries of such a mod, and as
     /// templates they take flags no query has, so queries skip them.
-    fn mod_flags(&self, v: &Value) -> Result<u32, String> {
-        if self.templates && matches!(v, Value::Table(_)) {
+    fn mod_flags<D: Dyn>(&self, v: &D) -> Result<u32, String> {
+        if self.templates && v.is_table() {
             return Ok(u32::MAX);
         }
-        flags(v)
+        d_flags(v)
     }
 
-    pub fn value(&self, v: &Value) -> Result<ModValue, String> {
-        Ok(match v {
-            Value::Bool(b) => ModValue::Bool(*b),
-            Value::Number(n) => ModValue::Number(*n),
-            Value::Str(x) => ModValue::Str(x.to_str_lossy().into()),
-            Value::Func(f) => ModValue::Func(Rc::new(Func {
-                name: f.key.clone(),
-                args: vec![],
+    pub fn value<D: Dyn>(&self, v: &D) -> Result<ModValue, String> {
+        Ok(match v.kind() {
+            Kind::Bool(b) => ModValue::Bool(b),
+            Kind::Num(n) => ModValue::Number(n),
+            Kind::Str(x) => ModValue::Str(x.into()),
+            Kind::Typed(m) => m,
+            Kind::Threshold(attrib, base) => ModValue::Func(Rc::new(Func {
+                name: "getThreshold".into(),
+                args: vec![
+                    Some(self.value(&attrib)?),
+                    Some(ModValue::Mod(Box::new(self.mod_(&base)?))),
+                ],
             })),
-            Value::Function(f) => ModValue::Func(Rc::new(Func {
-                name: f.name.clone(),
-                args: vec![],
-            })),
-            // `getThreshold` closes over the mod it builds,
-            // `mod(name, type, value, "", ...)`
-            Value::Closure(c) if &*c.name == "getThreshold" => {
-                let attrib = c.upvalues.first().cloned().unwrap_or_default();
-                let mut mod_args = c
-                    .upvalues
-                    .get(1..4)
-                    .map(<[Value]>::to_vec)
-                    .unwrap_or_default();
-                mod_args.push(Value::str(""));
-                mod_args.extend(c.upvalues.iter().skip(4).cloned());
-                let base = lua::modlib::create_mod_args(&mod_args);
-                ModValue::Func(Rc::new(Func {
-                    name: c.name.clone(),
-                    args: vec![
-                        Some(self.value(&attrib)?),
-                        Some(ModValue::Mod(Box::new(self.mod_(&Value::Table(base))?))),
-                    ],
-                }))
-            }
-            Value::Closure(c) => ModValue::Func(Rc::new(Func {
-                name: c.name.clone(),
-                args: c
-                    .upvalues
+            Kind::Closure(name, upvalues) => ModValue::Func(Rc::new(Func {
+                name,
+                args: upvalues
                     .iter()
                     .map(|u| {
                         if u.is_nil() {
@@ -184,28 +358,27 @@ impl Converter<'_> {
                     })
                     .collect::<Result<_, String>>()?,
             })),
-            Value::Nil => return Err("nil value".into()),
-            Value::Table(t) => {
-                if !get(v, "name").is_nil() && !get(v, "type").is_nil() && !get(v, "flags").is_nil()
-                {
+            Kind::Nil => return Err("nil value".into()),
+            Kind::Table => {
+                if !v.get("name").is_nil() && !v.get("type").is_nil() && !v.get("flags").is_nil() {
                     return Ok(ModValue::Mod(Box::new(self.mod_(v)?)));
                 }
                 // `{ ["$num"] = "inf" }`, how the oracle encodes infinities, does
                 // not occur in the live program; numbers stay numbers
-                let n = t.borrow().len();
-                if n > 0 && t.borrow().len_pairs() == n {
+                let n = v.border();
+                if n > 0 && v.len_pairs() == n {
                     let mut list = Vec::new();
-                    for x in t.array() {
+                    for x in d_array(v) {
                         list.push(self.value(&x)?);
                     }
                     return Ok(ModValue::List(list));
                 }
                 let mut rec = Record::default();
-                for (k, x) in t.entries() {
+                for (k, x) in v.entries() {
                     let name = match k {
-                        Key::Str(s) => Sym::new(&s.to_str_lossy()),
-                        Key::Int(i) => Sym::new(&i.to_string()),
-                        k => return Err(format!("record key {k:?}")),
+                        DKey::Str(s) => Sym::new(&s),
+                        DKey::Int(i) => Sym::new(&i.to_string()),
+                        DKey::Other(k) => return Err(format!("record key {k}")),
                     };
                     rec.fields.push((name, self.value(&x)?));
                 }
@@ -214,10 +387,14 @@ impl Converter<'_> {
         })
     }
 
-    pub fn mod_(&self, v: &Value) -> Result<Mod, String> {
-        let Value::Table(t) = v else {
-            return Err(format!("mod is {v:?}"));
-        };
+    pub fn mod_<D: Dyn>(&self, v: &D) -> Result<Mod, String> {
+        if let Kind::Typed(ModValue::Mod(m)) = v.kind() {
+            return Ok(*m);
+        }
+        if !v.is_table() {
+            return Err(format!("mod is {}", describe(v)));
+        }
+        let t = v;
         check_fields(
             t,
             "mod",
@@ -233,8 +410,8 @@ impl Converter<'_> {
                 "converted",
             ],
         )?;
-        let typ = ModType::new(&text(&get(v, "type"))?);
-        let raw = get(v, "value");
+        let typ = ModType::new(&d_text(&v.get("type"))?);
+        let raw = v.get("value");
         let value = if self.templates && raw.is_nil() {
             ModValue::Number(f64::NAN)
         } else {
@@ -243,7 +420,7 @@ impl Converter<'_> {
         // Upstream visits tags with `ipairs`
         let mut tags = Vec::new();
         loop {
-            let tag = t.get_int(tags.len() as i64 + 1);
+            let tag = t.get_i(tags.len() as i64 + 1);
             if tag.is_nil() {
                 break;
             }
@@ -251,39 +428,40 @@ impl Converter<'_> {
         }
         let mut unreached_tags = Vec::new();
         for (k, tag) in t.entries() {
-            if let Key::Int(i) = k
+            if let DKey::Int(i) = k
                 && i as usize > tags.len() + 1
             {
                 unreached_tags.push((i as usize, self.tag(&tag)?));
             }
         }
         Ok(Mod {
-            name: sym(&get(v, "name"))?,
+            name: d_sym(&v.get("name"))?,
             typ,
             value,
-            flags: self.mod_flags(&get(v, "flags"))?,
-            keyword_flags: self.mod_flags(&get(v, "keywordFlags"))?,
-            source: match get(v, "source") {
-                Value::Nil => None,
-                x => Some(text(&x)?),
+            flags: self.mod_flags(&v.get("flags"))?,
+            keyword_flags: self.mod_flags(&v.get("keywordFlags"))?,
+            source: match v.get("source") {
+                x if x.is_nil() => None,
+                x => Some(d_text(&x)?),
             },
-            source_slot: match get(v, "sourceSlot") {
-                Value::Nil => None,
-                x => Some(text(&x)?),
+            source_slot: match v.get("sourceSlot") {
+                x if x.is_nil() => None,
+                x => Some(d_text(&x)?),
             },
             tags: tags.into(),
             unreached_tags,
         })
     }
 
-    pub fn tag(&self, v: &Value) -> Result<Tag, String> {
-        let Value::Table(t) = v else {
-            return Err(format!("tag is {v:?}"));
-        };
-        let g = |k: &str| get(v, k);
-        let kind_name = text(&g("type"))?;
+    pub fn tag<D: Dyn>(&self, v: &D) -> Result<Tag, String> {
+        if !v.is_table() {
+            return Err(format!("tag is {}", describe(v)));
+        }
+        let t = v;
+        let g = |k: &str| v.get(k);
+        let kind_name = d_text(&g("type"))?;
         let global_limit = match (g("globalLimit"), g("globalLimitKey")) {
-            (l, k) if l.truthy() && k.truthy() => Some((number(&l)?, sym(&k)?)),
+            (l, k) if l.truthy() && k.truthy() => Some((d_number(&l)?, d_sym(&k)?)),
             _ => None,
         };
         let check = |known: &[&str]| {
@@ -311,18 +489,18 @@ impl Converter<'_> {
                 ])?;
                 TagKind::Multiplier(Multiplier {
                     vars: names(&g("var"), &g("varList"))?,
-                    actor: opt_sym(&g("actor"))?,
-                    limit_actor: opt_sym(&g("limitActor"))?,
-                    div: opt_number(&g("div"))?,
-                    div_var: opt_sym(&g("divVar"))?,
+                    actor: d_opt_sym(&g("actor"))?,
+                    limit_actor: d_opt_sym(&g("limitActor"))?,
+                    div: d_opt_number(&g("div"))?,
+                    div_var: d_opt_sym(&g("divVar"))?,
                     no_floor: flag(&g("noFloor")),
-                    limit: opt_number(&g("limit"))?,
-                    limit_var: opt_sym(&g("limitVar"))?,
-                    limit_stat: opt_sym(&g("limitStat"))?,
+                    limit: d_opt_number(&g("limit"))?,
+                    limit_var: d_opt_sym(&g("limitVar"))?,
+                    limit_stat: d_opt_sym(&g("limitStat"))?,
                     limit_total: flag(&g("limitTotal")),
                     limit_neg_total: flag(&g("limitNegTotal")),
                     invert: flag(&g("invert")),
-                    base: opt_number(&g("base"))?,
+                    base: d_opt_number(&g("base"))?,
                 })
             }
             "MultiplierThreshold" => {
@@ -338,10 +516,10 @@ impl Converter<'_> {
                 ])?;
                 TagKind::MultiplierThreshold(MultiplierThreshold {
                     vars: names(&g("var"), &g("varList"))?,
-                    actor: opt_sym(&g("actor"))?,
-                    threshold_actor: opt_sym(&g("thresholdActor"))?,
-                    threshold: opt_number(&g("threshold"))?,
-                    threshold_var: opt_sym(&g("thresholdVar"))?,
+                    actor: d_opt_sym(&g("actor"))?,
+                    threshold_actor: d_opt_sym(&g("thresholdActor"))?,
+                    threshold: d_opt_number(&g("threshold"))?,
+                    threshold_var: d_opt_sym(&g("thresholdVar"))?,
                     upper: flag(&g("upper")),
                     equals: flag(&g("equals")),
                 })
@@ -360,13 +538,13 @@ impl Converter<'_> {
                 ])?;
                 TagKind::PerStat(PerStat {
                     stats: stat_names(&g("stat"), &g("statList"))?,
-                    actor: opt_sym(&g("actor"))?,
-                    div: opt_number(&g("div"))?,
-                    div_var: opt_sym(&g("divVar"))?,
-                    limit: opt_number(&g("limit"))?,
-                    limit_var: opt_sym(&g("limitVar"))?,
+                    actor: d_opt_sym(&g("actor"))?,
+                    div: d_opt_number(&g("div"))?,
+                    div_var: d_opt_sym(&g("divVar"))?,
+                    limit: d_opt_number(&g("limit"))?,
+                    limit_var: d_opt_sym(&g("limitVar"))?,
                     limit_total: flag(&g("limitTotal")),
-                    base: opt_number(&g("base"))?,
+                    base: d_opt_number(&g("base"))?,
                 })
             }
             "PercentStat" => {
@@ -384,14 +562,14 @@ impl Converter<'_> {
                 ])?;
                 TagKind::PercentStat(PercentStat {
                     stats: stat_names(&g("stat"), &g("statList"))?,
-                    actor: opt_sym(&g("actor"))?,
-                    percent: opt_number(&g("percent"))?,
-                    percent_var: opt_sym(&g("percentVar"))?,
+                    actor: d_opt_sym(&g("actor"))?,
+                    percent: d_opt_number(&g("percent"))?,
+                    percent_var: d_opt_sym(&g("percentVar"))?,
                     floor: flag(&g("floor")),
-                    limit: opt_number(&g("limit"))?,
-                    limit_var: opt_sym(&g("limitVar"))?,
+                    limit: d_opt_number(&g("limit"))?,
+                    limit_var: d_opt_sym(&g("limitVar"))?,
                     limit_total: flag(&g("limitTotal")),
-                    base: opt_number(&g("base"))?,
+                    base: d_opt_number(&g("base"))?,
                 })
             }
             "StatThreshold" => {
@@ -406,35 +584,35 @@ impl Converter<'_> {
                 ])?;
                 TagKind::StatThreshold(StatThreshold {
                     stats: stat_names(&g("stat"), &g("statList"))?,
-                    threshold: opt_number(&g("threshold"))?,
-                    threshold_stat: opt_sym(&g("thresholdStat"))?,
-                    threshold_percent: opt_number(&g("thresholdPercent"))?,
-                    threshold_percent_var: opt_sym(&g("thresholdPercentVar"))?,
+                    threshold: d_opt_number(&g("threshold"))?,
+                    threshold_stat: d_opt_sym(&g("thresholdStat"))?,
+                    threshold_percent: d_opt_number(&g("thresholdPercent"))?,
+                    threshold_percent_var: d_opt_sym(&g("thresholdPercentVar"))?,
                     upper: flag(&g("upper")),
                 })
             }
             "DistanceRamp" => {
                 check(&["ramp"])?;
                 let mut ramp = Vec::new();
-                for p in array(&g("ramp")) {
-                    ramp.push((number(&get_i(&p, 1))?, number(&get_i(&p, 2))?));
+                for p in d_array(&g("ramp")) {
+                    ramp.push((d_number(&p.get_i(1))?, d_number(&p.get_i(2))?));
                 }
                 TagKind::DistanceRamp(ramp)
             }
             "MeleeProximity" => {
                 check(&["ramp"])?;
                 TagKind::MeleeProximity(
-                    array(&g("ramp"))
+                    d_array(&g("ramp"))
                         .iter()
-                        .map(number)
+                        .map(d_number)
                         .collect::<Result<_, _>>()?,
                 )
             }
             "Limit" => {
                 check(&["limit", "limitVar"])?;
                 TagKind::Limit {
-                    limit: opt_number(&g("limit"))?,
-                    limit_var: opt_sym(&g("limitVar"))?,
+                    limit: d_opt_number(&g("limit"))?,
+                    limit_var: d_opt_sym(&g("limitVar"))?,
                 }
             }
             "Condition" => {
@@ -442,13 +620,13 @@ impl Converter<'_> {
                 TagKind::Condition {
                     vars: names(&g("var"), &g("varList"))?.ok_or("Condition tag without var")?,
                     neg: flag(&g("neg")),
-                    actor: opt_sym(&g("actor"))?,
+                    actor: d_opt_sym(&g("actor"))?,
                 }
             }
             "ActorCondition" => {
                 check(&["actor", "var", "varList", "neg"])?;
                 TagKind::ActorCondition {
-                    actor: opt_sym(&g("actor"))?,
+                    actor: d_opt_sym(&g("actor"))?,
                     vars: names(&g("var"), &g("varList"))?,
                     neg: flag(&g("neg")),
                 }
@@ -468,15 +646,15 @@ impl Converter<'_> {
                     "neg",
                 ])?;
                 let opt_text = |k: &str| match g(k) {
-                    Value::Nil => Ok(None),
-                    x => text(&x).map(Some),
+                    x if x.is_nil() => Ok(None),
+                    x => d_text(&x).map(Some),
                 };
                 let opt_bool = |k: &str| match g(k) {
-                    Value::Nil => None,
+                    x if x.is_nil() => None,
                     x => Some(x.truthy()),
                 };
                 let ic = Rc::new(ItemCondition {
-                    item_slot: text(&g("itemSlot"))?,
+                    item_slot: d_text(&g("itemSlot"))?,
                     all_slots: flag(&g("allSlots")),
                     both_slots: flag(&g("bothSlots")),
                     exclude_self: flag(&g("excludeSelf")),
@@ -488,34 +666,35 @@ impl Converter<'_> {
                     name_cond: opt_text("nameCond")?,
                     neg: flag(&g("neg")),
                 });
-                if let Some(o) = self.originals {
+                if let (Some(o), Some(lv)) = (self.originals, v.lua()) {
                     o.borrow_mut()
                         .item_conditions
-                        .insert(Rc::as_ptr(&ic), v.clone());
+                        .insert(Rc::as_ptr(&ic), lv.clone());
                 }
                 TagKind::ItemCondition(ic)
             }
             "SocketedIn" => {
                 check(&["slotName", "keyword", "socketColor", "sockets", "neg"])?;
-                let sockets = match g("sockets") {
-                    Value::Nil => None,
-                    Value::Str(x) if x.as_bytes() == b"all" => Some(Sockets::All),
-                    Value::Number(n) => Some(Sockets::Fewer(n)),
-                    Value::Table(t) => {
+                let so = g("sockets");
+                let sockets = match so.kind() {
+                    Kind::Nil => None,
+                    Kind::Str(x) if x == "all" => Some(Sockets::All),
+                    Kind::Num(n) => Some(Sockets::Fewer(n)),
+                    Kind::Table => {
                         let mut nums = Vec::new();
-                        for x in t.array() {
-                            nums.push(number(&x)?);
+                        for x in d_array(&so) {
+                            nums.push(d_number(&x)?);
                         }
                         Some(Sockets::Numbers(nums))
                     }
-                    x => return Err(format!("SocketedIn sockets {x:?}")),
+                    _ => return Err(format!("SocketedIn sockets {}", describe(&so))),
                 };
                 let opt_text = |k: &str| match g(k) {
-                    Value::Nil => Ok(None),
-                    x => text(&x).map(Some),
+                    x if x.is_nil() => Ok(None),
+                    x => d_text(&x).map(Some),
                 };
                 TagKind::SocketedIn(Rc::new(SocketedIn {
-                    slot_name: opt_sym(&g("slotName"))?,
+                    slot_name: d_opt_sym(&g("slotName"))?,
                     keyword: opt_text("keyword")?,
                     socket_color: opt_text("socketColor")?,
                     sockets,
@@ -537,23 +716,23 @@ impl Converter<'_> {
                     summon_skill: flag(&g("summonSkill")),
                     neg: flag(&g("neg")),
                     skill_id: match g("skillId") {
-                        Value::Nil => None,
-                        x => Some(text(&x)?),
+                        x if x.is_nil() => None,
+                        x => Some(d_text(&x)?),
                     },
                 }
             }
             "SkillId" => {
                 check(&["skillId"])?;
                 TagKind::SkillId(match g("skillId") {
-                    Value::Nil => None,
-                    x => Some(text(&x)?),
+                    x if x.is_nil() => None,
+                    x => Some(d_text(&x)?),
                 })
             }
             "SkillPart" => {
                 check(&["skillPart", "skillPartList", "neg"])?;
                 TagKind::SkillPart {
                     list: number_list(&g("skillPartList"))?,
-                    part: opt_number(&g("skillPart"))?,
+                    part: d_opt_number(&g("skillPart"))?,
                     neg: flag(&g("neg")),
                 }
             }
@@ -561,14 +740,14 @@ impl Converter<'_> {
                 check(&["skillType", "skillTypeList", "neg"])?;
                 TagKind::SkillType {
                     list: number_list_pairs(&g("skillTypeList"))?,
-                    skill_type: opt_number(&g("skillType"))?,
+                    skill_type: d_opt_number(&g("skillType"))?,
                     neg: flag(&g("neg")),
                 }
             }
             "BaseFlag" => {
                 check(&["baseFlag", "neg"])?;
                 TagKind::BaseFlag {
-                    flag: sym(&g("baseFlag"))?,
+                    flag: d_sym(&g("baseFlag"))?,
                     neg: flag(&g("neg")),
                 }
             }
@@ -581,11 +760,11 @@ impl Converter<'_> {
             }
             "ModFlagOr" => {
                 check(&["modFlags"])?;
-                TagKind::ModFlagOr(flags(&g("modFlags"))?)
+                TagKind::ModFlagOr(d_flags(&g("modFlags"))?)
             }
             "KeywordFlagAnd" => {
                 check(&["keywordFlags"])?;
-                TagKind::KeywordFlagAnd(flags(&g("keywordFlags"))?)
+                TagKind::KeywordFlagAnd(d_flags(&g("keywordFlags"))?)
             }
             "MonsterTag" => {
                 check(&["monsterTag", "monsterTagList", "neg"])?;
@@ -595,7 +774,6 @@ impl Converter<'_> {
                 }
             }
             other => {
-                let Value::Table(_) = v else { unreachable!() };
                 let ModValue::Record(mut fields) = self.value(v)? else {
                     return Err(format!("{other} tag is not a record"));
                 };
@@ -610,41 +788,37 @@ impl Converter<'_> {
     }
 }
 
-fn get_i(v: &Value, i: i64) -> Value {
-    rt::index(v, &Value::Number(i as f64)).unwrap_or_default()
-}
-
 /// `stat`/`statList`; `ipairs` order for the list
-fn stat_names(one: &Value, list: &Value) -> Result<Option<Names>, String> {
+fn stat_names<D: Dyn>(one: &D, list: &D) -> Result<Option<Names>, String> {
     if list.is_nil() {
-        return Ok(opt_sym(one)?.map(Names::One));
+        return Ok(d_opt_sym(one)?.map(Names::One));
     }
     let mut out = Vec::new();
-    for v in array(list) {
-        out.push(sym(&v)?);
+    for v in d_array(list) {
+        out.push(d_sym(&v)?);
     }
     Ok(Some(Names::List(out)))
 }
 
-fn number_list(v: &Value) -> Result<Option<Vec<f64>>, String> {
+fn number_list<D: Dyn>(v: &D) -> Result<Option<Vec<f64>>, String> {
     if v.is_nil() {
         return Ok(None);
     }
-    array(v)
+    d_array(v)
         .iter()
-        .map(number)
+        .map(d_number)
         .collect::<Result<_, _>>()
         .map(Some)
 }
 
 /// A list `pairs` visits
-fn number_list_pairs(v: &Value) -> Result<Option<Vec<f64>>, String> {
-    let Value::Table(t) = v else {
+fn number_list_pairs<D: Dyn>(v: &D) -> Result<Option<Vec<f64>>, String> {
+    if !v.is_table() {
         return Ok(None);
-    };
-    t.entries()
+    }
+    v.entries()
         .iter()
-        .map(|(_, x)| number(x))
+        .map(|(_, x)| d_number(x))
         .collect::<Result<_, _>>()
         .map(Some)
 }
