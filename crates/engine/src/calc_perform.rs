@@ -7,7 +7,7 @@
 //! from their own cached calculation (Blight, Penance Brand, Earthquake),
 //! the overcapped lightning resistance's mana and allies' life pools.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -47,7 +47,8 @@ pub struct PerformInput<'a> {
     pub class_stats: [f64; 3],
     /// `env.spec.treeVersion`
     pub tree_version: &'a str,
-    /// A calculation of the Calcs tab, which builds breakdowns
+    /// `env.buildBreakdown`: the sidebar's and the Calcs tab's calculations
+    /// build breakdowns
     pub breakdown: bool,
     /// Calculations of other skills and their cache
     pub recalc: Option<&'a dyn crate::calc_cache::Recalc>,
@@ -249,6 +250,8 @@ pub struct Perform<'a> {
     pub curse_slots: Vec<(String, Option<Vec<Mod>>)>,
     /// `output.HasBonechill` and whether some skill guarantees it
     pub(crate) has_guaranteed_bonechill: bool,
+    /// `guaranteedChillSkills`: their chill is added after the buffs
+    guaranteed_chill: Vec<usize>,
     /// `env.weaponData1`, `env.player.weaponData1` after Dancing Dervish
     pub weapons_disabled: bool,
     /// `actor.weaponRange1`, `weaponRange2` set by the offence
@@ -595,6 +598,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         applied_enemy_modifiers: vec![Vec::new(), Vec::new()],
         curse_slots: Vec::new(),
         has_guaranteed_bonechill: false,
+        guaranteed_chill: Vec::new(),
         weapons_disabled: false,
         weapon_range: [None, None],
         n_player: n,
@@ -1264,13 +1268,12 @@ impl<'a> Perform<'a> {
                             .add(pdb, src("SelfScorchOverride", Base, effect, &name));
                     }
                 }
-            } else if self.has_type(i, "ChillingArea")
+            } else if self.has_flag(i, "guaranteedChill")
+                || self.has_type(i, "ChillingArea")
                 || (self.has_type(i, "NonHitChill")
                     && !self.c.flag(list, None, &["CannotChill"])?)
             {
-                let effect = ailment_default(self, "Chill")
-                    * self.c.calc_mod(list, Some(&cfg), &["EnemyChillEffect"])?;
-                self.c.add(pdb, src("ChillOverride", Base, effect, &name));
+                self.guaranteed_chill.push(i);
                 self.c
                     .add(edb, src("Condition:Chilled", FlagT, true, &name));
                 if bonechill {
@@ -1631,6 +1634,7 @@ impl<'a> Perform<'a> {
                 }
             }
             let effect_mod = 1.0 + flask_effect_inc / 100.0;
+            let is_utility = flask.life.is_none() && flask.mana.is_none();
             let calc_flask_mods = |base_name: &str,
                                    buff_mods: &[Mod],
                                    mods: &[Mod],
@@ -1644,6 +1648,9 @@ impl<'a> Perform<'a> {
                     if !only_minion {
                         let src_list = scaled(buff_mods, effect_mod, precision);
                         merge_buff(&src_list, buffs, base_name)?;
+                        if !is_utility {
+                            merge_buff(&src_list, non_utility, base_name)?;
+                        }
                     }
                     if for_minion {
                         let src_list = scaled(buff_mods, effect_mod_non_player, precision);
@@ -1660,7 +1667,9 @@ impl<'a> Perform<'a> {
                     };
                     if !only_recovery {
                         merge_buff(&src_list, buffs, &key)?;
-                        merge_buff(&src_list, non_utility, &key)?;
+                        if !is_utility {
+                            merge_buff(&src_list, non_utility, &key)?;
+                        }
                     }
                     if for_minion {
                         let src_list = scaled(mods, effect_mod_non_player, precision);
@@ -1727,21 +1736,19 @@ impl<'a> Perform<'a> {
                 )?;
             }
         }
-        if self
-            .c
-            .flag(pdb, None, &["UtilityFlasksDoNotApplyToPlayer"])?
-        {
-            for c in conditions_non_utility {
-                self.c.set_cond(pdb, &c, true);
-            }
-            for (_, l, _) in buffs_non_utility {
-                self.c.add_list(pdb, &l);
-            }
-        } else if !self.c.flag(pdb, None, &["FlasksDoNotApplyToPlayer"])? {
-            for c in &conditions {
+        if !self.c.flag(pdb, None, &["FlasksDoNotApplyToPlayer"])? {
+            let (conds, lists) = if self
+                .c
+                .flag(pdb, None, &["UtilityFlasksDoNotApplyToPlayer"])?
+            {
+                (&conditions_non_utility, buffs_non_utility)
+            } else {
+                (&conditions, buffs)
+            };
+            for c in conds {
                 self.c.set_cond(pdb, c, true);
             }
-            for (_, l, _) in buffs {
+            for (_, l, _) in lists {
                 self.c.add_list(pdb, &l);
             }
         }
@@ -2393,6 +2400,30 @@ impl<'a> Perform<'a> {
                     ("ChaosResistMax", Base, fl(2.0), 0),
                 ],
             ),
+            (
+                "BloodShrineOfRats",
+                vec![("ElementalDamageGainAsChaos", Base, fl(30.0), 0)],
+            ),
+            (
+                "BloodShrineOfLocusts",
+                vec![("DotMultiplier", Base, fl(30.0), 0)],
+            ),
+            (
+                "BloodShrineOfToads",
+                vec![("BloodShrineExplodingToadTriggerChance", Base, fl(25.0), 0)],
+            ),
+            (
+                "BloodShrineOfCrows",
+                vec![
+                    ("ChaosResist", Base, fl(50.0), 0),
+                    ("ElementalDamageFromHitsTakenAsChaos", Base, fl(10.0), 0),
+                    ("PhysicalDamageFromHitsTakenAsChaos", Base, fl(10.0), 0),
+                ],
+            ),
+            (
+                "BloodShrineOfBats",
+                vec![("EnemyCurseLimit", Base, fl(1.0), 0)],
+            ),
         ];
         for (flag, mods) in shrines {
             let on = if flag == "LesserAccelerationShrine" {
@@ -2411,8 +2442,13 @@ impl<'a> Perform<'a> {
                 }
                 source.push(ch);
             }
+            let source = source.replace(" Of ", " of ");
             for (name, typ, v, flags) in mods {
                 self.c.add(db, src(name, typ, v, &source).flags(flags, 0));
+            }
+            if flag == "BloodShrineOfBats" {
+                let curse = record([("skillId", "Enfeeble".into()), ("level", 1.0.into())]);
+                self.c.add(db, src("ExtraCurse", List, curse, &source));
             }
         }
         Ok(())
@@ -2488,7 +2524,8 @@ impl<'a> Perform<'a> {
         for i in 0..self.n_player {
             if !((self.has_type(i, "HasReservation")
                 || self.sd_truthy(i, "triggeredByAutoexertion"))
-                && !self.has_type(i, "ReservationBecomesCost"))
+                && !self.has_type(i, "ReservationBecomesCost")
+                && !self.has_flag(i, "disable"))
             {
                 continue;
             }
@@ -2536,7 +2573,9 @@ impl<'a> Perform<'a> {
             let mut life_pct = sd(self, "lifeReservationPercent")
                 .or(level.field("lifeReservationPercent"))
                 .unwrap_or(0.0);
-            if self.c.flag(list, Some(&cfg), &["BloodMagicReserved"])? {
+            if self.c.flag(list, Some(&cfg), &["BloodMagicReserved"])?
+                && self.sd(i, "ManaReservationPercentForced").is_none()
+            {
                 life_flat += mana_flat;
                 mana_flat = 0.0;
                 life_pct += mana_pct;
@@ -2655,6 +2694,12 @@ impl<'a> Perform<'a> {
                 {
                     self.uncancellable[pool] += pct;
                 }
+            }
+            if self.sd(i, "ManaReservationPercentForced").is_some()
+                && self.sd_num(i, "ManaReservedBase") == Some(0.0)
+            {
+                self.set_flag(i, "disable", true);
+                self.mods_mut(i).disable_reason = Some("This skill requires reserving Mana".into());
             }
         }
         self.update_reserving_skills();
@@ -3518,10 +3563,20 @@ impl<'a> Perform<'a> {
                         src("Damage", More, dmg * effect, "Arcane Surge").flags(spell, 0),
                     );
                 }
-                let regen = self.c.base(db, None, &["ArcaneSurgeAlsoLifeRegen"])?;
-                if regen > 0.0 {
-                    self.c
-                        .add(db, src("LifeRegen", Inc, regen * effect, "Arcane Surge"));
+                for (name, t) in [
+                    ("LifeRegen", Inc),
+                    ("ManaRecoup", Base),
+                    ("ManaCostEfficiency", Inc),
+                ] {
+                    let also = format!("ArcaneSurgeAlso{name}");
+                    let v = if t == Inc {
+                        self.c.inc(db, None, &[&also])?
+                    } else {
+                        self.c.base(db, None, &[&also])?
+                    };
+                    if v != 0.0 {
+                        self.c.add(db, src(name, t, v * effect, "Arcane Surge"));
+                    }
                 }
             }
             if self.c.flag(db, None, &["Fanaticism"])?
@@ -3588,6 +3643,15 @@ impl<'a> Perform<'a> {
                 );
                 self.c
                     .add(db, src("Condition:CanWither", FlagT, true, "Unholy Might"));
+                let pen = self
+                    .c
+                    .base(db, None, &["UnholyMightAlsoChaosPenetration"])?;
+                if pen != 0.0 {
+                    self.c.add(
+                        db,
+                        src("ChaosPenetration", Base, pen * effect, "Unholy Might"),
+                    );
+                }
             }
             if self.c.flag(db, None, &["ShepherdOfSouls"])? {
                 let (vt, at) = (self.st("Vaal") as f64, self.st("Aura") as f64);
@@ -3701,15 +3765,6 @@ impl<'a> Perform<'a> {
                 self.c.add(
                     db,
                     src("LifeRegenPercent", Base, 5.0 * effect, "Consecrated Ground"),
-                );
-                self.c.add(
-                    db,
-                    src(
-                        "CurseEffectOnSelf",
-                        Inc,
-                        -50.0 * effect,
-                        "Consecrated Ground",
-                    ),
                 );
                 let acc =
                     (self.c.inc(db, None, &["ConsecratedGroundAlsoAccuracy"])? * effect).floor();
@@ -5223,7 +5278,11 @@ impl<'a> Perform<'a> {
                 } else {
                     "WitherEffect"
                 };
-                let effect = (6.0 * (1.0 + self.c.inc(pdb, None, &[name])? / 100.0)).floor();
+                let mut wither = self.c.inc(pdb, None, &[name])?;
+                if !has_minion && self.c.flag(pdb, None, &["UnholyMight"])? {
+                    wither += self.c.inc(pdb, None, &["UnholyMightAlsoWitherEffect"])?;
+                }
+                let effect = (6.0 * (1.0 + wither / 100.0)).floor();
                 self.c
                     .add(pdb, Mod::new("WitherEffectStack", MaxT, effect, None));
             }
@@ -5302,6 +5361,23 @@ impl<'a> Perform<'a> {
         }
 
         // Extra curses, on the player's and the minion's databases
+        if self.env.mode.combat {
+            let minion_db = minion.map(|(_, _, mdb, _)| mdb);
+            for db in std::iter::once(pdb).chain(minion_db) {
+                if self.c.flag(db, None, &["Condition:OnConsecratedGround"])? {
+                    let effect = 1.0 + self.c.inc(db, None, &["ConsecratedGroundEffect"])? / 100.0;
+                    self.c.add(
+                        db,
+                        src(
+                            "CurseEffectOnSelf",
+                            Inc,
+                            -50.0 * effect,
+                            "Consecrated Ground",
+                        ),
+                    );
+                }
+            }
+        }
         let mut extra_curses: Vec<(bool, ModValue)> = self
             .c
             .list(pdb, None, &["ExtraCurse"])?
@@ -5579,6 +5655,23 @@ impl<'a> Perform<'a> {
             .into_iter()
             .map(|s| (s.name, s.mod_list.filter(|_| bd)))
             .collect();
+
+        // Guaranteed chills, after the buffs
+        for i in std::mem::take(&mut self.guaranteed_chill) {
+            let effect = self
+                .data()
+                .non_damaging_ailment
+                .get("Chill")
+                .and_then(|x| x.default)
+                .unwrap_or(f64::NAN)
+                * self.c.calc_mod(
+                    self.lists[i].list,
+                    Some(&self.cfg(i)),
+                    &["EnemyChillEffect"],
+                )?;
+            let name = self.skill(i).active_effect.granted_effect.name.clone();
+            self.c.add(pdb, src("ChillOverride", Base, effect, &name));
+        }
 
         // Impale stacks on the enemy
         let max_impale = self.c.base(pdb, None, &["ImpaleStacksMax"])?
@@ -5936,6 +6029,14 @@ impl<'a> Perform<'a> {
                 )? {
                     min += number(&v)?;
                 }
+                let effect = self.c.inc(
+                    pdb,
+                    None,
+                    &["ExposureEffect", &format!("{element}ExposureEffect")],
+                )?;
+                if effect != 0.0 {
+                    min *= 1.0 + effect / 100.0;
+                }
                 self.c.add(
                     edb,
                     src(&format!("Condition:Has{element}Exposure"), FlagT, true, ""),
@@ -6218,6 +6319,13 @@ impl<'a> Perform<'a> {
         }
         self.ally_life_list = list;
         Ok(())
+    }
+}
+
+impl Perform<'_> {
+    /// `env.mode == "CALCS"`
+    pub(crate) fn calcs_mode(&self) -> bool {
+        self.env.calc_mode == crate::calc_env::CalcMode::Calcs
     }
 }
 

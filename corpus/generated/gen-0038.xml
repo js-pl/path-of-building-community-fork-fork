@@ -38,11 +38,11 @@
 		<PlayerStat stat="Int" value="144"/>
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4559.4207031973"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3335"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2316"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2316"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="5511"/>
+		<PlayerStat stat="TotalEHP" value="3621.2429137672"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3121"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="1982"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="1982"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2901"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="1434"/>
 		<PlayerStat stat="Life" value="2065"/>
 		<PlayerStat stat="Spec:LifeInc" value="48"/>
@@ -64,10 +64,10 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="7248"/>
+		<PlayerStat stat="Evasion" value="6070"/>
 		<PlayerStat stat="Spec:EvasionInc" value="169"/>
-		<PlayerStat stat="MeleeEvadeChance" value="38"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="64"/>
+		<PlayerStat stat="MeleeEvadeChance" value="33"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="59"/>
 		<PlayerStat stat="Armour" value="1970"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
 		<PlayerStat stat="PhysicalDamageReduction" value="18"/>
@@ -76,11 +76,11 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="24"/>
-		<PlayerStat stat="FireResist" value="-16"/>
+		<PlayerStat stat="FireResist" value="-36"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="53"/>
+		<PlayerStat stat="ColdResist" value="8"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="-16"/>
+		<PlayerStat stat="LightningResist" value="-36"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
@@ -152,17 +152,20 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MapPrefix1" string="Fleet"/>
-			<Input name="barkskinStacks" number="7"/>
-			<Input boolean="true" name="conditionOnBrineGround"/>
-			<Input name="enemySizePreset" string="Large"/>
+			<Input name="MapPrefix3" string="Fleet"/>
+			<Input boolean="true" name="Unbound"/>
+			<Input boolean="true" name="balanceOfTerrorSelfCastConductivity"/>
+			<Input boolean="true" name="conditionCastSpellRecently"/>
+			<Input name="conditionChilledEffect" number="4"/>
 			<Input name="multiplierBarnacleStacks" number="1"/>
-			<Input name="playerCursedWithWarlordsMark" number="7"/>
-			<Input name="repeatMode" string="NONE"/>
-			<Input boolean="true" name="waitForMaxSeals"/>
-			<Input name="weepingBlackStacks" number="3"/>
+			<Input name="nearbyBleedingEnemies" number="3"/>
+			<Input name="overridePowerCharges" number="7"/>
+			<Input name="prideEffect" string="MAX"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -229,21 +232,23 @@ Spiraled Wand
 League: Breach
 Variant: Pre 3.16.0
 Variant: Pre 3.21.0
+Variant: Pre 3.29.0
 Variant: Current
 Selected Variant: 1
-{variant:3}Opal Wand
+{variant:3,4}Opal Wand
 {variant:1,2}Spiraled Wand
 Quality: 20
 Sockets: B-B-B
 LevelReq: 62
-Implicits: 2
+Implicits: 3
 {variant:1,2}{range:0.5}(15-19)% increased Spell Damage
+{variant:4}{range:0.5}(31-35)% increased Spell Damage
 {variant:3}{range:0.5}Adds (14-29) to (42-47) Cold Damage to Spells and Attacks
-{variant:3}{range:0.5}Adds (120-140) to (150-170) Cold Damage to Spells
+{variant:3,4}{range:0.5}Adds (120-140) to (150-170) Cold Damage to Spells
 {variant:1,2}{range:0.5}(10-15)% increased Cast Speed
-{variant:3}Gain a Power Charge on Killing a Frozen Enemy
+{variant:3,4}Gain a Power Charge on Killing a Frozen Enemy
 {variant:1,2}Adds 10 to 20 Cold Damage to Spells per Power Charge
-{variant:3}Cold Exposure you inflict applies an extra -12% to Cold Resistance
+{variant:3,4}Cold Exposure you inflict applies an extra -12% to Cold Resistance
 {range:0.5}+(20-25) Mana gained on Killing a Frozen Enemy
 {variant:1,2}50% chance to gain a Power Charge on Killing a Frozen Enemy
 			<ModRange id="1" range="0.5"/>
@@ -255,6 +260,7 @@ Implicits: 2
 			<ModRange id="7" range="0.5"/>
 			<ModRange id="8" range="0.5"/>
 			<ModRange id="9" range="0.5"/>
+			<ModRange id="10" range="0.5"/>
 		</Item>
 		<Item id="3" variant="1">
 			Rarity: UNIQUE
@@ -398,23 +404,26 @@ Implicits: 1
 		</Item>
 		<Item id="8">
 			Rarity: UNIQUE
-Replica Tasalio&apos;s Sign
-Sapphire Ring
+Replica Malachai&apos;s Artifice
+Unset Ring
 League: Heist
-LevelReq: 20
+Sockets: G
+LevelReq: 5
 Implicits: 1
-{tags:resistance}{range:0.5}+(20-30)% to Cold Resistance
-{tags:elemental_damage,attack,caster}{range:0.5}Adds (15-20) to (25-35) Cold Damage to Spells and Attacks
-{tags:defences}{range:0.5}+(200-300) to Evasion Rating
-Your Cold Damage cannot Freeze
-Immune to Chill
-{tags:elemental_damage}Adds 60 to 80 Cold Damage against Chilled Enemies
+Has 1 Socket
+All Sockets are White
+{tags:critical}Socketed Gems have Secrets of Suffering
+{tags:resistance}-20% to all Elemental Resistances
+{tags:resistance}{range:0.5}+(75-100)% to Fire Resistance when Socketed with a Red Gem
+{tags:resistance}{range:0.5}+(75-100)% to Cold Resistance when Socketed with a Green Gem
+{tags:resistance}{range:0.5}+(75-100)% to Lightning Resistance when Socketed with a Blue Gem
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
+			<ModRange id="7" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: RARE

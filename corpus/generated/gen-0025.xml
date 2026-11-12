@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Assassin" bandit="None" characterLevelAutoMode="false" className="Shadow" level="94" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="1202.44"/>
-		<PlayerStat stat="AverageBurstDamage" value="1202.44"/>
+		<PlayerStat stat="AverageHit" value="2404.88"/>
+		<PlayerStat stat="AverageBurstDamage" value="2404.88"/>
 		<PlayerStat stat="Speed" value="4.0333333333333"/>
 		<PlayerStat stat="MineLayingTime" value="0.24793388429752"/>
 		<PlayerStat stat="MineThrowCount" value="1"/>
@@ -10,16 +10,15 @@
 		<PlayerStat stat="CritChance" value="67.2"/>
 		<PlayerStat stat="CritMultiplier" value="2.25"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="4849.8413333333"/>
+		<PlayerStat stat="TotalDPS" value="9699.6826666667"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="4849.8413333333"/>
-		<PlayerStat stat="IgniteDPS" value="1068.2059009616"/>
-		<PlayerStat stat="WithIgniteDPS" value="5918.0472342949"/>
-		<PlayerStat stat="WithPoisonDPS" value="4849.8413333333"/>
-		<PlayerStat stat="TotalDotDPS" value="1068.2059009616"/>
-		<PlayerStat stat="CullingDPS" value="649.4228835093"/>
+		<PlayerStat stat="WithBleedDPS" value="9699.6826666667"/>
+		<PlayerStat stat="WithIgniteDPS" value="9699.6826666667"/>
+		<PlayerStat stat="WithPoisonDPS" value="9699.6826666667"/>
+		<PlayerStat stat="TotalDotDPS" value="0"/>
+		<PlayerStat stat="CullingDPS" value="1064.4044626762"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="6567.4701178042"/>
+		<PlayerStat stat="CombinedDPS" value="10764.087129343"/>
 		<PlayerStat stat="ManaCost" value="6"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
 		<PlayerStat stat="ManaPerSecondCost" value="24.2"/>
@@ -40,11 +39,11 @@
 		<PlayerStat stat="Int" value="293"/>
 		<PlayerStat stat="ReqInt" value="293"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="5652.9185242411"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="4674"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="4610"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="6147"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="4610"/>
+		<PlayerStat stat="TotalEHP" value="6605.3335519318"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="5333"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="5236"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="6981"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="5236"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="2963"/>
 		<PlayerStat stat="Life" value="2459"/>
 		<PlayerStat stat="Spec:LifeInc" value="45"/>
@@ -59,20 +58,20 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="98.926654740608"/>
 		<PlayerStat stat="ManaRegenRecovery" value="23.5"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="2151"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="2151"/>
+		<PlayerStat stat="EnergyShield" value="2777"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="2777"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="55"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="1361"/>
+		<PlayerStat stat="Evasion" value="1729"/>
 		<PlayerStat stat="Spec:EvasionInc" value="53"/>
-		<PlayerStat stat="MeleeEvadeChance" value="3"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="3"/>
-		<PlayerStat stat="Armour" value="329"/>
+		<PlayerStat stat="MeleeEvadeChance" value="8"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="8"/>
+		<PlayerStat stat="Armour" value="494"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="3"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="4"/>
 		<PlayerStat stat="EffectiveBlockChance" value="20"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -90,11 +89,11 @@
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
-		<PlayerStat stat="PowerChargesMax" value="3"/>
+		<PlayerStat stat="PowerChargesMax" value="4"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
-		<PlayerStat stat="FrenzyChargesMax" value="3"/>
+		<PlayerStat stat="FrenzyChargesMax" value="4"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
-		<PlayerStat stat="EnduranceChargesMax" value="3"/>
+		<PlayerStat stat="EnduranceChargesMax" value="4"/>
 		<TimelessData devotionVariant1="1" devotionVariant2="1" searchList="" searchListFallback=""/>
 	</Build>
 	<Calcs>
@@ -154,22 +153,25 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="balanceOfTerrorSelfCastElementalWeakness"/>
-			<Input boolean="true" name="buffGreaterSkeletalShrine"/>
-			<Input boolean="true" name="buffHerEmbrace"/>
+			<Input name="MapPrefix2" string="Fleet"/>
+			<Input boolean="true" name="balanceOfTerrorSelfCastFlammability"/>
+			<Input boolean="true" name="buffFanaticism"/>
+			<Input boolean="true" name="buffLesserImpenetrableShrine"/>
 			<Input boolean="true" name="buffResistanceShrine"/>
+			<Input boolean="true" name="buffResonatingShrine"/>
 			<Input name="carrionGolemNearbyMinion" number="7"/>
-			<Input boolean="true" name="conditionBlockedRecently"/>
-			<Input boolean="true" name="conditionEnemyOnScorchedGround"/>
-			<Input boolean="true" name="conditionHaveVulconus"/>
-			<Input boolean="true" name="conditionUsedBrandRecently"/>
-			<Input boolean="true" name="enemyConditionHitByFireDamage"/>
-			<Input name="minionsOverrideEnduranceCharges" number="4"/>
-			<Input name="multiplierIgniteAppliedRecently" number="9"/>
-			<Input name="multiplierMapModTier" string="LOW"/>
-			<Input name="overrideBlitzCharges" number="1"/>
+			<Input boolean="true" name="conditionAttackedRecently"/>
+			<Input boolean="true" name="conditionEnemyLifeHigherThanPlayer"/>
+			<Input boolean="true" name="conditionEnergyShieldRechargeRecently"/>
+			<Input boolean="true" name="conditionPoisonedEnemyRecently"/>
+			<Input name="conditionScorchedEffect" number="6"/>
+			<Input name="multiplierSoulEater" number="4"/>
+			<Input boolean="true" name="useGhostShrouds"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

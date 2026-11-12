@@ -10,7 +10,7 @@
 //! Configuration tab reads (`env.conditionsUsed`, ...; of them only
 //! `env.multipliersUsed`), the node and misc calculators.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::actor::OutVal;
 use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
@@ -485,7 +485,8 @@ pub fn build_output(
     }
     let build = &*build;
     let recalc = Recalculator::new(build, data, mode);
-    let mut input = PerformInput::new(build, data, mode == CalcMode::Calcs)?;
+    let breakdown = matches!(mode, CalcMode::Main | CalcMode::Calcs);
+    let mut input = PerformInput::new(build, data, breakdown)?;
     input.recalc = Some(&recalc);
     let mut p = perform(env, input)?;
     p.finish()?;
@@ -801,6 +802,11 @@ const COMBAT_FLAGS: &[(&str, &str)] = &[
     ("LesserMassiveShrine", "Lesser Massive Shrine"),
     ("LesserReplenishingShrine", "Lesser Replenishing Shrine"),
     ("LesserResistanceShrine", "Lesser Resistance Shrine"),
+    ("BloodShrineOfRats", "Blood Shrine of Rats"),
+    ("BloodShrineOfLocusts", "Blood Shrine of Locusts"),
+    ("BloodShrineOfToads", "Blood Shrine of Toads"),
+    ("BloodShrineOfCrows", "Blood Shrine of Crows"),
+    ("BloodShrineOfBats", "Blood Shrine of Bats"),
 ];
 
 /// The minion's flags the Calcs tab lists, in its order

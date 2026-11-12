@@ -2,7 +2,7 @@
 //! often the skill hits (speed, accuracy, block), then its hit damage
 //! (exerts, crits, resistances, leech, gains on hit, DPS).
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1321,7 +1321,12 @@ impl<'a> Perform<'a> {
                         } else {
                             0.0
                         };
-                    more = self.c.more(list, c, &["CritChance"])?;
+                    more = self.c.more(list, c, &["CritChance"])?
+                        * if effective {
+                            self.c.more(edb, None, &["SelfCritChance"])?
+                        } else {
+                            1.0
+                        };
                 }
                 let mut crit =
                     round((base_crit + base) * (1.0 + inc / 100.0) * more * 100.0, 0.0) / 100.0;
@@ -1533,7 +1538,7 @@ impl<'a> Perform<'a> {
     fn hit_passes(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor, edb, db) = (o.skill, o.list, o.actor, o.edb, o.db);
         let effective = self.env.mode.effective;
-        let calcs_mode = self.input.breakdown;
+        let calcs_mode = self.calcs_mode();
         for p in 0..o.passes.len() {
             o.pass = p;
             for k in [
@@ -1771,7 +1776,7 @@ impl<'a> Perform<'a> {
                         hit_min *= eff_mult;
                         hit_max *= eff_mult;
                         hit_avg *= eff_mult;
-                        if self.input.breakdown {
+                        if self.calcs_mode() {
                             self.set_po(o, &format!("{t}EffMult"), eff_mult);
                         }
                     }
@@ -1838,7 +1843,7 @@ impl<'a> Perform<'a> {
                     self.set_po(o, &format!("{t}CritAverage"), hit_avg);
                     total_crit_avg += hit_avg;
                 } else {
-                    if self.input.breakdown {
+                    if self.calcs_mode() {
                         self.set_po(o, &format!("{t}Min"), hit_min);
                         self.set_po(o, &format!("{t}Max"), hit_max);
                     }
@@ -2344,7 +2349,7 @@ impl<'a> Perform<'a> {
                 self.combine_stat(o, k, Combine::Dps, None);
             }
         }
-        if self.input.breakdown {
+        if self.calcs_mode() {
             let (k, unit) = if self.sd_truthy(i, "showAverage") {
                 ("AverageDamage", "average damage")
             } else {

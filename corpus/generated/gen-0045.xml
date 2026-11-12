@@ -157,13 +157,16 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionCritRecently"/>
-			<Input boolean="true" name="conditionImpaledRecently"/>
-			<Input boolean="true" name="conditionUsedFireSkillRecently"/>
-			<Input name="minionsOverrideFrenzyCharges" number="4"/>
-			<Input name="multiplierNearbyAlly" number="6"/>
+			<Input boolean="true" name="conditionUsedDashRecently"/>
+			<Input boolean="true" name="freshMeatBuffs"/>
+			<Input name="multiplierCritRecently" number="8"/>
+			<Input name="multiplierRampage" number="4"/>
+			<Input name="multiplierSummonedMinion" number="6"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

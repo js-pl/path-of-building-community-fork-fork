@@ -156,15 +156,16 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="animateWeaponLingeringBlade"/>
-			<Input boolean="true" name="conditionEnergyShieldRechargePastTwoSec"/>
-			<Input boolean="true" name="divineSentinelPhysAsLightning"/>
-			<Input name="highestDamageType" string="Cold"/>
-			<Input name="minionsOverridePowerCharges" number="1"/>
+			<Input boolean="true" name="buffHerEmbrace"/>
+			<Input boolean="true" name="conditionConvergence"/>
+			<Input boolean="true" name="divineSentinelRegenLife"/>
+			<Input name="multiplierNonVaalSummonedMinion" number="4"/>
 			<Input name="overrideEmptyRedSockets" number="1"/>
-			<Input name="stormRainActiveArrows" number="5"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

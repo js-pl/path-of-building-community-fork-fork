@@ -6,9 +6,9 @@
 		<PlayerStat stat="Speed" value="6.45"/>
 		<PlayerStat stat="HitSpeed" value="0.645"/>
 		<PlayerStat stat="HitTime" value="1.5503875968992"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="14.25"/>
-		<PlayerStat stat="CritChance" value="14.25"/>
-		<PlayerStat stat="CritMultiplier" value="1.75"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="0"/>
+		<PlayerStat stat="CritChance" value="0"/>
+		<PlayerStat stat="CritMultiplier" value="0"/>
 		<PlayerStat stat="HitChance" value="100"/>
 		<PlayerStat stat="TotalDPS" value="0"/>
 		<PlayerStat stat="TotalDot" value="0"/>
@@ -33,25 +33,25 @@
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
-		<PlayerStat stat="Str" value="127"/>
+		<PlayerStat stat="Str" value="102"/>
 		<PlayerStat stat="ReqStr" value="126"/>
-		<PlayerStat stat="Dex" value="181"/>
+		<PlayerStat stat="Dex" value="206"/>
 		<PlayerStat stat="ReqDex" value="155"/>
 		<PlayerStat stat="Int" value="173"/>
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2174.6046803647"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2192"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="1478"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2315"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="1478"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1341"/>
-		<PlayerStat stat="Life" value="1797"/>
+		<PlayerStat stat="TotalEHP" value="1351.6819259916"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="1365"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="996"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="887"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="1414"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="665"/>
+		<PlayerStat stat="Life" value="1781"/>
 		<PlayerStat stat="Spec:LifeInc" value="39"/>
-		<PlayerStat stat="LifeUnreserved" value="1797"/>
-		<PlayerStat stat="LifeRecoverable" value="1797"/>
+		<PlayerStat stat="LifeUnreserved" value="1781"/>
+		<PlayerStat stat="LifeRecoverable" value="890.5"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="7.2"/>
+		<PlayerStat stat="LifeRegenRecovery" value="7.1"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1115"/>
 		<PlayerStat stat="Spec:ManaInc" value="70"/>
@@ -66,7 +66,7 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="5079"/>
+		<PlayerStat stat="Evasion" value="5208"/>
 		<PlayerStat stat="Spec:EvasionInc" value="61"/>
 		<PlayerStat stat="MeleeEvadeChance" value="36"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="36"/>
@@ -78,20 +78,18 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="8"/>
-		<PlayerStat stat="FireResist" value="13"/>
+		<PlayerStat stat="FireResist" value="-39"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="-62"/>
+		<PlayerStat stat="ColdResist" value="5"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="-62"/>
+		<PlayerStat stat="LightningResist" value="-45"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-34"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.4"/>
-		<PlayerStat stat="FullDPS" value="339.37625757001"/>
-		<PlayerStat stat="FullDotDPS" value="14.639184"/>
-		<FullDPSSkill skillPart="" source="" stat="Frost Wall" value="321.53333333333"/>
-		<FullDPSSkill skillPart="" source="Frost Wall" stat="Best Ignite DPS" value="14.639184"/>
-		<FullDPSSkill skillPart="" source="" stat="Full Culling DPS" value="3.2037402366805"/>
+		<PlayerStat stat="FullDPS" value="418.13333333333"/>
+		<PlayerStat stat="FullDotDPS" value="0"/>
+		<FullDPSSkill skillPart="" source="" stat="Frost Wall" value="418.13333333333"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
@@ -157,18 +155,21 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="EverlastingSacrifice"/>
-			<Input name="HoarfrostStacks" number="1"/>
-			<Input name="carrionGolemNearbyMinion" number="8"/>
-			<Input boolean="true" name="conditionBrittle"/>
-			<Input boolean="true" name="conditionLeechingEnergyShield"/>
-			<Input boolean="true" name="conditionPoisonedEnemyRecently"/>
-			<Input boolean="true" name="conditionUsedRubyFlaskRecently"/>
-			<Input name="darkPactSkeletonLife" number="2"/>
-			<Input boolean="true" name="enemyMaxResist"/>
-			<Input name="playerCursedWithElementalWeakness" number="3"/>
+			<Input boolean="true" name="Disgorged"/>
+			<Input boolean="true" name="conditionEnemyChilledByYourHits"/>
+			<Input name="conditionHaveAugyre" string="ResTechnique"/>
+			<Input boolean="true" name="conditionLowLife"/>
+			<Input boolean="true" name="conditionUsedTopazFlaskRecently"/>
+			<Input boolean="true" name="divineSentinelPhysAsFire"/>
+			<Input boolean="true" name="minionsConditionLeechingEnergyShield"/>
+			<Input name="multiplierManaSpentRecently" number="1"/>
+			<Input name="multiplierPvpDamage" number="10"/>
+			<Input name="playerCursedWithFlammability" number="3"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -397,32 +398,32 @@ All Sockets are White
 		</Item>
 		<Item id="8" variant="7" variantAlt="1">
 			Rarity: UNIQUE
-Circle of Anguish
-Ruby Ring
+Circle of Fear
+Sapphire Ring
 League: Synthesis
 Variant: Skill Reservation (Pre 3.11.0)
 Variant: Skill Reservation (Current)
-Variant: Fire Damage
+Variant: Cold Damage
 Variant: Buff Effect (Pre 3.11.0)
 Variant: Buff Effect (Current)
 Variant: Max Resistance
-Variant: Fire Resistance
+Variant: Cold Resistance
 Selected Variant: 7
 Has Alt Variant: true
 Selected Alt Variant: 1
 LevelReq: 52
 Implicits: 1
-{tags:resistance}{range:0.5}+(20-30)% to Fire Resistance
-{tags:attribute}{fractured}{range:0.5}+(20-30) to Strength
-{tags:elemental_damage}{range:0.5}Adds (20-25) to (26-35) Fire Damage
-{tags:resistance}{range:0.5}+(20-30)% to Fire Resistance
-{tags:elemental_damage}{variant:3}{range:0.5}(40-60)% increased Fire Damage while affected by Herald of Ash
-{tags:resistance}{variant:7}{range:0.5}+(50-60)% to Fire Resistance while affected by Herald of Ash
-{variant:4}{range:0.5}Herald of Ash has (70-100)% increased Buff Effect
-{variant:5}{range:0.5}Herald of Ash has (40-60)% increased Buff Effect
-{tags:resource}{variant:2}{range:0.5}Herald of Ash has (30-40)% increased Mana Reservation Efficiency
-{tags:resistance}{variant:6}+1% to maximum Fire Resistance while affected by Herald of Ash
-{tags:resource}{variant:1}{range:0.5}Herald of Ash has (60-80)% reduced Mana Reservation Efficiency
+{tags:resistance}{range:0.5}+(20-30)% to Cold Resistance
+{tags:attribute}{fractured}{range:0.5}+(20-30) to Dexterity
+{tags:elemental_damage}{range:0.5}Adds (20-25) to (26-35) Cold Damage
+{tags:resistance}{range:0.5}+(20-30)% to Cold Resistance
+{tags:elemental_damage}{variant:3}{range:0.5}(40-60)% increased Cold Damage while affected by Herald of Ice
+{tags:resistance}{variant:7}{range:0.5}+(50-60)% to Cold Resistance while affected by Herald of Ice
+{variant:4}{range:0.5}Herald of Ice has (70-100)% increased Buff Effect
+{variant:5}{range:0.5}Herald of Ice has (40-60)% increased Buff Effect
+{tags:resource}{variant:2}{range:0.5}Herald of Ice has (30-40)% increased Mana Reservation Efficiency
+{tags:resistance}{variant:6}+1% to maximum Cold Resistance while affected by Herald of Ice
+{tags:resource}{variant:1}{range:0.5}Herald of Ice has (60-80)% reduced Mana Reservation Efficiency
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>

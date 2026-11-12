@@ -70,7 +70,7 @@ add("Misc", load("Misc"))
 add("data.modScalability", load("ModScalability"))
 for _, file in ipairs({ "ModExplicit", "ModItemExclusive", "ModCorrupted", "ModDelve", "ModSynthesis", "ModScourge",
 		"ModEldritch", "ModFlask", "ModTincture", "ModGraft", "ModJewel", "ModJewelAbyss", "ModJewelCluster",
-		"ModJewelCharm", "ModFoulborn", "ModMaster", "EnchantmentHelmet", "EnchantmentBoots", "EnchantmentGloves",
+		"ModJewelCharm", "ModFoulborn", "ModMercenary", "ModMaster", "EnchantmentHelmet", "EnchantmentBoots", "EnchantmentGloves",
 		"EnchantmentBelt", "EnchantmentBody", "EnchantmentWeapon", "EnchantmentFlask", "Essence", "ModVeiled",
 		"BeastCraft", "ModNecropolis", "Crucible", "Pantheons", "Costs", "ModMap", "ClusterJewels",
 		"TimelessJewelData/LegionTradeIds", "TimelessJewelData/NodeIndexMapping",

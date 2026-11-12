@@ -40,18 +40,18 @@
 		<PlayerStat stat="Int" value="252"/>
 		<PlayerStat stat="ReqInt" value="134"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4393.0111015866"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="5341"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="3277"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="3870"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="3277"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1994"/>
+		<PlayerStat stat="TotalEHP" value="3953.402070052"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="4807"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2949"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3483"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2949"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1795"/>
 		<PlayerStat stat="Life" value="2441"/>
 		<PlayerStat stat="Spec:LifeInc" value="42"/>
 		<PlayerStat stat="LifeUnreserved" value="2441"/>
 		<PlayerStat stat="LifeRecoverable" value="2441"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="0"/>
+		<PlayerStat stat="LifeRegenRecovery" value="122.1"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1244"/>
 		<PlayerStat stat="Spec:ManaInc" value="62"/>
@@ -86,7 +86,7 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-36"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.42"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="2.13"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -154,15 +154,18 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionBeenSavageHitRecently"/>
-			<Input boolean="true" name="conditionEnemyMalignantMadness"/>
-			<Input boolean="true" name="conditionHitsAlwaysStun"/>
-			<Input boolean="true" name="conditionOnProfaneGround"/>
-			<Input name="multiplierHitsSuppressedRecently" number="8"/>
-			<Input name="multiplierSummonedMinion" number="7"/>
-			<Input boolean="true" name="raiseSpectreEnableSanguimancerDemonLowLife"/>
+			<Input boolean="true" name="buffAccelerationShrine"/>
+			<Input boolean="true" name="conditionHitByLightningDamageRecently"/>
+			<Input boolean="true" name="conditionOnBrineGround"/>
+			<Input boolean="true" name="conditionOnConsecratedGround"/>
+			<Input boolean="true" name="conditionSummonedZombieInPast8Sec"/>
+			<Input boolean="true" name="conditionWardBrokenPast2Seconds"/>
+			<Input boolean="true" name="meatShieldEnemyNearYou"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

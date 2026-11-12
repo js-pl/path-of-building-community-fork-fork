@@ -8,7 +8,7 @@
 //! calculation caches its main skill's results by the skill's id
 //! (`cacheSkillUUID`).
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::actor::OutVal;
 use crate::build::Build;
@@ -124,7 +124,6 @@ impl Recalc for Recalculator<'_, '_> {
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
         let mut build = self.build.clone();
         let mut env = crate::calc_env::init_env(&mut build, self.data, self.mode)?;
-        let calcs = env.calc_mode == CalcMode::Calcs;
         let Some(main) = env
             .skills
             .active_skills
@@ -135,7 +134,8 @@ impl Recalc for Recalculator<'_, '_> {
             return Ok(());
         };
         env.skills.main_skill = main;
-        let mut input = PerformInput::new(&build, self.data, calcs)?;
+        // `fullEnv.buildBreakdown = false`
+        let mut input = PerformInput::new(&build, self.data, false)?;
         input.recalc = Some(self);
         input.limited = limited.to_vec();
         input.skip_ehp = true;
@@ -156,15 +156,11 @@ impl Recalc for Recalculator<'_, '_> {
             ext.player_actor.weapon_data[0].clone().unwrap_or_default(),
             ext.player_actor.weapon_data[1].clone().unwrap_or_default(),
         ];
-        let all_one_hand = weapons.iter().any(|w| {
-            w.get("countsAsAll1H")
-                .is_some_and(crate::mods::ModValue::truthy)
-        });
         let mut copy = crate::calc_skills::copy_active_skill(
             &ext.skill,
             &env.groups,
             &env.skills.from_item,
-            all_one_hand,
+            &crate::calc_skills::ActorWeapons::new(&weapons),
             data.skills,
         );
         let mut db = crate::calc_skills::PlayerDb::new(
@@ -242,8 +238,7 @@ impl Recalc for Recalculator<'_, '_> {
         let mut limited = limited.to_vec();
         limited.push(skill_uuid(&copy, &env.groups));
         ext.skill = copy;
-        let calcs = env.calc_mode == CalcMode::Calcs;
-        let mut input = PerformInput::new(&build, self.data, calcs)?;
+        let mut input = PerformInput::new(&build, self.data, false)?;
         input.recalc = Some(self);
         input.limited = limited;
         input.external = Some(ext);

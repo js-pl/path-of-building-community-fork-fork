@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
-	<Build ascendClassName="None" bandit="None" characterLevelAutoMode="false" className="Shadow" level="96" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
+	<Build ascendClassName="None" bandit="Oak" characterLevelAutoMode="false" className="Shadow" level="96" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="AverageHit" value="4476.1476"/>
 		<PlayerStat stat="AverageBurstDamage" value="4476.1476"/>
 		<PlayerStat stat="Speed" value="1.8"/>
@@ -39,18 +39,18 @@
 		<PlayerStat stat="Int" value="153"/>
 		<PlayerStat stat="ReqInt" value="293"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="3806.2962661325"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3444"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2591"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="5027"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2591"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="4318"/>
-		<PlayerStat stat="Life" value="2526"/>
+		<PlayerStat stat="TotalEHP" value="3888.8210789378"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3518"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2647"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="5136"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2647"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="4412"/>
+		<PlayerStat stat="Life" value="2581"/>
 		<PlayerStat stat="Spec:LifeInc" value="39"/>
-		<PlayerStat stat="LifeUnreserved" value="2526"/>
-		<PlayerStat stat="LifeRecoverable" value="2526"/>
+		<PlayerStat stat="LifeUnreserved" value="2581"/>
+		<PlayerStat stat="LifeRecoverable" value="2581"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="55.6"/>
+		<PlayerStat stat="LifeRegenRecovery" value="56.8"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1194"/>
 		<PlayerStat stat="Spec:ManaInc" value="62"/>
@@ -155,11 +155,14 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionEnemyOnConsecratedGround"/>
+			<Input name="bandit" string="Oak"/>
 			<Input boolean="true" name="conditionEnemyOnProfaneGround"/>
-			<Input boolean="true" name="conditionSingleBleed"/>
+			<Input name="overrideBleedStackPotential" number="10"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

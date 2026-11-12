@@ -30,31 +30,31 @@
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
-		<PlayerStat stat="Str" value="150"/>
+		<PlayerStat stat="Str" value="135"/>
 		<PlayerStat stat="ReqStr" value="220"/>
-		<PlayerStat stat="Dex" value="160"/>
+		<PlayerStat stat="Dex" value="145"/>
 		<PlayerStat stat="ReqDex" value="151"/>
-		<PlayerStat stat="Int" value="125"/>
+		<PlayerStat stat="Int" value="110"/>
 		<PlayerStat stat="ReqInt" value="151"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="6016.4302847625"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="4235"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="3684"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="4256"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="5740"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2278"/>
-		<PlayerStat stat="Life" value="1950"/>
+		<PlayerStat stat="TotalEHP" value="6177.3860018396"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="4274"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="3858"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="4494"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="6193"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2263"/>
+		<PlayerStat stat="Life" value="1936"/>
 		<PlayerStat stat="Spec:LifeInc" value="40"/>
-		<PlayerStat stat="LifeUnreserved" value="1950"/>
-		<PlayerStat stat="LifeRecoverable" value="1950"/>
+		<PlayerStat stat="LifeUnreserved" value="1936"/>
+		<PlayerStat stat="LifeRecoverable" value="1936"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="39"/>
+		<PlayerStat stat="LifeRegenRecovery" value="135.5"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
-		<PlayerStat stat="Mana" value="980"/>
+		<PlayerStat stat="Mana" value="969"/>
 		<PlayerStat stat="Spec:ManaInc" value="48"/>
-		<PlayerStat stat="ManaUnreserved" value="980"/>
+		<PlayerStat stat="ManaUnreserved" value="969"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="100"/>
-		<PlayerStat stat="ManaRegenRecovery" value="35.4"/>
+		<PlayerStat stat="ManaRegenRecovery" value="35.1"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
 		<PlayerStat stat="EnergyShield" value="812"/>
 		<PlayerStat stat="EnergyShieldRecoveryCap" value="812"/>
@@ -63,7 +63,7 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="200"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="3720"/>
+		<PlayerStat stat="Evasion" value="3675"/>
 		<PlayerStat stat="Spec:EvasionInc" value="60"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
@@ -75,11 +75,11 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="12"/>
-		<PlayerStat stat="FireResist" value="16"/>
+		<PlayerStat stat="FireResist" value="21"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="46"/>
+		<PlayerStat stat="ColdResist" value="51"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="-2"/>
+		<PlayerStat stat="LightningResist" value="3"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-18"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
@@ -107,7 +107,7 @@
 		<MinionStat stat="CombinedDPS" value="391.79"/>
 		<MinionStat stat="Cooldown" value="0.33"/>
 		<MinionStat stat="Life" value="8868"/>
-		<MinionStat stat="LifeRegenRecovery" value="0"/>
+		<MinionStat stat="LifeRegenRecovery" value="443.4"/>
 		<MinionStat stat="EnergyShield" value="5320"/>
 		<MinionStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<TimelessData devotionVariant1="1" devotionVariant2="1" searchList="" searchListFallback=""/>
@@ -169,15 +169,18 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="buffWildSavagery"/>
+			<Input boolean="true" name="buffFanaticism"/>
 			<Input boolean="true" name="conditionEnemyLightningResZero"/>
-			<Input boolean="true" name="conditionHaveVulconus"/>
-			<Input boolean="true" name="conditionOnChilledGround"/>
-			<Input name="meleeDistance" number="10"/>
-			<Input name="multiplierNonVaalSummonedMinion" number="7"/>
-			<Input name="skillPierceCount" number="1"/>
+			<Input boolean="true" name="conditionLeechingLife"/>
+			<Input boolean="true" name="conditionOnConsecratedGround"/>
+			<Input boolean="true" name="conditionUsedMovementSkillRecently"/>
+			<Input name="skillChainCount" number="1"/>
+			<Input name="skillPierceCount" number="10"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -394,22 +397,20 @@ Your Maximum Endurance Charges is equal to your Maximum Frenzy Charges
 		</Item>
 		<Item id="8" variant="1">
 			Rarity: UNIQUE
-Le Heup of All
-Iron Ring
-Variant: Pre 2.6.0
+Lori&apos;s Lantern
+Prismatic Ring
+Variant: Pre 1.0.0
 Variant: Current
 Selected Variant: 1
-LevelReq: 24
-Implicits: 1
-{tags:physical_damage,attack}Adds 1 to 4 Physical Damage to Attacks
-{tags:attribute}{variant:1}{range:0.5}+(10-20) to all Attributes
-{tags:attribute}{variant:2}{range:0.5}+(10-30) to all Attributes
-{variant:1}{range:0.5}(10-20)% increased Damage
-{variant:2}{range:0.5}(10-30)% increased Damage
-{variant:1}{range:0.5}(10-20)% increased Rarity of Items found
-{variant:2}{range:0.5}(10-30)% increased Rarity of Items found
-{tags:resistance}{variant:1}{range:0.5}+(10-20)% to all Elemental Resistances
-{tags:resistance}{variant:2}{range:0.5}+(10-30)% to all Elemental Resistances
+LevelReq: 30
+Implicits: 2
+{tags:resistance}{variant:1}{range:0.5}+(8-12)% to all Elemental Resistances
+{tags:resistance}{variant:2}{range:0.5}+(8-10)% to all Elemental Resistances
+{tags:resistance}+10% to all Elemental Resistances
+{tags:speed}{range:0.5}(6-8)% increased Movement Speed when on Low Life
+31% increased Light Radius
+{tags:resistance}{range:0.5}+(20-25)% to Chaos Resistance when on Low Life
+Damage of Enemies Hitting you is Unlucky while you are on Low Life
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -417,8 +418,6 @@ Implicits: 1
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
-			<ModRange id="8" range="0.5"/>
-			<ModRange id="9" range="0.5"/>
 		</Item>
 		<Item id="9" variant="3">
 			Rarity: UNIQUE

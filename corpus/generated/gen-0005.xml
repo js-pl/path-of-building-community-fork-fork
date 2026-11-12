@@ -1,26 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Juggernaut" bandit="None" characterLevelAutoMode="false" className="Marauder" level="90" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="389.785412"/>
-		<PlayerStat stat="AverageBurstDamage" value="389.785412"/>
+		<PlayerStat stat="AverageHit" value="428.322744"/>
+		<PlayerStat stat="PvpAverageHit" value="155.38881546579"/>
+		<PlayerStat stat="AverageBurstDamage" value="428.322744"/>
 		<PlayerStat stat="Speed" value="3.3333333333333"/>
 		<PlayerStat stat="MineLayingTime" value="0.3"/>
 		<PlayerStat stat="MineThrowCount" value="1"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="15.72"/>
-		<PlayerStat stat="CritChance" value="15.72"/>
-		<PlayerStat stat="CritMultiplier" value="1.46"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="6.72"/>
+		<PlayerStat stat="CritChance" value="6.72"/>
+		<PlayerStat stat="CritMultiplier" value="1.77"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="1299.2847066667"/>
+		<PlayerStat stat="TotalDPS" value="1427.74248"/>
+		<PlayerStat stat="PvpTotalDPS" value="517.9627182193"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="1299.2847066667"/>
-		<PlayerStat stat="IgniteDPS" value="674.47497674419"/>
-		<PlayerStat stat="WithIgniteDPS" value="1973.7596834109"/>
-		<PlayerStat stat="WithPoisonDPS" value="1299.2847066667"/>
-		<PlayerStat stat="TotalDotDPS" value="674.47497674419"/>
+		<PlayerStat stat="WithBleedDPS" value="1427.74248"/>
+		<PlayerStat stat="IgniteDPS" value="577.995264"/>
+		<PlayerStat stat="WithIgniteDPS" value="2005.737744"/>
+		<PlayerStat stat="WithPoisonDPS" value="1427.74248"/>
+		<PlayerStat stat="TotalDotDPS" value="577.995264"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="1973.7596834109"/>
-		<PlayerStat stat="AreaOfEffectRadiusMetres" value="3.1"/>
+		<PlayerStat stat="CombinedDPS" value="2005.737744"/>
+		<PlayerStat stat="AreaOfEffectRadiusMetres" value="2.8"/>
 		<PlayerStat stat="ManaCost" value="11"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
 		<PlayerStat stat="ManaPerSecondCost" value="36.666666666667"/>
@@ -34,42 +36,43 @@
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
-		<PlayerStat stat="Str" value="482"/>
+		<PlayerStat stat="Str" value="472"/>
 		<PlayerStat stat="ReqStr" value="220"/>
-		<PlayerStat stat="Dex" value="134"/>
+		<PlayerStat stat="Dex" value="124"/>
 		<PlayerStat stat="ReqDex" value="123"/>
-		<PlayerStat stat="Int" value="209"/>
+		<PlayerStat stat="Int" value="199"/>
 		<PlayerStat stat="ReqInt" value="98"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4361.6444035264"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="5400"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2806"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="5827"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="4095"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2584"/>
-		<PlayerStat stat="Life" value="2776"/>
+		<PlayerStat stat="TotalEHP" value="4386.0949626708"/>
+		<PlayerStat stat="PvPTotalTakenHit" value="1018.6446487928"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="5454"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2845"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="5910"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="4153"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2425"/>
+		<PlayerStat stat="Life" value="2767"/>
 		<PlayerStat stat="Spec:LifeInc" value="65"/>
-		<PlayerStat stat="LifeUnreserved" value="2776"/>
-		<PlayerStat stat="LifeRecoverable" value="2776"/>
+		<PlayerStat stat="LifeUnreserved" value="2767"/>
+		<PlayerStat stat="LifeRecoverable" value="2767"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="0"/>
-		<PlayerStat stat="LifeRecharge" value="925"/>
+		<PlayerStat stat="LifeRecharge" value="922"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
-		<PlayerStat stat="Mana" value="713"/>
+		<PlayerStat stat="Mana" value="708"/>
 		<PlayerStat stat="Spec:ManaInc" value="0"/>
-		<PlayerStat stat="ManaUnreserved" value="698"/>
-		<PlayerStat stat="ManaUnreservedPercent" value="97.896213183731"/>
-		<PlayerStat stat="ManaRegenRecovery" value="12.5"/>
+		<PlayerStat stat="ManaUnreserved" value="697"/>
+		<PlayerStat stat="ManaUnreservedPercent" value="98.446327683616"/>
+		<PlayerStat stat="ManaRegenRecovery" value="12.4"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="254"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="254"/>
+		<PlayerStat stat="EnergyShield" value="306"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="306"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="Rage" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="286"/>
+		<PlayerStat stat="Evasion" value="225"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
@@ -87,14 +90,14 @@
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="-5"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
-		<PlayerStat stat="ChaosResist" value="-28"/>
+		<PlayerStat stat="ChaosResist" value="-36"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.44"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
-		<PlayerStat stat="PowerCharges" value="3"/>
+		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
-		<PlayerStat stat="FrenzyCharges" value="0"/>
+		<PlayerStat stat="FrenzyCharges" value="3"/>
 		<PlayerStat stat="FrenzyChargesMax" value="3"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
 		<PlayerStat stat="EnduranceChargesMax" value="3"/>
@@ -157,17 +160,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MapSuffix4" string="of Toughness"/>
-			<Input boolean="true" name="buffElusive"/>
-			<Input name="buffPendulum" string="DAMAGE"/>
+			<Input boolean="true" name="PvpScaling"/>
+			<Input boolean="true" name="buffBastionOfHope"/>
+			<Input boolean="true" name="conditionBlinded"/>
 			<Input boolean="true" name="conditionHaveEnergyShield"/>
-			<Input boolean="true" name="conditionHitRecently"/>
-			<Input boolean="true" name="infusedChannellingInfusion"/>
-			<Input boolean="true" name="minionsConditionFullEnergyShield"/>
-			<Input name="sacrificedRageCount" number="6"/>
-			<Input boolean="true" name="usePowerCharges"/>
+			<Input boolean="true" name="conditionLinkedRecently"/>
+			<Input boolean="true" name="conditionUsedWarcryRecently"/>
+			<Input boolean="true" name="minionsConditionCreatedRecently"/>
+			<Input boolean="true" name="useFrenzyCharges"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -395,27 +400,23 @@ Implicits: 1
 		</Item>
 		<Item id="7">
 			Rarity: UNIQUE
-The Sundered Will
-Fugitive Ring
-LevelReq: 42
+The Selfish Shepherd
+Nameless Ring
+League: Settlers of Kalguur
+LevelReq: 50
 Implicits: 2
-{tags:resistance}+2% to maximum Chaos Resistance
-{tags:resistance}Cannot roll Modifiers of Non-Chaos Damage Types
-{tags:attribute}{range:0.5}+(7-13) to all Attributes
-{tags:chaos_damage}{range:0.5}Adds (7-11) to (17-23) Chaos Damage
-{tags:resistance}{range:0.5}+(13-29)% to Chaos Resistance
-{range:0.5}(20-30)% increased Area of Effect of Aura Skills
-{range:0.5}(20-35)% reduced Reservation Efficiency of Skills
-{range:0.5}Increases and Reductions to Chaos Damage also apply to Effect of
-Auras from Chaos Skills at (10-15)% of their value, up to a maximum of 150%
+50% increased Elemental Ailment Duration on you
+{tags:caster}50% reduced Effect of Curses on you
+Grants level 20 Affliction
+{tags:caster,speed}{range:0.5}(6-12)% increased Cast Speed
+{tags:defences}{range:0.5}+(30-60) to maximum Energy Shield
+{tags:resistance}{range:0.5}+(7-19)% to Chaos Resistance
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
-			<ModRange id="7" range="0.5"/>
-			<ModRange id="8" range="0.5"/>
 		</Item>
 		<Item id="8" variant="2">
 			Rarity: UNIQUE
@@ -674,6 +675,9 @@ Hypnotic Eye Jewel affecting you, up to a maximum of 40%
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Boots" source="Item:5:Beacon of Madness, Two-Toned Boots">
 				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="1" nameSpec="Embrace Madness" quality="0" skillId="EmbraceMadness"/>
+			</Skill>
+			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Ring 1" source="Item:7:The Selfish Shepherd, Nameless Ring">
+				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="20" nameSpec="Affliction" quality="0" skillId="Affliction"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="On Kill Monster Explosion" mainActiveSkill="nil" mainActiveSkillCalcs="nil" source="Explode">
 				<Gem count="nil" enableGlobal1="nil" enableGlobal2="nil" enabled="true" level="1" nameSpec="" quality="0" skillId="EnemyExplode" skillPart="1"/>

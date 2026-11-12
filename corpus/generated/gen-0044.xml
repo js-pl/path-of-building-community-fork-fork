@@ -1,25 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="None" bandit="None" characterLevelAutoMode="false" className="Duelist" level="83" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="1892.44919"/>
-		<PlayerStat stat="AverageBurstDamage" value="1892.44919"/>
+		<PlayerStat stat="AverageHit" value="1350.2355239618"/>
+		<PlayerStat stat="AverageBurstDamage" value="1350.2355239618"/>
 		<PlayerStat stat="Speed" value="1.1666666666667"/>
 		<PlayerStat stat="TrapThrowingTime" value="0.85714285714286"/>
 		<PlayerStat stat="TrapThrowCount" value="1"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="7.44"/>
-		<PlayerStat stat="CritChance" value="7.44"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="19.14"/>
+		<PlayerStat stat="CritChance" value="19.14"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="2207.8573883333"/>
+		<PlayerStat stat="TotalDPS" value="1575.2747779554"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="2207.8573883333"/>
-		<PlayerStat stat="IgniteDPS" value="203.09450112"/>
-		<PlayerStat stat="WithIgniteDPS" value="2410.9518894533"/>
-		<PlayerStat stat="WithPoisonDPS" value="2207.8573883333"/>
-		<PlayerStat stat="TotalDotDPS" value="203.09450112"/>
+		<PlayerStat stat="WithBleedDPS" value="1575.2747779554"/>
+		<PlayerStat stat="WithIgniteDPS" value="1575.2747779554"/>
+		<PlayerStat stat="WithPoisonDPS" value="1575.2747779554"/>
+		<PlayerStat stat="TotalDotDPS" value="0"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="2410.9518894533"/>
+		<PlayerStat stat="CombinedDPS" value="1575.2747779554"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="2.7"/>
 		<PlayerStat stat="ManaCost" value="61"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -41,18 +40,18 @@
 		<PlayerStat stat="Int" value="124"/>
 		<PlayerStat stat="ReqInt" value="122"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="3593.7882991991"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="4036"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2885"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2885"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="19531"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1587"/>
-		<PlayerStat stat="Life" value="1703"/>
+		<PlayerStat stat="TotalEHP" value="2961.100928089"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3653"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2591"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="2591"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="4922"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1282"/>
+		<PlayerStat stat="Life" value="1851"/>
 		<PlayerStat stat="Spec:LifeInc" value="24"/>
-		<PlayerStat stat="LifeUnreserved" value="1703"/>
-		<PlayerStat stat="LifeRecoverable" value="1703"/>
+		<PlayerStat stat="LifeUnreserved" value="1851"/>
+		<PlayerStat stat="LifeRecoverable" value="1851"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="61.3"/>
+		<PlayerStat stat="LifeRegenRecovery" value="66.6"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="784"/>
 		<PlayerStat stat="Spec:ManaInc" value="32"/>
@@ -60,30 +59,30 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="64.923469387755"/>
 		<PlayerStat stat="ManaRegenRecovery" value="20.6"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="636"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="636"/>
+		<PlayerStat stat="EnergyShield" value="410"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="410"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="200"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="2808"/>
+		<PlayerStat stat="Evasion" value="4508"/>
 		<PlayerStat stat="Spec:EvasionInc" value="18"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
-		<PlayerStat stat="Armour" value="2634"/>
+		<PlayerStat stat="Armour" value="4424"/>
 		<PlayerStat stat="Spec:ArmourInc" value="102"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="37"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="44"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="0"/>
-		<PlayerStat stat="FireResist" value="15"/>
+		<PlayerStat stat="FireResist" value="8"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="90"/>
-		<PlayerStat stat="ColdResistOverCap" value="10"/>
-		<PlayerStat stat="LightningResist" value="15"/>
+		<PlayerStat stat="ColdResist" value="53"/>
+		<PlayerStat stat="ColdResistOverCap" value="0"/>
+		<PlayerStat stat="LightningResist" value="8"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
@@ -155,15 +154,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="buffLesserBrutalShrine"/>
-			<Input boolean="true" name="buffOnslaught"/>
-			<Input boolean="true" name="buffResistanceShrine"/>
-			<Input boolean="true" name="conditionCursedEnemyRecently"/>
-			<Input boolean="true" name="conditionEnemyHallowingFlame"/>
-			<Input name="configSpectralTigerCount" number="3"/>
-			<Input name="multiplierRuptureStacks" number="6"/>
+			<Input boolean="true" name="buffLesserResistanceShrine"/>
+			<Input boolean="true" name="conditionConsumedCorpseRecently"/>
+			<Input boolean="true" name="conditionEnemyCrushed"/>
+			<Input boolean="true" name="conditionOnShockedGround"/>
+			<Input boolean="true" name="conditionSingleBleed"/>
+			<Input name="configSpectralWolfCount" number="3"/>
+			<Input boolean="true" name="freshMeatBuffs"/>
+			<Input boolean="true" name="minionBuffOnslaught"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -361,81 +364,27 @@ Implicits: 1
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 		</Item>
-		<Item id="8">
+		<Item id="8" variant="2">
 			Rarity: UNIQUE
-The Warden&apos;s Brand
-Iron Ring
-LevelReq: 30
+The Unseen Hue
+Opal Ring
+Variant: Scorch
+Variant: Brittle
+Variant: Sap
+Selected Variant: 2
+LevelReq: 80
 Implicits: 1
-{tags:physical_damage,attack}Adds 1 to 4 Physical Damage to Attacks
-{tags:physical_damage,attack}{range:0.5}Adds (5-15) to (25-50) Physical Damage to Attacks
-{tags:attack,speed}30% reduced Attack Speed
-15% chance to gain a Frenzy Charge when you Stun an Enemy
+{tags:elemental_damage}{range:0.5}(15-25)% increased Elemental Damage
+{tags:resistance}{range:0.5}+(5-30)% to Fire Resistance
+{tags:resistance}{range:0.5}+(5-30)% to Cold Resistance
+{tags:resistance}{range:0.5}+(5-30)% to Lightning Resistance
+{tags:attack,caster,speed}{range:0.5}(6-12)% increased Attack and Cast Speed
+{range:0.5}(10-20)% increased Effect of Non-Damaging Ailments
+{variant:2}Hits with Prismatic Skills always inflict Brittle
+{variant:3}Hits with Prismatic Skills always Sap
+{variant:1}Hits with Prismatic Skills always Scorch
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
-			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
-		</Item>
-		<Item id="9">
-			Rarity: UNIQUE
-The Burden of Truth
-Crystal Belt
-LevelReq: 79
-Implicits: 1
-{tags:defences}{range:0.5}+(60-80) to maximum Energy Shield
-33% of Non-Chaos Damage taken bypasses Energy Shield
-{tags:resource}{range:0.5}(30-40)% increased Life Recovery from Flasks
-33% of Chaos Damage taken does not bypass Energy Shield
-{tags:defences}{range:0.5}Gain (5-10)% of Maximum Life as Extra Maximum Energy Shield
-Supreme Decadence
-			<ModRange id="1" range="0.5"/>
-			<ModRange id="2" range="0.5"/>
-			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
-			<ModRange id="5" range="0.5"/>
-			<ModRange id="6" range="0.5"/>
-		</Item>
-		<Item id="10">
-			Rarity: UNIQUE
-Wellwater Phylactery
-Colossal Mana Flask
-Quality: 20
-LevelReq: 64
-Implicits: 0
-{range:0.5}(200-300)% increased Charges per use
-{range:0.5}(150-200)% increased Amount Recovered
-{range:0.5}(40-60)% less Duration
-{range:0.5}Removes (10-15)% of Life when Used
-Starts Energy Shield Recharge when Used
-Energy Shield Recharge is not delayed by Damage during Effect
-			<ModRange id="1" range="0.5"/>
-			<ModRange id="2" range="0.5"/>
-			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
-			<ModRange id="5" range="0.5"/>
-			<ModRange id="6" range="0.5"/>
-		</Item>
-		<Item id="11" variant="3">
-			Rarity: UNIQUE
-Soul Catcher
-Quartz Flask
-League: Incursion
-Variant: Pre 3.10.0
-Variant: Pre 3.15.0
-Variant: Current
-Selected Variant: 3
-Quality: 20
-LevelReq: 27
-Implicits: 0
-Cannot gain Mana during effect
-{variant:2}{range:0.5}(80-120)% increased Critical Strike Chance with Vaal Skills during effect
-{variant:3}{range:0.5}(60-80)% increased Critical Strike Chance with Vaal Skills during effect
-{variant:1}{range:0.5}(60-100)% increased Damage with Vaal Skills during effect
-{variant:2}{range:0.5}(80-120)% increased Damage with Vaal Skills during effect
-{variant:3}{range:0.5}(60-80)% increased Damage with Vaal Skills during effect
-{variant:1}Non-Aura Vaal Skills require 25% reduced Souls Per Use during Effect
-{variant:2}{range:0.5}Vaal Skills used during effect have (20-40)% reduced Soul Gain Prevention Duration
-{variant:3}Vaal Skills used during effect have 10% reduced Soul Gain Prevention Duration
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
@@ -443,28 +392,48 @@ Cannot gain Mana during effect
 			<ModRange id="7" range="0.5"/>
 			<ModRange id="8" range="0.5"/>
 			<ModRange id="9" range="0.5"/>
-			<ModRange id="10" range="0.5"/>
-			<ModRange id="11" range="0.5"/>
 		</Item>
-		<Item id="12">
-			Rarity: MAGIC
-Seething Divine Life Flask of Allaying
+		<Item id="9">
+			Rarity: RARE
+Belt
+Vanguard Belt
 Crafted: true
-Prefix: {range:0.5}FlaskFullInstantRecovery1
-Suffix: {range:0.028}FlaskBleedCorruptingBloodImmunity3______
-Quality: 20
-LevelReq: 60
-Implicits: 0
-{tags:flask}{prefix}66% reduced Amount Recovered
-{tags:flask}{prefix}Instant Recovery
-{tags:flask}{suffix}Grants Immunity to Bleeding for 12 seconds if used while Bleeding
-{tags:flask}{suffix}Grants Immunity to Corrupted Blood for 12 seconds if used while affected by Corrupted Blood
+Prefix: {range:0.5}IncreasedPhysicalDamageReductionRating5
+Prefix: {range:0.5}IncreasedLife7
+Prefix: None
+Suffix: None
+Suffix: None
+Suffix: None
+LevelReq: 78
+Implicits: 1
+{tags:defences,armour,evasion}{range:0.5}+(260-320) to Armour and Evasion Rating
+{tags:defences,armour}{prefix}+231 to Armour
+{tags:resource,life}{prefix}+107 to maximum Life
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
 		</Item>
-		<Item id="13" variant="3">
+		<Item id="10">
+			Rarity: MAGIC
+Alchemist&apos;s Stibnite Flask
+Crafted: true
+Prefix: {range:0}FlaskEffectReducedDuration3
+Suffix: None
+Quality: 20
+LevelReq: 64
+Implicits: 3
+{crafted}{range:1}(60-70)% increased effect
+{crafted}Gains no Charges during Effect
+{tags:flask}Creates a Smoke Cloud on Use
+{tags:flask}{prefix}23% reduced Duration
+{tags:flask}{prefix}25% increased effect
+			<ModRange id="2" range="1"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+			<ModRange id="6" range="0.5"/>
+		</Item>
+		<Item id="11" variant="5">
 			Rarity: UNIQUE
 Taste of Hate
 Sapphire Flask
@@ -473,7 +442,7 @@ Variant: Pre 3.0.0
 Variant: Pre 3.15.0
 Variant: Pre 3.25.0
 Variant: Current
-Selected Variant: 3
+Selected Variant: 5
 Quality: 20
 LevelReq: 18
 Implicits: 0
@@ -495,6 +464,40 @@ Implicits: 0
 			<ModRange id="9" range="0.5"/>
 			<ModRange id="10" range="0.5"/>
 			<ModRange id="11" range="0.5"/>
+		</Item>
+		<Item id="12">
+			Rarity: MAGIC
+Alchemist&apos;s Diamond Flask
+Crafted: true
+Prefix: {range:0}FlaskEffectReducedDuration3
+Suffix: None
+Quality: 20
+LevelReq: 64
+Implicits: 2
+{crafted}{range:1}(60-70)% increased effect
+{crafted}Gains no Charges during Effect
+{tags:flask}{prefix}23% reduced Duration
+{tags:flask}{prefix}25% increased effect
+			<ModRange id="2" range="1"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+		</Item>
+		<Item id="13">
+			Rarity: MAGIC
+Flagellant&apos;s Basalt Flask
+Crafted: true
+Prefix: {range:1}FlaskFullRechargeOnHit5___
+Suffix: None
+Quality: 20
+LevelReq: 64
+Implicits: 2
+{crafted}Used when Charges reach full
+{tags:flask}Taunts nearby Enemies on use
+{tags:flask}{prefix}Gain 3 Charges when you are Hit by an Enemy
+			<ModRange id="2" range="0.5"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
 		</Item>
 		<Item id="14">
 			Rarity: UNIQUE

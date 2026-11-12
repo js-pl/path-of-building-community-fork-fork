@@ -40,7 +40,7 @@
 		<PlayerStat stat="Int" value="164"/>
 		<PlayerStat stat="ReqInt" value="126"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="6052.2792282016"/>
+		<PlayerStat stat="TotalEHP" value="6083.5570043544"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="4318"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="3979"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="4910"/>
@@ -155,14 +155,17 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MapPrefix4" string="Impaling"/>
-			<Input boolean="true" name="conditionBrittle"/>
+			<Input name="MapSuffix2" string="of Doubt"/>
+			<Input boolean="true" name="buffSacrificialZeal"/>
 			<Input name="conditionCorruptingCryStages" number="10"/>
-			<Input boolean="true" name="deathmarkDeathmarkActive"/>
-			<Input boolean="true" name="minionbuffUnholyMight"/>
-			<Input name="multiplierHexDoom" number="1"/>
+			<Input boolean="true" name="conditionSapped"/>
+			<Input name="heraldOfAgonyVirulenceStack" number="1"/>
+			<Input name="prideEffect" string="MAX"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

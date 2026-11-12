@@ -879,12 +879,12 @@
 10% of damage dealt by your mines is leeched to you as life
 10% of damage dealt by your totems is leeched to you as life
 10% of damage from hits is taken from void spawns' life before you per void spawn
-10% of damage from hits is taken from your spectres' life before you
 10% of damage taken bypasses ward
 10% of damage taken while affected by clarity recouped as mana
 10% of damage taken while frozen recouped as life
 10% of evasion rating is regenerated as life per second while focussed
 10% of exsanguinate and reap physical damage converted to fire damage
+10% of fire and fire damage from hits taken as fire damage
 10% of fire and lightning damage from hits taken as cold damage during effect
 10% of fire damage taken as lightning
 10% of fire lost per second fire damage
@@ -1212,7 +1212,6 @@ enemies in your link beams have 10% increased damage
 enemies killed near corpses affected by your curses explode, dealing 10% of their life as fire damage
 enemies killed with attack hits have a 10% chance to explode, dealing a fire of their life as fire damage
 enemies killed with wand hits have a 10% chance to explode, dealing a fire of their life as fire damage
-enemies maimed by you take 10% increased damage over time
 enemies near targets you shatter have 10% chance to be covered in frost for 10 seconds
 enemies near your totems deal 10% increased damage
 enemies near your totems take 10% increased physical and fire damage
@@ -1382,8 +1381,6 @@ grants immunity to chill for 10 seconds if used while chilled
 grants immunity to corrupted blood for 10 seconds if used while affected by corrupted blood
 grants immunity to freeze for 10 seconds if used while frozen
 grants immunity to ignite for 10 seconds if used while ignited
-grants immunity to poison for 10 seconds if used while poisoned
-grants immunity to shock for 10 seconds if used while shocked
 grants level 10 fire
 grants level 10 fire curse aura during flask effect
 grants level 10 fire, which will be used by shaper memory
@@ -1574,6 +1571,7 @@ minions deal 10% increased damage per 10 dexterity
 minions deal 10% more damage while they are on low life
 minions deal no non-fire damage
 minions from herald skills deal 10% more damage
+minions gain added physical damage equal to 10% of maximum energy shield on your equipped helmet
 minions gain added resistances equal to 10% of your resistances
 minions have +10% to damage over time multiplier per ghastly eye jewel affecting you, up to a maximum of +10%
 minions have 10% chance to deal double damage per fortification on you
@@ -1789,6 +1787,7 @@ skills gain a base energy shield cost equal to 10% of base mana cost
 skills gain a base life cost equal to 10% of base mana cost
 skills gain added chaos damage equal to 10% of life cost, if life cost is not higher than the maximum you could spend
 skills gain added chaos damage equal to 10% of mana cost, if mana cost is not higher than the maximum you could spend
+skills granted by your passive tree are supported by level 10 fire
 skills have 10% increased damage
 skills socketed in your fire are supported by level 10 fire
 skills supported by nightblade have 10% increased effect of elusive
@@ -1910,6 +1909,7 @@ totems explode on death, dealing 10% of their life as fire damage
 totems fire 10 additional projectiles
 totems gain +10% to fire resistance
 totems have 10% increased damage
+totems have 10% more life per maximum number of summoned totems
 trap and mine damage 10% increased damage
 traps and mines deal 10 to 10 additional physical damage
 traps and mines deal 10-10 additional physical damage
@@ -2051,6 +2051,10 @@ while not on full life, sacrifice 10% of mana per second to recover that much li
 while on low life, life flasks gain 10 charges every 10 seconds
 while stationary, gain 10% increased area of effect every second, up to a maximum of 10%
 while stationary, gain 10% of life regenerated per second every second, up to a maximum of 10%
+while you have at least 10 ghastly eye jewels socketed: unholy might you grant also causes target's damage to penetrate 10% chaos resistance unholy might you grant also applies 10% increased effect of withered
+while you have at least 10 hypnotic eye jewels socketed: arcane surge also grants 10% of damage taken recouped as mana to you arcane surge also grants 10% increased mana cost efficiency to you
+while you have at least 10 murderous eye jewels socketed: intimidate you inflict applies an extra +10% increased attack damage taken intimidate you inflict causes targets to deal 10% less damage
+while you have at least 10 searching eye jewels socketed: targets affected by maim you inflict cannot deal critical strikes maim you inflict causes hits against the target to have 10% more critical strike chance
 while you have unbroken ward, your next non-channelling attack you use yourself breaks your ward to gain added cold damage equal to 10% of ward
 wild strike's beam chains an additional 10 times
 winter orb has +10 maximum stages
@@ -2109,7 +2113,6 @@ you take 10% reduced extra damage from critical strikes while affected by determ
 you take 10% reduced extra damage from critical strikes while you have no power charges
 you take 10% reduced extra damage from suppressed critical strikes
 your action speed is at least 10% of base value
-your blink and mirror arrow clones use your gloves
 your chance to block attack damage is lucky
 your chance to block attack damage is unlucky
 your chance to block is lucky
@@ -2144,9 +2147,7 @@ your shocks can increase damage taken by up to a maximum of 10%
 your skills cost no mana cost during flask effect
 your skills deal you 10% of mana cost as fire damage
 your skills deal you 10% of mana spent on upfront skill mana costs as fire damage
-your skills that throw mines reserve life instead of mana
 your strength is added to your minions
-your travel skills critically strike once every 3 uses
 your warcries cover enemies in ash for 10 seconds
 zealot's oath during flask effect
 zombies have 10% increased damage

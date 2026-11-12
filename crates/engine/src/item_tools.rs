@@ -1,7 +1,7 @@
 //! Item mod line helpers: upstream's `itemLib` (`Modules/ItemTools.lua`),
 //! which rolls a line's ranges and scales its values.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::item_data::ItemData;
 use crate::mod_parser::ModParser;

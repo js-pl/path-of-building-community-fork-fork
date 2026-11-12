@@ -2,7 +2,7 @@
 //! database, equipment, outputs and relations (`env.player`, `env.enemy`,
 //! `env.minion`), the [`Actors`] of the typed stores.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::item::{Fields, Item};
 use crate::item_data::ItemData;
@@ -75,7 +75,7 @@ pub struct Actor {
     pub player: Option<usize>,
     pub enemy: Option<usize>,
     pub parent: Option<usize>,
-    /// `actor.breakdown`, in a calculation of the Calcs tab
+    /// `actor.breakdown`, in the sidebar's and the Calcs tab's calculations
     pub breakdown: Option<Box<crate::breakdown::Breakdowns>>,
 }
 

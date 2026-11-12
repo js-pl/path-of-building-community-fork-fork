@@ -3,7 +3,7 @@
 //! mastery selections, and the dependencies and paths
 //! `BuildAllDependsAndPaths` derives from them.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 //!
 //! Not ported yet: jewels that change the tree (Intuitive Leap and the like,
 //! timeless jewels, Impossible Escape, Split Personality), tattoos, cluster
@@ -750,15 +750,17 @@ impl<'t> PassiveSpec<'t> {
                 self.nodes[i].distance_to_class_start = Some(0.0);
             }
         }
-        let mut place = 0;
-        while place < self.alloc_nodes.places() {
+        let mut roots = Vec::new();
+        for place in 0..self.alloc_nodes.places() {
             if let Some((_, &i)) = self.alloc_nodes.at(place) {
-                self.build_path_from_node(i);
-                if self.is_socket(i) {
-                    self.set_node_distance_to_class_start(i)?;
-                }
+                roots.push(i);
             }
-            place += 1;
+        }
+        self.build_paths(&roots);
+        for &i in &roots {
+            if self.is_socket(i) {
+                self.set_node_distance_to_class_start(i)?;
+            }
         }
         Ok(())
     }
@@ -769,36 +771,37 @@ impl<'t> PassiveSpec<'t> {
         tn.kind == NodeType::Socket || tn.expansion_jewel.is_some()
     }
 
-    /// `BuildPathFromNode(root)`: a breadth-first search recording in every
-    /// node closer to `root` than to any other allocated node its distance
-    /// and path
-    fn build_path_from_node(&mut self, root: usize) {
-        self.nodes[root].path_dist = 0.0;
-        self.nodes[root].path = Some(None);
-        let mut queue = vec![root];
-        let mut o = 0;
-        while o < queue.len() {
-            let node = queue[o];
-            o += 1;
+    /// The paths from the allocated nodes: a multi-source 0-1 breadth-first
+    /// search where allocated nodes cost nothing and the others one point
+    fn build_paths(&mut self, roots: &[usize]) {
+        let mut queue = std::collections::VecDeque::new();
+        for &r in roots {
+            self.nodes[r].path_dist = 0.0;
+            self.nodes[r].path = Some(None);
+            queue.push_back(r);
+        }
+        while let Some(node) = queue.pop_front() {
             let cur = self.nodes[node].path_dist;
             let node_asc = self.tree_node(node).ascendancy_name;
             let node_mastery = self.kind(node) == NodeType::Mastery;
             for li in 0..self.nodes[node].linked.len() {
                 let other = self.nodes[node].linked[li];
+                let free = self.nodes[other].alloc;
+                let dist = cur + if free { 0.0 } else { 1.0 };
                 let other_asc = self.tree_node(other).ascendancy_name;
-                if !node_mastery
+                if dist < self.nodes[other].path_dist
+                    && !node_mastery
                     && !self.is_start(other)
-                    && self.nodes[other].path_dist > cur
                     && (node_asc == other_asc || (cur == 0.0 && other_asc.is_none()))
                 {
-                    let mut dist = cur;
-                    if !self.nodes[other].alloc {
-                        dist += 1.0;
+                    if free {
+                        queue.push_front(other);
+                    } else {
+                        queue.push_back(other);
                     }
                     self.nodes[other].path_dist = dist;
                     let rest = self.nodes[node].path.clone().flatten();
                     self.nodes[other].path = Some(Some(Rc::new(PathStep { node: other, rest })));
-                    queue.push(other);
                 }
             }
         }

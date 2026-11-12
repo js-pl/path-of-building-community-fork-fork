@@ -1,12 +1,13 @@
 //! The Calcs tab's calculation breakdowns (`Modules/CalcBreakdown.lua` and
 //! the `breakdown.*` tables the calculations write), for the player and a
-//! minion. An actor has breakdowns only in a calculation of the Calcs tab
-//! (`PerformInput::breakdown`); elsewhere nothing of this runs.
+//! minion. An actor has breakdowns only in the sidebar's and the Calcs
+//! tab's calculations (`PerformInput::breakdown`, `env.buildBreakdown`);
+//! in calculators and Full DPS nothing of this runs.
 //!
 //! Not ported yet: `breakdown.leech` and the breakdowns of the triggers,
 //! mirages and offence.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::calc::Result;
 use crate::mods::{Mod, ModValue};

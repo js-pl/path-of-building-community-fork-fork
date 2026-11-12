@@ -3,28 +3,28 @@
 	<Build ascendClassName="Champion" bandit="None" characterLevelAutoMode="false" className="Duelist" level="84" mainSocketGroup="1" pantheonMajorGod="TheBrineKing" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="AverageDamage" value="281.75409134177"/>
 		<PlayerStat stat="AverageBurstDamage" value="281.75409134177"/>
-		<PlayerStat stat="Speed" value="6.6051"/>
+		<PlayerStat stat="Speed" value="4.293315"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="32.52"/>
 		<PlayerStat stat="CritChance" value="15.9348"/>
 		<PlayerStat stat="CritMultiplier" value="2.23"/>
 		<PlayerStat stat="HitChance" value="49"/>
-		<PlayerStat stat="TotalDPS" value="1861.0139487215"/>
+		<PlayerStat stat="TotalDPS" value="1209.659066669"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="BleedDPS" value="473.34016222169"/>
-		<PlayerStat stat="WithBleedDPS" value="2334.3541109432"/>
-		<PlayerStat stat="IgniteDPS" value="140.92690311508"/>
-		<PlayerStat stat="WithIgniteDPS" value="2001.9408518366"/>
-		<PlayerStat stat="WithPoisonDPS" value="1861.0139487215"/>
-		<PlayerStat stat="TotalDotDPS" value="614.26706533677"/>
-		<PlayerStat stat="ImpaleDPS" value="24.374236305721"/>
-		<PlayerStat stat="WithImpaleDPS" value="1885.3881850272"/>
+		<PlayerStat stat="BleedDPS" value="307.6711054441"/>
+		<PlayerStat stat="WithBleedDPS" value="1517.3301721131"/>
+		<PlayerStat stat="IgniteDPS" value="133.1779865498"/>
+		<PlayerStat stat="WithIgniteDPS" value="1342.8370532188"/>
+		<PlayerStat stat="WithPoisonDPS" value="1209.659066669"/>
+		<PlayerStat stat="TotalDotDPS" value="440.8490919939"/>
+		<PlayerStat stat="ImpaleDPS" value="15.843253598719"/>
+		<PlayerStat stat="WithImpaleDPS" value="1225.5023202677"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="2499.655250364"/>
+		<PlayerStat stat="CombinedDPS" value="1666.3514122616"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.4"/>
 		<PlayerStat stat="ManaCost" value="5"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="33.0255"/>
+		<PlayerStat stat="ManaPerSecondCost" value="21.466575"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -42,12 +42,12 @@
 		<PlayerStat stat="Int" value="149"/>
 		<PlayerStat stat="ReqInt" value="159"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="5730.7755673242"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3606"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="4162"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="5030"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="6402"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1523"/>
+		<PlayerStat stat="TotalEHP" value="5661.0659654308"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3245"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="4463"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="4618"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="8802"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1370"/>
 		<PlayerStat stat="MainHandAccuracy" value="606"/>
 		<PlayerStat stat="Life" value="1754"/>
 		<PlayerStat stat="Spec:LifeInc" value="30"/>
@@ -55,13 +55,13 @@
 		<PlayerStat stat="LifeRecoverable" value="1754"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="0"/>
-		<PlayerStat stat="LifeLeechGainRate" value="8.3020289128475"/>
+		<PlayerStat stat="LifeLeechGainRate" value="5.3963187933509"/>
 		<PlayerStat stat="Mana" value="1054"/>
 		<PlayerStat stat="Spec:ManaInc" value="55"/>
 		<PlayerStat stat="ManaUnreserved" value="583"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="55.313092979127"/>
 		<PlayerStat stat="ManaRegenRecovery" value="27.7"/>
-		<PlayerStat stat="ManaLeechGainRate" value="8.5165221923378"/>
+		<PlayerStat stat="ManaLeechGainRate" value="5.5357394250196"/>
 		<PlayerStat stat="EnergyShield" value="781"/>
 		<PlayerStat stat="EnergyShieldRecoveryCap" value="781"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
@@ -75,21 +75,21 @@
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
 		<PlayerStat stat="Armour" value="395"/>
 		<PlayerStat stat="Spec:ArmourInc" value="131"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="4"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="3"/>
 		<PlayerStat stat="EffectiveBlockChance" value="28"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="0"/>
-		<PlayerStat stat="FireResist" value="33"/>
+		<PlayerStat stat="FireResist" value="30"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="48"/>
+		<PlayerStat stat="ColdResist" value="67"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="13"/>
+		<PlayerStat stat="LightningResist" value="32"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="2.03"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.3195"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -157,23 +157,26 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="HoarfrostStacks" number="2"/>
-			<Input boolean="true" name="LostNonVaalBuffRecently"/>
-			<Input boolean="true" name="conditionChilledEnemyRecently"/>
-			<Input boolean="true" name="conditionEnemyBrittle"/>
-			<Input boolean="true" name="conditionEnemyDebilitated"/>
-			<Input boolean="true" name="conditionScorched"/>
+			<Input boolean="true" name="conditionChannelling"/>
+			<Input boolean="true" name="conditionEnemyTaunted"/>
+			<Input boolean="true" name="conditionFrozen"/>
+			<Input boolean="true" name="conditionSapped"/>
 			<Input name="conditionScorchedEffect" number="5"/>
-			<Input boolean="true" name="conditionShocked"/>
-			<Input boolean="true" name="conditionStunnedEnemyRecently"/>
+			<Input name="curseOverlaps" number="10"/>
+			<Input boolean="true" name="divineSentinelPhysAsLightning"/>
 			<Input name="enemyDamageType" string="Projectile"/>
-			<Input name="multiplierLinkedTargets" number="2"/>
-			<Input name="multiplierNearbyAlly" number="9"/>
+			<Input boolean="true" name="linkedToMinion"/>
+			<Input name="multiplierIgniteAppliedRecently" number="10"/>
+			<Input name="multiplierPoisonAppliedRecently" number="10"/>
+			<Input name="multiplierSummonedMinion" number="9"/>
 			<Input name="pantheonMajorGod" string="TheBrineKing"/>
 			<Input name="physMode" string="LIGHTNING"/>
-			<Input name="playerCursedWithElementalWeakness" number="6"/>
+			<Input name="playerCursedWithFlammability" number="6"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

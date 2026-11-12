@@ -37,12 +37,12 @@
 		<PlayerStat stat="Int" value="114"/>
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="3842.7523435392"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3515"/>
+		<PlayerStat stat="TotalEHP" value="3586.1897172487"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3432"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="3916"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="2210"/>
 		<PlayerStat stat="ColdMaximumHitTaken" value="2323"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2719"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2703"/>
 		<PlayerStat stat="Life" value="2741"/>
 		<PlayerStat stat="Spec:LifeInc" value="70"/>
 		<PlayerStat stat="LifeUnreserved" value="2741"/>
@@ -57,21 +57,21 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="100"/>
 		<PlayerStat stat="ManaRegenRecovery" value="12.8"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="1027"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="1027"/>
+		<PlayerStat stat="EnergyShield" value="725"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="725"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="9"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="Rage" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="5990"/>
+		<PlayerStat stat="Evasion" value="4197"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
-		<PlayerStat stat="MeleeEvadeChance" value="40"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="40"/>
-		<PlayerStat stat="Armour" value="4967"/>
+		<PlayerStat stat="MeleeEvadeChance" value="30"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="30"/>
+		<PlayerStat stat="Armour" value="4327"/>
 		<PlayerStat stat="Spec:ArmourInc" value="238"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="31"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="28"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="14"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -156,13 +156,17 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="Disgorged"/>
-			<Input boolean="true" name="buffLesserImpenetrableShrine"/>
-			<Input boolean="true" name="conditionUsingTincture"/>
-			<Input name="doomBlastSource" string="expiration"/>
-			<Input name="raiseSpidersSpiderCount" number="7"/>
+			<Input boolean="true" name="buffBloodShrineOfRats"/>
+			<Input boolean="true" name="conditionHaveTotem"/>
+			<Input boolean="true" name="conditionHitByLightningDamageRecently"/>
+			<Input boolean="true" name="conditionSummonedZombieInPast8Sec"/>
+			<Input name="curseOverlaps" number="1"/>
+			<Input boolean="true" name="greaterHarbingerOfTimeSlipstream"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

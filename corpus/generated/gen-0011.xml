@@ -37,11 +37,11 @@
 		<PlayerStat stat="Int" value="74"/>
 		<PlayerStat stat="ReqInt" value="149"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2277.3094549865"/>
+		<PlayerStat stat="TotalEHP" value="2401.5386097764"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="2850"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2403"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="1587"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="1587"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2835"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="1567"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="1765"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="1432"/>
 		<PlayerStat stat="Life" value="2062"/>
 		<PlayerStat stat="Spec:LifeInc" value="72"/>
@@ -63,7 +63,7 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="498"/>
+		<PlayerStat stat="Evasion" value="555"/>
 		<PlayerStat stat="Spec:EvasionInc" value="197"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
@@ -75,11 +75,11 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="24"/>
-		<PlayerStat stat="FireResist" value="-56"/>
+		<PlayerStat stat="FireResist" value="-58"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="-56"/>
+		<PlayerStat stat="ColdResist" value="-40"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="-2"/>
+		<PlayerStat stat="LightningResist" value="14"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
@@ -151,13 +151,16 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionGainedPowerChargeRecently"/>
-			<Input boolean="true" name="conditionMinionsKilledRecently"/>
-			<Input name="heraldOfTheHivePressure" number="5"/>
-			<Input name="inventionMineTrapPlacedDuration" number="3"/>
-			<Input name="playerCursedWithElementalWeakness" number="2"/>
+			<Input boolean="true" name="conditionHitByFireDamageRecently"/>
+			<Input boolean="true" name="conditionKilledAffectedByDoT"/>
+			<Input boolean="true" name="iceNovaCastOnFrostbolt"/>
+			<Input name="inventionMineTrapPlacedDuration" number="5"/>
+			<Input name="playerCursedWithFlammability" number="2"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

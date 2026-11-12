@@ -5,9 +5,9 @@
 		<PlayerStat stat="AverageBurstDamage" value="0"/>
 		<PlayerStat stat="Speed" value="0.96"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="43.5"/>
-		<PlayerStat stat="CritChance" value="16.095"/>
+		<PlayerStat stat="CritChance" value="15.66"/>
 		<PlayerStat stat="CritMultiplier" value="1"/>
-		<PlayerStat stat="HitChance" value="37"/>
+		<PlayerStat stat="HitChance" value="36"/>
 		<PlayerStat stat="TotalDPS" value="0"/>
 		<PlayerStat stat="TotalDot" value="0"/>
 		<PlayerStat stat="WithBleedDPS" value="0"/>
@@ -31,39 +31,39 @@
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
-		<PlayerStat stat="Str" value="104"/>
+		<PlayerStat stat="Str" value="94"/>
 		<PlayerStat stat="ReqStr" value="293"/>
-		<PlayerStat stat="Dex" value="104"/>
+		<PlayerStat stat="Dex" value="94"/>
 		<PlayerStat stat="ReqDex" value="111"/>
-		<PlayerStat stat="Int" value="322"/>
+		<PlayerStat stat="Int" value="312"/>
 		<PlayerStat stat="ReqInt" value="129"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="1613.4344388283"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2646"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="1312"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="1213"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="1213"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="977"/>
-		<PlayerStat stat="MainHandAccuracy" value="402"/>
-		<PlayerStat stat="Life" value="1992"/>
+		<PlayerStat stat="TotalEHP" value="1858.930890559"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2944"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="1521"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="1406"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="1406"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1056"/>
+		<PlayerStat stat="MainHandAccuracy" value="382"/>
+		<PlayerStat stat="Life" value="1986"/>
 		<PlayerStat stat="Spec:LifeInc" value="18"/>
-		<PlayerStat stat="LifeUnreserved" value="1300"/>
-		<PlayerStat stat="LifeRecoverable" value="1300"/>
-		<PlayerStat stat="LifeUnreservedPercent" value="65.261044176707"/>
+		<PlayerStat stat="LifeUnreserved" value="1489"/>
+		<PlayerStat stat="LifeRecoverable" value="1489"/>
+		<PlayerStat stat="LifeUnreservedPercent" value="74.974823766365"/>
 		<PlayerStat stat="LifeRegenRecovery" value="0"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="0"/>
 		<PlayerStat stat="Spec:ManaInc" value="132"/>
 		<PlayerStat stat="ManaRegenRecovery" value="11.2"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="301"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="301"/>
+		<PlayerStat stat="EnergyShield" value="367"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="367"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="20"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="499"/>
+		<PlayerStat stat="Evasion" value="491"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
@@ -81,7 +81,7 @@
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="-19"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
-		<PlayerStat stat="ChaosResist" value="-33"/>
+		<PlayerStat stat="ChaosResist" value="-41"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.2"/>
 		<PlayerStat stat="FullDPS" value="0"/>
@@ -151,17 +151,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="ColdSnapBypassCD"/>
 			<Input boolean="true" name="aspectOfTheCatCatsStealth"/>
-			<Input boolean="true" name="conditionChilledEnemyRecently"/>
 			<Input boolean="true" name="conditionEnemyLifeHigherThanPlayer"/>
-			<Input boolean="true" name="conditionUsedAmethystFlaskRecently"/>
+			<Input boolean="true" name="conditionEnemyMaimed"/>
+			<Input name="meleeDistance" number="2"/>
 			<Input name="multiplierFreezeShockIgniteOnEnemy" number="4"/>
-			<Input name="projectileDistance" number="2"/>
-			<Input name="skillChainCount" number="10"/>
-			<Input name="skillPierceCount" number="2"/>
+			<Input name="multiplierIgniteAppliedRecently" number="5"/>
+			<Input name="skillChainCount" number="2"/>
+			<Input name="skillForkCount" number="10"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -379,27 +381,23 @@ Implicits: 1
 		</Item>
 		<Item id="8">
 			Rarity: UNIQUE
-The Sundered Will
-Fugitive Ring
-LevelReq: 42
+The Selfish Shepherd
+Nameless Ring
+League: Settlers of Kalguur
+LevelReq: 50
 Implicits: 2
-{tags:resistance}+2% to maximum Chaos Resistance
-{tags:resistance}Cannot roll Modifiers of Non-Chaos Damage Types
-{tags:attribute}{range:0.5}+(7-13) to all Attributes
-{tags:chaos_damage}{range:0.5}Adds (7-11) to (17-23) Chaos Damage
-{tags:resistance}{range:0.5}+(13-29)% to Chaos Resistance
-{range:0.5}(20-30)% increased Area of Effect of Aura Skills
-{range:0.5}(20-35)% reduced Reservation Efficiency of Skills
-{range:0.5}Increases and Reductions to Chaos Damage also apply to Effect of
-Auras from Chaos Skills at (10-15)% of their value, up to a maximum of 150%
+50% increased Elemental Ailment Duration on you
+{tags:caster}50% reduced Effect of Curses on you
+Grants level 20 Affliction
+{tags:caster,speed}{range:0.5}(6-12)% increased Cast Speed
+{tags:defences}{range:0.5}+(30-60) to maximum Energy Shield
+{tags:resistance}{range:0.5}+(7-19)% to Chaos Resistance
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
-			<ModRange id="7" range="0.5"/>
-			<ModRange id="8" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: RARE
@@ -601,6 +599,9 @@ Melee Strike Skills deal Splash Damage to surrounding targets
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Boots" source="Item:5:Saqawal&apos;s Talons, Hydrascale Boots">
 				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="20" nameSpec="Aspect of the Avian" quality="0" skillId="AspectOfTheAvian"/>
+			</Skill>
+			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Ring 2" source="Item:8:The Selfish Shepherd, Nameless Ring">
+				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="20" nameSpec="Affliction" quality="0" skillId="Affliction"/>
 			</Skill>
 		</SkillSet>
 	</Skills>

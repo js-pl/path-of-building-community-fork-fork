@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Saboteur" bandit="None" characterLevelAutoMode="false" className="Shadow" level="90" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="867.16621"/>
-		<PlayerStat stat="AverageBurstDamage" value="867.16621"/>
+		<PlayerStat stat="AverageHit" value="907.984307725"/>
+		<PlayerStat stat="AverageBurstDamage" value="907.984307725"/>
 		<PlayerStat stat="Speed" value="3.6333333333333"/>
 		<PlayerStat stat="MineLayingTime" value="0.27522935779817"/>
 		<PlayerStat stat="MineThrowCount" value="1"/>
@@ -10,15 +10,16 @@
 		<PlayerStat stat="CritChance" value="14.85"/>
 		<PlayerStat stat="CritMultiplier" value="1.98"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="3150.7038963333"/>
+		<PlayerStat stat="TotalDPS" value="3299.0096514008"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="3150.7038963333"/>
-		<PlayerStat stat="WithIgniteDPS" value="3150.7038963333"/>
-		<PlayerStat stat="WithPoisonDPS" value="3150.7038963333"/>
-		<PlayerStat stat="TotalDotDPS" value="0"/>
-		<PlayerStat stat="CullingDPS" value="0"/>
+		<PlayerStat stat="WithBleedDPS" value="3299.0096514008"/>
+		<PlayerStat stat="IgniteDPS" value="1071.6067503844"/>
+		<PlayerStat stat="WithIgniteDPS" value="4370.6164017853"/>
+		<PlayerStat stat="WithPoisonDPS" value="3299.0096514008"/>
+		<PlayerStat stat="TotalDotDPS" value="1071.6067503844"/>
+		<PlayerStat stat="CullingDPS" value="485.62404464281"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="3150.7038963333"/>
+		<PlayerStat stat="CombinedDPS" value="4856.2404464281"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="2.1"/>
 		<PlayerStat stat="ManaCost" value="7"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -39,41 +40,41 @@
 		<PlayerStat stat="Omni" value="303"/>
 		<PlayerStat stat="ReqOmni" value="775"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2423.8409540951"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2418"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2301"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2301"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2301"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2082"/>
+		<PlayerStat stat="TotalEHP" value="3764.4596182707"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3648"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2925"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="2925"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2925"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="3359"/>
 		<PlayerStat stat="Life" value="1787"/>
 		<PlayerStat stat="Spec:LifeInc" value="36"/>
 		<PlayerStat stat="LifeUnreserved" value="1787"/>
 		<PlayerStat stat="LifeRecoverable" value="1787"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="98.3"/>
+		<PlayerStat stat="LifeRegenRecovery" value="39.3"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="838"/>
 		<PlayerStat stat="Spec:ManaInc" value="34"/>
 		<PlayerStat stat="ManaUnreserved" value="807"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="96.300715990453"/>
-		<PlayerStat stat="ManaRegenRecovery" value="32.3"/>
+		<PlayerStat stat="ManaRegenRecovery" value="17.6"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
 		<PlayerStat stat="EnergyShield" value="455"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="227.5"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="455"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="40"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
-		<PlayerStat stat="Ward" value="0"/>
+		<PlayerStat stat="Ward" value="240"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="32"/>
+		<PlayerStat stat="Evasion" value="23"/>
 		<PlayerStat stat="Spec:EvasionInc" value="30"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
-		<PlayerStat stat="Armour" value="2439"/>
+		<PlayerStat stat="Armour" value="3833"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="21"/>
-		<PlayerStat stat="EffectiveBlockChance" value="6"/>
-		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="27"/>
+		<PlayerStat stat="EffectiveBlockChance" value="23"/>
+		<PlayerStat stat="EffectiveSpellBlockChance" value="8"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="13"/>
@@ -83,9 +84,9 @@
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="0"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
-		<PlayerStat stat="ChaosResist" value="-1"/>
+		<PlayerStat stat="ChaosResist" value="29"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.58"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.18"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -153,15 +154,18 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="buffLesserReplenishingShrine"/>
-			<Input boolean="true" name="conditionLowEnergyShield"/>
-			<Input boolean="true" name="conditionMinionsKilledRecently"/>
-			<Input boolean="true" name="conditionSuppressedRecently"/>
-			<Input name="multiplierMinionsKilledRecently" number="10"/>
-			<Input name="perforateSpikeOverlap" number="4"/>
-			<Input name="playerCursedWithVulnerability" number="5"/>
+			<Input boolean="true" name="DetonatedMinesRecently"/>
+			<Input boolean="true" name="buffBloodShrineOfCrows"/>
+			<Input name="buffHeartstopper" string="HIT"/>
+			<Input boolean="true" name="conditionEnemyFireResZero"/>
+			<Input boolean="true" name="conditionKilledAffectedByDoT"/>
+			<Input boolean="true" name="conditionUsedMinionSkillRecently"/>
+			<Input name="multiplierNonVaalSummonedMinion" number="6"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -359,19 +363,1991 @@ Implicits: 1
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
 		</Item>
-		<Item id="8">
+		<Item id="8" variant="492" variantAlt="293">
 			Rarity: UNIQUE
-Original Sin
-Amethyst Ring
-League: Sanctum
-LevelReq: 52
+Pearl of Tsoatha
+Prismatic Ring
+League: Allflame
+Item Level: 85
+Variant: Boots / Added Chaos Damage
+Variant: Boots / Added Cold Damage
+Variant: Boots / Added Fire Damage
+Variant: Boots / Added Lightning Damage
+Variant: Boots / Additional Accuracy
+Variant: Boots / Advanced Traps
+Variant: Boots / Ancestral Call
+Variant: Boots / Arcane Surge
+Variant: Boots / Archmage
+Variant: Boots / Arrogance
+Variant: Boots / Arrow Nova
+Variant: Boots / Ballista Totem
+Variant: Boots / Barrage
+Variant: Boots / Behead
+Variant: Boots / Blasphemy
+Variant: Boots / Blastchain Mine
+Variant: Boots / Blessed Call
+Variant: Boots / Blind
+Variant: Boots / Bloodlust
+Variant: Boots / Bloodthirst
+Variant: Boots / Bonechill
+Variant: Boots / Brutality
+Variant: Boots / Burning Damage
+Variant: Boots / Cast On Critical Strike
+Variant: Boots / Cast on Death
+Variant: Boots / Cast on Melee Kill
+Variant: Boots / Cast when Damage Taken
+Variant: Boots / Cast when Stunned
+Variant: Boots / Cast while Channelling
+Variant: Boots / Chain
+Variant: Boots / Chance to Bleed
+Variant: Boots / Chance to Flee
+Variant: Boots / Chance to Poison
+Variant: Boots / Charged Mines
+Variant: Boots / Charged Traps
+Variant: Boots / Close Combat
+Variant: Boots / Cluster Traps
+Variant: Boots / Cold Penetration
+Variant: Boots / Cold to Fire
+Variant: Boots / Combustion
+Variant: Boots / Concentrated Effect
+Variant: Boots / Controlled Blaze
+Variant: Boots / Controlled Destruction
+Variant: Boots / Corrupting Cry
+Variant: Boots / Critical Strike Affliction
+Variant: Boots / Cruelty
+Variant: Boots / Culling Strike
+Variant: Boots / Cursed Ground
+Variant: Boots / Damage on Full Life
+Variant: Boots / Deadly Ailments
+Variant: Boots / Decay
+Variant: Boots / Devour
+Variant: Boots / Efficacy
+Variant: Boots / Elemental Army
+Variant: Boots / Elemental Damage with Attacks
+Variant: Boots / Elemental Focus
+Variant: Boots / Elemental Proliferation
+Variant: Boots / Endurance Charge on Melee Stun
+Variant: Boots / Energy Leech
+Variant: Boots / Eternal Blessing
+Variant: Boots / Excommunicate
+Variant: Boots / Exemplar
+Variant: Boots / Expert Retaliation
+Variant: Boots / Faster Attacks
+Variant: Boots / Faster Casting
+Variant: Boots / Faster Projectiles
+Variant: Boots / Feeding Frenzy
+Variant: Boots / Fire Penetration
+Variant: Boots / Fist of War
+Variant: Boots / Flamewood
+Variant: Boots / Focused Ballista
+Variant: Boots / Focused Channelling
+Variant: Boots / Fork
+Variant: Boots / Fortify
+Variant: Boots / Fresh Meat
+Variant: Boots / Frigid Bond
+Variant: Boots / Generosity
+Variant: Boots / Greater Multiple Projectiles
+Variant: Boots / Greater Volley
+Variant: Boots / Guardian&apos;s Blessing
+Variant: Boots / Hallow
+Variant: Boots / Hex Bloom
+Variant: Boots / Hextouch
+Variant: Boots / High-Impact Mine
+Variant: Boots / Hypothermia
+Variant: Boots / Ice Bite
+Variant: Boots / Ignite Proliferation
+Variant: Boots / Immolate
+Variant: Boots / Impale
+Variant: Boots / Increased Area of Effect
+Variant: Boots / Increased Critical Damage
+Variant: Boots / Increased Critical Strikes
+Variant: Boots / Infernal Legion
+Variant: Boots / Infused Channelling
+Variant: Boots / Innervate
+Variant: Boots / Inspiration
+Variant: Boots / Intensify
+Variant: Boots / Iron Grip
+Variant: Boots / Iron Will
+Variant: Boots / Item Rarity
+Variant: Boots / Knockback
+Variant: Boots / Less Duration
+Variant: Boots / Life Gain on Hit
+Variant: Boots / Life Leech
+Variant: Boots / Lifetap
+Variant: Boots / Lightning Penetration
+Variant: Boots / Locus Mine
+Variant: Boots / Maim
+Variant: Boots / Mana Leech
+Variant: Boots / Manaforged Arrows
+Variant: Boots / Mark On Hit
+Variant: Boots / Meat Shield
+Variant: Boots / Melee Physical Damage
+Variant: Boots / Melee Splash
+Variant: Boots / Minefield
+Variant: Boots / Minion Damage
+Variant: Boots / Minion Life
+Variant: Boots / Minion Speed
+Variant: Boots / Mirage Archer
+Variant: Boots / Momentum
+Variant: Boots / More Duration
+Variant: Boots / Multiple Projectiles
+Variant: Boots / Multiple Totems
+Variant: Boots / Multiple Traps
+Variant: Boots / Multistrike
+Variant: Boots / Nightblade
+Variant: Boots / Overcharge
+Variant: Boots / Overexertion
+Variant: Boots / Physical to Lightning
+Variant: Boots / Pierce
+Variant: Boots / Pinpoint
+Variant: Boots / Point Blank
+Variant: Boots / Power Charge On Critical
+Variant: Boots / Pulverise
+Variant: Boots / Rage
+Variant: Boots / Returning Projectiles
+Variant: Boots / Rupture
+Variant: Boots / Ruthless
+Variant: Boots / Sacrifice
+Variant: Boots / Sadism
+Variant: Boots / Second Wind
+Variant: Boots / Slower Projectiles
+Variant: Boots / Spell Cascade
+Variant: Boots / Spell Echo
+Variant: Boots / Spell Totem
+Variant: Boots / Spellblade
+Variant: Boots / Stun
+Variant: Boots / Summon Phantasm
+Variant: Boots / Swift Affliction
+Variant: Boots / Swift Assembly
+Variant: Boots / Swiftbrand
+Variant: Boots / Trap
+Variant: Boots / Trap and Mine Damage
+Variant: Boots / Trauma
+Variant: Boots / Trinity
+Variant: Boots / Unbound Ailments
+Variant: Boots / Unleash
+Variant: Boots / Urgent Orders
+Variant: Boots / Vicious Projectiles
+Variant: Boots / Vile Toxins
+Variant: Boots / Void Manipulation
+Variant: Boots / Volatility
+Variant: Boots / Volley
+Variant: Boots / Withering Touch
+Variant: Gloves / Added Chaos Damage
+Variant: Gloves / Added Cold Damage
+Variant: Gloves / Added Fire Damage
+Variant: Gloves / Added Lightning Damage
+Variant: Gloves / Additional Accuracy
+Variant: Gloves / Advanced Traps
+Variant: Gloves / Ancestral Call
+Variant: Gloves / Arcane Surge
+Variant: Gloves / Archmage
+Variant: Gloves / Arrogance
+Variant: Gloves / Arrow Nova
+Variant: Gloves / Ballista Totem
+Variant: Gloves / Barrage
+Variant: Gloves / Behead
+Variant: Gloves / Blasphemy
+Variant: Gloves / Blastchain Mine
+Variant: Gloves / Blessed Call
+Variant: Gloves / Blind
+Variant: Gloves / Bloodlust
+Variant: Gloves / Bloodthirst
+Variant: Gloves / Bonechill
+Variant: Gloves / Brutality
+Variant: Gloves / Burning Damage
+Variant: Gloves / Cast On Critical Strike
+Variant: Gloves / Cast on Death
+Variant: Gloves / Cast on Melee Kill
+Variant: Gloves / Cast when Damage Taken
+Variant: Gloves / Cast when Stunned
+Variant: Gloves / Cast while Channelling
+Variant: Gloves / Chain
+Variant: Gloves / Chance to Bleed
+Variant: Gloves / Chance to Flee
+Variant: Gloves / Chance to Poison
+Variant: Gloves / Charged Mines
+Variant: Gloves / Charged Traps
+Variant: Gloves / Close Combat
+Variant: Gloves / Cluster Traps
+Variant: Gloves / Cold Penetration
+Variant: Gloves / Cold to Fire
+Variant: Gloves / Combustion
+Variant: Gloves / Concentrated Effect
+Variant: Gloves / Controlled Blaze
+Variant: Gloves / Controlled Destruction
+Variant: Gloves / Corrupting Cry
+Variant: Gloves / Critical Strike Affliction
+Variant: Gloves / Cruelty
+Variant: Gloves / Culling Strike
+Variant: Gloves / Cursed Ground
+Variant: Gloves / Damage on Full Life
+Variant: Gloves / Deadly Ailments
+Variant: Gloves / Decay
+Variant: Gloves / Devour
+Variant: Gloves / Efficacy
+Variant: Gloves / Elemental Army
+Variant: Gloves / Elemental Damage with Attacks
+Variant: Gloves / Elemental Focus
+Variant: Gloves / Elemental Proliferation
+Variant: Gloves / Endurance Charge on Melee Stun
+Variant: Gloves / Energy Leech
+Variant: Gloves / Eternal Blessing
+Variant: Gloves / Excommunicate
+Variant: Gloves / Exemplar
+Variant: Gloves / Expert Retaliation
+Variant: Gloves / Faster Attacks
+Variant: Gloves / Faster Casting
+Variant: Gloves / Faster Projectiles
+Variant: Gloves / Feeding Frenzy
+Variant: Gloves / Fire Penetration
+Variant: Gloves / Fist of War
+Variant: Gloves / Flamewood
+Variant: Gloves / Focused Ballista
+Variant: Gloves / Focused Channelling
+Variant: Gloves / Fork
+Variant: Gloves / Fortify
+Variant: Gloves / Fresh Meat
+Variant: Gloves / Frigid Bond
+Variant: Gloves / Generosity
+Variant: Gloves / Greater Multiple Projectiles
+Variant: Gloves / Greater Volley
+Variant: Gloves / Guardian&apos;s Blessing
+Variant: Gloves / Hallow
+Variant: Gloves / Hex Bloom
+Variant: Gloves / Hextouch
+Variant: Gloves / High-Impact Mine
+Variant: Gloves / Hypothermia
+Variant: Gloves / Ice Bite
+Variant: Gloves / Ignite Proliferation
+Variant: Gloves / Immolate
+Variant: Gloves / Impale
+Variant: Gloves / Increased Area of Effect
+Variant: Gloves / Increased Critical Damage
+Variant: Gloves / Increased Critical Strikes
+Variant: Gloves / Infernal Legion
+Variant: Gloves / Infused Channelling
+Variant: Gloves / Innervate
+Variant: Gloves / Inspiration
+Variant: Gloves / Intensify
+Variant: Gloves / Iron Grip
+Variant: Gloves / Iron Will
+Variant: Gloves / Item Rarity
+Variant: Gloves / Knockback
+Variant: Gloves / Less Duration
+Variant: Gloves / Life Gain on Hit
+Variant: Gloves / Life Leech
+Variant: Gloves / Lifetap
+Variant: Gloves / Lightning Penetration
+Variant: Gloves / Locus Mine
+Variant: Gloves / Maim
+Variant: Gloves / Mana Leech
+Variant: Gloves / Manaforged Arrows
+Variant: Gloves / Mark On Hit
+Variant: Gloves / Meat Shield
+Variant: Gloves / Melee Physical Damage
+Variant: Gloves / Melee Splash
+Variant: Gloves / Minefield
+Variant: Gloves / Minion Damage
+Variant: Gloves / Minion Life
+Variant: Gloves / Minion Speed
+Variant: Gloves / Mirage Archer
+Variant: Gloves / Momentum
+Variant: Gloves / More Duration
+Variant: Gloves / Multiple Projectiles
+Variant: Gloves / Multiple Totems
+Variant: Gloves / Multiple Traps
+Variant: Gloves / Multistrike
+Variant: Gloves / Nightblade
+Variant: Gloves / Overcharge
+Variant: Gloves / Overexertion
+Variant: Gloves / Physical to Lightning
+Variant: Gloves / Pierce
+Variant: Gloves / Pinpoint
+Variant: Gloves / Point Blank
+Variant: Gloves / Power Charge On Critical
+Variant: Gloves / Pulverise
+Variant: Gloves / Rage
+Variant: Gloves / Returning Projectiles
+Variant: Gloves / Rupture
+Variant: Gloves / Ruthless
+Variant: Gloves / Sacrifice
+Variant: Gloves / Sadism
+Variant: Gloves / Second Wind
+Variant: Gloves / Slower Projectiles
+Variant: Gloves / Spell Cascade
+Variant: Gloves / Spell Echo
+Variant: Gloves / Spell Totem
+Variant: Gloves / Spellblade
+Variant: Gloves / Stun
+Variant: Gloves / Summon Phantasm
+Variant: Gloves / Swift Affliction
+Variant: Gloves / Swift Assembly
+Variant: Gloves / Swiftbrand
+Variant: Gloves / Trap
+Variant: Gloves / Trap and Mine Damage
+Variant: Gloves / Trauma
+Variant: Gloves / Trinity
+Variant: Gloves / Unbound Ailments
+Variant: Gloves / Unleash
+Variant: Gloves / Urgent Orders
+Variant: Gloves / Vicious Projectiles
+Variant: Gloves / Vile Toxins
+Variant: Gloves / Void Manipulation
+Variant: Gloves / Volatility
+Variant: Gloves / Volley
+Variant: Gloves / Withering Touch
+Variant: Helmet / Added Chaos Damage
+Variant: Helmet / Added Cold Damage
+Variant: Helmet / Added Fire Damage
+Variant: Helmet / Added Lightning Damage
+Variant: Helmet / Additional Accuracy
+Variant: Helmet / Advanced Traps
+Variant: Helmet / Ancestral Call
+Variant: Helmet / Arcane Surge
+Variant: Helmet / Archmage
+Variant: Helmet / Arrogance
+Variant: Helmet / Arrow Nova
+Variant: Helmet / Ballista Totem
+Variant: Helmet / Barrage
+Variant: Helmet / Behead
+Variant: Helmet / Blasphemy
+Variant: Helmet / Blastchain Mine
+Variant: Helmet / Blessed Call
+Variant: Helmet / Blind
+Variant: Helmet / Bloodlust
+Variant: Helmet / Bloodthirst
+Variant: Helmet / Bonechill
+Variant: Helmet / Brutality
+Variant: Helmet / Burning Damage
+Variant: Helmet / Cast On Critical Strike
+Variant: Helmet / Cast on Death
+Variant: Helmet / Cast on Melee Kill
+Variant: Helmet / Cast when Damage Taken
+Variant: Helmet / Cast when Stunned
+Variant: Helmet / Cast while Channelling
+Variant: Helmet / Chain
+Variant: Helmet / Chance to Bleed
+Variant: Helmet / Chance to Flee
+Variant: Helmet / Chance to Poison
+Variant: Helmet / Charged Mines
+Variant: Helmet / Charged Traps
+Variant: Helmet / Close Combat
+Variant: Helmet / Cluster Traps
+Variant: Helmet / Cold Penetration
+Variant: Helmet / Cold to Fire
+Variant: Helmet / Combustion
+Variant: Helmet / Concentrated Effect
+Variant: Helmet / Controlled Blaze
+Variant: Helmet / Controlled Destruction
+Variant: Helmet / Corrupting Cry
+Variant: Helmet / Critical Strike Affliction
+Variant: Helmet / Cruelty
+Variant: Helmet / Culling Strike
+Variant: Helmet / Cursed Ground
+Variant: Helmet / Damage on Full Life
+Variant: Helmet / Deadly Ailments
+Variant: Helmet / Decay
+Variant: Helmet / Devour
+Variant: Helmet / Efficacy
+Variant: Helmet / Elemental Army
+Variant: Helmet / Elemental Damage with Attacks
+Variant: Helmet / Elemental Focus
+Variant: Helmet / Elemental Proliferation
+Variant: Helmet / Endurance Charge on Melee Stun
+Variant: Helmet / Energy Leech
+Variant: Helmet / Eternal Blessing
+Variant: Helmet / Excommunicate
+Variant: Helmet / Exemplar
+Variant: Helmet / Expert Retaliation
+Variant: Helmet / Faster Attacks
+Variant: Helmet / Faster Casting
+Variant: Helmet / Faster Projectiles
+Variant: Helmet / Feeding Frenzy
+Variant: Helmet / Fire Penetration
+Variant: Helmet / Fist of War
+Variant: Helmet / Flamewood
+Variant: Helmet / Focused Ballista
+Variant: Helmet / Focused Channelling
+Variant: Helmet / Fork
+Variant: Helmet / Fortify
+Variant: Helmet / Fresh Meat
+Variant: Helmet / Frigid Bond
+Variant: Helmet / Generosity
+Variant: Helmet / Greater Multiple Projectiles
+Variant: Helmet / Greater Volley
+Variant: Helmet / Guardian&apos;s Blessing
+Variant: Helmet / Hallow
+Variant: Helmet / Hex Bloom
+Variant: Helmet / Hextouch
+Variant: Helmet / High-Impact Mine
+Variant: Helmet / Hypothermia
+Variant: Helmet / Ice Bite
+Variant: Helmet / Ignite Proliferation
+Variant: Helmet / Immolate
+Variant: Helmet / Impale
+Variant: Helmet / Increased Area of Effect
+Variant: Helmet / Increased Critical Damage
+Variant: Helmet / Increased Critical Strikes
+Variant: Helmet / Infernal Legion
+Variant: Helmet / Infused Channelling
+Variant: Helmet / Innervate
+Variant: Helmet / Inspiration
+Variant: Helmet / Intensify
+Variant: Helmet / Iron Grip
+Variant: Helmet / Iron Will
+Variant: Helmet / Item Rarity
+Variant: Helmet / Knockback
+Variant: Helmet / Less Duration
+Variant: Helmet / Life Gain on Hit
+Variant: Helmet / Life Leech
+Variant: Helmet / Lifetap
+Variant: Helmet / Lightning Penetration
+Variant: Helmet / Locus Mine
+Variant: Helmet / Maim
+Variant: Helmet / Mana Leech
+Variant: Helmet / Manaforged Arrows
+Variant: Helmet / Mark On Hit
+Variant: Helmet / Meat Shield
+Variant: Helmet / Melee Physical Damage
+Variant: Helmet / Melee Splash
+Variant: Helmet / Minefield
+Variant: Helmet / Minion Damage
+Variant: Helmet / Minion Life
+Variant: Helmet / Minion Speed
+Variant: Helmet / Mirage Archer
+Variant: Helmet / Momentum
+Variant: Helmet / More Duration
+Variant: Helmet / Multiple Projectiles
+Variant: Helmet / Multiple Totems
+Variant: Helmet / Multiple Traps
+Variant: Helmet / Multistrike
+Variant: Helmet / Nightblade
+Variant: Helmet / Overcharge
+Variant: Helmet / Overexertion
+Variant: Helmet / Physical to Lightning
+Variant: Helmet / Pierce
+Variant: Helmet / Pinpoint
+Variant: Helmet / Point Blank
+Variant: Helmet / Power Charge On Critical
+Variant: Helmet / Pulverise
+Variant: Helmet / Rage
+Variant: Helmet / Returning Projectiles
+Variant: Helmet / Rupture
+Variant: Helmet / Ruthless
+Variant: Helmet / Sacrifice
+Variant: Helmet / Sadism
+Variant: Helmet / Second Wind
+Variant: Helmet / Slower Projectiles
+Variant: Helmet / Spell Cascade
+Variant: Helmet / Spell Echo
+Variant: Helmet / Spell Totem
+Variant: Helmet / Spellblade
+Variant: Helmet / Stun
+Variant: Helmet / Summon Phantasm
+Variant: Helmet / Swift Affliction
+Variant: Helmet / Swift Assembly
+Variant: Helmet / Swiftbrand
+Variant: Helmet / Trap
+Variant: Helmet / Trap and Mine Damage
+Variant: Helmet / Trauma
+Variant: Helmet / Trinity
+Variant: Helmet / Unbound Ailments
+Variant: Helmet / Unleash
+Variant: Helmet / Urgent Orders
+Variant: Helmet / Vicious Projectiles
+Variant: Helmet / Vile Toxins
+Variant: Helmet / Void Manipulation
+Variant: Helmet / Volatility
+Variant: Helmet / Volley
+Variant: Helmet / Withering Touch
+Variant: Passive Tree / Added Chaos Damage
+Variant: Passive Tree / Added Cold Damage
+Variant: Passive Tree / Added Fire Damage
+Variant: Passive Tree / Added Lightning Damage
+Variant: Passive Tree / Additional Accuracy
+Variant: Passive Tree / Advanced Traps
+Variant: Passive Tree / Ancestral Call
+Variant: Passive Tree / Arcane Surge
+Variant: Passive Tree / Archmage
+Variant: Passive Tree / Arrogance
+Variant: Passive Tree / Arrow Nova
+Variant: Passive Tree / Ballista Totem
+Variant: Passive Tree / Barrage
+Variant: Passive Tree / Behead
+Variant: Passive Tree / Blasphemy
+Variant: Passive Tree / Blastchain Mine
+Variant: Passive Tree / Blessed Call
+Variant: Passive Tree / Blind
+Variant: Passive Tree / Bloodlust
+Variant: Passive Tree / Bloodthirst
+Variant: Passive Tree / Bonechill
+Variant: Passive Tree / Brutality
+Variant: Passive Tree / Burning Damage
+Variant: Passive Tree / Cast On Critical Strike
+Variant: Passive Tree / Cast on Death
+Variant: Passive Tree / Cast on Melee Kill
+Variant: Passive Tree / Cast when Damage Taken
+Variant: Passive Tree / Cast when Stunned
+Variant: Passive Tree / Cast while Channelling
+Variant: Passive Tree / Chain
+Variant: Passive Tree / Chance to Bleed
+Variant: Passive Tree / Chance to Flee
+Variant: Passive Tree / Chance to Poison
+Variant: Passive Tree / Charged Mines
+Variant: Passive Tree / Charged Traps
+Variant: Passive Tree / Close Combat
+Variant: Passive Tree / Cluster Traps
+Variant: Passive Tree / Cold Penetration
+Variant: Passive Tree / Cold to Fire
+Variant: Passive Tree / Combustion
+Variant: Passive Tree / Concentrated Effect
+Variant: Passive Tree / Controlled Blaze
+Variant: Passive Tree / Controlled Destruction
+Variant: Passive Tree / Corrupting Cry
+Variant: Passive Tree / Critical Strike Affliction
+Variant: Passive Tree / Cruelty
+Variant: Passive Tree / Culling Strike
+Variant: Passive Tree / Cursed Ground
+Variant: Passive Tree / Damage on Full Life
+Variant: Passive Tree / Deadly Ailments
+Variant: Passive Tree / Decay
+Variant: Passive Tree / Devour
+Variant: Passive Tree / Efficacy
+Variant: Passive Tree / Elemental Army
+Variant: Passive Tree / Elemental Damage with Attacks
+Variant: Passive Tree / Elemental Focus
+Variant: Passive Tree / Elemental Proliferation
+Variant: Passive Tree / Endurance Charge on Melee Stun
+Variant: Passive Tree / Energy Leech
+Variant: Passive Tree / Eternal Blessing
+Variant: Passive Tree / Excommunicate
+Variant: Passive Tree / Exemplar
+Variant: Passive Tree / Expert Retaliation
+Variant: Passive Tree / Faster Attacks
+Variant: Passive Tree / Faster Casting
+Variant: Passive Tree / Faster Projectiles
+Variant: Passive Tree / Feeding Frenzy
+Variant: Passive Tree / Fire Penetration
+Variant: Passive Tree / Fist of War
+Variant: Passive Tree / Flamewood
+Variant: Passive Tree / Focused Ballista
+Variant: Passive Tree / Focused Channelling
+Variant: Passive Tree / Fork
+Variant: Passive Tree / Fortify
+Variant: Passive Tree / Fresh Meat
+Variant: Passive Tree / Frigid Bond
+Variant: Passive Tree / Generosity
+Variant: Passive Tree / Greater Multiple Projectiles
+Variant: Passive Tree / Greater Volley
+Variant: Passive Tree / Guardian&apos;s Blessing
+Variant: Passive Tree / Hallow
+Variant: Passive Tree / Hex Bloom
+Variant: Passive Tree / Hextouch
+Variant: Passive Tree / High-Impact Mine
+Variant: Passive Tree / Hypothermia
+Variant: Passive Tree / Ice Bite
+Variant: Passive Tree / Ignite Proliferation
+Variant: Passive Tree / Immolate
+Variant: Passive Tree / Impale
+Variant: Passive Tree / Increased Area of Effect
+Variant: Passive Tree / Increased Critical Damage
+Variant: Passive Tree / Increased Critical Strikes
+Variant: Passive Tree / Infernal Legion
+Variant: Passive Tree / Infused Channelling
+Variant: Passive Tree / Innervate
+Variant: Passive Tree / Inspiration
+Variant: Passive Tree / Intensify
+Variant: Passive Tree / Iron Grip
+Variant: Passive Tree / Iron Will
+Variant: Passive Tree / Item Rarity
+Variant: Passive Tree / Knockback
+Variant: Passive Tree / Less Duration
+Variant: Passive Tree / Life Gain on Hit
+Variant: Passive Tree / Life Leech
+Variant: Passive Tree / Lifetap
+Variant: Passive Tree / Lightning Penetration
+Variant: Passive Tree / Locus Mine
+Variant: Passive Tree / Maim
+Variant: Passive Tree / Mana Leech
+Variant: Passive Tree / Manaforged Arrows
+Variant: Passive Tree / Mark On Hit
+Variant: Passive Tree / Meat Shield
+Variant: Passive Tree / Melee Physical Damage
+Variant: Passive Tree / Melee Splash
+Variant: Passive Tree / Minefield
+Variant: Passive Tree / Minion Damage
+Variant: Passive Tree / Minion Life
+Variant: Passive Tree / Minion Speed
+Variant: Passive Tree / Mirage Archer
+Variant: Passive Tree / Momentum
+Variant: Passive Tree / More Duration
+Variant: Passive Tree / Multiple Projectiles
+Variant: Passive Tree / Multiple Totems
+Variant: Passive Tree / Multiple Traps
+Variant: Passive Tree / Multistrike
+Variant: Passive Tree / Nightblade
+Variant: Passive Tree / Overcharge
+Variant: Passive Tree / Overexertion
+Variant: Passive Tree / Physical to Lightning
+Variant: Passive Tree / Pierce
+Variant: Passive Tree / Pinpoint
+Variant: Passive Tree / Point Blank
+Variant: Passive Tree / Power Charge On Critical
+Variant: Passive Tree / Pulverise
+Variant: Passive Tree / Rage
+Variant: Passive Tree / Returning Projectiles
+Variant: Passive Tree / Rupture
+Variant: Passive Tree / Ruthless
+Variant: Passive Tree / Sacrifice
+Variant: Passive Tree / Sadism
+Variant: Passive Tree / Second Wind
+Variant: Passive Tree / Slower Projectiles
+Variant: Passive Tree / Spell Cascade
+Variant: Passive Tree / Spell Echo
+Variant: Passive Tree / Spell Totem
+Variant: Passive Tree / Spellblade
+Variant: Passive Tree / Stun
+Variant: Passive Tree / Summon Phantasm
+Variant: Passive Tree / Swift Affliction
+Variant: Passive Tree / Swift Assembly
+Variant: Passive Tree / Swiftbrand
+Variant: Passive Tree / Trap
+Variant: Passive Tree / Trap and Mine Damage
+Variant: Passive Tree / Trauma
+Variant: Passive Tree / Trinity
+Variant: Passive Tree / Unbound Ailments
+Variant: Passive Tree / Unleash
+Variant: Passive Tree / Urgent Orders
+Variant: Passive Tree / Vicious Projectiles
+Variant: Passive Tree / Vile Toxins
+Variant: Passive Tree / Void Manipulation
+Variant: Passive Tree / Volatility
+Variant: Passive Tree / Volley
+Variant: Passive Tree / Withering Touch
+Selected Variant: 492
+Has Alt Variant: true
+Selected Alt Variant: 293
+LevelReq: 30
 Implicits: 1
-{tags:resistance}{range:0.5}+(17-23)% to Chaos Resistance
-{tags:elemental_damage,chaos_damage}All Elemental Damage Converted to Chaos Damage
-{tags:chaos_damage,resistance}Nearby Enemies&apos; Chaos Resistance is 0
+{tags:elemental,resistance}{range:0.5}+(8-10)% to all Elemental Resistances
+{tags:elemental,resistance}{range:0.5}+(27-34)% to all Elemental Resistances
+{tags:elemental_damage,damage,elemental}{range:0.5}(30-60)% increased Elemental Damage
+{variant:1}Skills Socketed in your Boots are Supported by level 20 Added Chaos Damage
+{variant:2}Skills Socketed in your Boots are Supported by level 20 Added Cold Damage
+{variant:3}Skills Socketed in your Boots are Supported by level 20 Added Fire Damage
+{variant:4}Skills Socketed in your Boots are Supported by level 20 Added Lightning Damage
+{variant:5}Skills Socketed in your Boots are Supported by level 20 Additional Accuracy
+{variant:6}Skills Socketed in your Boots are Supported by level 20 Advanced Traps
+{variant:7}Skills Socketed in your Boots are Supported by level 20 Ancestral Call
+{variant:8}Skills Socketed in your Boots are Supported by level 20 Arcane Surge
+{variant:9}Skills Socketed in your Boots are Supported by level 20 Archmage
+{variant:10}Skills Socketed in your Boots are Supported by level 20 Arrogance
+{variant:11}Skills Socketed in your Boots are Supported by level 20 Arrow Nova
+{variant:12}Skills Socketed in your Boots are Supported by level 20 Ballista Totem
+{variant:13}Skills Socketed in your Boots are Supported by level 20 Barrage
+{variant:14}Skills Socketed in your Boots are Supported by level 20 Behead
+{variant:15}Skills Socketed in your Boots are Supported by level 20 Blasphemy
+{variant:16}Skills Socketed in your Boots are Supported by level 20 Blastchain Mine
+{variant:17}Skills Socketed in your Boots are Supported by level 20 Blessed Call
+{variant:18}Skills Socketed in your Boots are Supported by level 20 Blind
+{variant:19}Skills Socketed in your Boots are Supported by level 20 Bloodlust
+{variant:20}Skills Socketed in your Boots are Supported by level 20 Bloodthirst
+{variant:21}Skills Socketed in your Boots are Supported by level 20 Bonechill
+{variant:22}Skills Socketed in your Boots are Supported by level 20 Brutality
+{variant:23}Skills Socketed in your Boots are Supported by level 20 Burning Damage
+{variant:24}Skills Socketed in your Boots are Supported by level 20 Cast On Critical Strike
+{variant:25}Skills Socketed in your Boots are Supported by level 20 Cast on Death
+{variant:26}Skills Socketed in your Boots are Supported by level 20 Cast on Melee Kill
+{variant:27}Skills Socketed in your Boots are Supported by level 20 Cast when Damage Taken
+{variant:28}Skills Socketed in your Boots are Supported by level 20 Cast when Stunned
+{variant:29}Skills Socketed in your Boots are Supported by level 20 Cast while Channelling
+{variant:30}Skills Socketed in your Boots are Supported by level 20 Chain
+{variant:31}Skills Socketed in your Boots are Supported by level 20 Chance to Bleed
+{variant:32}Skills Socketed in your Boots are Supported by level 20 Chance to Flee
+{variant:33}Skills Socketed in your Boots are Supported by level 20 Chance to Poison
+{variant:34}Skills Socketed in your Boots are Supported by level 20 Charged Mines
+{variant:35}Skills Socketed in your Boots are Supported by level 20 Charged Traps
+{variant:36}Skills Socketed in your Boots are Supported by level 20 Close Combat
+{variant:37}Skills Socketed in your Boots are Supported by level 20 Cluster Traps
+{variant:38}Skills Socketed in your Boots are Supported by level 20 Cold Penetration
+{variant:39}Skills Socketed in your Boots are Supported by level 20 Cold to Fire
+{variant:40}Skills Socketed in your Boots are Supported by level 20 Combustion
+{variant:41}Skills Socketed in your Boots are Supported by level 20 Concentrated Effect
+{variant:42}Skills Socketed in your Boots are Supported by level 20 Controlled Blaze
+{variant:43}Skills Socketed in your Boots are Supported by level 20 Controlled Destruction
+{variant:44}Skills Socketed in your Boots are Supported by level 20 Corrupting Cry
+{variant:45}Skills Socketed in your Boots are Supported by level 20 Critical Strike Affliction
+{variant:46}Skills Socketed in your Boots are Supported by level 20 Cruelty
+{variant:47}Skills Socketed in your Boots are Supported by level 20 Culling Strike
+{variant:48}Skills Socketed in your Boots are Supported by level 20 Cursed Ground
+{variant:49}Skills Socketed in your Boots are Supported by level 20 Damage on Full Life
+{variant:50}Skills Socketed in your Boots are Supported by level 20 Deadly Ailments
+{variant:51}Skills Socketed in your Boots are Supported by level 20 Decay
+{variant:52}Skills Socketed in your Boots are Supported by level 20 Devour
+{variant:53}Skills Socketed in your Boots are Supported by level 20 Efficacy
+{variant:54}Skills Socketed in your Boots are Supported by level 20 Elemental Army
+{variant:55}Skills Socketed in your Boots are Supported by level 20 Elemental Damage with Attacks
+{variant:56}Skills Socketed in your Boots are Supported by level 20 Elemental Focus
+{variant:57}Skills Socketed in your Boots are Supported by level 20 Elemental Proliferation
+{variant:58}Skills Socketed in your Boots are Supported by level 20 Endurance Charge on Melee Stun
+{variant:59}Skills Socketed in your Boots are Supported by level 20 Energy Leech
+{variant:60}Skills Socketed in your Boots are Supported by level 20 Eternal Blessing
+{variant:61}Skills Socketed in your Boots are Supported by level 20 Excommunicate
+{variant:62}Skills Socketed in your Boots are Supported by level 20 Exemplar
+{variant:63}Skills Socketed in your Boots are Supported by level 20 Expert Retaliation
+{variant:64}Skills Socketed in your Boots are Supported by level 20 Faster Attacks
+{variant:65}Skills Socketed in your Boots are Supported by level 20 Faster Casting
+{variant:66}Skills Socketed in your Boots are Supported by level 20 Faster Projectiles
+{variant:67}Skills Socketed in your Boots are Supported by level 20 Feeding Frenzy
+{variant:68}Skills Socketed in your Boots are Supported by level 20 Fire Penetration
+{variant:69}Skills Socketed in your Boots are Supported by level 20 Fist of War
+{variant:70}Skills Socketed in your Boots are Supported by level 20 Flamewood
+{variant:71}Skills Socketed in your Boots are Supported by level 20 Focused Ballista
+{variant:72}Skills Socketed in your Boots are Supported by level 20 Focused Channelling
+{variant:73}Skills Socketed in your Boots are Supported by level 20 Fork
+{variant:74}Skills Socketed in your Boots are Supported by level 20 Fortify
+{variant:75}Skills Socketed in your Boots are Supported by level 20 Fresh Meat
+{variant:76}Skills Socketed in your Boots are Supported by level 20 Frigid Bond
+{variant:77}Skills Socketed in your Boots are Supported by level 20 Generosity
+{variant:78}Skills Socketed in your Boots are Supported by level 20 Greater Multiple Projectiles
+{variant:79}Skills Socketed in your Boots are Supported by level 20 Greater Volley
+{variant:80}Skills Socketed in your Boots are Supported by level 20 Guardian&apos;s Blessing
+{variant:81}Skills Socketed in your Boots are Supported by level 20 Hallow
+{variant:82}Skills Socketed in your Boots are Supported by level 20 Hex Bloom
+{variant:83}Skills Socketed in your Boots are Supported by level 20 Hextouch
+{variant:84}Skills Socketed in your Boots are Supported by level 20 High-Impact Mine
+{variant:85}Skills Socketed in your Boots are Supported by level 20 Hypothermia
+{variant:86}Skills Socketed in your Boots are Supported by level 20 Ice Bite
+{variant:87}Skills Socketed in your Boots are Supported by level 20 Ignite Proliferation
+{variant:88}Skills Socketed in your Boots are Supported by level 20 Immolate
+{variant:89}Skills Socketed in your Boots are Supported by level 20 Impale
+{variant:90}Skills Socketed in your Boots are Supported by level 20 Increased Area of Effect
+{variant:91}Skills Socketed in your Boots are Supported by level 20 Increased Critical Damage
+{variant:92}Skills Socketed in your Boots are Supported by level 20 Increased Critical Strikes
+{variant:93}Skills Socketed in your Boots are Supported by level 20 Infernal Legion
+{variant:94}Skills Socketed in your Boots are Supported by level 20 Infused Channelling
+{variant:95}Skills Socketed in your Boots are Supported by level 20 Innervate
+{variant:96}Skills Socketed in your Boots are Supported by level 20 Inspiration
+{variant:97}Skills Socketed in your Boots are Supported by level 20 Intensify
+{variant:98}Skills Socketed in your Boots are Supported by level 20 Iron Grip
+{variant:99}Skills Socketed in your Boots are Supported by level 20 Iron Will
+{variant:100}Skills Socketed in your Boots are Supported by level 20 Item Rarity
+{variant:101}Skills Socketed in your Boots are Supported by level 20 Knockback
+{variant:102}Skills Socketed in your Boots are Supported by level 20 Less Duration
+{variant:103}Skills Socketed in your Boots are Supported by level 20 Life Gain on Hit
+{variant:104}Skills Socketed in your Boots are Supported by level 20 Life Leech
+{variant:105}Skills Socketed in your Boots are Supported by level 20 Lifetap
+{variant:106}Skills Socketed in your Boots are Supported by level 20 Lightning Penetration
+{variant:107}Skills Socketed in your Boots are Supported by level 20 Locus Mine
+{variant:108}Skills Socketed in your Boots are Supported by level 20 Maim
+{variant:109}Skills Socketed in your Boots are Supported by level 20 Mana Leech
+{variant:110}Skills Socketed in your Boots are Supported by level 20 Manaforged Arrows
+{variant:111}Skills Socketed in your Boots are Supported by level 20 Mark On Hit
+{variant:112}Skills Socketed in your Boots are Supported by level 20 Meat Shield
+{variant:113}Skills Socketed in your Boots are Supported by level 20 Melee Physical Damage
+{variant:114}Skills Socketed in your Boots are Supported by level 20 Melee Splash
+{variant:115}Skills Socketed in your Boots are Supported by level 20 Minefield
+{variant:116}Skills Socketed in your Boots are Supported by level 20 Minion Damage
+{variant:117}Skills Socketed in your Boots are Supported by level 20 Minion Life
+{variant:118}Skills Socketed in your Boots are Supported by level 20 Minion Speed
+{variant:119}Skills Socketed in your Boots are Supported by level 20 Mirage Archer
+{variant:120}Skills Socketed in your Boots are Supported by level 20 Momentum
+{variant:121}Skills Socketed in your Boots are Supported by level 20 More Duration
+{variant:122}Skills Socketed in your Boots are Supported by level 20 Multiple Projectiles
+{variant:123}Skills Socketed in your Boots are Supported by level 20 Multiple Totems
+{variant:124}Skills Socketed in your Boots are Supported by level 20 Multiple Traps
+{variant:125}Skills Socketed in your Boots are Supported by level 20 Multistrike
+{variant:126}Skills Socketed in your Boots are Supported by level 20 Nightblade
+{variant:127}Skills Socketed in your Boots are Supported by level 20 Overcharge
+{variant:128}Skills Socketed in your Boots are Supported by level 20 Overexertion
+{variant:129}Skills Socketed in your Boots are Supported by level 20 Physical to Lightning
+{variant:130}Skills Socketed in your Boots are Supported by level 20 Pierce
+{variant:131}Skills Socketed in your Boots are Supported by level 20 Pinpoint
+{variant:132}Skills Socketed in your Boots are Supported by level 20 Point Blank
+{variant:133}Skills Socketed in your Boots are Supported by level 20 Power Charge On Critical
+{variant:134}Skills Socketed in your Boots are Supported by level 20 Pulverise
+{variant:135}Skills Socketed in your Boots are Supported by level 20 Rage
+{variant:136}Skills Socketed in your Boots are Supported by level 20 Returning Projectiles
+{variant:137}Skills Socketed in your Boots are Supported by level 20 Rupture
+{variant:138}Skills Socketed in your Boots are Supported by level 20 Ruthless
+{variant:139}Skills Socketed in your Boots are Supported by level 20 Sacrifice
+{variant:140}Skills Socketed in your Boots are Supported by level 20 Sadism
+{variant:141}Skills Socketed in your Boots are Supported by level 20 Second Wind
+{variant:142}Skills Socketed in your Boots are Supported by level 20 Slower Projectiles
+{variant:143}Skills Socketed in your Boots are Supported by level 20 Spell Cascade
+{variant:144}Skills Socketed in your Boots are Supported by level 20 Spell Echo
+{variant:145}Skills Socketed in your Boots are Supported by level 20 Spell Totem
+{variant:146}Skills Socketed in your Boots are Supported by level 20 Spellblade
+{variant:147}Skills Socketed in your Boots are Supported by level 20 Stun
+{variant:148}Skills Socketed in your Boots are Supported by level 20 Summon Phantasm
+{variant:149}Skills Socketed in your Boots are Supported by level 20 Swift Affliction
+{variant:150}Skills Socketed in your Boots are Supported by level 20 Swift Assembly
+{variant:151}Skills Socketed in your Boots are Supported by level 20 Swiftbrand
+{variant:152}Skills Socketed in your Boots are Supported by level 20 Trap
+{variant:153}Skills Socketed in your Boots are Supported by level 20 Trap and Mine Damage
+{variant:154}Skills Socketed in your Boots are Supported by level 20 Trauma
+{variant:155}Skills Socketed in your Boots are Supported by level 20 Trinity
+{variant:156}Skills Socketed in your Boots are Supported by level 20 Unbound Ailments
+{variant:157}Skills Socketed in your Boots are Supported by level 20 Unleash
+{variant:158}Skills Socketed in your Boots are Supported by level 20 Urgent Orders
+{variant:159}Skills Socketed in your Boots are Supported by level 20 Vicious Projectiles
+{variant:160}Skills Socketed in your Boots are Supported by level 20 Vile Toxins
+{variant:161}Skills Socketed in your Boots are Supported by level 20 Void Manipulation
+{variant:162}Skills Socketed in your Boots are Supported by level 20 Volatility
+{variant:163}Skills Socketed in your Boots are Supported by level 20 Volley
+{variant:164}Skills Socketed in your Boots are Supported by level 20 Withering Touch
+{variant:165}Skills Socketed in your Gloves are Supported by level 20 Added Chaos Damage
+{variant:166}Skills Socketed in your Gloves are Supported by level 20 Added Cold Damage
+{variant:167}Skills Socketed in your Gloves are Supported by level 20 Added Fire Damage
+{variant:168}Skills Socketed in your Gloves are Supported by level 20 Added Lightning Damage
+{variant:169}Skills Socketed in your Gloves are Supported by level 20 Additional Accuracy
+{variant:170}Skills Socketed in your Gloves are Supported by level 20 Advanced Traps
+{variant:171}Skills Socketed in your Gloves are Supported by level 20 Ancestral Call
+{variant:172}Skills Socketed in your Gloves are Supported by level 20 Arcane Surge
+{variant:173}Skills Socketed in your Gloves are Supported by level 20 Archmage
+{variant:174}Skills Socketed in your Gloves are Supported by level 20 Arrogance
+{variant:175}Skills Socketed in your Gloves are Supported by level 20 Arrow Nova
+{variant:176}Skills Socketed in your Gloves are Supported by level 20 Ballista Totem
+{variant:177}Skills Socketed in your Gloves are Supported by level 20 Barrage
+{variant:178}Skills Socketed in your Gloves are Supported by level 20 Behead
+{variant:179}Skills Socketed in your Gloves are Supported by level 20 Blasphemy
+{variant:180}Skills Socketed in your Gloves are Supported by level 20 Blastchain Mine
+{variant:181}Skills Socketed in your Gloves are Supported by level 20 Blessed Call
+{variant:182}Skills Socketed in your Gloves are Supported by level 20 Blind
+{variant:183}Skills Socketed in your Gloves are Supported by level 20 Bloodlust
+{variant:184}Skills Socketed in your Gloves are Supported by level 20 Bloodthirst
+{variant:185}Skills Socketed in your Gloves are Supported by level 20 Bonechill
+{variant:186}Skills Socketed in your Gloves are Supported by level 20 Brutality
+{variant:187}Skills Socketed in your Gloves are Supported by level 20 Burning Damage
+{variant:188}Skills Socketed in your Gloves are Supported by level 20 Cast On Critical Strike
+{variant:189}Skills Socketed in your Gloves are Supported by level 20 Cast on Death
+{variant:190}Skills Socketed in your Gloves are Supported by level 20 Cast on Melee Kill
+{variant:191}Skills Socketed in your Gloves are Supported by level 20 Cast when Damage Taken
+{variant:192}Skills Socketed in your Gloves are Supported by level 20 Cast when Stunned
+{variant:193}Skills Socketed in your Gloves are Supported by level 20 Cast while Channelling
+{variant:194}Skills Socketed in your Gloves are Supported by level 20 Chain
+{variant:195}Skills Socketed in your Gloves are Supported by level 20 Chance to Bleed
+{variant:196}Skills Socketed in your Gloves are Supported by level 20 Chance to Flee
+{variant:197}Skills Socketed in your Gloves are Supported by level 20 Chance to Poison
+{variant:198}Skills Socketed in your Gloves are Supported by level 20 Charged Mines
+{variant:199}Skills Socketed in your Gloves are Supported by level 20 Charged Traps
+{variant:200}Skills Socketed in your Gloves are Supported by level 20 Close Combat
+{variant:201}Skills Socketed in your Gloves are Supported by level 20 Cluster Traps
+{variant:202}Skills Socketed in your Gloves are Supported by level 20 Cold Penetration
+{variant:203}Skills Socketed in your Gloves are Supported by level 20 Cold to Fire
+{variant:204}Skills Socketed in your Gloves are Supported by level 20 Combustion
+{variant:205}Skills Socketed in your Gloves are Supported by level 20 Concentrated Effect
+{variant:206}Skills Socketed in your Gloves are Supported by level 20 Controlled Blaze
+{variant:207}Skills Socketed in your Gloves are Supported by level 20 Controlled Destruction
+{variant:208}Skills Socketed in your Gloves are Supported by level 20 Corrupting Cry
+{variant:209}Skills Socketed in your Gloves are Supported by level 20 Critical Strike Affliction
+{variant:210}Skills Socketed in your Gloves are Supported by level 20 Cruelty
+{variant:211}Skills Socketed in your Gloves are Supported by level 20 Culling Strike
+{variant:212}Skills Socketed in your Gloves are Supported by level 20 Cursed Ground
+{variant:213}Skills Socketed in your Gloves are Supported by level 20 Damage on Full Life
+{variant:214}Skills Socketed in your Gloves are Supported by level 20 Deadly Ailments
+{variant:215}Skills Socketed in your Gloves are Supported by level 20 Decay
+{variant:216}Skills Socketed in your Gloves are Supported by level 20 Devour
+{variant:217}Skills Socketed in your Gloves are Supported by level 20 Efficacy
+{variant:218}Skills Socketed in your Gloves are Supported by level 20 Elemental Army
+{variant:219}Skills Socketed in your Gloves are Supported by level 20 Elemental Damage with Attacks
+{variant:220}Skills Socketed in your Gloves are Supported by level 20 Elemental Focus
+{variant:221}Skills Socketed in your Gloves are Supported by level 20 Elemental Proliferation
+{variant:222}Skills Socketed in your Gloves are Supported by level 20 Endurance Charge on Melee Stun
+{variant:223}Skills Socketed in your Gloves are Supported by level 20 Energy Leech
+{variant:224}Skills Socketed in your Gloves are Supported by level 20 Eternal Blessing
+{variant:225}Skills Socketed in your Gloves are Supported by level 20 Excommunicate
+{variant:226}Skills Socketed in your Gloves are Supported by level 20 Exemplar
+{variant:227}Skills Socketed in your Gloves are Supported by level 20 Expert Retaliation
+{variant:228}Skills Socketed in your Gloves are Supported by level 20 Faster Attacks
+{variant:229}Skills Socketed in your Gloves are Supported by level 20 Faster Casting
+{variant:230}Skills Socketed in your Gloves are Supported by level 20 Faster Projectiles
+{variant:231}Skills Socketed in your Gloves are Supported by level 20 Feeding Frenzy
+{variant:232}Skills Socketed in your Gloves are Supported by level 20 Fire Penetration
+{variant:233}Skills Socketed in your Gloves are Supported by level 20 Fist of War
+{variant:234}Skills Socketed in your Gloves are Supported by level 20 Flamewood
+{variant:235}Skills Socketed in your Gloves are Supported by level 20 Focused Ballista
+{variant:236}Skills Socketed in your Gloves are Supported by level 20 Focused Channelling
+{variant:237}Skills Socketed in your Gloves are Supported by level 20 Fork
+{variant:238}Skills Socketed in your Gloves are Supported by level 20 Fortify
+{variant:239}Skills Socketed in your Gloves are Supported by level 20 Fresh Meat
+{variant:240}Skills Socketed in your Gloves are Supported by level 20 Frigid Bond
+{variant:241}Skills Socketed in your Gloves are Supported by level 20 Generosity
+{variant:242}Skills Socketed in your Gloves are Supported by level 20 Greater Multiple Projectiles
+{variant:243}Skills Socketed in your Gloves are Supported by level 20 Greater Volley
+{variant:244}Skills Socketed in your Gloves are Supported by level 20 Guardian&apos;s Blessing
+{variant:245}Skills Socketed in your Gloves are Supported by level 20 Hallow
+{variant:246}Skills Socketed in your Gloves are Supported by level 20 Hex Bloom
+{variant:247}Skills Socketed in your Gloves are Supported by level 20 Hextouch
+{variant:248}Skills Socketed in your Gloves are Supported by level 20 High-Impact Mine
+{variant:249}Skills Socketed in your Gloves are Supported by level 20 Hypothermia
+{variant:250}Skills Socketed in your Gloves are Supported by level 20 Ice Bite
+{variant:251}Skills Socketed in your Gloves are Supported by level 20 Ignite Proliferation
+{variant:252}Skills Socketed in your Gloves are Supported by level 20 Immolate
+{variant:253}Skills Socketed in your Gloves are Supported by level 20 Impale
+{variant:254}Skills Socketed in your Gloves are Supported by level 20 Increased Area of Effect
+{variant:255}Skills Socketed in your Gloves are Supported by level 20 Increased Critical Damage
+{variant:256}Skills Socketed in your Gloves are Supported by level 20 Increased Critical Strikes
+{variant:257}Skills Socketed in your Gloves are Supported by level 20 Infernal Legion
+{variant:258}Skills Socketed in your Gloves are Supported by level 20 Infused Channelling
+{variant:259}Skills Socketed in your Gloves are Supported by level 20 Innervate
+{variant:260}Skills Socketed in your Gloves are Supported by level 20 Inspiration
+{variant:261}Skills Socketed in your Gloves are Supported by level 20 Intensify
+{variant:262}Skills Socketed in your Gloves are Supported by level 20 Iron Grip
+{variant:263}Skills Socketed in your Gloves are Supported by level 20 Iron Will
+{variant:264}Skills Socketed in your Gloves are Supported by level 20 Item Rarity
+{variant:265}Skills Socketed in your Gloves are Supported by level 20 Knockback
+{variant:266}Skills Socketed in your Gloves are Supported by level 20 Less Duration
+{variant:267}Skills Socketed in your Gloves are Supported by level 20 Life Gain on Hit
+{variant:268}Skills Socketed in your Gloves are Supported by level 20 Life Leech
+{variant:269}Skills Socketed in your Gloves are Supported by level 20 Lifetap
+{variant:270}Skills Socketed in your Gloves are Supported by level 20 Lightning Penetration
+{variant:271}Skills Socketed in your Gloves are Supported by level 20 Locus Mine
+{variant:272}Skills Socketed in your Gloves are Supported by level 20 Maim
+{variant:273}Skills Socketed in your Gloves are Supported by level 20 Mana Leech
+{variant:274}Skills Socketed in your Gloves are Supported by level 20 Manaforged Arrows
+{variant:275}Skills Socketed in your Gloves are Supported by level 20 Mark On Hit
+{variant:276}Skills Socketed in your Gloves are Supported by level 20 Meat Shield
+{variant:277}Skills Socketed in your Gloves are Supported by level 20 Melee Physical Damage
+{variant:278}Skills Socketed in your Gloves are Supported by level 20 Melee Splash
+{variant:279}Skills Socketed in your Gloves are Supported by level 20 Minefield
+{variant:280}Skills Socketed in your Gloves are Supported by level 20 Minion Damage
+{variant:281}Skills Socketed in your Gloves are Supported by level 20 Minion Life
+{variant:282}Skills Socketed in your Gloves are Supported by level 20 Minion Speed
+{variant:283}Skills Socketed in your Gloves are Supported by level 20 Mirage Archer
+{variant:284}Skills Socketed in your Gloves are Supported by level 20 Momentum
+{variant:285}Skills Socketed in your Gloves are Supported by level 20 More Duration
+{variant:286}Skills Socketed in your Gloves are Supported by level 20 Multiple Projectiles
+{variant:287}Skills Socketed in your Gloves are Supported by level 20 Multiple Totems
+{variant:288}Skills Socketed in your Gloves are Supported by level 20 Multiple Traps
+{variant:289}Skills Socketed in your Gloves are Supported by level 20 Multistrike
+{variant:290}Skills Socketed in your Gloves are Supported by level 20 Nightblade
+{variant:291}Skills Socketed in your Gloves are Supported by level 20 Overcharge
+{variant:292}Skills Socketed in your Gloves are Supported by level 20 Overexertion
+{variant:293}Skills Socketed in your Gloves are Supported by level 20 Physical to Lightning
+{variant:294}Skills Socketed in your Gloves are Supported by level 20 Pierce
+{variant:295}Skills Socketed in your Gloves are Supported by level 20 Pinpoint
+{variant:296}Skills Socketed in your Gloves are Supported by level 20 Point Blank
+{variant:297}Skills Socketed in your Gloves are Supported by level 20 Power Charge On Critical
+{variant:298}Skills Socketed in your Gloves are Supported by level 20 Pulverise
+{variant:299}Skills Socketed in your Gloves are Supported by level 20 Rage
+{variant:300}Skills Socketed in your Gloves are Supported by level 20 Returning Projectiles
+{variant:301}Skills Socketed in your Gloves are Supported by level 20 Rupture
+{variant:302}Skills Socketed in your Gloves are Supported by level 20 Ruthless
+{variant:303}Skills Socketed in your Gloves are Supported by level 20 Sacrifice
+{variant:304}Skills Socketed in your Gloves are Supported by level 20 Sadism
+{variant:305}Skills Socketed in your Gloves are Supported by level 20 Second Wind
+{variant:306}Skills Socketed in your Gloves are Supported by level 20 Slower Projectiles
+{variant:307}Skills Socketed in your Gloves are Supported by level 20 Spell Cascade
+{variant:308}Skills Socketed in your Gloves are Supported by level 20 Spell Echo
+{variant:309}Skills Socketed in your Gloves are Supported by level 20 Spell Totem
+{variant:310}Skills Socketed in your Gloves are Supported by level 20 Spellblade
+{variant:311}Skills Socketed in your Gloves are Supported by level 20 Stun
+{variant:312}Skills Socketed in your Gloves are Supported by level 20 Summon Phantasm
+{variant:313}Skills Socketed in your Gloves are Supported by level 20 Swift Affliction
+{variant:314}Skills Socketed in your Gloves are Supported by level 20 Swift Assembly
+{variant:315}Skills Socketed in your Gloves are Supported by level 20 Swiftbrand
+{variant:316}Skills Socketed in your Gloves are Supported by level 20 Trap
+{variant:317}Skills Socketed in your Gloves are Supported by level 20 Trap and Mine Damage
+{variant:318}Skills Socketed in your Gloves are Supported by level 20 Trauma
+{variant:319}Skills Socketed in your Gloves are Supported by level 20 Trinity
+{variant:320}Skills Socketed in your Gloves are Supported by level 20 Unbound Ailments
+{variant:321}Skills Socketed in your Gloves are Supported by level 20 Unleash
+{variant:322}Skills Socketed in your Gloves are Supported by level 20 Urgent Orders
+{variant:323}Skills Socketed in your Gloves are Supported by level 20 Vicious Projectiles
+{variant:324}Skills Socketed in your Gloves are Supported by level 20 Vile Toxins
+{variant:325}Skills Socketed in your Gloves are Supported by level 20 Void Manipulation
+{variant:326}Skills Socketed in your Gloves are Supported by level 20 Volatility
+{variant:327}Skills Socketed in your Gloves are Supported by level 20 Volley
+{variant:328}Skills Socketed in your Gloves are Supported by level 20 Withering Touch
+{variant:329}Skills Socketed in your Helmet are Supported by level 20 Added Chaos Damage
+{variant:330}Skills Socketed in your Helmet are Supported by level 20 Added Cold Damage
+{variant:331}Skills Socketed in your Helmet are Supported by level 20 Added Fire Damage
+{variant:332}Skills Socketed in your Helmet are Supported by level 20 Added Lightning Damage
+{variant:333}Skills Socketed in your Helmet are Supported by level 20 Additional Accuracy
+{variant:334}Skills Socketed in your Helmet are Supported by level 20 Advanced Traps
+{variant:335}Skills Socketed in your Helmet are Supported by level 20 Ancestral Call
+{variant:336}Skills Socketed in your Helmet are Supported by level 20 Arcane Surge
+{variant:337}Skills Socketed in your Helmet are Supported by level 20 Archmage
+{variant:338}Skills Socketed in your Helmet are Supported by level 20 Arrogance
+{variant:339}Skills Socketed in your Helmet are Supported by level 20 Arrow Nova
+{variant:340}Skills Socketed in your Helmet are Supported by level 20 Ballista Totem
+{variant:341}Skills Socketed in your Helmet are Supported by level 20 Barrage
+{variant:342}Skills Socketed in your Helmet are Supported by level 20 Behead
+{variant:343}Skills Socketed in your Helmet are Supported by level 20 Blasphemy
+{variant:344}Skills Socketed in your Helmet are Supported by level 20 Blastchain Mine
+{variant:345}Skills Socketed in your Helmet are Supported by level 20 Blessed Call
+{variant:346}Skills Socketed in your Helmet are Supported by level 20 Blind
+{variant:347}Skills Socketed in your Helmet are Supported by level 20 Bloodlust
+{variant:348}Skills Socketed in your Helmet are Supported by level 20 Bloodthirst
+{variant:349}Skills Socketed in your Helmet are Supported by level 20 Bonechill
+{variant:350}Skills Socketed in your Helmet are Supported by level 20 Brutality
+{variant:351}Skills Socketed in your Helmet are Supported by level 20 Burning Damage
+{variant:352}Skills Socketed in your Helmet are Supported by level 20 Cast On Critical Strike
+{variant:353}Skills Socketed in your Helmet are Supported by level 20 Cast on Death
+{variant:354}Skills Socketed in your Helmet are Supported by level 20 Cast on Melee Kill
+{variant:355}Skills Socketed in your Helmet are Supported by level 20 Cast when Damage Taken
+{variant:356}Skills Socketed in your Helmet are Supported by level 20 Cast when Stunned
+{variant:357}Skills Socketed in your Helmet are Supported by level 20 Cast while Channelling
+{variant:358}Skills Socketed in your Helmet are Supported by level 20 Chain
+{variant:359}Skills Socketed in your Helmet are Supported by level 20 Chance to Bleed
+{variant:360}Skills Socketed in your Helmet are Supported by level 20 Chance to Flee
+{variant:361}Skills Socketed in your Helmet are Supported by level 20 Chance to Poison
+{variant:362}Skills Socketed in your Helmet are Supported by level 20 Charged Mines
+{variant:363}Skills Socketed in your Helmet are Supported by level 20 Charged Traps
+{variant:364}Skills Socketed in your Helmet are Supported by level 20 Close Combat
+{variant:365}Skills Socketed in your Helmet are Supported by level 20 Cluster Traps
+{variant:366}Skills Socketed in your Helmet are Supported by level 20 Cold Penetration
+{variant:367}Skills Socketed in your Helmet are Supported by level 20 Cold to Fire
+{variant:368}Skills Socketed in your Helmet are Supported by level 20 Combustion
+{variant:369}Skills Socketed in your Helmet are Supported by level 20 Concentrated Effect
+{variant:370}Skills Socketed in your Helmet are Supported by level 20 Controlled Blaze
+{variant:371}Skills Socketed in your Helmet are Supported by level 20 Controlled Destruction
+{variant:372}Skills Socketed in your Helmet are Supported by level 20 Corrupting Cry
+{variant:373}Skills Socketed in your Helmet are Supported by level 20 Critical Strike Affliction
+{variant:374}Skills Socketed in your Helmet are Supported by level 20 Cruelty
+{variant:375}Skills Socketed in your Helmet are Supported by level 20 Culling Strike
+{variant:376}Skills Socketed in your Helmet are Supported by level 20 Cursed Ground
+{variant:377}Skills Socketed in your Helmet are Supported by level 20 Damage on Full Life
+{variant:378}Skills Socketed in your Helmet are Supported by level 20 Deadly Ailments
+{variant:379}Skills Socketed in your Helmet are Supported by level 20 Decay
+{variant:380}Skills Socketed in your Helmet are Supported by level 20 Devour
+{variant:381}Skills Socketed in your Helmet are Supported by level 20 Efficacy
+{variant:382}Skills Socketed in your Helmet are Supported by level 20 Elemental Army
+{variant:383}Skills Socketed in your Helmet are Supported by level 20 Elemental Damage with Attacks
+{variant:384}Skills Socketed in your Helmet are Supported by level 20 Elemental Focus
+{variant:385}Skills Socketed in your Helmet are Supported by level 20 Elemental Proliferation
+{variant:386}Skills Socketed in your Helmet are Supported by level 20 Endurance Charge on Melee Stun
+{variant:387}Skills Socketed in your Helmet are Supported by level 20 Energy Leech
+{variant:388}Skills Socketed in your Helmet are Supported by level 20 Eternal Blessing
+{variant:389}Skills Socketed in your Helmet are Supported by level 20 Excommunicate
+{variant:390}Skills Socketed in your Helmet are Supported by level 20 Exemplar
+{variant:391}Skills Socketed in your Helmet are Supported by level 20 Expert Retaliation
+{variant:392}Skills Socketed in your Helmet are Supported by level 20 Faster Attacks
+{variant:393}Skills Socketed in your Helmet are Supported by level 20 Faster Casting
+{variant:394}Skills Socketed in your Helmet are Supported by level 20 Faster Projectiles
+{variant:395}Skills Socketed in your Helmet are Supported by level 20 Feeding Frenzy
+{variant:396}Skills Socketed in your Helmet are Supported by level 20 Fire Penetration
+{variant:397}Skills Socketed in your Helmet are Supported by level 20 Fist of War
+{variant:398}Skills Socketed in your Helmet are Supported by level 20 Flamewood
+{variant:399}Skills Socketed in your Helmet are Supported by level 20 Focused Ballista
+{variant:400}Skills Socketed in your Helmet are Supported by level 20 Focused Channelling
+{variant:401}Skills Socketed in your Helmet are Supported by level 20 Fork
+{variant:402}Skills Socketed in your Helmet are Supported by level 20 Fortify
+{variant:403}Skills Socketed in your Helmet are Supported by level 20 Fresh Meat
+{variant:404}Skills Socketed in your Helmet are Supported by level 20 Frigid Bond
+{variant:405}Skills Socketed in your Helmet are Supported by level 20 Generosity
+{variant:406}Skills Socketed in your Helmet are Supported by level 20 Greater Multiple Projectiles
+{variant:407}Skills Socketed in your Helmet are Supported by level 20 Greater Volley
+{variant:408}Skills Socketed in your Helmet are Supported by level 20 Guardian&apos;s Blessing
+{variant:409}Skills Socketed in your Helmet are Supported by level 20 Hallow
+{variant:410}Skills Socketed in your Helmet are Supported by level 20 Hex Bloom
+{variant:411}Skills Socketed in your Helmet are Supported by level 20 Hextouch
+{variant:412}Skills Socketed in your Helmet are Supported by level 20 High-Impact Mine
+{variant:413}Skills Socketed in your Helmet are Supported by level 20 Hypothermia
+{variant:414}Skills Socketed in your Helmet are Supported by level 20 Ice Bite
+{variant:415}Skills Socketed in your Helmet are Supported by level 20 Ignite Proliferation
+{variant:416}Skills Socketed in your Helmet are Supported by level 20 Immolate
+{variant:417}Skills Socketed in your Helmet are Supported by level 20 Impale
+{variant:418}Skills Socketed in your Helmet are Supported by level 20 Increased Area of Effect
+{variant:419}Skills Socketed in your Helmet are Supported by level 20 Increased Critical Damage
+{variant:420}Skills Socketed in your Helmet are Supported by level 20 Increased Critical Strikes
+{variant:421}Skills Socketed in your Helmet are Supported by level 20 Infernal Legion
+{variant:422}Skills Socketed in your Helmet are Supported by level 20 Infused Channelling
+{variant:423}Skills Socketed in your Helmet are Supported by level 20 Innervate
+{variant:424}Skills Socketed in your Helmet are Supported by level 20 Inspiration
+{variant:425}Skills Socketed in your Helmet are Supported by level 20 Intensify
+{variant:426}Skills Socketed in your Helmet are Supported by level 20 Iron Grip
+{variant:427}Skills Socketed in your Helmet are Supported by level 20 Iron Will
+{variant:428}Skills Socketed in your Helmet are Supported by level 20 Item Rarity
+{variant:429}Skills Socketed in your Helmet are Supported by level 20 Knockback
+{variant:430}Skills Socketed in your Helmet are Supported by level 20 Less Duration
+{variant:431}Skills Socketed in your Helmet are Supported by level 20 Life Gain on Hit
+{variant:432}Skills Socketed in your Helmet are Supported by level 20 Life Leech
+{variant:433}Skills Socketed in your Helmet are Supported by level 20 Lifetap
+{variant:434}Skills Socketed in your Helmet are Supported by level 20 Lightning Penetration
+{variant:435}Skills Socketed in your Helmet are Supported by level 20 Locus Mine
+{variant:436}Skills Socketed in your Helmet are Supported by level 20 Maim
+{variant:437}Skills Socketed in your Helmet are Supported by level 20 Mana Leech
+{variant:438}Skills Socketed in your Helmet are Supported by level 20 Manaforged Arrows
+{variant:439}Skills Socketed in your Helmet are Supported by level 20 Mark On Hit
+{variant:440}Skills Socketed in your Helmet are Supported by level 20 Meat Shield
+{variant:441}Skills Socketed in your Helmet are Supported by level 20 Melee Physical Damage
+{variant:442}Skills Socketed in your Helmet are Supported by level 20 Melee Splash
+{variant:443}Skills Socketed in your Helmet are Supported by level 20 Minefield
+{variant:444}Skills Socketed in your Helmet are Supported by level 20 Minion Damage
+{variant:445}Skills Socketed in your Helmet are Supported by level 20 Minion Life
+{variant:446}Skills Socketed in your Helmet are Supported by level 20 Minion Speed
+{variant:447}Skills Socketed in your Helmet are Supported by level 20 Mirage Archer
+{variant:448}Skills Socketed in your Helmet are Supported by level 20 Momentum
+{variant:449}Skills Socketed in your Helmet are Supported by level 20 More Duration
+{variant:450}Skills Socketed in your Helmet are Supported by level 20 Multiple Projectiles
+{variant:451}Skills Socketed in your Helmet are Supported by level 20 Multiple Totems
+{variant:452}Skills Socketed in your Helmet are Supported by level 20 Multiple Traps
+{variant:453}Skills Socketed in your Helmet are Supported by level 20 Multistrike
+{variant:454}Skills Socketed in your Helmet are Supported by level 20 Nightblade
+{variant:455}Skills Socketed in your Helmet are Supported by level 20 Overcharge
+{variant:456}Skills Socketed in your Helmet are Supported by level 20 Overexertion
+{variant:457}Skills Socketed in your Helmet are Supported by level 20 Physical to Lightning
+{variant:458}Skills Socketed in your Helmet are Supported by level 20 Pierce
+{variant:459}Skills Socketed in your Helmet are Supported by level 20 Pinpoint
+{variant:460}Skills Socketed in your Helmet are Supported by level 20 Point Blank
+{variant:461}Skills Socketed in your Helmet are Supported by level 20 Power Charge On Critical
+{variant:462}Skills Socketed in your Helmet are Supported by level 20 Pulverise
+{variant:463}Skills Socketed in your Helmet are Supported by level 20 Rage
+{variant:464}Skills Socketed in your Helmet are Supported by level 20 Returning Projectiles
+{variant:465}Skills Socketed in your Helmet are Supported by level 20 Rupture
+{variant:466}Skills Socketed in your Helmet are Supported by level 20 Ruthless
+{variant:467}Skills Socketed in your Helmet are Supported by level 20 Sacrifice
+{variant:468}Skills Socketed in your Helmet are Supported by level 20 Sadism
+{variant:469}Skills Socketed in your Helmet are Supported by level 20 Second Wind
+{variant:470}Skills Socketed in your Helmet are Supported by level 20 Slower Projectiles
+{variant:471}Skills Socketed in your Helmet are Supported by level 20 Spell Cascade
+{variant:472}Skills Socketed in your Helmet are Supported by level 20 Spell Echo
+{variant:473}Skills Socketed in your Helmet are Supported by level 20 Spell Totem
+{variant:474}Skills Socketed in your Helmet are Supported by level 20 Spellblade
+{variant:475}Skills Socketed in your Helmet are Supported by level 20 Stun
+{variant:476}Skills Socketed in your Helmet are Supported by level 20 Summon Phantasm
+{variant:477}Skills Socketed in your Helmet are Supported by level 20 Swift Affliction
+{variant:478}Skills Socketed in your Helmet are Supported by level 20 Swift Assembly
+{variant:479}Skills Socketed in your Helmet are Supported by level 20 Swiftbrand
+{variant:480}Skills Socketed in your Helmet are Supported by level 20 Trap
+{variant:481}Skills Socketed in your Helmet are Supported by level 20 Trap and Mine Damage
+{variant:482}Skills Socketed in your Helmet are Supported by level 20 Trauma
+{variant:483}Skills Socketed in your Helmet are Supported by level 20 Trinity
+{variant:484}Skills Socketed in your Helmet are Supported by level 20 Unbound Ailments
+{variant:485}Skills Socketed in your Helmet are Supported by level 20 Unleash
+{variant:486}Skills Socketed in your Helmet are Supported by level 20 Urgent Orders
+{variant:487}Skills Socketed in your Helmet are Supported by level 20 Vicious Projectiles
+{variant:488}Skills Socketed in your Helmet are Supported by level 20 Vile Toxins
+{variant:489}Skills Socketed in your Helmet are Supported by level 20 Void Manipulation
+{variant:490}Skills Socketed in your Helmet are Supported by level 20 Volatility
+{variant:491}Skills Socketed in your Helmet are Supported by level 20 Volley
+{variant:492}Skills Socketed in your Helmet are Supported by level 20 Withering Touch
+{variant:493}Skills granted by your Passive Tree are Supported by level 20 Added Chaos Damage
+{variant:494}Skills granted by your Passive Tree are Supported by level 20 Added Cold Damage
+{variant:495}Skills granted by your Passive Tree are Supported by level 20 Added Fire Damage
+{variant:496}Skills granted by your Passive Tree are Supported by level 20 Added Lightning Damage
+{variant:497}Skills granted by your Passive Tree are Supported by level 20 Additional Accuracy
+{variant:498}Skills granted by your Passive Tree are Supported by level 20 Advanced Traps
+{variant:499}Skills granted by your Passive Tree are Supported by level 20 Ancestral Call
+{variant:500}Skills granted by your Passive Tree are Supported by level 20 Arcane Surge
+{variant:501}Skills granted by your Passive Tree are Supported by level 20 Archmage
+{variant:502}Skills granted by your Passive Tree are Supported by level 20 Arrogance
+{variant:503}Skills granted by your Passive Tree are Supported by level 20 Arrow Nova
+{variant:504}Skills granted by your Passive Tree are Supported by level 20 Ballista Totem
+{variant:505}Skills granted by your Passive Tree are Supported by level 20 Barrage
+{variant:506}Skills granted by your Passive Tree are Supported by level 20 Behead
+{variant:507}Skills granted by your Passive Tree are Supported by level 20 Blasphemy
+{variant:508}Skills granted by your Passive Tree are Supported by level 20 Blastchain Mine
+{variant:509}Skills granted by your Passive Tree are Supported by level 20 Blessed Call
+{variant:510}Skills granted by your Passive Tree are Supported by level 20 Blind
+{variant:511}Skills granted by your Passive Tree are Supported by level 20 Bloodlust
+{variant:512}Skills granted by your Passive Tree are Supported by level 20 Bloodthirst
+{variant:513}Skills granted by your Passive Tree are Supported by level 20 Bonechill
+{variant:514}Skills granted by your Passive Tree are Supported by level 20 Brutality
+{variant:515}Skills granted by your Passive Tree are Supported by level 20 Burning Damage
+{variant:516}Skills granted by your Passive Tree are Supported by level 20 Cast On Critical Strike
+{variant:517}Skills granted by your Passive Tree are Supported by level 20 Cast on Death
+{variant:518}Skills granted by your Passive Tree are Supported by level 20 Cast on Melee Kill
+{variant:519}Skills granted by your Passive Tree are Supported by level 20 Cast when Damage Taken
+{variant:520}Skills granted by your Passive Tree are Supported by level 20 Cast when Stunned
+{variant:521}Skills granted by your Passive Tree are Supported by level 20 Cast while Channelling
+{variant:522}Skills granted by your Passive Tree are Supported by level 20 Chain
+{variant:523}Skills granted by your Passive Tree are Supported by level 20 Chance to Bleed
+{variant:524}Skills granted by your Passive Tree are Supported by level 20 Chance to Flee
+{variant:525}Skills granted by your Passive Tree are Supported by level 20 Chance to Poison
+{variant:526}Skills granted by your Passive Tree are Supported by level 20 Charged Mines
+{variant:527}Skills granted by your Passive Tree are Supported by level 20 Charged Traps
+{variant:528}Skills granted by your Passive Tree are Supported by level 20 Close Combat
+{variant:529}Skills granted by your Passive Tree are Supported by level 20 Cluster Traps
+{variant:530}Skills granted by your Passive Tree are Supported by level 20 Cold Penetration
+{variant:531}Skills granted by your Passive Tree are Supported by level 20 Cold to Fire
+{variant:532}Skills granted by your Passive Tree are Supported by level 20 Combustion
+{variant:533}Skills granted by your Passive Tree are Supported by level 20 Concentrated Effect
+{variant:534}Skills granted by your Passive Tree are Supported by level 20 Controlled Blaze
+{variant:535}Skills granted by your Passive Tree are Supported by level 20 Controlled Destruction
+{variant:536}Skills granted by your Passive Tree are Supported by level 20 Corrupting Cry
+{variant:537}Skills granted by your Passive Tree are Supported by level 20 Critical Strike Affliction
+{variant:538}Skills granted by your Passive Tree are Supported by level 20 Cruelty
+{variant:539}Skills granted by your Passive Tree are Supported by level 20 Culling Strike
+{variant:540}Skills granted by your Passive Tree are Supported by level 20 Cursed Ground
+{variant:541}Skills granted by your Passive Tree are Supported by level 20 Damage on Full Life
+{variant:542}Skills granted by your Passive Tree are Supported by level 20 Deadly Ailments
+{variant:543}Skills granted by your Passive Tree are Supported by level 20 Decay
+{variant:544}Skills granted by your Passive Tree are Supported by level 20 Devour
+{variant:545}Skills granted by your Passive Tree are Supported by level 20 Efficacy
+{variant:546}Skills granted by your Passive Tree are Supported by level 20 Elemental Army
+{variant:547}Skills granted by your Passive Tree are Supported by level 20 Elemental Damage with Attacks
+{variant:548}Skills granted by your Passive Tree are Supported by level 20 Elemental Focus
+{variant:549}Skills granted by your Passive Tree are Supported by level 20 Elemental Proliferation
+{variant:550}Skills granted by your Passive Tree are Supported by level 20 Endurance Charge on Melee Stun
+{variant:551}Skills granted by your Passive Tree are Supported by level 20 Energy Leech
+{variant:552}Skills granted by your Passive Tree are Supported by level 20 Eternal Blessing
+{variant:553}Skills granted by your Passive Tree are Supported by level 20 Excommunicate
+{variant:554}Skills granted by your Passive Tree are Supported by level 20 Exemplar
+{variant:555}Skills granted by your Passive Tree are Supported by level 20 Expert Retaliation
+{variant:556}Skills granted by your Passive Tree are Supported by level 20 Faster Attacks
+{variant:557}Skills granted by your Passive Tree are Supported by level 20 Faster Casting
+{variant:558}Skills granted by your Passive Tree are Supported by level 20 Faster Projectiles
+{variant:559}Skills granted by your Passive Tree are Supported by level 20 Feeding Frenzy
+{variant:560}Skills granted by your Passive Tree are Supported by level 20 Fire Penetration
+{variant:561}Skills granted by your Passive Tree are Supported by level 20 Fist of War
+{variant:562}Skills granted by your Passive Tree are Supported by level 20 Flamewood
+{variant:563}Skills granted by your Passive Tree are Supported by level 20 Focused Ballista
+{variant:564}Skills granted by your Passive Tree are Supported by level 20 Focused Channelling
+{variant:565}Skills granted by your Passive Tree are Supported by level 20 Fork
+{variant:566}Skills granted by your Passive Tree are Supported by level 20 Fortify
+{variant:567}Skills granted by your Passive Tree are Supported by level 20 Fresh Meat
+{variant:568}Skills granted by your Passive Tree are Supported by level 20 Frigid Bond
+{variant:569}Skills granted by your Passive Tree are Supported by level 20 Generosity
+{variant:570}Skills granted by your Passive Tree are Supported by level 20 Greater Multiple Projectiles
+{variant:571}Skills granted by your Passive Tree are Supported by level 20 Greater Volley
+{variant:572}Skills granted by your Passive Tree are Supported by level 20 Guardian&apos;s Blessing
+{variant:573}Skills granted by your Passive Tree are Supported by level 20 Hallow
+{variant:574}Skills granted by your Passive Tree are Supported by level 20 Hex Bloom
+{variant:575}Skills granted by your Passive Tree are Supported by level 20 Hextouch
+{variant:576}Skills granted by your Passive Tree are Supported by level 20 High-Impact Mine
+{variant:577}Skills granted by your Passive Tree are Supported by level 20 Hypothermia
+{variant:578}Skills granted by your Passive Tree are Supported by level 20 Ice Bite
+{variant:579}Skills granted by your Passive Tree are Supported by level 20 Ignite Proliferation
+{variant:580}Skills granted by your Passive Tree are Supported by level 20 Immolate
+{variant:581}Skills granted by your Passive Tree are Supported by level 20 Impale
+{variant:582}Skills granted by your Passive Tree are Supported by level 20 Increased Area of Effect
+{variant:583}Skills granted by your Passive Tree are Supported by level 20 Increased Critical Damage
+{variant:584}Skills granted by your Passive Tree are Supported by level 20 Increased Critical Strikes
+{variant:585}Skills granted by your Passive Tree are Supported by level 20 Infernal Legion
+{variant:586}Skills granted by your Passive Tree are Supported by level 20 Infused Channelling
+{variant:587}Skills granted by your Passive Tree are Supported by level 20 Innervate
+{variant:588}Skills granted by your Passive Tree are Supported by level 20 Inspiration
+{variant:589}Skills granted by your Passive Tree are Supported by level 20 Intensify
+{variant:590}Skills granted by your Passive Tree are Supported by level 20 Iron Grip
+{variant:591}Skills granted by your Passive Tree are Supported by level 20 Iron Will
+{variant:592}Skills granted by your Passive Tree are Supported by level 20 Item Rarity
+{variant:593}Skills granted by your Passive Tree are Supported by level 20 Knockback
+{variant:594}Skills granted by your Passive Tree are Supported by level 20 Less Duration
+{variant:595}Skills granted by your Passive Tree are Supported by level 20 Life Gain on Hit
+{variant:596}Skills granted by your Passive Tree are Supported by level 20 Life Leech
+{variant:597}Skills granted by your Passive Tree are Supported by level 20 Lifetap
+{variant:598}Skills granted by your Passive Tree are Supported by level 20 Lightning Penetration
+{variant:599}Skills granted by your Passive Tree are Supported by level 20 Locus Mine
+{variant:600}Skills granted by your Passive Tree are Supported by level 20 Maim
+{variant:601}Skills granted by your Passive Tree are Supported by level 20 Mana Leech
+{variant:602}Skills granted by your Passive Tree are Supported by level 20 Manaforged Arrows
+{variant:603}Skills granted by your Passive Tree are Supported by level 20 Mark On Hit
+{variant:604}Skills granted by your Passive Tree are Supported by level 20 Meat Shield
+{variant:605}Skills granted by your Passive Tree are Supported by level 20 Melee Physical Damage
+{variant:606}Skills granted by your Passive Tree are Supported by level 20 Melee Splash
+{variant:607}Skills granted by your Passive Tree are Supported by level 20 Minefield
+{variant:608}Skills granted by your Passive Tree are Supported by level 20 Minion Damage
+{variant:609}Skills granted by your Passive Tree are Supported by level 20 Minion Life
+{variant:610}Skills granted by your Passive Tree are Supported by level 20 Minion Speed
+{variant:611}Skills granted by your Passive Tree are Supported by level 20 Mirage Archer
+{variant:612}Skills granted by your Passive Tree are Supported by level 20 Momentum
+{variant:613}Skills granted by your Passive Tree are Supported by level 20 More Duration
+{variant:614}Skills granted by your Passive Tree are Supported by level 20 Multiple Projectiles
+{variant:615}Skills granted by your Passive Tree are Supported by level 20 Multiple Totems
+{variant:616}Skills granted by your Passive Tree are Supported by level 20 Multiple Traps
+{variant:617}Skills granted by your Passive Tree are Supported by level 20 Multistrike
+{variant:618}Skills granted by your Passive Tree are Supported by level 20 Nightblade
+{variant:619}Skills granted by your Passive Tree are Supported by level 20 Overcharge
+{variant:620}Skills granted by your Passive Tree are Supported by level 20 Overexertion
+{variant:621}Skills granted by your Passive Tree are Supported by level 20 Physical to Lightning
+{variant:622}Skills granted by your Passive Tree are Supported by level 20 Pierce
+{variant:623}Skills granted by your Passive Tree are Supported by level 20 Pinpoint
+{variant:624}Skills granted by your Passive Tree are Supported by level 20 Point Blank
+{variant:625}Skills granted by your Passive Tree are Supported by level 20 Power Charge On Critical
+{variant:626}Skills granted by your Passive Tree are Supported by level 20 Pulverise
+{variant:627}Skills granted by your Passive Tree are Supported by level 20 Rage
+{variant:628}Skills granted by your Passive Tree are Supported by level 20 Returning Projectiles
+{variant:629}Skills granted by your Passive Tree are Supported by level 20 Rupture
+{variant:630}Skills granted by your Passive Tree are Supported by level 20 Ruthless
+{variant:631}Skills granted by your Passive Tree are Supported by level 20 Sacrifice
+{variant:632}Skills granted by your Passive Tree are Supported by level 20 Sadism
+{variant:633}Skills granted by your Passive Tree are Supported by level 20 Second Wind
+{variant:634}Skills granted by your Passive Tree are Supported by level 20 Slower Projectiles
+{variant:635}Skills granted by your Passive Tree are Supported by level 20 Spell Cascade
+{variant:636}Skills granted by your Passive Tree are Supported by level 20 Spell Echo
+{variant:637}Skills granted by your Passive Tree are Supported by level 20 Spell Totem
+{variant:638}Skills granted by your Passive Tree are Supported by level 20 Spellblade
+{variant:639}Skills granted by your Passive Tree are Supported by level 20 Stun
+{variant:640}Skills granted by your Passive Tree are Supported by level 20 Summon Phantasm
+{variant:641}Skills granted by your Passive Tree are Supported by level 20 Swift Affliction
+{variant:642}Skills granted by your Passive Tree are Supported by level 20 Swift Assembly
+{variant:643}Skills granted by your Passive Tree are Supported by level 20 Swiftbrand
+{variant:644}Skills granted by your Passive Tree are Supported by level 20 Trap
+{variant:645}Skills granted by your Passive Tree are Supported by level 20 Trap and Mine Damage
+{variant:646}Skills granted by your Passive Tree are Supported by level 20 Trauma
+{variant:647}Skills granted by your Passive Tree are Supported by level 20 Trinity
+{variant:648}Skills granted by your Passive Tree are Supported by level 20 Unbound Ailments
+{variant:649}Skills granted by your Passive Tree are Supported by level 20 Unleash
+{variant:650}Skills granted by your Passive Tree are Supported by level 20 Urgent Orders
+{variant:651}Skills granted by your Passive Tree are Supported by level 20 Vicious Projectiles
+{variant:652}Skills granted by your Passive Tree are Supported by level 20 Vile Toxins
+{variant:653}Skills granted by your Passive Tree are Supported by level 20 Void Manipulation
+{variant:654}Skills granted by your Passive Tree are Supported by level 20 Volatility
+{variant:655}Skills granted by your Passive Tree are Supported by level 20 Volley
+{variant:656}Skills granted by your Passive Tree are Supported by level 20 Withering Touch
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+			<ModRange id="6" range="0.5"/>
+			<ModRange id="7" range="0.5"/>
+			<ModRange id="8" range="0.5"/>
+			<ModRange id="9" range="0.5"/>
+			<ModRange id="10" range="0.5"/>
+			<ModRange id="11" range="0.5"/>
+			<ModRange id="12" range="0.5"/>
+			<ModRange id="13" range="0.5"/>
+			<ModRange id="14" range="0.5"/>
+			<ModRange id="15" range="0.5"/>
+			<ModRange id="16" range="0.5"/>
+			<ModRange id="17" range="0.5"/>
+			<ModRange id="18" range="0.5"/>
+			<ModRange id="19" range="0.5"/>
+			<ModRange id="20" range="0.5"/>
+			<ModRange id="21" range="0.5"/>
+			<ModRange id="22" range="0.5"/>
+			<ModRange id="23" range="0.5"/>
+			<ModRange id="24" range="0.5"/>
+			<ModRange id="25" range="0.5"/>
+			<ModRange id="26" range="0.5"/>
+			<ModRange id="27" range="0.5"/>
+			<ModRange id="28" range="0.5"/>
+			<ModRange id="29" range="0.5"/>
+			<ModRange id="30" range="0.5"/>
+			<ModRange id="31" range="0.5"/>
+			<ModRange id="32" range="0.5"/>
+			<ModRange id="33" range="0.5"/>
+			<ModRange id="34" range="0.5"/>
+			<ModRange id="35" range="0.5"/>
+			<ModRange id="36" range="0.5"/>
+			<ModRange id="37" range="0.5"/>
+			<ModRange id="38" range="0.5"/>
+			<ModRange id="39" range="0.5"/>
+			<ModRange id="40" range="0.5"/>
+			<ModRange id="41" range="0.5"/>
+			<ModRange id="42" range="0.5"/>
+			<ModRange id="43" range="0.5"/>
+			<ModRange id="44" range="0.5"/>
+			<ModRange id="45" range="0.5"/>
+			<ModRange id="46" range="0.5"/>
+			<ModRange id="47" range="0.5"/>
+			<ModRange id="48" range="0.5"/>
+			<ModRange id="49" range="0.5"/>
+			<ModRange id="50" range="0.5"/>
+			<ModRange id="51" range="0.5"/>
+			<ModRange id="52" range="0.5"/>
+			<ModRange id="53" range="0.5"/>
+			<ModRange id="54" range="0.5"/>
+			<ModRange id="55" range="0.5"/>
+			<ModRange id="56" range="0.5"/>
+			<ModRange id="57" range="0.5"/>
+			<ModRange id="58" range="0.5"/>
+			<ModRange id="59" range="0.5"/>
+			<ModRange id="60" range="0.5"/>
+			<ModRange id="61" range="0.5"/>
+			<ModRange id="62" range="0.5"/>
+			<ModRange id="63" range="0.5"/>
+			<ModRange id="64" range="0.5"/>
+			<ModRange id="65" range="0.5"/>
+			<ModRange id="66" range="0.5"/>
+			<ModRange id="67" range="0.5"/>
+			<ModRange id="68" range="0.5"/>
+			<ModRange id="69" range="0.5"/>
+			<ModRange id="70" range="0.5"/>
+			<ModRange id="71" range="0.5"/>
+			<ModRange id="72" range="0.5"/>
+			<ModRange id="73" range="0.5"/>
+			<ModRange id="74" range="0.5"/>
+			<ModRange id="75" range="0.5"/>
+			<ModRange id="76" range="0.5"/>
+			<ModRange id="77" range="0.5"/>
+			<ModRange id="78" range="0.5"/>
+			<ModRange id="79" range="0.5"/>
+			<ModRange id="80" range="0.5"/>
+			<ModRange id="81" range="0.5"/>
+			<ModRange id="82" range="0.5"/>
+			<ModRange id="83" range="0.5"/>
+			<ModRange id="84" range="0.5"/>
+			<ModRange id="85" range="0.5"/>
+			<ModRange id="86" range="0.5"/>
+			<ModRange id="87" range="0.5"/>
+			<ModRange id="88" range="0.5"/>
+			<ModRange id="89" range="0.5"/>
+			<ModRange id="90" range="0.5"/>
+			<ModRange id="91" range="0.5"/>
+			<ModRange id="92" range="0.5"/>
+			<ModRange id="93" range="0.5"/>
+			<ModRange id="94" range="0.5"/>
+			<ModRange id="95" range="0.5"/>
+			<ModRange id="96" range="0.5"/>
+			<ModRange id="97" range="0.5"/>
+			<ModRange id="98" range="0.5"/>
+			<ModRange id="99" range="0.5"/>
+			<ModRange id="100" range="0.5"/>
+			<ModRange id="101" range="0.5"/>
+			<ModRange id="102" range="0.5"/>
+			<ModRange id="103" range="0.5"/>
+			<ModRange id="104" range="0.5"/>
+			<ModRange id="105" range="0.5"/>
+			<ModRange id="106" range="0.5"/>
+			<ModRange id="107" range="0.5"/>
+			<ModRange id="108" range="0.5"/>
+			<ModRange id="109" range="0.5"/>
+			<ModRange id="110" range="0.5"/>
+			<ModRange id="111" range="0.5"/>
+			<ModRange id="112" range="0.5"/>
+			<ModRange id="113" range="0.5"/>
+			<ModRange id="114" range="0.5"/>
+			<ModRange id="115" range="0.5"/>
+			<ModRange id="116" range="0.5"/>
+			<ModRange id="117" range="0.5"/>
+			<ModRange id="118" range="0.5"/>
+			<ModRange id="119" range="0.5"/>
+			<ModRange id="120" range="0.5"/>
+			<ModRange id="121" range="0.5"/>
+			<ModRange id="122" range="0.5"/>
+			<ModRange id="123" range="0.5"/>
+			<ModRange id="124" range="0.5"/>
+			<ModRange id="125" range="0.5"/>
+			<ModRange id="126" range="0.5"/>
+			<ModRange id="127" range="0.5"/>
+			<ModRange id="128" range="0.5"/>
+			<ModRange id="129" range="0.5"/>
+			<ModRange id="130" range="0.5"/>
+			<ModRange id="131" range="0.5"/>
+			<ModRange id="132" range="0.5"/>
+			<ModRange id="133" range="0.5"/>
+			<ModRange id="134" range="0.5"/>
+			<ModRange id="135" range="0.5"/>
+			<ModRange id="136" range="0.5"/>
+			<ModRange id="137" range="0.5"/>
+			<ModRange id="138" range="0.5"/>
+			<ModRange id="139" range="0.5"/>
+			<ModRange id="140" range="0.5"/>
+			<ModRange id="141" range="0.5"/>
+			<ModRange id="142" range="0.5"/>
+			<ModRange id="143" range="0.5"/>
+			<ModRange id="144" range="0.5"/>
+			<ModRange id="145" range="0.5"/>
+			<ModRange id="146" range="0.5"/>
+			<ModRange id="147" range="0.5"/>
+			<ModRange id="148" range="0.5"/>
+			<ModRange id="149" range="0.5"/>
+			<ModRange id="150" range="0.5"/>
+			<ModRange id="151" range="0.5"/>
+			<ModRange id="152" range="0.5"/>
+			<ModRange id="153" range="0.5"/>
+			<ModRange id="154" range="0.5"/>
+			<ModRange id="155" range="0.5"/>
+			<ModRange id="156" range="0.5"/>
+			<ModRange id="157" range="0.5"/>
+			<ModRange id="158" range="0.5"/>
+			<ModRange id="159" range="0.5"/>
+			<ModRange id="160" range="0.5"/>
+			<ModRange id="161" range="0.5"/>
+			<ModRange id="162" range="0.5"/>
+			<ModRange id="163" range="0.5"/>
+			<ModRange id="164" range="0.5"/>
+			<ModRange id="165" range="0.5"/>
+			<ModRange id="166" range="0.5"/>
+			<ModRange id="167" range="0.5"/>
+			<ModRange id="168" range="0.5"/>
+			<ModRange id="169" range="0.5"/>
+			<ModRange id="170" range="0.5"/>
+			<ModRange id="171" range="0.5"/>
+			<ModRange id="172" range="0.5"/>
+			<ModRange id="173" range="0.5"/>
+			<ModRange id="174" range="0.5"/>
+			<ModRange id="175" range="0.5"/>
+			<ModRange id="176" range="0.5"/>
+			<ModRange id="177" range="0.5"/>
+			<ModRange id="178" range="0.5"/>
+			<ModRange id="179" range="0.5"/>
+			<ModRange id="180" range="0.5"/>
+			<ModRange id="181" range="0.5"/>
+			<ModRange id="182" range="0.5"/>
+			<ModRange id="183" range="0.5"/>
+			<ModRange id="184" range="0.5"/>
+			<ModRange id="185" range="0.5"/>
+			<ModRange id="186" range="0.5"/>
+			<ModRange id="187" range="0.5"/>
+			<ModRange id="188" range="0.5"/>
+			<ModRange id="189" range="0.5"/>
+			<ModRange id="190" range="0.5"/>
+			<ModRange id="191" range="0.5"/>
+			<ModRange id="192" range="0.5"/>
+			<ModRange id="193" range="0.5"/>
+			<ModRange id="194" range="0.5"/>
+			<ModRange id="195" range="0.5"/>
+			<ModRange id="196" range="0.5"/>
+			<ModRange id="197" range="0.5"/>
+			<ModRange id="198" range="0.5"/>
+			<ModRange id="199" range="0.5"/>
+			<ModRange id="200" range="0.5"/>
+			<ModRange id="201" range="0.5"/>
+			<ModRange id="202" range="0.5"/>
+			<ModRange id="203" range="0.5"/>
+			<ModRange id="204" range="0.5"/>
+			<ModRange id="205" range="0.5"/>
+			<ModRange id="206" range="0.5"/>
+			<ModRange id="207" range="0.5"/>
+			<ModRange id="208" range="0.5"/>
+			<ModRange id="209" range="0.5"/>
+			<ModRange id="210" range="0.5"/>
+			<ModRange id="211" range="0.5"/>
+			<ModRange id="212" range="0.5"/>
+			<ModRange id="213" range="0.5"/>
+			<ModRange id="214" range="0.5"/>
+			<ModRange id="215" range="0.5"/>
+			<ModRange id="216" range="0.5"/>
+			<ModRange id="217" range="0.5"/>
+			<ModRange id="218" range="0.5"/>
+			<ModRange id="219" range="0.5"/>
+			<ModRange id="220" range="0.5"/>
+			<ModRange id="221" range="0.5"/>
+			<ModRange id="222" range="0.5"/>
+			<ModRange id="223" range="0.5"/>
+			<ModRange id="224" range="0.5"/>
+			<ModRange id="225" range="0.5"/>
+			<ModRange id="226" range="0.5"/>
+			<ModRange id="227" range="0.5"/>
+			<ModRange id="228" range="0.5"/>
+			<ModRange id="229" range="0.5"/>
+			<ModRange id="230" range="0.5"/>
+			<ModRange id="231" range="0.5"/>
+			<ModRange id="232" range="0.5"/>
+			<ModRange id="233" range="0.5"/>
+			<ModRange id="234" range="0.5"/>
+			<ModRange id="235" range="0.5"/>
+			<ModRange id="236" range="0.5"/>
+			<ModRange id="237" range="0.5"/>
+			<ModRange id="238" range="0.5"/>
+			<ModRange id="239" range="0.5"/>
+			<ModRange id="240" range="0.5"/>
+			<ModRange id="241" range="0.5"/>
+			<ModRange id="242" range="0.5"/>
+			<ModRange id="243" range="0.5"/>
+			<ModRange id="244" range="0.5"/>
+			<ModRange id="245" range="0.5"/>
+			<ModRange id="246" range="0.5"/>
+			<ModRange id="247" range="0.5"/>
+			<ModRange id="248" range="0.5"/>
+			<ModRange id="249" range="0.5"/>
+			<ModRange id="250" range="0.5"/>
+			<ModRange id="251" range="0.5"/>
+			<ModRange id="252" range="0.5"/>
+			<ModRange id="253" range="0.5"/>
+			<ModRange id="254" range="0.5"/>
+			<ModRange id="255" range="0.5"/>
+			<ModRange id="256" range="0.5"/>
+			<ModRange id="257" range="0.5"/>
+			<ModRange id="258" range="0.5"/>
+			<ModRange id="259" range="0.5"/>
+			<ModRange id="260" range="0.5"/>
+			<ModRange id="261" range="0.5"/>
+			<ModRange id="262" range="0.5"/>
+			<ModRange id="263" range="0.5"/>
+			<ModRange id="264" range="0.5"/>
+			<ModRange id="265" range="0.5"/>
+			<ModRange id="266" range="0.5"/>
+			<ModRange id="267" range="0.5"/>
+			<ModRange id="268" range="0.5"/>
+			<ModRange id="269" range="0.5"/>
+			<ModRange id="270" range="0.5"/>
+			<ModRange id="271" range="0.5"/>
+			<ModRange id="272" range="0.5"/>
+			<ModRange id="273" range="0.5"/>
+			<ModRange id="274" range="0.5"/>
+			<ModRange id="275" range="0.5"/>
+			<ModRange id="276" range="0.5"/>
+			<ModRange id="277" range="0.5"/>
+			<ModRange id="278" range="0.5"/>
+			<ModRange id="279" range="0.5"/>
+			<ModRange id="280" range="0.5"/>
+			<ModRange id="281" range="0.5"/>
+			<ModRange id="282" range="0.5"/>
+			<ModRange id="283" range="0.5"/>
+			<ModRange id="284" range="0.5"/>
+			<ModRange id="285" range="0.5"/>
+			<ModRange id="286" range="0.5"/>
+			<ModRange id="287" range="0.5"/>
+			<ModRange id="288" range="0.5"/>
+			<ModRange id="289" range="0.5"/>
+			<ModRange id="290" range="0.5"/>
+			<ModRange id="291" range="0.5"/>
+			<ModRange id="292" range="0.5"/>
+			<ModRange id="293" range="0.5"/>
+			<ModRange id="294" range="0.5"/>
+			<ModRange id="295" range="0.5"/>
+			<ModRange id="296" range="0.5"/>
+			<ModRange id="297" range="0.5"/>
+			<ModRange id="298" range="0.5"/>
+			<ModRange id="299" range="0.5"/>
+			<ModRange id="300" range="0.5"/>
+			<ModRange id="301" range="0.5"/>
+			<ModRange id="302" range="0.5"/>
+			<ModRange id="303" range="0.5"/>
+			<ModRange id="304" range="0.5"/>
+			<ModRange id="305" range="0.5"/>
+			<ModRange id="306" range="0.5"/>
+			<ModRange id="307" range="0.5"/>
+			<ModRange id="308" range="0.5"/>
+			<ModRange id="309" range="0.5"/>
+			<ModRange id="310" range="0.5"/>
+			<ModRange id="311" range="0.5"/>
+			<ModRange id="312" range="0.5"/>
+			<ModRange id="313" range="0.5"/>
+			<ModRange id="314" range="0.5"/>
+			<ModRange id="315" range="0.5"/>
+			<ModRange id="316" range="0.5"/>
+			<ModRange id="317" range="0.5"/>
+			<ModRange id="318" range="0.5"/>
+			<ModRange id="319" range="0.5"/>
+			<ModRange id="320" range="0.5"/>
+			<ModRange id="321" range="0.5"/>
+			<ModRange id="322" range="0.5"/>
+			<ModRange id="323" range="0.5"/>
+			<ModRange id="324" range="0.5"/>
+			<ModRange id="325" range="0.5"/>
+			<ModRange id="326" range="0.5"/>
+			<ModRange id="327" range="0.5"/>
+			<ModRange id="328" range="0.5"/>
+			<ModRange id="329" range="0.5"/>
+			<ModRange id="330" range="0.5"/>
+			<ModRange id="331" range="0.5"/>
+			<ModRange id="332" range="0.5"/>
+			<ModRange id="333" range="0.5"/>
+			<ModRange id="334" range="0.5"/>
+			<ModRange id="335" range="0.5"/>
+			<ModRange id="336" range="0.5"/>
+			<ModRange id="337" range="0.5"/>
+			<ModRange id="338" range="0.5"/>
+			<ModRange id="339" range="0.5"/>
+			<ModRange id="340" range="0.5"/>
+			<ModRange id="341" range="0.5"/>
+			<ModRange id="342" range="0.5"/>
+			<ModRange id="343" range="0.5"/>
+			<ModRange id="344" range="0.5"/>
+			<ModRange id="345" range="0.5"/>
+			<ModRange id="346" range="0.5"/>
+			<ModRange id="347" range="0.5"/>
+			<ModRange id="348" range="0.5"/>
+			<ModRange id="349" range="0.5"/>
+			<ModRange id="350" range="0.5"/>
+			<ModRange id="351" range="0.5"/>
+			<ModRange id="352" range="0.5"/>
+			<ModRange id="353" range="0.5"/>
+			<ModRange id="354" range="0.5"/>
+			<ModRange id="355" range="0.5"/>
+			<ModRange id="356" range="0.5"/>
+			<ModRange id="357" range="0.5"/>
+			<ModRange id="358" range="0.5"/>
+			<ModRange id="359" range="0.5"/>
+			<ModRange id="360" range="0.5"/>
+			<ModRange id="361" range="0.5"/>
+			<ModRange id="362" range="0.5"/>
+			<ModRange id="363" range="0.5"/>
+			<ModRange id="364" range="0.5"/>
+			<ModRange id="365" range="0.5"/>
+			<ModRange id="366" range="0.5"/>
+			<ModRange id="367" range="0.5"/>
+			<ModRange id="368" range="0.5"/>
+			<ModRange id="369" range="0.5"/>
+			<ModRange id="370" range="0.5"/>
+			<ModRange id="371" range="0.5"/>
+			<ModRange id="372" range="0.5"/>
+			<ModRange id="373" range="0.5"/>
+			<ModRange id="374" range="0.5"/>
+			<ModRange id="375" range="0.5"/>
+			<ModRange id="376" range="0.5"/>
+			<ModRange id="377" range="0.5"/>
+			<ModRange id="378" range="0.5"/>
+			<ModRange id="379" range="0.5"/>
+			<ModRange id="380" range="0.5"/>
+			<ModRange id="381" range="0.5"/>
+			<ModRange id="382" range="0.5"/>
+			<ModRange id="383" range="0.5"/>
+			<ModRange id="384" range="0.5"/>
+			<ModRange id="385" range="0.5"/>
+			<ModRange id="386" range="0.5"/>
+			<ModRange id="387" range="0.5"/>
+			<ModRange id="388" range="0.5"/>
+			<ModRange id="389" range="0.5"/>
+			<ModRange id="390" range="0.5"/>
+			<ModRange id="391" range="0.5"/>
+			<ModRange id="392" range="0.5"/>
+			<ModRange id="393" range="0.5"/>
+			<ModRange id="394" range="0.5"/>
+			<ModRange id="395" range="0.5"/>
+			<ModRange id="396" range="0.5"/>
+			<ModRange id="397" range="0.5"/>
+			<ModRange id="398" range="0.5"/>
+			<ModRange id="399" range="0.5"/>
+			<ModRange id="400" range="0.5"/>
+			<ModRange id="401" range="0.5"/>
+			<ModRange id="402" range="0.5"/>
+			<ModRange id="403" range="0.5"/>
+			<ModRange id="404" range="0.5"/>
+			<ModRange id="405" range="0.5"/>
+			<ModRange id="406" range="0.5"/>
+			<ModRange id="407" range="0.5"/>
+			<ModRange id="408" range="0.5"/>
+			<ModRange id="409" range="0.5"/>
+			<ModRange id="410" range="0.5"/>
+			<ModRange id="411" range="0.5"/>
+			<ModRange id="412" range="0.5"/>
+			<ModRange id="413" range="0.5"/>
+			<ModRange id="414" range="0.5"/>
+			<ModRange id="415" range="0.5"/>
+			<ModRange id="416" range="0.5"/>
+			<ModRange id="417" range="0.5"/>
+			<ModRange id="418" range="0.5"/>
+			<ModRange id="419" range="0.5"/>
+			<ModRange id="420" range="0.5"/>
+			<ModRange id="421" range="0.5"/>
+			<ModRange id="422" range="0.5"/>
+			<ModRange id="423" range="0.5"/>
+			<ModRange id="424" range="0.5"/>
+			<ModRange id="425" range="0.5"/>
+			<ModRange id="426" range="0.5"/>
+			<ModRange id="427" range="0.5"/>
+			<ModRange id="428" range="0.5"/>
+			<ModRange id="429" range="0.5"/>
+			<ModRange id="430" range="0.5"/>
+			<ModRange id="431" range="0.5"/>
+			<ModRange id="432" range="0.5"/>
+			<ModRange id="433" range="0.5"/>
+			<ModRange id="434" range="0.5"/>
+			<ModRange id="435" range="0.5"/>
+			<ModRange id="436" range="0.5"/>
+			<ModRange id="437" range="0.5"/>
+			<ModRange id="438" range="0.5"/>
+			<ModRange id="439" range="0.5"/>
+			<ModRange id="440" range="0.5"/>
+			<ModRange id="441" range="0.5"/>
+			<ModRange id="442" range="0.5"/>
+			<ModRange id="443" range="0.5"/>
+			<ModRange id="444" range="0.5"/>
+			<ModRange id="445" range="0.5"/>
+			<ModRange id="446" range="0.5"/>
+			<ModRange id="447" range="0.5"/>
+			<ModRange id="448" range="0.5"/>
+			<ModRange id="449" range="0.5"/>
+			<ModRange id="450" range="0.5"/>
+			<ModRange id="451" range="0.5"/>
+			<ModRange id="452" range="0.5"/>
+			<ModRange id="453" range="0.5"/>
+			<ModRange id="454" range="0.5"/>
+			<ModRange id="455" range="0.5"/>
+			<ModRange id="456" range="0.5"/>
+			<ModRange id="457" range="0.5"/>
+			<ModRange id="458" range="0.5"/>
+			<ModRange id="459" range="0.5"/>
+			<ModRange id="460" range="0.5"/>
+			<ModRange id="461" range="0.5"/>
+			<ModRange id="462" range="0.5"/>
+			<ModRange id="463" range="0.5"/>
+			<ModRange id="464" range="0.5"/>
+			<ModRange id="465" range="0.5"/>
+			<ModRange id="466" range="0.5"/>
+			<ModRange id="467" range="0.5"/>
+			<ModRange id="468" range="0.5"/>
+			<ModRange id="469" range="0.5"/>
+			<ModRange id="470" range="0.5"/>
+			<ModRange id="471" range="0.5"/>
+			<ModRange id="472" range="0.5"/>
+			<ModRange id="473" range="0.5"/>
+			<ModRange id="474" range="0.5"/>
+			<ModRange id="475" range="0.5"/>
+			<ModRange id="476" range="0.5"/>
+			<ModRange id="477" range="0.5"/>
+			<ModRange id="478" range="0.5"/>
+			<ModRange id="479" range="0.5"/>
+			<ModRange id="480" range="0.5"/>
+			<ModRange id="481" range="0.5"/>
+			<ModRange id="482" range="0.5"/>
+			<ModRange id="483" range="0.5"/>
+			<ModRange id="484" range="0.5"/>
+			<ModRange id="485" range="0.5"/>
+			<ModRange id="486" range="0.5"/>
+			<ModRange id="487" range="0.5"/>
+			<ModRange id="488" range="0.5"/>
+			<ModRange id="489" range="0.5"/>
+			<ModRange id="490" range="0.5"/>
+			<ModRange id="491" range="0.5"/>
+			<ModRange id="492" range="0.5"/>
+			<ModRange id="493" range="0.5"/>
+			<ModRange id="494" range="0.5"/>
+			<ModRange id="495" range="0.5"/>
+			<ModRange id="496" range="0.5"/>
+			<ModRange id="497" range="0.5"/>
+			<ModRange id="498" range="0.5"/>
+			<ModRange id="499" range="0.5"/>
+			<ModRange id="500" range="0.5"/>
+			<ModRange id="501" range="0.5"/>
+			<ModRange id="502" range="0.5"/>
+			<ModRange id="503" range="0.5"/>
+			<ModRange id="504" range="0.5"/>
+			<ModRange id="505" range="0.5"/>
+			<ModRange id="506" range="0.5"/>
+			<ModRange id="507" range="0.5"/>
+			<ModRange id="508" range="0.5"/>
+			<ModRange id="509" range="0.5"/>
+			<ModRange id="510" range="0.5"/>
+			<ModRange id="511" range="0.5"/>
+			<ModRange id="512" range="0.5"/>
+			<ModRange id="513" range="0.5"/>
+			<ModRange id="514" range="0.5"/>
+			<ModRange id="515" range="0.5"/>
+			<ModRange id="516" range="0.5"/>
+			<ModRange id="517" range="0.5"/>
+			<ModRange id="518" range="0.5"/>
+			<ModRange id="519" range="0.5"/>
+			<ModRange id="520" range="0.5"/>
+			<ModRange id="521" range="0.5"/>
+			<ModRange id="522" range="0.5"/>
+			<ModRange id="523" range="0.5"/>
+			<ModRange id="524" range="0.5"/>
+			<ModRange id="525" range="0.5"/>
+			<ModRange id="526" range="0.5"/>
+			<ModRange id="527" range="0.5"/>
+			<ModRange id="528" range="0.5"/>
+			<ModRange id="529" range="0.5"/>
+			<ModRange id="530" range="0.5"/>
+			<ModRange id="531" range="0.5"/>
+			<ModRange id="532" range="0.5"/>
+			<ModRange id="533" range="0.5"/>
+			<ModRange id="534" range="0.5"/>
+			<ModRange id="535" range="0.5"/>
+			<ModRange id="536" range="0.5"/>
+			<ModRange id="537" range="0.5"/>
+			<ModRange id="538" range="0.5"/>
+			<ModRange id="539" range="0.5"/>
+			<ModRange id="540" range="0.5"/>
+			<ModRange id="541" range="0.5"/>
+			<ModRange id="542" range="0.5"/>
+			<ModRange id="543" range="0.5"/>
+			<ModRange id="544" range="0.5"/>
+			<ModRange id="545" range="0.5"/>
+			<ModRange id="546" range="0.5"/>
+			<ModRange id="547" range="0.5"/>
+			<ModRange id="548" range="0.5"/>
+			<ModRange id="549" range="0.5"/>
+			<ModRange id="550" range="0.5"/>
+			<ModRange id="551" range="0.5"/>
+			<ModRange id="552" range="0.5"/>
+			<ModRange id="553" range="0.5"/>
+			<ModRange id="554" range="0.5"/>
+			<ModRange id="555" range="0.5"/>
+			<ModRange id="556" range="0.5"/>
+			<ModRange id="557" range="0.5"/>
+			<ModRange id="558" range="0.5"/>
+			<ModRange id="559" range="0.5"/>
+			<ModRange id="560" range="0.5"/>
+			<ModRange id="561" range="0.5"/>
+			<ModRange id="562" range="0.5"/>
+			<ModRange id="563" range="0.5"/>
+			<ModRange id="564" range="0.5"/>
+			<ModRange id="565" range="0.5"/>
+			<ModRange id="566" range="0.5"/>
+			<ModRange id="567" range="0.5"/>
+			<ModRange id="568" range="0.5"/>
+			<ModRange id="569" range="0.5"/>
+			<ModRange id="570" range="0.5"/>
+			<ModRange id="571" range="0.5"/>
+			<ModRange id="572" range="0.5"/>
+			<ModRange id="573" range="0.5"/>
+			<ModRange id="574" range="0.5"/>
+			<ModRange id="575" range="0.5"/>
+			<ModRange id="576" range="0.5"/>
+			<ModRange id="577" range="0.5"/>
+			<ModRange id="578" range="0.5"/>
+			<ModRange id="579" range="0.5"/>
+			<ModRange id="580" range="0.5"/>
+			<ModRange id="581" range="0.5"/>
+			<ModRange id="582" range="0.5"/>
+			<ModRange id="583" range="0.5"/>
+			<ModRange id="584" range="0.5"/>
+			<ModRange id="585" range="0.5"/>
+			<ModRange id="586" range="0.5"/>
+			<ModRange id="587" range="0.5"/>
+			<ModRange id="588" range="0.5"/>
+			<ModRange id="589" range="0.5"/>
+			<ModRange id="590" range="0.5"/>
+			<ModRange id="591" range="0.5"/>
+			<ModRange id="592" range="0.5"/>
+			<ModRange id="593" range="0.5"/>
+			<ModRange id="594" range="0.5"/>
+			<ModRange id="595" range="0.5"/>
+			<ModRange id="596" range="0.5"/>
+			<ModRange id="597" range="0.5"/>
+			<ModRange id="598" range="0.5"/>
+			<ModRange id="599" range="0.5"/>
+			<ModRange id="600" range="0.5"/>
+			<ModRange id="601" range="0.5"/>
+			<ModRange id="602" range="0.5"/>
+			<ModRange id="603" range="0.5"/>
+			<ModRange id="604" range="0.5"/>
+			<ModRange id="605" range="0.5"/>
+			<ModRange id="606" range="0.5"/>
+			<ModRange id="607" range="0.5"/>
+			<ModRange id="608" range="0.5"/>
+			<ModRange id="609" range="0.5"/>
+			<ModRange id="610" range="0.5"/>
+			<ModRange id="611" range="0.5"/>
+			<ModRange id="612" range="0.5"/>
+			<ModRange id="613" range="0.5"/>
+			<ModRange id="614" range="0.5"/>
+			<ModRange id="615" range="0.5"/>
+			<ModRange id="616" range="0.5"/>
+			<ModRange id="617" range="0.5"/>
+			<ModRange id="618" range="0.5"/>
+			<ModRange id="619" range="0.5"/>
+			<ModRange id="620" range="0.5"/>
+			<ModRange id="621" range="0.5"/>
+			<ModRange id="622" range="0.5"/>
+			<ModRange id="623" range="0.5"/>
+			<ModRange id="624" range="0.5"/>
+			<ModRange id="625" range="0.5"/>
+			<ModRange id="626" range="0.5"/>
+			<ModRange id="627" range="0.5"/>
+			<ModRange id="628" range="0.5"/>
+			<ModRange id="629" range="0.5"/>
+			<ModRange id="630" range="0.5"/>
+			<ModRange id="631" range="0.5"/>
+			<ModRange id="632" range="0.5"/>
+			<ModRange id="633" range="0.5"/>
+			<ModRange id="634" range="0.5"/>
+			<ModRange id="635" range="0.5"/>
+			<ModRange id="636" range="0.5"/>
+			<ModRange id="637" range="0.5"/>
+			<ModRange id="638" range="0.5"/>
+			<ModRange id="639" range="0.5"/>
+			<ModRange id="640" range="0.5"/>
+			<ModRange id="641" range="0.5"/>
+			<ModRange id="642" range="0.5"/>
+			<ModRange id="643" range="0.5"/>
+			<ModRange id="644" range="0.5"/>
+			<ModRange id="645" range="0.5"/>
+			<ModRange id="646" range="0.5"/>
+			<ModRange id="647" range="0.5"/>
+			<ModRange id="648" range="0.5"/>
+			<ModRange id="649" range="0.5"/>
+			<ModRange id="650" range="0.5"/>
+			<ModRange id="651" range="0.5"/>
+			<ModRange id="652" range="0.5"/>
+			<ModRange id="653" range="0.5"/>
+			<ModRange id="654" range="0.5"/>
+			<ModRange id="655" range="0.5"/>
+			<ModRange id="656" range="0.5"/>
+			<ModRange id="657" range="0.5"/>
+			<ModRange id="658" range="0.5"/>
+			<ModRange id="659" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: RARE
@@ -390,24 +2366,74 @@ Has 1 Abyssal Socket
 			<ModRange id="1" range="0.5"/>
 		</Item>
 		<Item id="10">
-			Rarity: MAGIC
-Flagellant&apos;s Basalt Flask
-Crafted: true
-Prefix: {range:1}FlaskFullRechargeOnHit5___
-Suffix: None
+			Rarity: UNIQUE
+Vorana&apos;s Preparation
+Iron Flask
+League: Expedition
 Quality: 20
-LevelReq: 64
-Implicits: 2
-{crafted}Used when Charges reach full
-{tags:flask}Taunts nearby Enemies on use
-{tags:flask}{prefix}Gain 3 Charges when you are Hit by an Enemy
+LevelReq: 27
+Implicits: 1
+Restores Ward on use
+{range:0.5}(-10-10)% reduced Charges per use
+Debilitate nearby Enemies for 2 Seconds when Effect ends
+Effect is removed when Ward Breaks
+Culling Strike during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+			<ModRange id="6" range="0.5"/>
 		</Item>
 		<Item id="11">
 			Rarity: MAGIC
-Flagellant&apos;s Basalt Flask
+Alchemist&apos;s Granite Flask
+Crafted: true
+Prefix: {range:0}FlaskEffectReducedDuration3
+Suffix: None
+Quality: 20
+LevelReq: 64
+Implicits: 2
+{crafted}{range:1}(60-70)% increased effect
+{crafted}Gains no Charges during Effect
+{tags:flask}{prefix}23% reduced Duration
+{tags:flask}{prefix}25% increased effect
+			<ModRange id="2" range="1"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+		</Item>
+		<Item id="12" variant="3">
+			Rarity: UNIQUE
+Rumi&apos;s Concoction
+Granite Flask
+Variant: Pre 1.3.0
+Variant: Pre 2.5.0
+Variant: Pre 3.15.0
+Variant: Current
+Selected Variant: 3
+Quality: 20
+LevelReq: 68
+Implicits: 0
+{variant:1}{range:0.5}+(30-40)% Chance to Block Attack Damage during Effect
+{variant:2}{range:0.5}+(20-30)% Chance to Block Attack Damage during Effect
+{variant:3}{range:0.5}+(14-20)% Chance to Block Attack Damage during Effect
+{variant:4}{range:0.5}+(8-12)% Chance to Block Attack Damage during Effect
+{variant:1}{range:0.5}+(15-20)% Chance to Block Spell Damage during Effect
+{variant:2}{range:0.5}+(10-15)% Chance to Block Spell Damage during Effect
+{variant:3}{range:0.5}+(6-10)% Chance to Block Spell Damage during Effect
+{variant:4}{range:0.5}+(4-6)% Chance to Block Spell Damage during Effect
+			<ModRange id="2" range="0.5"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
+			<ModRange id="6" range="0.5"/>
+			<ModRange id="7" range="0.5"/>
+			<ModRange id="8" range="0.5"/>
+			<ModRange id="9" range="0.5"/>
+		</Item>
+		<Item id="13">
+			Rarity: MAGIC
+Flagellant&apos;s Stibnite Flask
 Crafted: true
 Prefix: {range:1}FlaskFullRechargeOnHit5___
 Suffix: None
@@ -415,34 +2441,58 @@ Quality: 20
 LevelReq: 64
 Implicits: 2
 {crafted}Used when Charges reach full
-{tags:flask}Taunts nearby Enemies on use
+{tags:flask}Creates a Smoke Cloud on Use
 {tags:flask}{prefix}Gain 3 Charges when you are Hit by an Enemy
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 		</Item>
-		<Item id="12" variant="2">
+		<Item id="14" variant="8">
 			Rarity: UNIQUE
-Taste of Hate
-Sapphire Flask
-Variant: Pre 2.2.0
-Variant: Pre 3.0.0
-Variant: Pre 3.15.0
-Variant: Pre 3.25.0
-Variant: Current
-Selected Variant: 2
+Vessel of Vinktar
+Topaz Flask
+Variant: Pre 2.2.0 (Penetration)
+Variant: Pre 2.2.0 (Spells)
+Variant: Pre 2.2.0 (Attacks)
+Variant: Pre 2.2.0 (Conversion)
+Variant: Pre 3.0.0 (Penetration)
+Variant: Pre 3.0.0 (Spells)
+Variant: Pre 3.0.0 (Attacks)
+Variant: Pre 3.0.0 (Conversion)
+Variant: Pre 3.14.0 (Spells)
+Variant: Pre 3.14.0 (Conversion)
+Variant: Pre 3.15.0 (Penetration)
+Variant: Pre 3.15.0 (Spells)
+Variant: Pre 3.15.0 (Attacks)
+Variant: Current (Conversion)
+Variant: Current (Proliferation)
+Variant: Current (Penetration)
+Variant: Current (Spells)
+Variant: Current (Attacks)
+Selected Variant: 8
 Quality: 20
-LevelReq: 18
+LevelReq: 68
 Implicits: 0
-{variant:5}{range:0.5}(20-30)% of Fire and Lightning Damage from Hits taken as Cold Damage during Effect
-{variant:1}30% of Physical Damage from Hits taken as Cold Damage during Effect
-{variant:2,3}20% of Physical Damage from Hits taken as Cold Damage during Effect
-{variant:4}{range:0.5}(10-15)% of Physical Damage from Hits taken as Cold Damage during Effect
-{variant:1,2}{range:0.5}Gain (20-30)% of Physical Damage as Extra Cold Damage during effect
-{variant:3}{range:0.5}Gain (15-20)% of Physical Damage as Extra Cold Damage during effect
-{variant:4,5}{range:0.5}Gain (10-15)% of Physical Damage as Extra Cold Damage during effect
-30% chance to Avoid being Chilled during Effect
-30% chance to Avoid being Frozen during Effect
+{variant:5,6,7,8,9,10,11,12,13}{range:0.5}(80-100)% increased Charges per use
+{variant:14,15,16,17,18}{range:0.5}(125-150)% increased Charges per use
+Shocks nearby Enemies during Effect, causing 10% increased Damage taken
+You are Shocked during Effect, causing 50% increased Damage taken
+{variant:4,8,10}20% of Physical Damage Converted to Lightning during Effect
+{variant:14}50% of Physical Damage Converted to Lightning during Effect
+{variant:1,5,11}Damage Penetrates 10% Lightning Resistance during Effect
+{variant:16}Damage Penetrates 6% Lightning Resistance during Effect
+{variant:15}{range:0.5}(25-40)% increased Effect of Shocks you inflict during Effect
+{variant:15}Shocks you inflict during Effect spread to other Enemies within 2 metres
+{variant:3,7,13}{range:0.5}Adds (25-35) to (110-130) Lightning Damage to Attacks during Effect
+{variant:18}{range:0.5}Adds (10-15) to (55-65) Lightning Damage to Attacks during Effect
+{variant:2,6,9}{range:0.5}Adds (15-25) to (70-90) Lightning Damage to Spells during Effect
+{variant:12}{range:0.5}Adds (25-35) to (110-130) Lightning Damage to Spells during Effect
+{variant:17}{range:0.5}Adds (10-15) to (55-65) Lightning Damage to Spells during Effect
+{variant:1,2,3,4}30% of Lightning Damage Leeched as Life during Effect
+{variant:5,6,7,8,9,10,11,12,13,14,15,16,17,18}20% of Lightning Damage Leeched as Life during Effect
+{variant:1,2,3,4}30% of Lightning Damage Leeched as Mana during Effect
+{variant:5,6,7,8}20% of Lightning Damage Leeched as Mana during Effect
+{variant:1,2,3,4}Life and Mana Leech are instant during effect
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
@@ -452,40 +2502,28 @@ Implicits: 0
 			<ModRange id="9" range="0.5"/>
 			<ModRange id="10" range="0.5"/>
 			<ModRange id="11" range="0.5"/>
+			<ModRange id="12" range="0.5"/>
+			<ModRange id="13" range="0.5"/>
+			<ModRange id="14" range="0.5"/>
+			<ModRange id="15" range="0.5"/>
+			<ModRange id="16" range="0.5"/>
+			<ModRange id="17" range="0.5"/>
+			<ModRange id="18" range="0.5"/>
+			<ModRange id="19" range="0.5"/>
+			<ModRange id="20" range="0.5"/>
+			<ModRange id="21" range="0.5"/>
+			<ModRange id="22" range="0.5"/>
 		</Item>
-		<Item id="13">
-			Rarity: MAGIC
-Alchemist&apos;s Stibnite Flask
+		<Item id="15">
+			Rarity: RARE
+Abyss Jewel
+Ghastly Eye Jewel
 Crafted: true
-Prefix: {range:0}FlaskEffectReducedDuration3
+Prefix: None
+Prefix: None
 Suffix: None
-Quality: 20
-LevelReq: 64
-Implicits: 3
-{crafted}{range:1}(60-70)% increased effect
-{crafted}Gains no Charges during Effect
-{tags:flask}Creates a Smoke Cloud on Use
-{tags:flask}{prefix}23% reduced Duration
-{tags:flask}{prefix}25% increased effect
-			<ModRange id="2" range="1"/>
-			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
-			<ModRange id="5" range="0.5"/>
-			<ModRange id="6" range="0.5"/>
-		</Item>
-		<Item id="14">
-			Rarity: MAGIC
-Flagellant&apos;s Quicksilver Flask
-Crafted: true
-Prefix: {range:1}FlaskFullRechargeOnHit5___
 Suffix: None
-Quality: 20
-LevelReq: 64
-Implicits: 1
-{crafted}Used when Charges reach full
-{tags:flask}{prefix}Gain 3 Charges when you are Hit by an Enemy
-			<ModRange id="2" range="0.5"/>
-			<ModRange id="3" range="0.5"/>
+Implicits: 0
 		</Item>
 		<ItemSet id="1" useSecondWeaponSet="nil">
 			<Slot itemId="6" itemPbURL="" name="Amulet"/>
@@ -594,7 +2632,9 @@ Implicits: 1
 			<URL>
 				https://www.pathofexile.com/passive-skill-tree/AAAABgYbd7IonsQHY-4Vpr7dSLcwg_egeXqLlPEWv2JPb3cAWf0RGoEDZfk3bAvjhMu9tDgpD8t_HvBtbI4T74h71wbnAQmJ0yL00HXgcVBC-JcsRlRHIcDNKjy94ZJqjJE3E217DSaVvV3JPVVLJoiMNuNWtUi4vgcee19rF3aCBkDK0zJJ36Cr1N7UFAm-iv1KPDHmgXX9yAy00RGW6Fq3dVvT5OukBfJzbTr0GpZ48nU3TRPfNEvb1O1BLcSw2HBSYeKhL47p6KSaE8FrUzUOSNRCUXT79V3yuNlD5HBWKgv1R-UZsw6m-IRvppk3geLVkycAB7rPAFmOe9B1CZu4vnpjMkn29zwxvQE0S5eeQ-Q=
 			</URL>
-			<Sockets/>
+			<Sockets>
+				<Socket itemId="15" nodeId="41263"/>
+			</Sockets>
 			<Overrides/>
 		</Spec>
 	</Tree>

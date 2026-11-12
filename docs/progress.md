@@ -31,8 +31,8 @@ State at the handoff:
   Blast's trigger sources are ported (all four `doomBlastSource` modes);
   the corpus reaches only the default, Vixen's.
 - `perform.rs` and its variants test skip no build.
-- Breakdowns (`engine::breakdown`, `Actor::breakdown`, only in the Calcs
-  tab's calculation): the helpers of `CalcBreakdown.lua` but `leech`, and
+- Breakdowns (`engine::breakdown`, `Actor::breakdown`, only with
+  `env.buildBreakdown`): the helpers of `CalcBreakdown.lua` but `leech`, and
   every breakdown of `calcs.perform` before the triggers, `calcs.defence`,
   `calcs.buildDefenceEstimations` and `calcs.buildOutput`'s `SkillBuffs` and
   `SkillDebuffs`, for the player and the minion: equal to the translated
