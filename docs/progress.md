@@ -55,6 +55,16 @@ State at the handoff:
   the translated `calcFunc`'s for every corpus build, over a sample of
   overrides each (`tests/calculator.rs`, 1063 overrides, about 2
   minutes).
+- Node power (`engine::power::node_power`, `CalcsTab:PowerBuilder` with
+  `data.powerStatList`, `CalculatePowerStat` and the combined offence and
+  defence): every spec node's power, the masteries' by effect, cluster
+  notables and `powerMax` equal the translated `PowerBuilder`'s
+  (`tests/power.rs`, a build in ten with a depth of one point and three
+  cluster notables; `POWER_FULL=1` runs every node). Full node power of
+  gen-0004 (2618 nodes with power): typed 14 to 22 s with the build's
+  own calculations, the translation 42 to 51 s (one thread, a loaded
+  machine). Builds with Intuitive Leap and the
+  like return `not ported` (the spec does not port them).
 
 What remains for the full migration, in order:
 
@@ -67,9 +77,10 @@ What remains for the full migration, in order:
    the session API.
 2. A variants test per trigger support and per helmet focus, and of
    the Calcs tab's other minion and stage selections.
-3. The power calculators on the calculator (node power, then item, gem
-   and anoint comparisons), with the fast path (base environment reused,
-   candidates in parallel natively).
+3. The fast path of node power: candidates as a job list run on a base
+   environment built once (`node_power` keeps its API); parallelism
+   needs the engine's `Rc` data shared or rebuilt per worker. Then item,
+   gem and anoint comparisons on the calculator.
 4. `Data.lua` into the importer, so no Lua runs at load.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
@@ -133,6 +144,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
 | `calcs.getMiscCalculator`, `CalcOverride` in `initEnv` | `calculator.rs`, `calc_override.rs` (the override and the allocation it gives) |
+| `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs` |
 | `CalcBreakdown.lua`, the calculations' `breakdown.*` | `breakdown.rs` (types and helpers); the breakdowns where each calculation writes them, into `Actor::breakdown` |
 
 Every skill with a minion has an actor of its own after the player and the

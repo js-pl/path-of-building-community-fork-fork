@@ -14,6 +14,7 @@ use crate::calc_override::Override;
 use crate::calc_perform::{PerformInput, Result, perform};
 use crate::calcs::{FullDps, FullDpsSkill, Output, calc_full_dps_with};
 use crate::mods::Sym;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 /// A calculator's results: `env.player.output`, and the main skill's
@@ -49,17 +50,19 @@ impl CalcOutput {
 }
 
 /// `calcs.initEnv(build, "CALCULATOR", override)` and `calcs.perform(env)`
-/// on the calculator's cache, which it gives back
+/// on the calculator's cache, which it gives back with the passives items
+/// grant (`env.grantedPassives`)
 fn calculate(
     build: &Build,
     data: &CalcData,
     ovr: &Override,
     cache: Cache,
-) -> Result<(CalcOutput, Cache)> {
+) -> Result<(CalcOutput, Cache, BTreeSet<u32>)> {
     let mut b = build.clone();
     let mode = CalcMode::Calculator;
     let base = mode.buff_mode(&b);
     let env = init_env_with(&mut b, data, mode, base, ovr)?;
+    let granted = env.setup.tree.granted_passives.clone();
     let recalc = Recalculator::new(&b, data, mode)
         .with_override(ovr)
         .with_cache(cache);
@@ -75,7 +78,7 @@ fn calculate(
         minion,
     };
     drop(p);
-    Ok((out, recalc.into_cache()))
+    Ok((out, recalc.into_cache(), granted))
 }
 
 /// `calcs.getMiscCalculator(build)`.
@@ -91,6 +94,7 @@ pub struct MiscCalculator<'a, 't> {
     base: CalcOutput,
     cache: Cache,
     used_full_dps: bool,
+    granted_passives: BTreeSet<u32>,
 }
 
 impl<'a, 't> MiscCalculator<'a, 't> {
@@ -98,7 +102,7 @@ impl<'a, 't> MiscCalculator<'a, 't> {
     /// calculations, with the build's own calculation
     pub fn new(build: &Build<'t>, data: &'a CalcData<'a>) -> Result<Self> {
         let none = Override::default();
-        let (mut base, cache) = calculate(build, data, &none, Cache::new())?;
+        let (mut base, cache, granted_passives) = calculate(build, data, &none, Cache::new())?;
         let mode = CalcMode::Calculator.buff_mode(build);
         let (full, cache) = calc_full_dps_with(build, data, mode, &none, cache)?;
         let used_full_dps = !full.skills.is_empty();
@@ -111,6 +115,7 @@ impl<'a, 't> MiscCalculator<'a, 't> {
             base,
             cache,
             used_full_dps,
+            granted_passives,
         })
     }
 
@@ -123,11 +128,16 @@ impl<'a, 't> MiscCalculator<'a, 't> {
         &self.build
     }
 
+    /// The passives items grant (`env.grantedPassives`)
+    pub fn granted_passives(&self) -> &BTreeSet<u32> {
+        &self.granted_passives
+    }
+
     /// `calcFunc(override, useFullDPS)`: with `full_dps` (`useFullDPS ~=
     /// false or build.viewMode == "TREE"`), the Full DPS is calculated again
     /// when the build has Full DPS skills
     pub fn calculate(&self, ovr: &Override, full_dps: bool) -> Result<CalcOutput> {
-        let (mut out, cache) = calculate(&self.build, self.data, ovr, self.cache.clone())?;
+        let (mut out, cache, _) = calculate(&self.build, self.data, ovr, self.cache.clone())?;
         if full_dps && self.used_full_dps {
             let mode = CalcMode::Calculator.buff_mode(&self.build);
             let (full, _) = calc_full_dps_with(&self.build, self.data, mode, ovr, cache)?;

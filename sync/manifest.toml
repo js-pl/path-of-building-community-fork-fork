@@ -16,7 +16,7 @@ upstream = "16de4b82d57f1c0de6eb40f37143c32d4da36a02"
 "Classes/ButtonControl.lua" = { status = "todo" }
 "Classes/CalcBreakdownControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Classes/CalcSectionControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
-"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx crates/engine/src/build.rs crates/engine/src/calcs.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
+"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx crates/engine/src/build.rs crates/engine/src/calcs.rs crates/engine/src/power.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Classes/CheckBoxControl.lua" = { status = "partial", port = "web/src/ui/Control.tsx", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Classes/CompareBuySimilar.lua" = { status = "todo" }
 "Classes/CompareCalcsHelpers.lua" = { status = "todo" }
@@ -319,7 +319,7 @@ upstream = "16de4b82d57f1c0de6eb40f37143c32d4da36a02"
 "Modules/ConfigModBrowser.lua" = { status = "todo" }
 "Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/ConfigVisibility.lua" = { status = "todo" }
-"Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
+"Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs crates/engine/src/power.rs", sync = "16de4b82d57f1c0de6eb40f37143c32d4da36a02" }
 "Modules/DataAbyssJewelLookUpTableHelper.lua" = { status = "todo" }
 "Modules/DataJewelFileLoader.lua" = { status = "todo" }
 "Modules/DataLegionLookUpTableHelper.lua" = { status = "todo" }
