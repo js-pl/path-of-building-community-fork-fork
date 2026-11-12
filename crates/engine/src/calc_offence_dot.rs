@@ -14,6 +14,7 @@ use crate::calc_offence::Off;
 use crate::calc_offence_hit::Combine;
 use crate::calc_perform::Perform;
 use crate::mods::{Cfg, ModValue};
+use crate::sf;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -108,6 +109,10 @@ impl<'a> Perform<'a> {
                 let more = self.c.more(edb, None, &names)?;
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
                 self.c.set_out(actor, "DecayEffMult", eff);
+                if eff != 1.0 && self.has_bd(actor) {
+                    let l = self.dot_type_eff_breakdown("Chaos", eff, resist, inc, more)?;
+                    self.bd(actor).unwrap().set_lines("DecayEffMult", l);
+                }
             }
             let inc = self.c.inc(list, Some(&dot), &["Damage", "ChaosDamage"])?;
             let more = self.c.more(list, Some(&dot), &["Damage", "ChaosDamage"])?;
@@ -118,13 +123,26 @@ impl<'a> Perform<'a> {
                         + self.c.base(list, Some(&dot), &["ChaosDotMultiplier"])?
                 }
             };
-            self.c.set_out(
-                actor,
-                "DecayDPS",
-                decay * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * eff,
-            );
-            self.c
-                .set_out(actor, "DecayDuration", 8.0 * o.debuff_duration_mult);
+            let dps = decay * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * eff;
+            self.c.set_out(actor, "DecayDPS", dps);
+            let duration = 8.0 * o.debuff_duration_mult;
+            self.c.set_out(actor, "DecayDuration", duration);
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                crate::breakdown::dot(&mut l, decay, inc, more, Some(mult), None, None, eff, dps);
+                b.set_lines("DecayDPS", l);
+                if duration != 8.0 {
+                    let mut l = vec![sf!("%.2fs ^8(base duration)", 8.0)];
+                    if o.debuff_duration_mult != 1.0 {
+                        l.push(sf!(
+                            "/ %.2f ^8(debuff expires slower/faster)",
+                            1.0 / o.debuff_duration_mult
+                        ));
+                    }
+                    l.push(sf!("= %.2fs", duration));
+                    b.set_lines("DecayDuration", l);
+                }
+            }
         }
         let db = o.db;
         let ground = self.c.base(db, None, &["DropsBurningGround"])?;
@@ -256,6 +274,12 @@ impl<'a> Perform<'a> {
                 };
                 eff = (1.0 - resist / 100.0) * (1.0 + inc / 100.0) * more;
                 self.c.set_out(actor, &format!("{t}DotEffMult"), eff);
+                if eff != 1.0 && self.has_bd(actor) {
+                    let l = self.dot_type_eff_breakdown(t, eff, resist, inc, more)?;
+                    self.bd(actor)
+                        .unwrap()
+                        .set_lines(format!("{t}DotEffMult"), l);
+                }
             }
             let td = format!("{t}Damage");
             let mut names = vec!["Damage", td.as_str()];
@@ -280,11 +304,21 @@ impl<'a> Perform<'a> {
                 && !self.has_type(i, "RemoteMined")
                 && !self.has_type(i, "Banner")
             {
-                self.c.calc_mod(list, Some(&typ), &["AuraEffect"])?
+                Some(self.c.calc_mod(list, Some(&typ), &["AuraEffect"])?)
             } else {
-                1.0
+                None
             };
-            let total = base * (1.0 + inc / 100.0) * more * (1.0 + mult / 100.0) * aura * eff;
+            let total = base
+                * (1.0 + inc / 100.0)
+                * more
+                * (1.0 + mult / 100.0)
+                * aura.unwrap_or(1.0)
+                * eff;
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                crate::breakdown::dot(&mut l, base, inc, more, Some(mult), None, aura, eff, total);
+                b.set_lines(key.clone(), l);
+            }
             let instance = g(self, "TotalDotInstance").unwrap_or(f64::NAN);
             match g(self, &key) {
                 Some(v) if v != 0.0 => {
@@ -320,6 +354,28 @@ impl<'a> Perform<'a> {
             );
             self.c.set_out(actor, "TotalDot", total);
             self.c.set_out(actor, "TotalDotCalcSection", total);
+            if self.has_bd(actor) {
+                let mut l = vec![
+                    sf!("%.1f ^8(Damage per Instance)", instance),
+                    sf!("x %.2f ^8(hits per second)", speed),
+                    sf!(
+                        "x %.2f ^8(skill duration)",
+                        g(self, "Duration").unwrap_or(f64::NAN)
+                    ),
+                ];
+                let dps_mult = self.sd_num(i, "dpsMultiplier").unwrap_or(f64::NAN);
+                if dps_mult != 1.0 {
+                    l.push(sf!("x %g ^8(DPS multiplier for this skill)", dps_mult));
+                }
+                if o.quantity_multiplier > 1.0 {
+                    l.push(sf!(
+                        "x %g ^8(quantity multiplier for this skill)",
+                        o.quantity_multiplier
+                    ));
+                }
+                l.push(sf!("= %.1f", total));
+                self.bd(actor).unwrap().set_lines("TotalDot", l);
+            }
         } else if let Some((flag, out, from)) = [
             (
                 "dotIsBurningGround",
@@ -391,9 +447,15 @@ impl<'a> Perform<'a> {
         ] {
             let speed = g(self, "Speed").unwrap_or(f64::NAN);
             let cooldown = g(self, "Cooldown");
+            let skill_cfg = self.cfg(i);
+            let es_cost = eb
+                && self
+                    .c
+                    .base(list, Some(&skill_cfg), &["ManaCostAsEnergyShieldCost"])?
+                    != 0.0;
             if !(has(self, &format!("{resource}HasCost"))
                 && g(self, &format!("{resource}Cost")).unwrap_or(f64::NAN) > 0.0
-                && !(has(self, &format!("{resource}PerSecondHasCost")) && !eb)
+                && !(has(self, &format!("{resource}PerSecondHasCost")) && !es_cost)
                 && (speed > 0.0 || cooldown.is_some()))
             {
                 continue;
@@ -404,6 +466,23 @@ impl<'a> Perform<'a> {
                 resource
             };
             let repeats = g(self, "Repeats").unwrap_or(1.0);
+            let (trap, totem) = (self.has_flag(i, "trap"), self.has_flag(i, "totem"));
+            let time_type = if trap || self.has_flag(i, "mine") {
+                if trap { "trap throwing" } else { "mine laying" }
+            } else if totem {
+                "totem placement"
+            } else if self.c.flag(list, None, &["HasSeals"])?
+                && self.c.flag(list, None, &["UseMaxUnleash"])?
+                && self.sd_num(self.main(), "hitTimeOverride").is_some()
+            {
+                "full unleash"
+            } else if self.sd_truthy(i, "triggered") {
+                "trigger"
+            } else if self.has_flag(i, "attack") {
+                "attack"
+            } else {
+                "cast"
+            };
             let use_speed = if self.has_flag(i, "trap") || self.has_flag(i, "mine") {
                 let pre = g(self, "TrapThrowingSpeed").or_else(|| g(self, "MineLayingSpeed"));
                 match g(self, "TrapCooldown").or(cooldown) {
@@ -447,8 +526,41 @@ impl<'a> Perform<'a> {
             let v = g(self, &format!("{used}PerSecondCost")).unwrap_or(0.0)
                 + g(self, &format!("{resource}Cost")).unwrap_or(f64::NAN) * use_speed;
             self.c.set_out(actor, &format!("{used}PerSecondCost"), v);
+            if let Some(b) = self.bd(actor) {
+                let mut l = b
+                    .get(&format!("{resource}Cost"))
+                    .ok_or("bad argument #1 to 'pairs' (table expected, got nil)")?
+                    .lines
+                    .clone();
+                l.pop();
+                l.push(sf!(&format!("x %.2f ^8({time_type} speed)"), use_speed));
+                l.push(sf!("= %.2f per second", v));
+                b.set_lines(format!("{used}PerSecondCost"), l);
+            }
         }
         Ok(())
+    }
+
+    /// `breakdown.effMult(t, resist, 0, takenInc, effMult, takenMore,
+    /// sourceRes, true)` of a damage over time
+    pub(crate) fn dot_type_eff_breakdown(&self, t: &str, eff: f64, resist: f64, inc: f64, more: f64) -> Result<Vec<String>> {
+        let source = if self.c.flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])? {
+            format!("Your {t} Resistance")
+        } else {
+            t.to_string()
+        };
+        Ok(crate::breakdown::eff_mult(crate::breakdown::EffMult {
+            damage_type: t,
+            resist,
+            pen: 0.0,
+            taken: inc,
+            mult: eff,
+            taken_more: more,
+            source_res: Some(&source),
+            use_res: true,
+            invert_chance: None,
+            effective_resist: None,
+        }))
     }
 
     /// Damage the skill deals to the player (`SelfHitDamage`)
@@ -477,8 +589,14 @@ impl<'a> Perform<'a> {
             }
         };
         let out = |p: &Self, k: &str| p.c.out(actor, k);
-        // Each source's damage type and base damage, in a fixed order
-        let mut sources: Vec<(String, f64)> = Vec::new();
+        // Each source's damage taken and breakdown, in a fixed order
+        let mut sources: Vec<(f64, Vec<String>)> = Vec::new();
+        let wrap = |(taken, mut l): (f64, Vec<String>), first: String, last: String| {
+            l.insert(0, first);
+            l.insert(1, String::new());
+            l.push(last);
+            (taken, l)
+        };
         // Heartbound Loop, Storm Secret, Enmity's Embrace: the rings' sum
         let summed = |p: &Self, n: &str| -> Result<Option<(String, f64)>> {
             let mut t = None;
@@ -492,15 +610,26 @@ impl<'a> Perform<'a> {
         if name == "Summon Skeletons"
             && let Some((t, v)) = summed(self, "HeartboundLoopSelfDamage")?
         {
-            let taken = self.dmg_taken_conversion(o, &t, v)?;
+            let r = self.dmg_taken_conversion(o, &t, v)?;
             let per_cast = out(self, "SummonedMinionsPerCast").unwrap_or(f64::NAN);
-            sources.push((t, taken * per_cast));
+            let last = sf!(
+                "Total Heartbound Loop damage taken per cast/attack: %.2f * %d ^8(minions per cast)^7 = %.2f",
+                r.0,
+                per_cast,
+                r.0 * per_cast
+            );
+            let (taken, l) = wrap(r, sf!("Heartbound Loop base damage: %d", v), last);
+            sources.push((taken * per_cast, l));
         }
         if name == "Herald of Thunder"
             && let Some((t, v)) = summed(self, "StormSecretSelfDamage")?
         {
-            let taken = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push((t, taken));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let last = sf!(
+                "Total Storm Secret damage taken per Herald of Thunder Hit: %.2f",
+                r.0
+            );
+            sources.push(wrap(r, sf!("Storm Secret base damage: %d", v), last));
         }
         if let Some(r) = records(self, "EyeOfInnocenceSelfDamage")?
             .into_iter()
@@ -509,8 +638,9 @@ impl<'a> Perform<'a> {
             && let Some(t) = typ(&r)
         {
             let v = num(&r, "baseDamage")?;
-            let taken = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push((t, taken));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let last = sf!("Total Eye of Innocence damage taken per cast/attack: %.2f ", r.0);
+            sources.push(wrap(r, sf!("Eye of Innocence base damage: %d", v), last));
         }
         if let Some(r) = records(self, "EchoesOfCreationSelfDamage")?
             .into_iter()
@@ -526,9 +656,18 @@ impl<'a> Perform<'a> {
                     .c
                     .base(self.pdb(), None, &["Multiplier:ExertingWarcryCount"])?;
             }
-            let base = out(self, "Life").unwrap_or(0.0) * mult / 100.0 * count;
-            let taken = self.dmg_taken_conversion(o, &t, base)?;
-            sources.push((t, taken));
+            let life = out(self, "Life").unwrap_or(0.0);
+            let base = life * mult / 100.0 * count;
+            let r = self.dmg_taken_conversion(o, &t, base)?;
+            let first = sf!(
+                "Echoes of Creation base damage: %d ^8(Life)^7 * %d%% * %.2f ^8(Avg. Warcry Count)^7 = %.2f",
+                life,
+                mult,
+                count,
+                base
+            );
+            let last = sf!("Total Echoes of Creation damage taken per Attack: %.2f ", r.0);
+            sources.push(wrap(r, first, last));
         }
         let has_cost = matches!(
             self.c.out_val(actor, "ManaHasCost"),
@@ -539,31 +678,76 @@ impl<'a> Perform<'a> {
             && let Some(t) = typ(&r)
         {
             let mult = num(&r, "dmgMult")?;
-            let base = out(self, "ManaCost").unwrap_or(0.0) * mult / 100.0;
-            let taken = self.dmg_taken_conversion(o, &t, base)?;
-            sources.push((t, taken));
+            let cost = out(self, "ManaCost").unwrap_or(0.0);
+            let base = cost * mult / 100.0;
+            let r = self.dmg_taken_conversion(o, &t, base)?;
+            let first = sf!(
+                "Scold's Bridle base damage: %d ^8(Mana Cost)^7 * %d%% = %.2f",
+                cost,
+                mult,
+                base
+            );
+            let last = sf!(
+                "Total Scold's Bridle damage taken per cast/attack: %.2f ",
+                r.0
+            );
+            sources.push(wrap(r, first, last));
         }
         if self.c.flag(self.lists[i].base, None, &["HasTrauma"])? {
             let stacks = m_max(self.c.base(list, None, &["Multiplier:TraumaStacks"])?, 1.0);
             let per = self.c.base(list, None, &["TraumaSelfDamageTakenLife"])?;
-            let taken = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
-            sources.push(("Physical".into(), taken));
+            let r = self.dmg_taken_conversion(o, "Physical", per * stacks)?;
+            let sustainable = self.cfg(i);
+            let which = if self.c.base(
+                list,
+                Some(&sustainable),
+                &["Multiplier:SustainableTraumaStacks"],
+            )? == stacks
+            {
+                "sustainable"
+            } else {
+                "current"
+            };
+            let first = sf!(
+                "%d ^8(base %s damage)^7 * %.2f ^8(%s trauma)^7 = %.2f %s damage",
+                per,
+                "Physical",
+                stacks,
+                which,
+                per * stacks,
+                "Physical"
+            );
+            let last = sf!("Total Trauma damage taken per cast/attack: %.2f ", r.0);
+            sources.push(wrap(r, first, last));
         }
         if let Some((t, v)) = summed(self, "EnmitysEmbraceSelfDamage")? {
-            let taken = self.dmg_taken_conversion(o, &t, v)?;
-            sources.push((t, taken));
+            let r = self.dmg_taken_conversion(o, &t, v)?;
+            let last = sf!("Total Enmity's Embrace damage taken per cast/attack: %.2f ", r.0);
+            sources.push(wrap(r, sf!("Enmity's Embrace base damage: %d", v), last));
         }
-        for (_, taken) in sources {
+        let mut lines: Option<Vec<String>> = None;
+        for (taken, l) in sources {
             let v = out(self, "SelfHitDamage").unwrap_or(0.0) + taken;
             self.c.set_out(actor, "SelfHitDamage", v);
+            if self.has_bd(actor) {
+                let x = lines.get_or_insert_with(Vec::new);
+                x.extend(l);
+                x.push(String::new());
+            }
+        }
+        if let Some(mut l) = lines {
+            l.pop();
+            self.bd(actor).unwrap().set_lines("SelfHitDamage", l);
         }
         Ok(())
     }
 
     /// `calcs.applyDmgTakenConversion(activeSkill, output, breakdown,
     /// sourceType, baseDmg)`: the damage the actor takes from its own hit
-    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<f64> {
+    fn dmg_taken_conversion(&self, o: &Off, source: &str, base: f64) -> Result<(f64, Vec<String>)> {
         let (list, actor) = (o.list, o.actor);
+        let bd = self.has_bd(actor);
+        let mut lines = Vec::new();
         let out = |k: &str| self.c.out(actor, k);
         let elemental = |t: &str| matches!(t, "Lightning" | "Cold" | "Fire");
         let types = ["Physical", "Lightning", "Cold", "Fire", "Chaos"];
@@ -675,9 +859,31 @@ impl<'a> Perform<'a> {
             let reduct_mult = (1.0
                 - m_max(m_min(reduct_max, armour_reduct + reduction), 0.0) / 100.0)
                 * taken_mods;
-            total += damage * (res_mult * reduct_mult);
+            let combined = res_mult * reduct_mult;
+            total += damage * combined;
+            if bd {
+                lines.push(format!("{t} Damage Taken"));
+                if taken_as != 1.0 {
+                    lines.push(sf!(
+                        "^8=^7 %d^8 (Base Damage)^7 * %.2f^8 (Damage taken as %s)",
+                        base,
+                        taken_as,
+                        *t
+                    ));
+                }
+                if combined != 1.0 {
+                    lines.push(sf!(
+                        "^8=^7 %d^8 (%s Damage)^7 * %.4f^8 (Damage taken multi)",
+                        damage,
+                        *t,
+                        combined
+                    ));
+                }
+                lines.push(sf!("^8=^7 %d^8 (%s Damage taken)", damage * combined, *t));
+                lines.push(String::new());
+            }
         }
-        Ok(total)
+        Ok((total, lines))
     }
 
     /// The combined DPS estimate, with damage over time
@@ -808,6 +1014,68 @@ impl<'a> Perform<'a> {
             }
             self.c.set_out(actor, "ImpaleDPS", impale);
             combined += impale;
+            if self.has_bd(actor) {
+                let both = self.has_flag(i, "attack")
+                    && self.sd_truthy(i, "doubleHitsWhenDualWielding")
+                    && self.has_flag(i, "bothWeaponAttack");
+                let mut l = Vec::new();
+                if both {
+                    let mut dps = [0.0; 2];
+                    for (h, (label, short)) in [("Main Hand", "MH"), ("Off Hand", "OH")].into_iter().enumerate() {
+                        let stored = hand(self, h, "impaleStoredHitAvg").unwrap_or(f64::NAN);
+                        let m = hand(self, h, "ImpaleModifier").unwrap_or(1.0) - 1.0;
+                        let hc = hand(self, h, "HitChance").unwrap_or(f64::NAN);
+                        let hit = hc / 100.0;
+                        dps[h] = stored * m * hc / 100.0 * dps_mult;
+                        l.push(format!("{label}:"));
+                        l.push(sf!(&format!("%.2f ^8({short} average physical hit before mitigation)"), stored));
+                        l.push(sf!(&format!("x %.2f ^8({short} chance to hit)"), hit));
+                        let nl = if h == 0 { "\n" } else { "" };
+                        l.push(sf!(&format!("x %.2f ^8({short} impale damage multiplier){nl}"), m));
+                        l.push(sf!("= %.2f", dps[h]));
+                    }
+                    l.push("Combined total:".into());
+                    l.push(sf!("%.2f + %.2f", dps[0], dps[1]));
+                } else {
+                    l.push(sf!(
+                        "%.2f ^8(average physical hit before mitigation)",
+                        n(self, "impaleStoredHitAvg")
+                    ));
+                    l.push(sf!("x %.2f ^8(chance to hit)", n(self, "HitChance") / 100.0));
+                    l.push(sf!(
+                        "x %.2f ^8(impale damage multiplier)",
+                        g(self, "ImpaleModifier").unwrap_or(1.0) - 1.0
+                    ));
+                }
+                if self.has_flag(i, "notAverage") {
+                    l.push(match g(self, "HitSpeed") {
+                        Some(h) => sf!("x %.2f ^8(hit rate)", h),
+                        None => sf!(
+                            "x %.2f ^8(%s rate)",
+                            n(self, "Speed"),
+                            if self.has_flag(i, "attack") {
+                                "attack"
+                            } else {
+                                "cast"
+                            }
+                        ),
+                    });
+                }
+                if dps_mult != 1.0 {
+                    l.push(sf!("x %g ^8(dps multiplier for this skill)", dps_mult));
+                }
+                if o.quantity_multiplier > 1.0 {
+                    l.push(sf!(
+                        "x %g ^8(quantity multiplier for this skill)",
+                        o.quantity_multiplier
+                    ));
+                }
+                if n(self, "ImpaleDuration") <= 0.0 {
+                    l.push("x 0 ^8(no Impale Duration)".into());
+                }
+                l.push(sf!("= %.1f", impale));
+                self.bd(actor).unwrap().set_lines("ImpaleDPS", l);
+            }
         }
         // The mirage's damage (`activeSkill.mirage`)
         let mut mirage_cull = 1.0;

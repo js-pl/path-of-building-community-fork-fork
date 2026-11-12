@@ -283,23 +283,7 @@ impl<'a> Perform<'a> {
     /// sourceRes, true)` of a damage over time, `Your <t> Resistance` for
     /// an enemy with the player's
     fn dot_eff_breakdown(&self, t: &str, (eff, resist, inc, more): (f64, f64, f64, f64)) -> Result<Vec<String>> {
-        let source = if self.c.flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])? {
-            format!("Your {t} Resistance")
-        } else {
-            t.to_string()
-        };
-        Ok(crate::breakdown::eff_mult(crate::breakdown::EffMult {
-            damage_type: t,
-            resist,
-            pen: 0.0,
-            taken: inc,
-            mult: eff,
-            taken_more: more,
-            source_res: Some(&source),
-            use_res: true,
-            invert_chance: None,
-            effective_resist: None,
-        }))
+        self.dot_type_eff_breakdown(t, eff, resist, inc, more)
     }
 
     /// The ailment passes
