@@ -5143,3 +5143,31 @@ crate::codec_struct!(ConfigData {
     boss_stats,
     boss_skills,
 });
+
+impl crate::codec::Codec for Val {
+    fn put(&self, w: &mut crate::codec::Writer) {
+        match self {
+            Val::Bool(b) => {
+                0u8.put(w);
+                b.put(w);
+            }
+            Val::Number(n) => {
+                1u8.put(w);
+                n.put(w);
+            }
+            Val::Str(s) => {
+                2u8.put(w);
+                s.put(w);
+            }
+        }
+    }
+    fn get(r: &mut crate::codec::Reader) -> crate::codec::Result<Self> {
+        use crate::codec::Codec;
+        Ok(match u8::get(r)? {
+            0 => Val::Bool(Codec::get(r)?),
+            1 => Val::Number(Codec::get(r)?),
+            2 => Val::Str(Codec::get(r)?),
+            k => return Err(format!("bad option value {k} in typed data")),
+        })
+    }
+}

@@ -987,3 +987,118 @@ impl PassiveTree {
 fn rt_index(v: &Value, i: i64) -> Value {
     lua::rt::index(v, &Value::Number(i as f64)).unwrap_or_default()
 }
+
+impl crate::codec::Codec for NodeType {
+    fn put(&self, w: &mut crate::codec::Writer) {
+        (*self as u8).put(w);
+    }
+    fn get(r: &mut crate::codec::Reader) -> crate::codec::Result<Self> {
+        use NodeType::*;
+        [
+            ClassStart,
+            AscendClassStart,
+            Mastery,
+            Socket,
+            Keystone,
+            Notable,
+            Normal,
+        ]
+        .get(usize::from(u8::get(r)?))
+        .copied()
+        .ok_or_else(|| "bad node type in typed data".into())
+    }
+}
+
+crate::codec_struct!(StatLine { list, extra });
+crate::codec_struct!(Group {
+    x,
+    y,
+    is_proxy,
+    nodes,
+    ascendancy_name,
+    is_ascendancy_start,
+});
+crate::codec_struct!(MasteryEffect {
+    id,
+    sd,
+    mods,
+    mod_list
+});
+crate::codec_struct!(ExpansionJewel {
+    size,
+    index,
+    proxy,
+    parent
+});
+crate::codec_struct!(Node {
+    id,
+    dn,
+    sd,
+    kind,
+    ascendancy_name,
+    class_start_index,
+    group,
+    orbit,
+    orbit_index,
+    angle,
+    x,
+    y,
+    linked_id,
+    passive_points_granted,
+    is_proxy,
+    is_blighted,
+    is_mastery,
+    is_multiple_choice,
+    is_multiple_choice_option,
+    is_ascendancy_start,
+    charm_socket,
+    expansion_jewel,
+    mastery_effects,
+    mods,
+    mod_list,
+    keystone_mod,
+    unknown,
+    extra,
+    nodes_in_radius,
+});
+crate::codec_struct!(Ascendancy {
+    id,
+    name,
+    start_node_id
+});
+crate::codec_struct!(Class {
+    name,
+    ascendancies,
+    start_node_id,
+    base_stats
+});
+crate::codec_struct!(PassiveTree {
+    version,
+    version_num,
+    classes,
+    groups,
+    group_ids,
+    nodes,
+    node_index,
+    keystone_map,
+    legion_keystones,
+    notable_map,
+    ascendancy_map,
+    cluster_node_map,
+    class_notables,
+    sockets,
+    skills_per_orbit,
+    mastery_effects,
+    alternate_ascendancies,
+});
+
+impl PassiveTree {
+    /// Reads a tree from the binary form of [`crate::codec`].
+    pub fn decode(bytes: &[u8]) -> crate::codec::Result<PassiveTree> {
+        crate::codec::decode(bytes)
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        crate::codec::encode(self)
+    }
+}
