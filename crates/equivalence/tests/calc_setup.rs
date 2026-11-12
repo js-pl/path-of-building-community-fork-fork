@@ -1339,14 +1339,14 @@ fn items_setup_matches_upstream() {
                 fail(format!("config {what}: {}", diff.join(", ")));
             }
         }
-        if typed_build.config_mods != config_mods {
+        if *typed_build.config_mods != config_mods {
             fail(format!(
                 "config mods: {} != {}",
                 typed_build.config_mods.len(),
                 config_mods.len()
             ));
         }
-        if typed_build.config_enemy_mods != config_enemy_mods {
+        if *typed_build.config_enemy_mods != config_enemy_mods {
             fail("config enemy mods differ".into());
         }
         let calc_data = engine::calc_env::CalcData {

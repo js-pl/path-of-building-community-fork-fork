@@ -12,10 +12,11 @@
 
 use crate::actor::OutVal;
 use crate::build::Build;
-use crate::calc_env::{CalcData, CalcMode};
+use crate::calc_env::{CalcData, CalcMode, Env};
 use crate::calc_override::Override;
 use crate::calc_perform::{Perform, PerformInput, Result};
 use crate::calc_skills::ActiveSkill;
+use crate::calcs::Output;
 use crate::mods::Sym;
 use crate::skills::SocketGroup;
 use std::cell::RefCell;
@@ -99,6 +100,9 @@ pub struct Recalculator<'a, 't> {
     /// The override of the calculations (`env.override`)
     pub ovr: Override,
     cache: RefCell<Cache>,
+    /// The setup of the calculations and the build it leaves, which does
+    /// not depend on the main skill
+    setup: RefCell<Option<Rc<(Build<'t>, Env)>>>,
 }
 
 impl<'a, 't> Recalculator<'a, 't> {
@@ -109,6 +113,7 @@ impl<'a, 't> Recalculator<'a, 't> {
             mode,
             ovr: Override::default(),
             cache: RefCell::new(HashMap::new()),
+            setup: RefCell::new(None),
         }
     }
 
@@ -130,14 +135,21 @@ impl<'a, 't> Recalculator<'a, 't> {
         self.cache.into_inner()
     }
 
-    fn init_env(&self, build: &mut Build) -> Result<crate::calc_env::Env> {
-        crate::calc_env::init_env_with(
-            build,
-            self.data,
-            self.mode,
-            self.mode.buff_mode(build),
-            &self.ovr,
-        )
+    /// A calculation's setup, and the build after it: a copy of the
+    /// first with [`crate::calc_env::reuse_setup`]
+    fn init_env(&self) -> Result<(Build<'t>, Env)> {
+        let reuse = crate::calc_env::reuse_setup();
+        if reuse && let Some(s) = self.setup.borrow().as_ref() {
+            return Ok((s.0.clone(), s.1.clone()));
+        }
+        let mut build = self.build.clone();
+        let base = self.mode.buff_mode(&build);
+        let env =
+            crate::calc_env::init_env_with(&mut build, self.data, self.mode, base, &self.ovr)?;
+        if reuse {
+            *self.setup.borrow_mut() = Some(Rc::new((build.clone(), env.clone())));
+        }
+        Ok((build, env))
     }
 }
 
@@ -157,8 +169,7 @@ impl Recalc for Recalculator<'_, '_> {
     }
 
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
-        let mut build = self.build.clone();
-        let mut env = self.init_env(&mut build)?;
+        let (build, mut env) = self.init_env()?;
         let Some(main) = env
             .skills
             .active_skills
@@ -174,8 +185,8 @@ impl Recalc for Recalculator<'_, '_> {
         input.recalc = Some(self);
         input.limited = limited.to_vec();
         input.skip_ehp = true;
-        let mut p = crate::calc_perform::perform(env, input)?;
-        p.finish()
+        crate::calc_perform::perform(env, input)?.finish_owned()?;
+        Ok(())
     }
 
     fn mirage(
@@ -184,8 +195,7 @@ impl Recalc for Recalculator<'_, '_> {
         limited: &[String],
     ) -> Result<crate::mods::SymMap<OutVal>> {
         use crate::calc_skill_mods::{ModsInput, Owner};
-        let mut build = self.build.clone();
-        let mut env = self.init_env(&mut build)?;
+        let (build, mut env) = self.init_env()?;
         let data = self.data;
         let weapons = [
             ext.player_actor.weapon_data[0].clone().unwrap_or_default(),
@@ -288,6 +298,50 @@ impl<'a> Perform<'a> {
     /// defence, the triggers, mirages and offence of the player and the
     /// minion, then the main skill's results cached
     pub fn finish(&mut self) -> Result<()> {
+        self.finish_calcs()?;
+        self.cache_main();
+        Ok(())
+    }
+
+    /// [`Perform::finish`] of a calculation nothing reads after: the main
+    /// skill's results move into the cache instead of being copied. Gives
+    /// the player's output and the minion's.
+    pub fn finish_owned(mut self) -> Result<(Output, Option<Output>)> {
+        self.finish_calcs()?;
+        let minion = self
+            .minion_actor()
+            .map(|a| self.c.actors.actors[a].output.clone());
+        let Some(recalc) = self.input.recalc else {
+            let player = std::mem::take(&mut self.c.actors.actors[crate::calc::PLAYER].output);
+            return Ok((player, minion));
+        };
+        let main = self.main();
+        let uuid = self.skill_uuid(main);
+        let skill = self.skill(main).clone();
+        let (pdb, edb) = (self.pdb(), self.edb());
+        let stores = &mut self.c.stores.stores;
+        let player_store = std::mem::replace(&mut stores[pdb], crate::mods::Store::db());
+        let enemy_store = std::mem::replace(&mut stores[edb], crate::mods::Store::db());
+        let actors = &mut self.c.actors.actors;
+        let player_actor = std::mem::take(&mut actors[crate::calc::PLAYER]);
+        let enemy_actor = std::mem::take(&mut actors[crate::calc::ENEMY]);
+        let output = player_actor.output.clone();
+        recalc.store(
+            &uuid,
+            CachedCalc {
+                output: player_actor.output.clone(),
+                skill,
+                minion_output: minion.clone(),
+                player_store,
+                enemy_store,
+                player_actor,
+                enemy_actor,
+            },
+        );
+        Ok((output, minion))
+    }
+
+    fn finish_calcs(&mut self) -> Result<()> {
         let skip = self.input.skip_ehp;
         self.defence(crate::calc::PLAYER)?;
         if !skip {
@@ -303,7 +357,6 @@ impl<'a> Perform<'a> {
             let main = self.actor_main(a).ok_or("a minion without a main skill")?;
             self.offence(a, main)?;
         }
-        self.cache_main();
         Ok(())
     }
 

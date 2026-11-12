@@ -215,7 +215,7 @@ written by hand. Details, the JSON format and the determinism checks are in
    results.
 7. **Fast path vs simple path.** Incremental, deduplicated and parallel
    results equal a from-scratch single-threaded calc. Engine-only, so it also
-   runs on inputs the oracle cannot handle quickly.
+   runs on inputs the oracle cannot handle quickly: `tests/fast_path.rs`.
 8. **Round trip.** Builds saved by the engine load in upstream with identical
    outputs, and the other way round.
 

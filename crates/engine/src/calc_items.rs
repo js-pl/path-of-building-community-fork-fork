@@ -70,7 +70,7 @@ pub struct ItemRequirement {
 }
 
 /// What equipping the items sets up
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ItemsSetup {
     /// `env.itemModDB`
     pub item_db: Store,

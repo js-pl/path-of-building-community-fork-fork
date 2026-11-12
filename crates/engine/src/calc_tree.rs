@@ -22,7 +22,7 @@ use std::collections::{BTreeSet, HashMap};
 pub type Result<T> = std::result::Result<T, String>;
 
 /// The allocated nodes and their mods
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TreeSetup {
     /// `env.allocNodes`: each node's index in the spec, by id
     pub alloc: LjMap<usize>,
@@ -36,7 +36,7 @@ pub struct TreeSetup {
 
 /// `env.modDB` as the items and the tree leave it, with the items and the
 /// tree
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EnvSetup {
     pub mod_db: Store,
     pub items: ItemsSetup,
