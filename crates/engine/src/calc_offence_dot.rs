@@ -96,6 +96,7 @@ impl<'a> Perform<'a> {
                 ),
                 ..Cfg::default()
             };
+            self.keep_cfg(i, "decay", &dot);
             let mut eff = 1.0;
             if effective {
                 let resist = self.resist_for_type(o, "Chaos", Some(&dot))?;
@@ -221,6 +222,7 @@ impl<'a> Perform<'a> {
             keyword_flags: Some(skill_cfg.keyword_flags.unwrap_or(0) & !self.kf("Hit")),
             ..Cfg::default()
         };
+        self.keep_cfg(i, "dot", &dot);
         let mut taken = dot.clone();
         if self.sd_truthy(i, "dotIsSpell") {
             taken.flags = Some(flags & !self.mf("Spell"));
@@ -235,6 +237,7 @@ impl<'a> Perform<'a> {
                 keyword_flags: Some(dot.keyword_flags.unwrap_or(0) | self.kf(&format!("{t}Dot"))),
                 ..dot.clone()
             };
+            self.keep_cfg(i, format!("dot{t}"), &typ);
             let base = if o.can_deal[ti] {
                 self.sd_num(i, &format!("{t}Dot")).unwrap_or(0.0)
             } else {

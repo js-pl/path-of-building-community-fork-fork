@@ -19,11 +19,11 @@ use std::sync::OnceLock;
 
 /// A drop-down's state: labels, selection and visibility
 #[derive(Clone, Debug)]
-struct Drop {
-    list: Vec<String>,
-    sel: f64,
-    shown: bool,
-    enabled: bool,
+pub(super) struct Drop {
+    pub list: Vec<String>,
+    pub sel: f64,
+    pub shown: bool,
+    pub enabled: bool,
 }
 
 impl Default for Drop {
@@ -38,7 +38,7 @@ impl Default for Drop {
 }
 
 impl Drop {
-    fn json(&self) -> J {
+    pub(super) fn json(&self) -> J {
         json!({
             "class": "DropDownControl",
             "shown": self.shown,
@@ -50,9 +50,9 @@ impl Drop {
 }
 
 #[derive(Clone, Debug)]
-struct Edit {
-    text: String,
-    shown: bool,
+pub(super) struct Edit {
+    pub text: String,
+    pub shown: bool,
 }
 
 impl Default for Edit {
@@ -65,7 +65,7 @@ impl Default for Edit {
 }
 
 impl Edit {
-    fn json(&self) -> J {
+    pub(super) fn json(&self) -> J {
         json!({ "class": "EditControl", "shown": self.shown, "enabled": true, "text": self.text })
     }
 }
@@ -86,14 +86,23 @@ pub struct Controls {
     class: Drop,
     ascend: Drop,
     secondary: Drop,
-    socket_group: Drop,
-    skill: Drop,
-    part: Drop,
-    stage: Edit,
-    mine: Edit,
-    minion: Drop,
+    skill_select: SkillSelect,
+}
+
+/// The skill selection controls of the sidebar or the Calcs tab
+/// (`RefreshSkillSelectControls`)
+#[derive(Clone, Debug, Default)]
+pub(super) struct SkillSelect {
+    pub socket_group: Drop,
+    pub skill: Drop,
+    pub part: Drop,
+    pub stage: Edit,
+    pub mine: Edit,
+    pub minion: Drop,
     minion_entries: Vec<MinionEntry>,
-    minion_skill: Drop,
+    pub minion_skill: Drop,
+    /// `mainSkillMinionLibrary.shown`, once set
+    pub library: Option<bool>,
 }
 
 const MAIN_TREE_POINTS: f64 = 99.0 + 23.0;
@@ -601,10 +610,24 @@ impl TypedSession<'_> {
     /// `buildMode:RefreshSkillSelectControls(controls, mainSocketGroup, "")`
     fn refresh_skill_controls(&mut self) -> Result<()> {
         let main_group = self.build.info.main_socket_group;
-        let groups = self.groups().to_vec();
-        let sb = self.main.sidebar.clone().ok_or("no sidebar calculation")?;
+        let sb = self.main.sidebar.as_ref().ok_or("no sidebar calculation")?;
+        let mut c = std::mem::take(&mut self.controls.skill_select);
+        let r = self.refresh_skill_select(&mut c, main_group, sb, false);
+        self.controls.skill_select = c;
+        r
+    }
+
+    /// `buildMode:RefreshSkillSelectControls(controls, mainGroup, suffix)`
+    /// on a calculation's socket groups, with the suffix `Calcs` or none
+    pub(super) fn refresh_skill_select(
+        &self,
+        c: &mut SkillSelect,
+        main_group: f64,
+        sb: &Sidebar,
+        calcs: bool,
+    ) -> Result<()> {
+        let groups = self.groups();
         let env_main = sb.main_socket_group;
-        let c = &mut self.controls;
         c.socket_group.sel = main_group;
         c.socket_group.list = groups.iter().map(display_label).collect();
         if groups.is_empty() {
@@ -626,16 +649,19 @@ impl TypedSession<'_> {
             .filter(|&g| g < groups.len());
         let gi = gi.ok_or("attempt to index a nil value (local 'mainSocketGroup')")?;
         let group = &groups[gi];
-        let display = sb.groups.get(gi).cloned().unwrap_or_default();
-        let mut main_active = group.main_active_skill;
+        let display = sb.groups.get(gi).map_or(&[][..], |v| v);
+        let mut main_active = if calcs {
+            group.main_active_skill_calcs
+        } else {
+            group.main_active_skill
+        };
         if gi + 1 == env_main && !display.is_empty() {
             main_active = main_active.min(display.len() as f64);
         }
         let labels = display
             .iter()
-            .map(|d| self.skill_label(d, &groups))
+            .map(|d| self.skill_label(d, groups))
             .collect();
-        let c = &mut self.controls;
         c.skill.list = labels;
         c.skill.enabled = display.len() > 1;
         c.skill.sel = main_active;
@@ -645,6 +671,7 @@ impl TypedSession<'_> {
         c.stage.shown = false;
         c.minion.shown = false;
         c.minion_skill.shown = false;
+        c.library = Some(false);
         if display.is_empty() {
             return Ok(());
         }
@@ -669,7 +696,15 @@ impl TypedSession<'_> {
                     _ => String::new(),
                 })
                 .collect();
-            c.part.sel = src.and_then(|g| g.skill_part).unwrap_or(1.0);
+            c.part.sel = src
+                .and_then(|g| {
+                    if calcs {
+                        g.skill_part_calcs
+                    } else {
+                        g.skill_part
+                    }
+                })
+                .unwrap_or(1.0);
             let part = parts.get((c.part.sel as usize).wrapping_sub(1));
             if let Some(p) = part
                 && field(p, "stages").is_some_and(|v| v.truthy())
@@ -677,7 +712,13 @@ impl TypedSession<'_> {
                 c.stage.shown = true;
                 let min = field(p, "stagesMin").and_then(|v| v.as_number());
                 let n = src
-                    .and_then(|g| g.skill_stage_count)
+                    .and_then(|g| {
+                        if calcs {
+                            g.skill_stage_count_calcs
+                        } else {
+                            g.skill_stage_count
+                        }
+                    })
                     .or(skill.stages_max)
                     .or(min)
                     .unwrap_or(1.0);
@@ -687,14 +728,26 @@ impl TypedSession<'_> {
         if skill.flags.contains("mine") {
             c.mine.shown = true;
             c.mine.text = src
-                .and_then(|g| g.skill_mine_count)
+                .and_then(|g| {
+                    if calcs {
+                        g.skill_mine_count_calcs
+                    } else {
+                        g.skill_mine_count
+                    }
+                })
                 .map(engine::pat::num)
                 .unwrap_or_default();
         }
         if skill.flags.contains("multiStage") && parts.len() <= 1 {
             c.stage.shown = true;
             let n = src
-                .and_then(|g| g.skill_stage_count)
+                .and_then(|g| {
+                    if calcs {
+                        g.skill_stage_count_calcs
+                    } else {
+                        g.skill_stage_count
+                    }
+                })
                 .or(skill.stages_max)
                 .or(skill.stages_min)
                 .unwrap_or(1.0);
@@ -715,12 +768,21 @@ impl TypedSession<'_> {
                     labels.push(title.unwrap_or_else(|| "Default Item Set".into()));
                     entries.push(MinionEntry::ItemSet(id));
                 }
-                let want =
-                    MinionEntry::ItemSet(src.and_then(|g| g.skill_minion_item_set).unwrap_or(1.0));
+                let want = MinionEntry::ItemSet(
+                    src.and_then(|g| {
+                        if calcs {
+                            g.skill_minion_item_set_calcs
+                        } else {
+                            g.skill_minion_item_set
+                        }
+                    })
+                    .unwrap_or(1.0),
+                );
                 if let Some(k) = entries.iter().position(|e| *e == want) {
                     c.minion.sel = (k + 1) as f64;
                 }
             } else {
+                c.library = Some(ge.minion_list.as_ref().is_some_and(|l| l.is_empty()));
                 for id in &skill.minion_list {
                     let name = self
                         .data
@@ -733,10 +795,15 @@ impl TypedSession<'_> {
                     labels.push(name.to_string());
                     entries.push(MinionEntry::Minion(id.clone()));
                 }
-                if let Some(id) = src.and_then(|g| g.skill_minion.clone())
-                    && let Some(k) = entries
-                        .iter()
-                        .position(|e| *e == MinionEntry::Minion(id.clone()))
+                if let Some(id) = src.and_then(|g| {
+                    if calcs {
+                        g.skill_minion_calcs.clone()
+                    } else {
+                        g.skill_minion.clone()
+                    }
+                }) && let Some(k) = entries
+                    .iter()
+                    .position(|e| *e == MinionEntry::Minion(id.clone()))
                 {
                     c.minion.sel = (k + 1) as f64;
                 }
@@ -746,7 +813,15 @@ impl TypedSession<'_> {
             match &skill.minion_skills {
                 Some(names) => {
                     c.minion_skill.list = names.clone();
-                    c.minion_skill.sel = src.and_then(|g| g.skill_minion_skill).unwrap_or(1.0);
+                    c.minion_skill.sel = src
+                        .and_then(|g| {
+                            if calcs {
+                                g.skill_minion_skill_calcs
+                            } else {
+                                g.skill_minion_skill
+                            }
+                        })
+                        .unwrap_or(1.0);
                     c.minion_skill.shown = true;
                     c.minion_skill.enabled = names.len() > 1;
                 }
@@ -811,12 +886,13 @@ impl TypedSession<'_> {
         if let Some(x) = self.extra_points() {
             points.insert("max".into(), num(x));
         }
-        let c = &self.controls;
+        let k = &self.controls;
+        let c = &k.skill_select;
         let controls = json!({
-            "build.characterLevel": c.level.json(),
-            "build.classDrop": c.class.json(),
-            "build.ascendDrop": c.ascend.json(),
-            "build.secondaryAscendDrop": c.secondary.json(),
+            "build.characterLevel": k.level.json(),
+            "build.classDrop": k.class.json(),
+            "build.ascendDrop": k.ascend.json(),
+            "build.secondaryAscendDrop": k.secondary.json(),
             "build.mainSocketGroup": c.socket_group.json(),
             "build.mainSkill": Drop { shown: c.skill.shown && c.socket_group.shown, ..c.skill.clone() }.json(),
             "build.mainSkillPart": c.part.json(),

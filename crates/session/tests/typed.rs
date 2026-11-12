@@ -232,3 +232,86 @@ fn node_power_matches_translated() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+/// The Calcs tab's cells, its controls and every cell's breakdown on the
+/// dispatcher's build: where they differ, as paths
+fn compare_calcs(d: &mut Dispatcher, id: &str, times: &mut [Duration; 2]) -> (usize, Vec<String>) {
+    let mut reqs = vec![json!({"cmd": "calcs"})];
+    let mut paths = vec![json!("build.mainSkill"), json!("build.mainSocketGroup")];
+    let typed = answer(d.request(r#"{"cmd":"calcs"}"#), "typed calcs");
+    for s in typed["ok"]["sections"].as_array().into_iter().flatten() {
+        for u in s["subs"].as_array().into_iter().flatten() {
+            for r in u["rows"].as_array().into_iter().flatten() {
+                for c in r["cells"].as_array().into_iter().flatten() {
+                    if let Some(b) = c.get("breakdown") {
+                        reqs.push(json!({"cmd": "breakdown", "cell": b}));
+                    }
+                    if let Some(p) = c.get("control") {
+                        paths.push(p.clone());
+                    }
+                }
+            }
+        }
+    }
+    reqs.insert(1, json!({"cmd": "controls", "paths": paths}));
+    let mut out = Vec::new();
+    for req in &reqs {
+        let req = req.to_string();
+        let t = Instant::now();
+        let typed = answer(d.request(&req), "typed");
+        times[0] += t.elapsed();
+        let t = Instant::now();
+        let tr = answer(d.translated_request(&req), "translated");
+        times[1] += t.elapsed();
+        let n = out.len();
+        diff(&typed, &tr, &req, &mut out);
+        if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
+            eprintln!("{id} {req}:\ntyped {typed}\ntranslated {tr}");
+        }
+    }
+    (reqs.len() - 2, out)
+}
+
+/// The Calcs tab gives the translation's JSON, for every corpus build.
+/// Upstream's tree keeps the source `modLib.mergeKeystones` last gave a
+/// keystone's mods, also from builds loaded before: a build that differs
+/// is compared again on a fresh translated session.
+#[test]
+fn calcs_match_translated() {
+    let data = data();
+    let session = || Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let (mut failures, mut compared, mut cells) = (Vec::new(), 0, 0);
+    let mut times = [Duration::ZERO; 2];
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+        answer(d.request(&load), "load");
+        if !d.typed_active() {
+            continue;
+        }
+        let (n, mut out) = compare_calcs(&mut d, &id, &mut times);
+        if !out.is_empty() {
+            let mut fresh = Dispatcher::new(session(), Some(data), Prefer::Typed);
+            answer(fresh.request(&load), "load");
+            out = compare_calcs(&mut fresh, &id, &mut [Duration::ZERO; 2]).1;
+        }
+        cells += n;
+        compared += 1;
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(6);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load)",
+        times[0], times[1]
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
