@@ -25,11 +25,11 @@ use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
 use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, StoreId, Sym, TagKind};
 use crate::skills::SocketGroup;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 
 /// An actor's output
-pub type Output = HashMap<Sym, OutVal>;
+pub type Output = crate::mods::SymMap<OutVal>;
 
 /// A row of the Full DPS table (`fullDPS.skills`)
 #[derive(Clone, Debug, PartialEq)]

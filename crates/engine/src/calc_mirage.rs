@@ -17,7 +17,6 @@ use crate::calc_cache::CachedCalc;
 use crate::calc_perform::{Perform, Result, SkillLists, SkillMarks};
 use crate::calc_skills::ActiveSkill;
 use crate::mods::{Cfg, Mod, ModType, Store, Sym};
-use std::collections::HashMap;
 
 /// A copy of a skill for a mirage, with the databases it stands on
 pub struct External {
@@ -56,7 +55,7 @@ pub struct Mirage {
     /// The copied skill's name and part
     pub name: String,
     pub skill_part_name: Option<String>,
-    pub output: HashMap<Sym, OutVal>,
+    pub output: crate::mods::SymMap<OutVal>,
     pub count: Option<f64>,
 }
 
