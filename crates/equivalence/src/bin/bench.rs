@@ -1,7 +1,7 @@
 //! Times the typed engine's calculations on corpus builds against the
 //! translation's, as a table: `cargo run --release -p equivalence --bin
 //! bench -- [--all] [--filter <id>] [--reps N] [--power-reps N]
-//! [--overrides N] [--typed-only] [--no-power]`
+//! [--power-depth N (0: every node)] [--overrides N] [--typed-only] [--no-power]`
 
 use equivalence::bench::{Options, run, table};
 
@@ -18,6 +18,9 @@ fn main() {
             "--filter" => opts.filter = args.next().expect("--filter <id>"),
             "--reps" => opts.reps = num(args.next()),
             "--power-reps" => opts.power_reps = num(args.next()),
+            "--power-depth" => {
+                opts.power_depth = Some(num(args.next()) as f64).filter(|&d| d > 0.0)
+            }
             "--overrides" => opts.overrides = num(args.next()),
             "--typed-only" => opts.translation = false,
             "--no-power" => opts.power = false,

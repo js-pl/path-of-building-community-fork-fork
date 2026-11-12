@@ -271,6 +271,42 @@ impl<'a> Calc<'a> {
         self.add(id, m);
     }
 
+    /// `ConvertMod(oldName, mod)`: replaces the first mod named `old` with
+    /// the mod's type, flags and source, in the store or its parents (a
+    /// ModDB moves it to the new name's mods), else adds the mod
+    pub fn convert_mod(&mut self, id: StoreId, old: Sym, m: Mod) {
+        let same = |c: &Mod| {
+            c.name == old
+                && c.typ == m.typ
+                && c.flags == m.flags
+                && c.keyword_flags == m.keyword_flags
+                && c.source == m.source
+        };
+        let mut cur = Some(id);
+        while let Some(s) = cur {
+            let store = &mut self.stores.stores[s];
+            match &mut store.mods {
+                crate::mods::Mods::List(l) => {
+                    if let Some(c) = l.iter_mut().find(|c| same(c)) {
+                        *c = m;
+                        return;
+                    }
+                }
+                crate::mods::Mods::Db(by_name) => {
+                    if let Some(list) = by_name.get_mut(&old)
+                        && let Some(i) = list.iter().position(same)
+                    {
+                        list.remove(i);
+                        by_name.entry(m.name).or_default().push(m);
+                        return;
+                    }
+                }
+            }
+            cur = store.parent;
+        }
+        self.add(id, m);
+    }
+
     /// `store.conditions[var]`
     pub fn cond(&self, id: StoreId, var: &str) -> bool {
         self.store(id)
