@@ -2,15 +2,26 @@
 //! from upstream's data files at build time, in the binary form of
 //! [`crate::codec`].
 
+use crate::calc_setup::SetupData;
 use crate::codec;
+use crate::config::ConfigData;
 use crate::item_data::ItemData;
+use crate::skill_data::SkillData;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GameData {
     pub items: ItemData,
+    pub skills: SkillData,
+    pub setup: SetupData,
+    pub config: ConfigData,
 }
 
-crate::codec_struct!(GameData { items });
+crate::codec_struct!(GameData {
+    items,
+    skills,
+    setup,
+    config
+});
 
 impl GameData {
     /// Reads the data from its binary form.
