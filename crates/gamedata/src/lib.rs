@@ -7,8 +7,11 @@
 pub mod data_lua;
 mod jsonc;
 
+use engine::calc_setup::SetupData;
+use engine::config::ConfigData;
 use engine::game_data::GameData;
 use engine::item_data::ItemData;
+use engine::skill_data::SkillData;
 use lua::{TableRef, Value};
 use std::path::Path;
 
@@ -31,6 +34,7 @@ impl Source {
             data: raw.data,
         };
         data_lua::process(&src, src_dir)?;
+        engine::data::Data::new(src.globals.clone(), src.data.clone());
         Ok(src)
     }
 
@@ -39,13 +43,43 @@ impl Source {
     }
 
     pub fn items(&self) -> Result<ItemData> {
-        ItemData::from_lua(&Value::Table(self.data.clone()), &self.global("colorCodes"))
+        ItemData::from_lua(&self.value(), &self.global("colorCodes"))
             .map_err(|e| format!("item data: {e}"))
+    }
+
+    pub fn skills(&self) -> Result<SkillData> {
+        SkillData::from_lua(
+            &self.value(),
+            &self.global("colorCodes"),
+            &self.global("SkillType"),
+        )
+        .map_err(|e| format!("skill data: {e}"))
+    }
+
+    pub fn setup(&self) -> Result<SetupData> {
+        SetupData::from_lua(
+            &self.value(),
+            &self.global("ModFlag"),
+            &self.global("KeywordFlag"),
+        )
+        .map_err(|e| format!("setup data: {e}"))
+    }
+
+    pub fn config(&self) -> Result<ConfigData> {
+        ConfigData::from_lua(&self.value(), &self.global("SkillType"))
+            .map_err(|e| format!("config data: {e}"))
+    }
+
+    fn value(&self) -> Value {
+        Value::Table(self.data.clone())
     }
 
     pub fn game_data(&self) -> Result<GameData> {
         Ok(GameData {
             items: self.items()?,
+            skills: self.skills()?,
+            setup: self.setup()?,
+            config: self.config()?,
         })
     }
 }

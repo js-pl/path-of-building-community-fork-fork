@@ -12,6 +12,10 @@ use std::path::Path;
 
 /// The literal tables of `Data.lua` the typed data reads
 const LITERALS: &[&str] = &[
+    "data.misc",
+    "data.cursePriority",
+    "data.weaponTypeInfo",
+    "data.unarmedWeaponData",
     "data.defaultHighPrecision",
     "data.highPrecisionMods",
     "data.itemTagSpecial",
@@ -35,6 +39,8 @@ pub fn process(src: &Source, src_dir: &Path) -> Result<()> {
         .eval_assigns("Modules/Data.lua", &text, LITERALS)
         .map_err(|e| e.to_string())?;
     let data = &src.data;
+    boss_stats(data);
+    minions(data);
     item_mods(data);
     rare_like_uniques(data)?;
     let map = im
@@ -62,6 +68,45 @@ fn text(v: &Value) -> String {
 
 fn key_text(k: &Key) -> String {
     text(&k.to_value())
+}
+
+/// `data.bossStats`: the mean armour and evasion of the bosses and the
+/// uber bosses
+fn boss_stats(data: &TableRef) {
+    let (mut count, mut uber_count) = (0.0, 0.0);
+    let (mut armour, mut evasion, mut uber_armour, mut uber_evasion) = (0.0, 0.0, 0.0, 0.0);
+    for (_, boss) in table(&data.get_str("bosses")).entries() {
+        let num = |k| field(&boss, k).as_number().unwrap_or(f64::NAN);
+        if field(&boss, "isUber").truthy() {
+            uber_count += 1.0;
+            uber_armour += num("armourMult");
+            uber_evasion += num("evasionMult");
+        }
+        count += 1.0;
+        armour += num("armourMult");
+        evasion += num("evasionMult");
+    }
+    let stats = TableRef::new();
+    stats.set_str("PinnacleArmourMean", 100.0 + armour / count);
+    stats.set_str("PinnacleEvasionMean", 100.0 + evasion / count);
+    stats.set_str("UberArmourMean", 100.0 + uber_armour / uber_count);
+    stats.set_str("UberEvasionMean", 100.0 + uber_evasion / uber_count);
+    data.set_str("bossStats", Value::Table(stats));
+}
+
+/// The spectres join `data.minions`, and the minions' mods get their source
+fn minions(data: &TableRef) {
+    let minions = table(&data.get_str("minions"));
+    for (name, spectre) in table(&data.get_str("spectres")).entries() {
+        table(&spectre).set_str("limit", Value::str("ActiveSpectreLimit"));
+        minions.set(name.to_value(), spectre);
+    }
+    for (_, minion) in minions.entries() {
+        let source = format!("Minion:{}", text(&field(&minion, "name")));
+        for m in table(&field(&minion, "modList")).array() {
+            table(&m).set_str("source", Value::str(&source));
+        }
+    }
 }
 
 /// `data.itemMods.Vestigial`, `.Item` and `.WatchersEye`

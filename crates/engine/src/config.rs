@@ -135,7 +135,7 @@ fn flag(name: &str) -> Mod {
 }
 
 /// A boss skill preset (`data.bossSkills[name]`)
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct BossSkill {
     pub damage_type: Option<String>,
     /// Damage type to its base and roll range multipliers
@@ -157,7 +157,7 @@ pub struct BossSkill {
 type BossStats = Vec<(String, Option<ModValue>)>;
 
 /// The game data the options need
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ConfigData {
     pub skill_types: HashMap<String, f64>,
     /// By monster level, from 1
@@ -5119,3 +5119,27 @@ fn map_mods() -> Vec<(&'static str, MapKind, MapApply)> {
         }),
     ]
 }
+
+crate::codec_struct!(BossSkill {
+    damage_type,
+    damage_multipliers,
+    uber_damage_multiplier,
+    damage_penetrations,
+    uber_damage_penetrations,
+    speed,
+    uber_speed,
+    crit_chance,
+    earlier_uber,
+    additional_base,
+    additional_uber,
+});
+crate::codec_struct!(ConfigData {
+    skill_types,
+    monster_damage,
+    monster_armour,
+    monster_evasion,
+    monster_constants,
+    misc,
+    boss_stats,
+    boss_skills,
+});

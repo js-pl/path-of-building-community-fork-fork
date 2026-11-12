@@ -3,6 +3,7 @@
 //! of upstream's `ModStore`, `ModDB`, `ModList` and `modLib.createMod`.
 
 pub mod build;
+mod codec;
 pub mod convert;
 pub mod list;
 pub mod store;
