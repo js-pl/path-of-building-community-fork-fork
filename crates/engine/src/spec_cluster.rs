@@ -269,6 +269,33 @@ impl<'t> PassiveSpec<'t> {
         result
     }
 
+    /// `BuildClusterJewelGraphs()` after an edit: the subgraphs removed,
+    /// keeping their allocated nodes to allocate again, and built anew
+    pub fn rebuild_cluster_jewel_graphs(&mut self, tab: &ItemsTab, data: &ItemData) -> Result<()> {
+        for (_, ids) in self.sub_graphs.iter() {
+            for &id in ids {
+                if self.index.remove(&id).is_some() {
+                    self.order.remove(id);
+                    if self.alloc_nodes.contains(id) {
+                        self.alloc_nodes.remove(id);
+                        self.alloc_subgraph_nodes.push(id);
+                    }
+                }
+            }
+        }
+        let base = self
+            .nodes
+            .iter()
+            .position(|n| n.synth.is_some())
+            .unwrap_or(self.nodes.len());
+        self.nodes.truncate(base);
+        for n in &mut self.nodes {
+            n.linked.retain(|&j| j < base);
+        }
+        self.sub_graphs.clear();
+        self.build_cluster_jewel_graphs(tab, data)
+    }
+
     /// `ApplyLegacyClusterNodeRemap()`
     fn apply_legacy_remap(&mut self) {
         let Some(map) = self.legacy_map.clone() else {
@@ -340,6 +367,7 @@ impl<'t> PassiveSpec<'t> {
         }
         let size_index = cj.size_index as i64;
         let node_id = id + ((size_index as u32) << 4);
+        self.sub_graphs.insert(node_id, Vec::new());
         let proxy_node = ej
             .proxy
             .as_deref()
@@ -373,7 +401,7 @@ impl<'t> PassiveSpec<'t> {
                 oidx: 1,
                 linked: vec![],
             });
-            return self.add_subgraph(b, tab, data, jewel, parent, nodes, 0, id);
+            return self.add_subgraph(b, tab, data, jewel, parent, nodes, 0, (id, node_id));
         }
         let legacy_group = self
             .legacy_map
@@ -390,6 +418,7 @@ impl<'t> PassiveSpec<'t> {
                 .and_then(|&id| tree.node(id))
             else {
                 // Old trees miss some notables: no subgraph
+                self.sub_graphs.remove(node_id);
                 return Ok(());
             };
             notables.push(n);
@@ -625,7 +654,7 @@ impl<'t> PassiveSpec<'t> {
         {
             link(&mut nodes, f, l);
         }
-        self.add_subgraph(b, tab, data, jewel, parent, nodes, entrance, id)
+        self.add_subgraph(b, tab, data, jewel, parent, nodes, entrance, (id, node_id))
     }
 
     /// The end of `BuildSubgraph`: the nodes processed and linked to the
@@ -640,11 +669,18 @@ impl<'t> PassiveSpec<'t> {
         parent: Parent,
         mut nodes: Vec<Synth>,
         entrance: usize,
-        id: u32,
+        (id, key): (u32, u32),
     ) -> Result<()> {
         let inc_effect = field_num(jewel, "clusterJewelIncEffect");
         // `linkNodes(subGraph.entranceNode, parentSocket)`
         let entrance_id = nodes[entrance].id;
+        if let Some(ids) = self
+            .sub_graphs
+            .get(key)
+            .map(|_| nodes.iter().map(|n| n.id).collect())
+        {
+            self.sub_graphs.insert(key, ids);
+        }
         let parent_id = match parent {
             Parent::Spec(i) => {
                 b.spec_links.push((i, entrance_id));

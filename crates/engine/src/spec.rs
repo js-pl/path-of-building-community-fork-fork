@@ -124,6 +124,8 @@ pub struct PassiveSpec<'t> {
     pub mastery_selections: LjMap<f64>,
     /// Allocated node ids the spec does not have (in cluster subgraphs)
     pub alloc_subgraph_nodes: Vec<u32>,
+    /// `subGraphs`: each cluster jewel subgraph's node ids, by its id
+    pub sub_graphs: LjMap<Vec<u32>>,
     pub cur_class_id: Option<i64>,
     pub cur_ascend_class_id: Option<i64>,
     pub cur_secondary_ascend_class_id: Option<i64>,
@@ -158,6 +160,7 @@ impl<'t> PassiveSpec<'t> {
             alloc_nodes: LjMap::default(),
             mastery_selections: LjMap::default(),
             alloc_subgraph_nodes: Vec::new(),
+            sub_graphs: LjMap::default(),
             cur_class_id: None,
             cur_ascend_class_id: None,
             cur_secondary_ascend_class_id: None,
@@ -347,7 +350,7 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `ResetNodes()`: deallocates every node but the start nodes
-    fn reset_nodes(&mut self) {
+    pub fn reset_nodes(&mut self) {
         for p in 0..self.order.places() {
             if let Some((_, &i)) = self.order.at(p)
                 && !self.is_start(i)
@@ -533,6 +536,75 @@ impl<'t> PassiveSpec<'t> {
         self.set_stats(i, sd, &starts)?;
         self.nodes[i].all_mastery_options = Some(true);
         Ok(())
+    }
+
+    /// `AllocNode(node)`: the node and the nodes on its path, then the
+    /// cluster jewel subgraphs or the paths rebuilt. Jewels that change
+    /// paths (Intuitive Leap and the like) are not ported.
+    pub fn alloc_node(
+        &mut self,
+        i: usize,
+        tab: &crate::items_tab::ItemsTab,
+        data: &crate::item_data::ItemData,
+    ) -> Result<()> {
+        let Some(path) = self.path(i) else {
+            return Ok(());
+        };
+        let mut rebuild = false;
+        for p in path {
+            rebuild |= !self.nodes[p].alloc && self.tree_node(p).expansion_jewel.is_some();
+            self.alloc(p);
+        }
+        if self.tree_node(i).is_multiple_choice_option
+            && let Some(&parent) = self.nodes[i].linked.first()
+        {
+            for k in 0..self.nodes[parent].linked.len() {
+                let o = self.nodes[parent].linked[k];
+                if o != i && self.nodes[o].alloc && self.tree_node(o).is_multiple_choice_option {
+                    self.dealloc(o);
+                }
+            }
+        }
+        if rebuild {
+            self.rebuild_cluster_jewel_graphs(tab, data)
+        } else {
+            self.build_all_depends_and_paths()
+        }
+    }
+
+    /// `DeallocNode(node)`: the node and the nodes that depend on it
+    pub fn dealloc_node(
+        &mut self,
+        i: usize,
+        tab: &crate::items_tab::ItemsTab,
+        data: &crate::item_data::ItemData,
+    ) -> Result<()> {
+        let mut rebuild = false;
+        for d in self.nodes[i].depends.clone() {
+            rebuild |= self.nodes[d].alloc && self.tree_node(d).expansion_jewel.is_some();
+            self.dealloc_single(d)?;
+        }
+        if rebuild {
+            self.rebuild_cluster_jewel_graphs(tab, data)
+        } else {
+            self.build_all_depends_and_paths()
+        }
+    }
+
+    /// `curAscendClassBaseName`: the current ascendancy's id
+    pub fn ascend_class_base_name(&self) -> Option<Rc<str>> {
+        self.ascend_class(self.cur_ascend_class_id?)
+            .ok()?
+            .id
+            .clone()
+    }
+
+    /// The current class's ascendancies (`curClass.classes`)
+    pub fn ascend_classes(&self) -> Vec<(i64, &'t tree::Ascendancy)> {
+        self.cur_class_id
+            .and_then(|c| self.class(c).ok())
+            .map(|c| c.ascendancies.iter().map(|(i, a)| (*i, a)).collect())
+            .unwrap_or_default()
     }
 
     /// `DeallocSingleNode(node)`

@@ -315,3 +315,182 @@ fn calcs_match_translated() {
         failures.join("\n")
     );
 }
+
+/// A small deterministic random number generator for edit sequences
+struct Lcg(u64);
+
+impl Lcg {
+    fn below(&mut self, n: usize) -> usize {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((self.0 >> 33) as usize) % n.max(1)
+    }
+}
+
+/// Random sequences of tree edits (clicks on allocated and unallocated
+/// nodes, ascendancies and masteries with an effect chosen, a reset) give
+/// the translation's sidebar, outputs and tree state after each step
+#[test]
+fn tree_edits_match_translated() {
+    let data = data();
+    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
+    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    for (k, (id, path)) in corpus().into_iter().enumerate() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let tree = answer(d.translated_request(r#"{"cmd":"tree"}"#), "tree");
+        let ids: Vec<u64> = tree["ok"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|n| n["id"].as_u64())
+            .collect();
+        // Large cluster sockets, whose edits rebuild the subgraphs
+        let sockets: Vec<u64> = tree["ok"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|n| n["kind"] == "ClusterSocket")
+            .filter_map(|n| n["id"].as_u64())
+            .filter(|&i| i < 0x10000)
+            .collect();
+        let mut rng = Lcg(k as u64 + 1);
+        let mut out = Vec::new();
+        let compare = |d: &mut Dispatcher, reqs: &[J], step: &str, out: &mut Vec<String>| {
+            for req in reqs {
+                let edit = req["cmd"] == "selectMastery";
+                let req = req.to_string();
+                let typed = answer(d.request(&req), "typed");
+                if edit {
+                    // The translation replays the typed edit
+                    answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+                    assert!(d.typed_active(), "{step} {req}: {:?}", d.typed_error);
+                    continue;
+                }
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{step} {req}"), out);
+            }
+        };
+        let mut socket_clicks = Vec::new();
+        {
+            let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+            let alloc = &state["ok"]["alloc"];
+            for s in &sockets {
+                if alloc
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|a| a.as_u64() == Some(*s))
+                {
+                    socket_clicks.push(*s);
+                    socket_clicks.push(*s);
+                    break;
+                }
+            }
+        }
+        let total = steps_per_build + socket_clicks.len();
+        for step in 0..=total {
+            let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+            let alloc: Vec<u64> = state["ok"]["alloc"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(J::as_u64)
+                .collect();
+            let req = if let Some(s) = (step < socket_clicks.len()).then(|| socket_clicks[step]) {
+                json!({"cmd": "clickNode", "id": s})
+            } else if step == total {
+                json!({"cmd": "resetTree"})
+            } else if rng.below(2) == 0 && alloc.len() > 2 {
+                json!({"cmd": "clickNode", "id": alloc[rng.below(alloc.len())]})
+            } else {
+                // A node next to the allocation more often than not
+                let mut pick = ids[rng.below(ids.len())];
+                for _ in 0..40 {
+                    let p = answer(
+                        d.request(&json!({"cmd": "nodePath", "id": pick}).to_string()),
+                        "nodePath",
+                    );
+                    let n = p["ok"]["path"].as_array().map_or(0, Vec::len);
+                    if (1..=4).contains(&n) {
+                        break;
+                    }
+                    pick = ids[rng.below(ids.len())];
+                }
+                json!({"cmd": "clickNode", "id": pick})
+            };
+            let label = format!("step {step} {req}");
+            let r = req.to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            let tr = answer(
+                d.translated_request(r#"{"cmd":"treeState"}"#),
+                "translated edit",
+            );
+            times[1] += t.elapsed();
+            let _ = tr;
+            let mut follow = vec![
+                json!({"cmd": "treeState"}),
+                json!({"cmd": "state"}),
+                json!({"cmd": "outputs"}),
+            ];
+            if let Some(i) = req.get("id") {
+                follow.push(json!({"cmd": "nodePath", "id": i}));
+            }
+            if let Some(opts) = typed["ok"]["mastery"].as_array() {
+                follow.push(json!({"cmd": "masteryOptions", "id": req["id"]}));
+                if !opts.is_empty() {
+                    let e = &opts[rng.below(opts.len())]["id"];
+                    follow.push(json!({"cmd": "selectMastery", "id": req["id"], "effect": e}));
+                    follow.push(json!({"cmd": "treeState"}));
+                    follow.push(json!({"cmd": "state"}));
+                    follow.push(json!({"cmd": "outputs"}));
+                }
+            }
+            compare(&mut d, &follow, &label, &mut out);
+            steps += 1;
+            if !out.is_empty() {
+                break;
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}

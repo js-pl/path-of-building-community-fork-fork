@@ -68,6 +68,8 @@ pub struct Sidebar {
     pub aspects: [bool; 3],
     /// The same of `env.minion`
     pub minion_aspects: [bool; 3],
+    /// `env.grantedPassives`
+    pub granted_passives: BTreeSet<u32>,
 }
 
 fn num(v: Option<&ModValue>) -> Option<f64> {
@@ -141,5 +143,6 @@ pub(crate) fn collect(p: &Perform) -> Result<Sidebar> {
             Some(a) => aspects(a)?,
             None => [false; 3],
         },
+        granted_passives: p.env.setup.tree.granted_passives.clone(),
     })
 }
