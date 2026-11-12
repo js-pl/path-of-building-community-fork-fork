@@ -250,6 +250,8 @@ impl Col {
 pub struct Slot {
     pub base: f64,
     pub inc: Option<String>,
+    /// The row has no `inc` at all (energy shield converted to ward)
+    pub no_inc: bool,
     pub more: Option<String>,
     pub total: String,
     pub source: String,
@@ -502,6 +504,7 @@ pub fn slot(
     Slot {
         base,
         inc: (inc != 0.0).then(|| sf!(" x %.2f", 1.0 + inc / 100.0)),
+        no_inc: false,
         more: (more != 1.0).then(|| sf!(" x %.2f", more)),
         total: sf!("%.2f", total.unwrap_or(base * (1.0 + inc / 100.0) * more)),
         source: source.to_string(),

@@ -129,7 +129,7 @@ const ACTS: [(f64, f64); 11] = [
     (67.0, 23.0),
 ];
 
-fn display_stats() -> &'static (Vec<Stat>, Vec<Stat>) {
+pub(super) fn display_stats() -> &'static (Vec<Stat>, Vec<Stat>) {
     static STATS: OnceLock<(Vec<Stat>, Vec<Stat>)> = OnceLock::new();
     STATS.get_or_init(|| (ds::display_stats(), ds::minion_display_stats()))
 }
@@ -391,7 +391,7 @@ fn list_of(v: Option<&OutVal>) -> Option<Vec<String>> {
 }
 
 impl TypedSession<'_> {
-    fn sidebar(&self) -> Result<&Sidebar> {
+    pub(super) fn sidebar(&self) -> Result<&Sidebar> {
         self.main
             .sidebar
             .as_ref()
@@ -642,7 +642,8 @@ impl TypedSession<'_> {
             group.main_active_skill_calcs
         } else {
             group.main_active_skill
-        };
+        }
+        .unwrap_or(1.0);
         if gi + 1 == env_main && !display.is_empty() {
             main_active = main_active.min(display.len() as f64);
         }

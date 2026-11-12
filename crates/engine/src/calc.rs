@@ -70,9 +70,6 @@ pub struct Calc<'a> {
     pub stores: Stores,
     pub actors: EnvActors<'a>,
     pub precision: &'a dyn Precision,
-    /// Mods a `ReplaceMod` put in a ModDB, which later ones pass over
-    /// (upstream marks them `replaced`)
-    pub replaced: std::collections::HashSet<(StoreId, Sym, usize)>,
 }
 
 impl<'a> Calc<'a> {
@@ -234,11 +231,11 @@ impl<'a> Calc<'a> {
     }
 
     /// `ReplaceMod`: replaces the first mod with the same name, type,
-    /// flags and source, in the store or its parents, else adds it. In a
+    /// flags and source, in the store or its parents (a shared base too,
+    /// as upstream changes `specEnv.cachedPlayerDB`), else adds it. In a
     /// ModDB, a mod put there by a replacement is not replaced again.
     pub fn replace_mod(&mut self, id: StoreId, m: Mod) {
-        let mut cur = Some(id);
-        while let Some(s) = cur {
+        fn replace(store: &mut Store, m: &Mod) -> bool {
             let same = |c: &Mod| {
                 c.name == m.name
                     && c.typ == m.typ
@@ -246,25 +243,34 @@ impl<'a> Calc<'a> {
                     && c.keyword_flags == m.keyword_flags
                     && c.source == m.source
             };
-            let replaced = &self.replaced;
-            let store = &mut self.stores.stores[s];
             match &mut store.mods {
                 crate::mods::Mods::Db(by_name) => {
                     let list = by_name.entry(m.name).or_default();
                     if let Some(i) = (0..list.len())
-                        .find(|&i| same(&list[i]) && !replaced.contains(&(s, m.name, i)))
+                        .find(|&i| same(&list[i]) && !store.replaced.contains(&(m.name, i)))
                     {
                         list[i] = m.clone();
-                        self.replaced.insert((s, m.name, i));
-                        return;
+                        store.replaced.push((m.name, i));
+                        return true;
                     }
                 }
                 crate::mods::Mods::List(l) => {
                     if let Some(c) = l.iter_mut().find(|c| same(c)) {
-                        *c = m;
-                        return;
+                        *c = m.clone();
+                        return true;
                     }
                 }
+            }
+            store
+                .base
+                .as_mut()
+                .is_some_and(|b| replace(std::sync::Arc::make_mut(b), m))
+        }
+        let mut cur = Some(id);
+        while let Some(s) = cur {
+            let store = &mut self.stores.stores[s];
+            if replace(store, &m) {
+                return;
             }
             cur = store.parent;
         }
@@ -275,21 +281,19 @@ impl<'a> Calc<'a> {
     /// the mod's type, flags and source, in the store or its parents (a
     /// ModDB moves it to the new name's mods), else adds the mod
     pub fn convert_mod(&mut self, id: StoreId, old: Sym, m: Mod) {
-        let same = |c: &Mod| {
-            c.name == old
-                && c.typ == m.typ
-                && c.flags == m.flags
-                && c.keyword_flags == m.keyword_flags
-                && c.source == m.source
-        };
-        let mut cur = Some(id);
-        while let Some(s) = cur {
-            let store = &mut self.stores.stores[s];
+        fn convert(store: &mut Store, old: Sym, m: &Mod) -> bool {
+            let same = |c: &Mod| {
+                c.name == old
+                    && c.typ == m.typ
+                    && c.flags == m.flags
+                    && c.keyword_flags == m.keyword_flags
+                    && c.source == m.source
+            };
             match &mut store.mods {
                 crate::mods::Mods::List(l) => {
                     if let Some(c) = l.iter_mut().find(|c| same(c)) {
-                        *c = m;
-                        return;
+                        *c = m.clone();
+                        return true;
                     }
                 }
                 crate::mods::Mods::Db(by_name) => {
@@ -297,10 +301,21 @@ impl<'a> Calc<'a> {
                         && let Some(i) = list.iter().position(same)
                     {
                         list.remove(i);
-                        by_name.entry(m.name).or_default().push(m);
-                        return;
+                        by_name.entry(m.name).or_default().push(m.clone());
+                        return true;
                     }
                 }
+            }
+            store
+                .base
+                .as_mut()
+                .is_some_and(|b| convert(std::sync::Arc::make_mut(b), old, m))
+        }
+        let mut cur = Some(id);
+        while let Some(s) = cur {
+            let store = &mut self.stores.stores[s];
+            if convert(store, old, &m) {
+                return;
             }
             cur = store.parent;
         }

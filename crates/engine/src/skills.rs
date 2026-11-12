@@ -87,13 +87,15 @@ impl GemInstance {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SocketGroup {
     pub enabled: bool,
-    pub include_in_full_dps: bool,
+    /// `nil` until the file or an edit sets it
+    pub include_in_full_dps: Option<bool>,
     pub group_count: Option<f64>,
     pub label: Option<String>,
     pub slot: Option<String>,
     pub source: Option<String>,
-    pub main_active_skill: f64,
-    pub main_active_skill_calcs: f64,
+    /// `nil` in a group made in this session until a calculation picks it
+    pub main_active_skill: Option<f64>,
+    pub main_active_skill_calcs: Option<f64>,
     pub imbued_support: Option<String>,
     pub gem_list: Vec<GemInstance>,
     /// For the skills of an item or a node: their source
@@ -134,6 +136,16 @@ impl DefaultGemLevel {
             "levelOne" => DefaultGemLevel::LevelOne,
             _ => return None,
         })
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            DefaultGemLevel::NormalMaximum => "normalMaximum",
+            DefaultGemLevel::CorruptedMaximum => "corruptedMaximum",
+            DefaultGemLevel::AwakenedMaximum => "awakenedMaximum",
+            DefaultGemLevel::CharacterLevel => "characterLevel",
+            DefaultGemLevel::LevelOne => "levelOne",
+        }
     }
 }
 
@@ -327,13 +339,13 @@ fn load_skill(node: &Element, ctx: &Ctx) -> Option<SocketGroup> {
     let a = |k: &str| node.attr(k);
     let mut group = SocketGroup {
         enabled: a("active") == Some("true") || a("enabled") == Some("true"),
-        include_in_full_dps: a("includeInFullDPS") == Some("true"),
+        include_in_full_dps: a("includeInFullDPS").map(|v| v == "true"),
         group_count: num(a("groupCount")),
         label: a("label").map(String::from),
         slot: a("slot").map(String::from),
         source: a("source").map(String::from),
-        main_active_skill: num(a("mainActiveSkill")).unwrap_or(1.0),
-        main_active_skill_calcs: num(a("mainActiveSkillCalcs")).unwrap_or(1.0),
+        main_active_skill: Some(num(a("mainActiveSkill")).unwrap_or(1.0)),
+        main_active_skill_calcs: Some(num(a("mainActiveSkillCalcs")).unwrap_or(1.0)),
         imbued_support: None,
         gem_list: vec![],
         ..SocketGroup::default()

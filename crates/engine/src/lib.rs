@@ -36,6 +36,7 @@ pub mod data;
 pub mod game_data;
 pub mod item;
 pub mod item_data;
+mod item_raw;
 pub mod item_tools;
 pub mod items_tab;
 pub mod jewel;

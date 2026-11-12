@@ -224,7 +224,7 @@ impl<'t> PassiveSpec<'t> {
         }
     }
 
-    fn kind(&self, i: usize) -> NodeType {
+    pub fn kind(&self, i: usize) -> NodeType {
         self.tree_node(i).kind
     }
 
@@ -329,6 +329,11 @@ impl<'t> PassiveSpec<'t> {
 
     /// `SelectSecondaryAscendClass(ascendClassId)`
     pub fn select_secondary_ascend_class(&mut self, ascend_class_id: i64) -> Result<()> {
+        self.select_secondary(Some(ascend_class_id))
+    }
+
+    /// `SelectSecondaryAscendClass(ascendClassId)`, which may be nil
+    fn select_secondary(&mut self, ascend_class_id: Option<i64>) -> Result<()> {
         let Some(alternates) = &self.tree.alternate_ascendancies else {
             return Ok(());
         };
@@ -339,9 +344,9 @@ impl<'t> PassiveSpec<'t> {
         {
             self.dealloc(i);
         }
-        self.cur_secondary_ascend_class_id = Some(ascend_class_id);
-        if ascend_class_id != 0
-            && let Some(a) = find(ascend_class_id)
+        self.cur_secondary_ascend_class_id = ascend_class_id;
+        if let Some(id) = ascend_class_id.filter(|id| *id != 0)
+            && let Some(a) = find(id)
             && let Some(i) = self.start_index(a.start_node_id)
         {
             self.alloc(i);
@@ -420,7 +425,10 @@ impl<'t> PassiveSpec<'t> {
         self.import_from_node_list(
             class_id as i64,
             ascend_class_id as i64,
-            num("secondaryAscendClassId").unwrap_or(0.0) as i64,
+            match xml.attr("secondaryAscendClassId") {
+                None => Some(0),
+                Some(v) => crate::pat::to_number(v).map(|v| v as i64),
+            },
             &hash_list,
             &effects,
         )
@@ -434,14 +442,14 @@ impl<'t> PassiveSpec<'t> {
         &mut self,
         class_id: i64,
         ascend_class_id: i64,
-        secondary_ascend_class_id: i64,
+        secondary_ascend_class_id: Option<i64>,
         hash_list: &[u32],
         mastery_effects: &[(u32, f64)],
     ) -> Result<()> {
         self.reset_nodes();
         self.select_class(class_id)?;
         self.select_ascend_class(ascend_class_id)?;
-        self.select_secondary_ascend_class(secondary_ascend_class_id)?;
+        self.select_secondary(secondary_ascend_class_id)?;
         self.mastery_selections.clear();
         for (mastery, effect) in mastery_effects {
             // Ignore GGG's codes from profile imports

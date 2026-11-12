@@ -866,13 +866,15 @@ impl TypedSession<'_> {
                         )),
                         None => s.source_name.clone(),
                     };
-                    let mut r: Row = vec![
-                        ("base", Cell::Num(s.base)),
-                        ("inc", Cell::from(s.inc.clone())),
+                    let mut r: Row = vec![("base", Cell::Num(s.base))];
+                    if !s.no_inc {
+                        r.push(("inc", Cell::from(s.inc.clone())));
+                    }
+                    r.extend([
                         ("more", Cell::from(s.more.clone())),
                         ("total", Cell::from(s.total.clone())),
                         ("source", Cell::from(s.source.clone())),
-                    ];
+                    ]);
                     if let Some(l) = label {
                         r.push(("sourceLabel", Cell::Str(l)));
                     }
