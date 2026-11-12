@@ -374,14 +374,14 @@ Implicits: 0
 {variant:1}+10 to Intelligence
 {variant:2,3,4}{range:0.5}+(20-30) to Intelligence
 {variant:1}{range:0.5}(50-70)% increased Energy Shield
+{variant:1}{range:0.5}(10-15)% increased Stun and Block Recovery
 {variant:2,3}{range:0.5}(100-140)% increased Energy Shield
+{variant:2,3}{range:0.5}(10-15)% increased Stun and Block Recovery
 {variant:4}{range:0.5}(100-140)% increased Energy Shield
+{variant:4}{range:0.5}(150-200)% increased Stun and Block Recovery
 {variant:3,4}15% increased Movement Speed
 {variant:1,2}35% increased Movement Speed when on Full Life
 {variant:3,4}20% increased Movement Speed when on Full Life
-{variant:1}{range:0.5}(10-15)% increased Stun and Block Recovery
-{variant:2,3}{range:0.5}(10-15)% increased Stun and Block Recovery
-{variant:4}{range:0.5}(150-200)% increased Stun and Block Recovery
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -677,9 +677,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="4" clusterHashFormatVersion="2" masteryEffects="{26154,12916},{48859,64642},{65395,64875},{37956,23936}" nodes="27422,50041,64226,42911,49178,14813,5612,25355,49407,12236,16380,23834,47030,36704,31700,24377,25324,39725,50986,6982,30842,30691,20010,17201,27604,9171,35756,6741,59718,48438,28265,43725,35568,60508,25111,26294,43303,50515,41433,42086,24544,14056,50340,12033,60529,34666,46730,24984,34400,17833,63649,47389,55392,17818,11568,10808,48807,8904,48859,26154,45227,40841,34031,43412,17020,40907,36972,25456,6580,36222,34009,40653,4565,54776,34284,11651,49538,27605,34959,49412,31080,24865,56001,3009,23199,65395,49167,8410,28475,56920,60002,11412,43374,40867,49806,19711,25933,50360,22423,30155,62694,476,39211,18302,51856,48513,37956,19782,50306,29185,64816,56803,28498,22703,17383" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="4" clusterHashFormatVersion="2" masteryEffects="{26154,12916},{37956,23936},{48859,64642},{65395,64875}" nodes="476,3009,4565,5612,6580,6741,6982,8410,8904,9171,10808,11412,11568,11651,12033,12236,14056,14813,16380,17020,17201,17383,17818,17833,18302,19711,19782,20010,22423,22703,23199,23834,24377,24544,24865,24984,25111,25324,25355,25456,25933,26154,26294,27422,27604,27605,28265,28475,28498,29185,30155,30691,30842,31080,31700,34009,34031,34284,34400,34666,34959,35568,35756,36222,36704,36972,37956,39211,39725,40653,40841,40867,40907,41433,42086,42911,43303,43374,43412,43725,45227,46730,47030,47389,48438,48513,48807,48859,49167,49178,49407,49412,49538,49806,50041,50306,50340,50360,50515,50986,51856,54776,55392,56001,56803,56920,59718,60002,60508,60529,62694,63649,64226,64816,65395" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgQDcWsew3n64qefwBo53RXsYwvA_y_MP_xdGre2j2B71F85YuybLRtGeHp3404qQzFr1CPTi6waVelGvTZuaarNivDsXGIXZrapJ8VTodmkZl_gNujEpC8B7HGHaraKhmBFqfihuR3YYEWaLTAqOL6nIsi-22YqsKufiYTvqZRCfJ_LkGxjcBm0jX6E2Z7NEdXV-IXsLYPBgmvViI_BBHloYSHawQvBWp__c8APINpvO95Y6mIslKlun6PCjkz_ZU3EuFeXdcv05gHcmStHfsqQvYGURE1GxIJyAf0w3eNvUlivQ-cABPyCvtsydGYq_Wv_c12AlEQ=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgQDcQHcC8ER1RXsGbQaVRtGINoiyCPTKjgslC0wLYMvAS_MNug53T_8QnxDMUPnRZpFqUd-TP9NRk4qV5dYr1qfXRpfOV_gYSFiF2LsYwtjcGVNZipmtmsea9Rr1W5pbztvUnIBdct343h6eWh71ITZhO-F7IZgh2qIj4rwi6yNfo9gkGyURJkrmy2ezZ-Jn6Ofy6HZpGann6knqW6plKrNsKu2ire2uR29Nr2Bvqe-28APwBrA_8EEwYLCjsN5xILEpMS4xVPKkNX42GDawd3j3ljpRupi7FzscfTm-KH64v0w_3MABDJ0ZipdgJRE_IK-2_1r_3M=
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="28475"/>

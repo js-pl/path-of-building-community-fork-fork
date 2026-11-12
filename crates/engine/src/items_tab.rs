@@ -3,9 +3,9 @@
 //! Loads the items and item sets, and settles which item each slot holds,
 //! as the tab's slot lists do.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
-use crate::item::{Item, ItemContext};
+use crate::item::{Item, ItemContext, ModLine};
 use crate::spec::PassiveSpec;
 use crate::xml::{Element, Node};
 use std::collections::{BTreeMap, HashMap};
@@ -186,10 +186,35 @@ impl ItemsTab {
                             item.variant_alt[i] = crate::pat::to_number(v);
                         }
                     }
+                    // Enchants of the base were not in the saved text, so
+                    // saved ModRange ids skip them
+                    let saved = |l: &[ModLine]| {
+                        if l.first().is_some_and(|m| m.added_from_base) {
+                            0.0
+                        } else {
+                            l.len() as f64
+                        }
+                    };
+                    let mod_ranges = node
+                        .children
+                        .iter()
+                        .filter(|c| matches!(c, Node::Element(e) if e.elem == "ModRange"))
+                        .count() as f64;
+                    let mut ignore_ranges = false;
                     for child in &node.children {
                         match child {
-                            Node::Text(t) => item.parse_raw(ctx, t, None, false)?,
-                            Node::Element(e) if e.elem == "ModRange" => {
+                            Node::Text(t) => {
+                                item.parse_raw(ctx, t, None, false)?;
+                                // More ranges than lines: the ids no longer
+                                // match their lines
+                                ignore_ranges = mod_ranges
+                                    > saved(&item.enchant_mod_lines)
+                                        + item.scourge_mod_lines.len() as f64
+                                        + item.implicit_mod_lines.len() as f64
+                                        + item.explicit_mod_lines.len() as f64
+                                        + item.crucible_mod_lines.len() as f64;
+                            }
+                            Node::Element(e) if e.elem == "ModRange" && !ignore_ranges => {
                                 // The range of a line, counted across the lists
                                 let mut id = num(e.attr("id")).unwrap_or(0.0);
                                 let range = num(e.attr("range")).unwrap_or(1.0);
@@ -201,13 +226,17 @@ impl ItemsTab {
                                     &mut item.explicit_mod_lines,
                                     &mut item.crucible_mod_lines,
                                 ] {
-                                    if id <= list.len() as f64 {
-                                        if id >= 1.0 && id.fract() == 0.0 {
+                                    let count = saved(list);
+                                    if id <= count {
+                                        if id >= 1.0
+                                            && id.fract() == 0.0
+                                            && !list[id as usize - 1].range_from_value
+                                        {
                                             list[id as usize - 1].range = Some(range);
                                         }
                                         break;
                                     }
-                                    id -= list.len() as f64;
+                                    id -= count;
                                 }
                             }
                             Node::Element(_) => {}

@@ -325,7 +325,7 @@ Variant: Current
 Selected Variant: 2
 Quality: 20
 Sockets: R-R-R-R
-LevelReq: 47
+LevelReq: 72
 Implicits: 0
 Socketed Gems are Supported by Level 30 Rage
 {range:0.5}(120-150)% increased Armour
@@ -375,8 +375,8 @@ Implicits: 1
 Replica Hinekora&apos;s Sight
 Onyx Amulet
 League: Heist
-LevelReq: 20
-Implicits: 0
+LevelReq: 44
+Implicits: 1
 {tags:attribute}{range:0.5}+(10-16) to all Attributes
 {tags:attack}{range:0.5}+(600-1000) to Accuracy Rating
 {tags:defences}{range:0.5}+(600-1000) to Armour
@@ -399,8 +399,9 @@ Variant: Pre 3.19.0
 Variant: Current
 Selected Variant: 2
 LevelReq: 30
-Implicits: 1
-{tags:defences}{range:0.5}+(15-25) to maximum Energy Shield
+Implicits: 2
+{tags:caster,speed}{variant:4}{range:0.5}(7-10)% increased Cast Speed
+{tags:defences}{variant:1,2,3}{range:0.5}+(15-25) to maximum Energy Shield
 {tags:attribute}{range:0.5}+(60-75) to Intelligence
 {tags:resource}Right ring slot: You cannot Regenerate Mana
 {tags:defences}{variant:1}Right ring slot: Regenerate 4% of Energy Shield per second
@@ -426,6 +427,7 @@ Implicits: 1
 			<ModRange id="11" range="0.5"/>
 			<ModRange id="12" range="0.5"/>
 			<ModRange id="13" range="0.5"/>
+			<ModRange id="14" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: RARE
@@ -662,9 +664,9 @@ Melee Weapon Damage Penetrates 1% Elemental Resistances per Mana Burn, up to a m
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="6" clusterHashFormatVersion="2" masteryEffects="{1215,46099},{47294,1251},{10495,64642},{53365,2823}" nodes="40644,1891,41689,60949,42686,3537,51220,49308,33783,53456,5823,32345,40751,30338,58244,53365,10511,7920,28012,9877,1767,265,60259,21264,27659,56276,63639,51402,17749,21575,12850,35283,57746,46676,1215,47321,38129,6064,3656,9014,21835,58229,35894,44339,46408,47294,46277,31583,42804,61834,5129,24426,56295,10153,3314,10495,47362,51212,20546,9864,59009,32710,51801,4973,5022,53213,46965,8027,44683,41989,46896,55414,62490,38520,2260,4502,33903,11018,54338,11162,42443,45272,28754,25058,1600,14157,18182,39443,57248,18747,22261,64501,32176,25411,31371,7112,24050,15549,28758,10763,62791,58649,56648,21301,42744,52157,27656,23024,11334,37671" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="6" clusterHashFormatVersion="2" masteryEffects="{1215,46099},{10495,64642},{47294,1251},{53365,2823}" nodes="265,1215,1600,1767,1891,2260,3314,3537,3656,4502,4973,5022,5129,5823,6064,7112,7920,8027,9014,9864,9877,10153,10495,10511,10763,11018,11162,11334,12850,14157,15549,17749,18182,18747,20546,21264,21301,21575,21835,22261,23024,24050,24426,25058,25411,27656,27659,28012,28754,28758,30338,31371,31583,32176,32345,32710,33783,33903,35283,35894,37671,38129,38520,39443,40644,40751,41689,41989,42443,42686,42744,42804,44339,44683,45272,46277,46408,46676,46896,46965,47294,47321,47362,49308,51212,51220,51402,51801,52157,53213,53365,53456,54338,55414,56276,56295,56648,57248,57746,58229,58244,58649,59009,60259,60949,61834,62490,62791,63639,64501" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgYBbJ7EB2Oi2e4Vpr4N0cgUwJyD99DQFr9-WZ8vdoLjhNB1KQ8e8G1sJpUG5wEJ62NTEGwL29T4l8jKRVVURzIyidPhkrZUBL-42ZTxF7AOSCM2VUuMNq0ztUi4vrTFe1-nNPGKFAlfatvnJ6kM8ij_uQLIDFBCJojmgX_GylkTbROez923dR9bpAW3MNh29BqWeAjUEZaEbysK1EIrmqXLsNhwUmHiBkA3TUcGmhPfoEk7VvX79X2wY0N6ixvIXfI8vXBWKgv1R-UZ3UhTNab4y71sCFnwLEaTJwAECwfQdbQTBL8E47i-_IIo_w==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgYBbAEJBL8GQAbnB2MI1AzyDdEOSBGWE20TnhQJFr8XsBvIHvAfWyM2JogmlSepKP8pDyoLKwormixGMjI3TTy9RVVHBkk7UEJTEFM1VEdVS1b1WfBd8l9qYeJjQ2wIbAttbHBScFZ2gnqLe199sH5Zf8aD94RvidOMNpMnlPGWeJoTnsSfL6LZpAWly6a-pvinNK0zsNi0xbVItlS3MLd1uL642bkCwJzIDMgUyMrKWcu9z93QddDQ1ELYdtvU2-fdSN-g4ZLjhOUZ5oHrY-4V8Yr0GvVH-Jf79QAEtBMEv_yCKP8E47i-CwfQdQ==
 			</URL>
 			<Sockets/>
 			<Overrides/>

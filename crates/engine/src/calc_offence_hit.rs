@@ -2,7 +2,7 @@
 //! often the skill hits (speed, accuracy, block), then its hit damage
 //! (exerts, crits, resistances, leech, gains on hit, DPS).
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -523,7 +523,13 @@ impl<'a> Perform<'a> {
             if ge.cast_time == Some(0.0) && !self.sd_truthy(i, "castTimeOverride") && !triggered {
                 self.set_po(o, "Time", 0.0);
                 self.set_po(o, "Speed", 0.0);
-            } else if let Some(t) = self.sd_num(i, "timeOverride") {
+            } else if let Some(mut t) = self.sd_num(i, "timeOverride") {
+                if let Some(cd) = self
+                    .go(o, "TrapCooldown")
+                    .or_else(|| self.go(o, "Cooldown"))
+                {
+                    t = m_max(t, cd);
+                }
                 self.set_po(o, "Time", t);
                 self.set_po(o, "Speed", 1.0 / t);
             } else if self.sd_truthy(i, "fixedCastTime") {
@@ -1554,11 +1560,16 @@ impl<'a> Perform<'a> {
             let count = self.c.base(jl, jcc, &[&format!("{key}EmpoweredSpells")])?;
             let stored = self.sd_num(j, "storedUses").unwrap_or(f64::NAN)
                 + self.c.base(jl, jcc, &["AdditionalCooldownUses"])?;
-            let speed = self.go(o, "Speed").unwrap_or(0.0);
-            let mut uptime = if speed == 0.0 {
+            let nil =
+                |k: &str| format!("attempt to perform arithmetic on field '{k}' (a nil value)");
+            let speed = self.go(o, "Speed").ok_or_else(|| nil("Speed"))?;
+            let repeats = self.go(o, "Repeats").ok_or_else(|| nil("Repeats"))?;
+            // Repeated spells keep the initial cast's empowerment
+            let use_rate = speed / repeats;
+            let mut uptime = if use_rate == 0.0 {
                 100.0
             } else {
-                m_min((count / speed) / (cooldown + cast), 1.0) * 100.0
+                m_min((count / use_rate) / (cooldown + cast), 1.0) * 100.0
             };
             uptime = m_min(100.0, uptime * stored);
             let effect = if self.c.flag(list, None, &["Condition:PactMaxHit"])? {
@@ -1622,7 +1633,9 @@ impl<'a> Perform<'a> {
                     && !self.c.flag(list, sc, &["CannotChain"])?
                     && !self.c.flag(list, sc, &["NoAdditionalChains"])?
                 {
-                    let v = self.c.base(jl, jcc, &["BeidatAdditionalBeamChains"])? * em;
+                    let v = self.c.base(jl, jcc, &["BeidatAdditionalBeamChains"])?
+                        * em
+                        * self.c.more(list, sc, &["ChainCountMax"])?;
                     self.set_go(o, "BeidatAdditionalBeamChains", v);
                     let max = self.go(o, "ChainMax").unwrap_or(f64::NAN) + v;
                     self.set_go(o, "ChainMax", max);
@@ -2710,8 +2723,12 @@ impl<'a> Perform<'a> {
                         es_total += hit_avg * es / 100.0;
                     }
                 } else if let Some(b) = self.bd(actor) {
-                    let l = vec![format!("You can't deal {t} damage")];
-                    b.set_lines(Self::pkey(o, t), l);
+                    let bd = Breakdown {
+                        lines: vec![format!("You can't deal {t} damage")],
+                        mod_list: (!o.can_deal[ti]).then(|| o.deal_no_mods[ti].clone()),
+                        ..Breakdown::default()
+                    };
+                    b.set(Self::pkey(o, t), bd);
                 }
                 if pass == 1 {
                     self.set_po(o, &format!("{t}CritAverage"), hit_avg);

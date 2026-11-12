@@ -576,6 +576,15 @@ Implicits: 0
 {variant:13}Recharges 1 Charge when you Consume an Ignited corpse
 {variant:15,16,17,18}Recharges 5 Charges when you Consume an Ignited corpse
 {variant:14}{range:0.5}(175-200)% increased Charges per use
+{variant:4,5}{crafted}50% Chance to Avoid being Stunned during Effect
+{variant:11}{crafted}Ignites you inflict during Effect spread to other Enemies within 1.5 metres
+{variant:9}{crafted}Enemies Ignited by you during Effect have Malediction
+{variant:3}{crafted}{range:0.5}(20-30)% increased Rarity of Items found during Effect
+{variant:12}{crafted}Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect
+{variant:2}{crafted}15% of Damage Taken from Hits is Leeched as Life during Effect
+{variant:6}{crafted}Regenerate 3% of Life per second during Effect
+{variant:10}{crafted}You can apply an additional Curse during Effect
+{variant:8}{crafted}Your Physical Damage can Ignite during Effect
 {variant:13}Enemies Ignited by you during Effect take 10% increased Damage
 {variant:14,15,16,17,18}{range:0.5}Enemies Ignited by you during Effect take (7-10)% increased Damage
 {variant:13,15,16}{range:0.5}Recover (1-3)% of Life when you Kill an Enemy during Effect
@@ -583,17 +592,8 @@ Implicits: 0
 {variant:13,15,18}{range:0.5}Recover (1-3)% of Energy Shield when you Kill an Enemy during Effect
 {variant:14}{crafted}{range:0.5}(60-80)% increased Critical Strike Chance during Effect
 {variant:1}{crafted}{range:0.5}(45-55)% increased Critical Strike Chance during Effect
-{variant:2}{crafted}15% of Damage Taken from Hits is Leeched as Life during Effect
-{variant:3}{crafted}{range:0.5}(20-30)% increased Rarity of Items found during Effect
 {variant:4}{crafted}{range:0.5}(8-12)% increased Movement Speed during Effect
-{variant:4,5}{crafted}50% Chance to avoid being Stunned during Effect
-{variant:6}{crafted}Regenerate 3% of Life per second during Effect
 {variant:7}{crafted}{range:0.5}(60-80)% reduced Reflected Damage taken during Effect
-{variant:8}{crafted}Your Physical Damage can Ignite during Effect
-{variant:9}{crafted}Enemies Ignited by you during Effect have Malediction
-{variant:10}{crafted}You can apply an additional Curse during Effect
-{variant:11}{crafted}Ignites you inflict during Effect spread to other Enemies within 1.5 metres
-{variant:12}{crafted}Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
@@ -739,9 +739,9 @@ Converted to Cold Damage
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="4" clusterHashFormatVersion="2" masteryEffects="{62015,63994},{65395,55886},{6912,35582},{37956,38703},{4327,1915},{33657,46807},{51974,51153},{35221,64775},{26154,23021},{64406,10680}" nodes="27422,64226,42911,49178,54862,5612,57257,33657,49407,12236,50340,23834,27140,10542,27301,28265,487,50858,50986,40653,2225,6884,15451,2599,30691,56370,56589,61868,51856,34959,6741,59718,48438,28728,6139,35568,22703,25933,13019,49167,50515,29359,6718,24544,28498,5152,15438,45227,24383,50360,12033,33287,22285,63649,47389,2355,17818,32739,39725,48807,8904,5408,36543,18302,40841,30251,43412,26365,40907,50306,63027,6580,6912,34009,1340,16380,54776,16245,11651,42086,27605,53558,49412,31080,24865,6043,53793,60031,65395,24641,35221,28475,57900,42800,59494,43374,4327,49806,51974,48513,33098,64406,62015,61602,56920,40867,62017,43787,35756,37956,62694,24377,39211,64816,56803,5065,26154,476" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="4" clusterHashFormatVersion="2" masteryEffects="{4327,1915},{6912,35582},{26154,23021},{33657,46807},{35221,64775},{37956,38703},{51974,51153},{62015,63994},{64406,10680},{65395,55886}" nodes="476,487,1340,2225,2355,2599,4327,5065,5152,5408,5612,6043,6139,6580,6718,6741,6884,6912,8904,10542,11651,12033,12236,13019,15438,15451,16245,16380,17818,18302,22285,22703,23834,24377,24383,24544,24641,24865,25933,26154,26365,27140,27301,27422,27605,28265,28475,28498,28728,29359,30251,30691,31080,32739,33098,33287,33657,34009,34959,35221,35568,35756,36543,37956,39211,39725,40653,40841,40867,40907,42086,42800,42911,43374,43412,43787,45227,47389,48438,48513,48807,49167,49178,49407,49412,49806,50306,50340,50360,50515,50858,50986,51856,51974,53558,53793,54776,54862,56370,56589,56803,56920,57257,57900,59494,59718,60031,61602,61868,62015,62017,62694,63027,63649,64226,64406,64816,65395" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgQAdWse-uKnn8Aa1k4V7N-pg3nA_y_MxKRdGmoEKS5qpW5pAefGqp7NCLEa5DxbCid349wy3Q3xrMqQiI8aVelGvTZwOBf7ivBYr2VNMtvAD8VTcq8aPl_gb1IUIDxOsKtfP8S4LwGCB1cN-KG5HQkzRZp_45stvqciyBUgjr9Hfp-JdiuplGb9n8vEgvYzGbQbAITZBTw__NX4P3Utg6Rma9XRNsEEeWhhIReb0iHqf_9zYEGJlW874iynMOhmqW4Q58KOywa9gYFK-5byP_Ci3lifo_JBqwuLrJRE9OZfOZkr_TDd4xPJZioB3AAKtteDeYr-GwDaTv9z_QeJlQd7EOfH0csGKbj7lvn68j-XL5REWe1mKg==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgQAdQHcAecFPAixCTMKJxDnE8kUIBUgFewXmxf7GbQaPhpVGuQbACLIKS4tgy8BL8wy2zxOPFs_dT_8RZpHflcNWK9dGl85Xz9f4GBBYSFlTWYqZv1qBGqlax5r1W5pbztvUnA4cq92K3fjeWh_44FKggeDeYTZiI-JlYrwi6yOv5REmSubLZ7Nn4mfo5_LpGanMKefqW6plKsLsKu5Hb02vYG-p8APwBrA_8EEwo7EgsSkxLjFU8aqypDLBtE20iHV-NZO3DLdDd3j3ljfqeIs6GbpRup_8KLxrPI_8kH05vYz-KH64vuW_TD_cwAKB3sQ54r-GwBZ7WYqtteDef0HiZWXL5REx9HLBvn68j8puPuW2k7_cw==
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="28475"/>

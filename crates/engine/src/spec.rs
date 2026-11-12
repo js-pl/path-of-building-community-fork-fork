@@ -3,7 +3,7 @@
 //! mastery selections, and the dependencies and paths
 //! `BuildAllDependsAndPaths` derives from them.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 //!
 //! Not ported yet: jewels that change the tree (Intuitive Leap and the like,
 //! timeless jewels, Impossible Escape, Split Personality), tattoos, cluster
