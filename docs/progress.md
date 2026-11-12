@@ -125,8 +125,10 @@ What remains for the full migration, in order:
    `modLib.mergeKeystones` last gave a keystone's mods, also across
    builds: a session that loaded another build with an item granting
    the keystone shows that item as the source of the tree's keystone
-   mods; the test compares such builds again on a fresh translated
-   session. Not followed either: the slots of energy shield converted
+   mods; the test takes the typed source for such tree keystone rows (46
+   rows over the corpus, counted). The session tests share one typed
+   data and one translated session (`typed_session_matches_translated`,
+   about 3.5 GB). Not followed either: the slots of energy shield converted
    to ward, whose `inc` upstream leaves nil (typed: `false`).
 
    Tree edits are typed (`session::typed::tree`): `clickNode`

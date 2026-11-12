@@ -80,11 +80,24 @@ fn data() -> &'static TypedData {
     data
 }
 
+fn session() -> Session {
+    Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The typed engine's commands on one session (one data and one translated
+/// session keep the memory down): the sidebar and outputs, the Calcs tab
+/// and tree edits, each over the corpus
 #[test]
-fn typed_commands_match_translated() {
+fn typed_session_matches_translated() {
     let data = data();
-    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    commands_match(data, &mut d);
+    calcs_match(data, &mut d);
+    tree_edits_match(&mut d);
+}
+
+/// `loadXml`, `loadCode`, `state` and `outputs`
+fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut skipped, mut compared) = (Vec::new(), Vec::new(), 0);
     let mut times = [Duration::ZERO; 4];
     for (id, path) in corpus() {
@@ -235,7 +248,14 @@ fn node_power_matches_translated() {
 
 /// The Calcs tab's cells, its controls and every cell's breakdown on the
 /// dispatcher's build: where they differ, as paths
-fn compare_calcs(d: &mut Dispatcher, id: &str, times: &mut [Duration; 2]) -> (usize, Vec<String>) {
+fn compare_calcs(
+    data: &TypedData,
+    d: &mut Dispatcher,
+    id: &str,
+    times: &mut [Duration; 2],
+) -> (usize, Vec<String>, usize) {
+    let latest = data.tree(data.game.latest_tree_version()).unwrap();
+    let mut aligned = 0;
     let mut reqs = vec![json!({"cmd": "calcs"})];
     let mut paths = vec![json!("build.mainSkill"), json!("build.mainSocketGroup")];
     let typed = answer(d.request(r#"{"cmd":"calcs"}"#), "typed calcs");
@@ -261,27 +281,52 @@ fn compare_calcs(d: &mut Dispatcher, id: &str, times: &mut [Duration; 2]) -> (us
         let typed = answer(d.request(&req), "typed");
         times[0] += t.elapsed();
         let t = Instant::now();
-        let tr = answer(d.translated_request(&req), "translated");
+        let mut tr = answer(d.translated_request(&req), "translated");
         times[1] += t.elapsed();
+        aligned += align_keystone_sources(&typed, &mut tr, latest);
         let n = out.len();
         diff(&typed, &tr, &req, &mut out);
         if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
             eprintln!("{id} {req}:\ntyped {typed}\ntranslated {tr}");
         }
     }
-    (reqs.len() - 2, out)
+    (reqs.len() - 2, out, aligned)
 }
 
-/// The Calcs tab gives the translation's JSON, for every corpus build.
 /// Upstream's tree keeps the source `modLib.mergeKeystones` last gave a
-/// keystone's mods, also from builds loaded before: a build that differs
-/// is compared again on a fresh translated session.
-#[test]
-fn calcs_match_translated() {
-    let data = data();
-    let session = || Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    let (mut failures, mut compared, mut cells) = (Vec::new(), 0, 0);
+/// keystone's own mods, also from builds loaded before in the session: a
+/// tree keystone's mod row that the translation shows as another source's
+/// (an item or a configuration of an earlier build that granted the
+/// keystone) takes the typed source. The number of rows so aligned.
+fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTree) -> usize {
+    let mut n = 0;
+    let (Some(ts), Some(rs)) = (
+        typed["ok"]["sections"].as_array(),
+        tr["ok"]["sections"].as_array_mut(),
+    ) else {
+        return 0;
+    };
+    for (t, r) in ts.iter().zip(rs) {
+        let (Some(trows), Some(rrows)) = (t["rows"].as_array(), r["rows"].as_array_mut()) else {
+            continue;
+        };
+        for (a, b) in trows.iter().zip(rrows) {
+            let keystone = a["sourceName"]
+                .as_str()
+                .is_some_and(|k| tree.keystone_map.contains_key(k));
+            if a["source"] == "Tree" && b["source"] != "Tree" && keystone {
+                b["source"] = a["source"].clone();
+                b["sourceName"] = a["sourceName"].clone();
+                n += 1;
+            }
+        }
+    }
+    n
+}
+
+/// The Calcs tab gives the translation's JSON, for every corpus build
+fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
     for (id, path) in corpus() {
         let xml = std::fs::read_to_string(&path).unwrap();
@@ -290,12 +335,8 @@ fn calcs_match_translated() {
         if !d.typed_active() {
             continue;
         }
-        let (n, mut out) = compare_calcs(&mut d, &id, &mut times);
-        if !out.is_empty() {
-            let mut fresh = Dispatcher::new(session(), Some(data), Prefer::Typed);
-            answer(fresh.request(&load), "load");
-            out = compare_calcs(&mut fresh, &id, &mut [Duration::ZERO; 2]).1;
-        }
+        let (n, mut out, a) = compare_calcs(data, d, &id, &mut times);
+        aligned += a;
         cells += n;
         compared += 1;
         if !out.is_empty() {
@@ -305,7 +346,7 @@ fn calcs_match_translated() {
         }
     }
     eprintln!(
-        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load)",
+        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load); {aligned} keystone sources aligned",
         times[0], times[1]
     );
     assert!(
@@ -332,11 +373,7 @@ impl Lcg {
 /// Random sequences of tree edits (clicks on allocated and unallocated
 /// nodes, ascendancies and masteries with an effect chosen, a reset) give
 /// the translation's sidebar, outputs and tree state after each step
-#[test]
-fn tree_edits_match_translated() {
-    let data = data();
-    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
+fn tree_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
@@ -469,7 +506,7 @@ fn tree_edits_match_translated() {
                     follow.push(json!({"cmd": "outputs"}));
                 }
             }
-            compare(&mut d, &follow, &label, &mut out);
+            compare(d, &follow, &label, &mut out);
             steps += 1;
             if !out.is_empty() {
                 break;
