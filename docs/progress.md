@@ -82,11 +82,13 @@ What remains for the full migration, in order:
    needs the engine's `Rc` data shared or rebuilt per worker. Then item,
    gem and anoint comparisons on the calculator.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
-   makes the typed data at build time (`engine::game_data::GameData`, in
-   `engine::codec`'s binary form). Done: the item, skill and gem, setup
-   and config data, the Configuration tab's option defaults, jewel radii
-   and tree versions, and each tree version's passive tree (one file per
-   version, its stats parsed). Next: `TypedData` loads the binary.
+   makes the typed data at build time (`engine::game_data::GameData` and
+   one `PassiveTree` per tree version, in `engine::codec`'s binary form),
+   and the equivalence tests' `TypedData` reads it from there. Left: the
+   mod parser still takes the importer's tables of `ModParser.lua` and
+   `ModCache.lua` at load; the `from_lua` constructors only run at build
+   time now and can move into `gamedata`; `pob bundle` should ship the
+   binary once the engine API uses the typed engine.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -160,14 +162,13 @@ minion's output (as the player's `output.Minion`), its database and its
 skills' mod lists at each stage, and after the minion's own defence and
 offence.
 
-The equivalence tests still read the game data from upstream's processed
-Lua `data` table (`SetupData`, `ItemData`, `SkillData`, `ConfigData`
-`from_lua`). `crates/gamedata` makes it from the importer's tables
-instead, family by family; `tests/game_data.rs` compares the two (items,
-skills, setup and config: 6.2 MB, 1.6 MB compressed, read in about
-0.15 s natively, where starting upstream's host takes about 10 s; the
-41 trees: 31 MB, 13.6 MB compressed, about 12 ms each to read, 0.5 s
-each to make).
+The typed engine's game data comes from `crates/gamedata`, through its
+binary form (`TypedData::load`, `equivalence::game_data`); no upstream
+host is needed for it. `tests/game_data.rs` checks it against
+`from_lua` on a started host's `data` (items, skills, setup and config:
+6.2 MB, 1.6 MB compressed, read in about 0.15 s natively, where starting
+upstream's host takes about 10 s; the 41 trees: 31 MB, 13.6 MB
+compressed, about 12 ms each to read, 0.5 s each to make).
 
 ## Performance
 
@@ -269,7 +270,7 @@ the tests align these:
 ## Working notes
 
 - `build_output` checks the typed engine alone against the oracle in
-  under a minute: run it first
+  about 20 seconds, without starting upstream: run it first
 - Equivalence tests take about 5 minutes each (`cargo test --release -p
   equivalence --test <name>`); `CALCS_FILTER=<substring>` limits the builds
   (`fn-` for the skill variants, whose ids are `fn-<skill>-<part>-<template>`)

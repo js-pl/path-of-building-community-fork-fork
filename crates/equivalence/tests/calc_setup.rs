@@ -9,7 +9,7 @@
 
 use engine::calc_env::CalcMode;
 use engine::calc_override::{Allocation, Override};
-use engine::calc_setup::{self, BaseInput, BuffMode, SetupData};
+use engine::calc_setup::{self, BaseInput, BuffMode};
 use engine::config::{Inputs, Val};
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
@@ -240,12 +240,7 @@ fn base_dbs_match_upstream() {
     let mut im = importer::Importer::new(&upstream_src());
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
-    let data = SetupData::from_lua(
-        &host.global("data"),
-        &host.global("ModFlag"),
-        &host.global("KeywordFlag"),
-    )
-    .unwrap_or_else(|e| panic!("setup data: {e}"));
+    let data = equivalence::game_data().setup;
     let mut failures = Vec::new();
     let mut compared = 0;
     for (id, path) in corpus() {
@@ -310,7 +305,6 @@ fn base_dbs_match_upstream() {
 /// allocated nodes' mods in allocation order, then the keystones they grant
 #[test]
 fn initial_node_mods_match_upstream() {
-    use engine::item_data::ItemData;
     use engine::spec::PassiveSpec;
     use equivalence::typed_build::Trees;
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
@@ -321,8 +315,7 @@ fn initial_node_mods_match_upstream() {
     let mut im = importer::Importer::new(&upstream_src());
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
-    let item_data = ItemData::from_lua(&host.global("data"), &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let item_data = equivalence::game_data().items;
     let mut trees = Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
     let mut failures = Vec::new();
     let (mut compared, mut skipped) = (0, 0);
@@ -437,9 +430,9 @@ fn items_setup_matches_upstream() {
     use engine::calc_skills;
     use engine::calc_tree;
     use engine::item::ItemContext;
-    use engine::item_data::ItemData;
+
     use engine::items_tab::ItemsTab;
-    use engine::skill_data::SkillData;
+
     use engine::skills::Skills;
     use engine::skills::{ExplodeSource, SocketGroup};
     use engine::spec::PassiveSpec;
@@ -454,33 +447,15 @@ fn items_setup_matches_upstream() {
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
     let ldata = host.global("data");
-    let config_data = engine::config::ConfigData::from_lua(&ldata, &host.global("SkillType"))
-        .unwrap_or_else(|e| panic!("config data: {e}"));
-    let var_list = rt::call(&host.global("LoadModule"), &[s("Modules/ConfigOptions")])
-        .unwrap_or_else(|e| panic!("{}", describe(&e)))
-        .into_iter()
-        .next()
-        .unwrap();
-    let option_defaults = engine::config_tab::option_defaults(&var_list);
-    let setup_data =
-        SetupData::from_lua(&ldata, &host.global("ModFlag"), &host.global("KeywordFlag"))
-            .unwrap_or_else(|e| panic!("setup data: {e}"));
-    let item_data = ItemData::from_lua(&ldata, &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("item data: {e}"));
-    let skill_data = SkillData::from_lua(
-        &ldata,
-        &host.global("colorCodes"),
-        &host.global("SkillType"),
-    )
-    .unwrap_or_else(|e| panic!("skill data: {e}"));
-    let radius: Vec<String> = entries(&get(&ldata, "jewelRadius"))
-        .into_iter()
-        .map(|(_, r)| {
-            lua::to_string(&get(&r, "label"))
-                .to_str_lossy()
-                .into_owned()
-        })
-        .collect();
+    let engine::game_data::GameData {
+        items: item_data,
+        skills: skill_data,
+        setup: setup_data,
+        config: config_data,
+        option_defaults,
+        jewel_radius: radius,
+        ..
+    } = equivalence::game_data();
     let ctx = ItemContext {
         data: &item_data,
         parser: &parser,

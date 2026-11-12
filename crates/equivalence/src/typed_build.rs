@@ -1,26 +1,30 @@
-//! Typed parts of a build for the tests: passive trees by version, loaded
-//! once.
+//! The typed engine's inputs for the tests: its game data and passive
+//! trees, made by `gamedata` and read from their binary form, as the engine
+//! gets them, and builds loaded on them.
 
+use engine::game_data::GameData;
 use engine::mod_parser::ModParser;
 use engine::tree::{self, PassiveTree};
 use std::collections::HashMap;
+use std::rc::Rc;
 
-/// Typed passive trees, by version
+/// Typed passive trees, by version, made by `gamedata` and read back from
+/// their binary form, once each
 pub struct Trees {
-    im: importer::Importer,
-    jewel_radii: lua::Value,
-    legion: Option<lua::Value>,
+    src: Rc<gamedata::Source>,
     latest: String,
     trees: HashMap<String, PassiveTree>,
 }
 
 impl Trees {
     pub fn new(latest: &str) -> Trees {
-        let (data, _) = crate::load_data();
+        let src = gamedata::Source::load(&crate::upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+        Trees::with_source(Rc::new(src), latest)
+    }
+
+    fn with_source(src: Rc<gamedata::Source>, latest: &str) -> Trees {
         Trees {
-            im: importer::Importer::new(&crate::upstream_src()),
-            jewel_radii: data.get("jewelRadii"),
-            legion: None,
+            src,
             latest: latest.to_string(),
             trees: HashMap::new(),
         }
@@ -29,21 +33,10 @@ impl Trees {
     /// The tree of a version
     pub fn get(&mut self, version: &str, parser: &ModParser) -> &PassiveTree {
         if !self.trees.contains_key(version) {
-            let data = self
-                .im
-                .load1(&format!("TreeData/{version}/tree"), vec![])
-                .unwrap_or_else(|e| panic!("{version}: {e}"));
-            let radii = tree::jewel_radii(&self.jewel_radii, version).unwrap();
-            let mut t = PassiveTree::new(version, &data, &radii, parser, version == self.latest)
-                .unwrap_or_else(|e| panic!("{version}: {e}"));
-            if self.legion.is_none() {
-                self.legion = Some(
-                    self.im
-                        .load1("Data/TimelessJewelData/LegionPassives", vec![])
-                        .unwrap_or_else(|e| panic!("legion passives: {e}")),
-                );
-            }
-            t.add_legion_keystones(self.legion.as_ref().unwrap(), parser)
+            let t = self
+                .src
+                .tree(version, parser, version == self.latest)
+                .and_then(|t| PassiveTree::decode(&t.encode()))
                 .unwrap_or_else(|e| panic!("{version}: {e}"));
             self.trees.insert(version.to_string(), t);
         }
@@ -60,8 +53,9 @@ impl Trees {
     }
 }
 
-/// The game data the typed engine reads, taken from a started upstream
-/// host, with the mod parser and the passive trees
+/// The game data the typed engine reads, made by `gamedata` from
+/// upstream's data files and read back from its binary form, with the mod
+/// parser and the passive trees
 pub struct TypedData {
     pub parser: ModParser,
     pub config: engine::config::ConfigData,
@@ -77,54 +71,21 @@ pub struct TypedData {
 }
 
 impl TypedData {
-    pub fn load(host: &upstream::host::Host) -> TypedData {
-        use lua::{Value, rt};
-        let get = |v: &Value, k: &str| rt::index(v, &Value::str(k)).unwrap_or_default();
-        let parser = crate::mod_parser();
-        let mut im = importer::Importer::new(&crate::upstream_src());
-        let cache =
-            importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-        parser.preload(&cache);
-        let ldata = host.global("data");
-        let config = engine::config::ConfigData::from_lua(&ldata, &host.global("SkillType"))
-            .unwrap_or_else(|e| panic!("config data: {e}"));
-        let var_list = rt::call(
-            &host.global("LoadModule"),
-            &[Value::str("Modules/ConfigOptions")],
-        )
-        .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())))
-        .into_iter()
-        .next()
-        .unwrap();
-        let option_defaults = engine::config_tab::option_defaults(&var_list);
-        let setup = engine::calc_setup::SetupData::from_lua(
-            &ldata,
-            &host.global("ModFlag"),
-            &host.global("KeywordFlag"),
-        )
-        .unwrap_or_else(|e| panic!("setup data: {e}"));
-        let items = engine::item_data::ItemData::from_lua(&ldata, &host.global("colorCodes"))
-            .unwrap_or_else(|e| panic!("item data: {e}"));
-        let skills = engine::skill_data::SkillData::from_lua(
-            &ldata,
-            &host.global("colorCodes"),
-            &host.global("SkillType"),
-        )
-        .unwrap_or_else(|e| panic!("skill data: {e}"));
-        let radius = get(&ldata, "jewelRadius")
-            .as_table()
-            .map(|t| t.entries())
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(_, r)| {
-                lua::to_string(&get(&r, "label"))
-                    .to_str_lossy()
-                    .into_owned()
-            })
-            .collect();
-        let mut trees =
-            Trees::new(&lua::to_string(&host.global("latestTreeVersion")).to_str_lossy());
-        let latest = trees.latest().to_string();
+    pub fn load() -> TypedData {
+        let src = gamedata::Source::load(&crate::upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+        let bytes = src.game_data().unwrap_or_else(|e| panic!("{e}")).encode();
+        let GameData {
+            items,
+            skills,
+            setup,
+            config,
+            option_defaults,
+            jewel_radius,
+            tree_versions,
+        } = GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"));
+        let parser = src.mod_parser().unwrap_or_else(|e| panic!("{e}"));
+        let latest = tree_versions.last().cloned().unwrap_or_default();
+        let mut trees = Trees::with_source(Rc::new(src), &latest);
         let socket_ids = trees
             .get(&latest, &parser)
             .nodes
@@ -139,7 +100,7 @@ impl TypedData {
             setup,
             items,
             skills,
-            radius,
+            radius: jewel_radius,
             socket_ids,
             trees,
         }

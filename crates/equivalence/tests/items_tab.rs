@@ -7,7 +7,6 @@
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::item::ItemContext;
-use engine::item_data::ItemData;
 use engine::items_tab::ItemsTab;
 use engine::spec::PassiveSpec;
 use engine::tree::{self, PassiveTree};
@@ -54,8 +53,7 @@ fn items_tabs_match_upstream() {
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
     let (data, _) = load_data();
-    let item_data = ItemData::from_lua(&host.global("data"), &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let item_data = equivalence::game_data().items;
     let latest = lua::to_string(&host.global("latestTreeVersion")).to_string();
     let weapon_types = get(&host.global("data"), "weaponTypeInfo");
     let one_hand = |t: &str| -> Option<bool> {

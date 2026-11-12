@@ -139,7 +139,7 @@ fn node_power_matches_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let mut data = TypedData::load(&host);
+    let mut data = TypedData::load();
     let stats = power_stats();
     let mut failures = Vec::new();
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
