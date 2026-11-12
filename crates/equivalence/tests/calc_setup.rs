@@ -365,12 +365,13 @@ fn initial_node_mods_match_upstream() {
             skipped += 1;
             continue;
         }
-        let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+        let alloc_nodes = engine::spec::copy_table(&spec.alloc_nodes);
+        let alloc: Vec<usize> = alloc_nodes.iter().map(|(_, &i)| i).collect();
         compared += 1;
         let result = calc_setup::build_mod_list_for_node_list(
             &spec,
             &alloc,
-            &spec.alloc_nodes,
+            &alloc_nodes,
             &mut [],
             &[],
             true,
@@ -545,11 +546,12 @@ fn items_setup_matches_upstream() {
         let groups: Vec<SocketGroup> = skills
             .as_ref()
             .map_or(vec![], |s| s.socket_group_list().to_vec());
-        let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+        let alloc_nodes = engine::spec::copy_table(&spec.alloc_nodes);
+        let alloc: Vec<usize> = alloc_nodes.iter().map(|(_, &i)| i).collect();
         let mut node_mods = match calc_setup::build_mod_list_for_node_list(
             &spec,
             &alloc,
-            &spec.alloc_nodes,
+            &alloc_nodes,
             &mut [],
             &[],
             true,

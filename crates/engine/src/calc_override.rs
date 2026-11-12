@@ -6,8 +6,9 @@
 
 use crate::item::Item;
 use crate::mods::{Mod, ModType, Store};
-use crate::spec::{OrderedMap, PassiveSpec, SpecNode};
+use crate::spec::{PassiveSpec, SpecNode, copy_table};
 use crate::tree::NodeType;
+use lua::ljtab::LjMap;
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -105,7 +106,7 @@ pub fn tree_node(spec: &PassiveSpec, id: u32) -> Option<SpecNode> {
 #[derive(Clone, Debug)]
 pub struct Allocation {
     /// Each node's index in the spec, by id
-    pub nodes: OrderedMap<usize>,
+    pub nodes: LjMap<usize>,
     pub notable: i64,
     pub keystone: i64,
     pub mastery: i64,
@@ -119,7 +120,7 @@ impl Allocation {
     /// their indices in it ([`Override::spec_with_nodes`])
     pub fn new(spec: &PassiveSpec, ovr: &Override, added: &[usize]) -> Allocation {
         let mut a = Allocation {
-            nodes: OrderedMap::default(),
+            nodes: LjMap::default(),
             notable: spec.allocated_notable_count as i64,
             keystone: spec.allocated_keystone_count as i64,
             mastery: spec.allocated_mastery_count as i64,
@@ -131,9 +132,7 @@ impl Allocation {
                 .collect(),
         };
         if ovr.add_nodes.is_empty() && ovr.remove_nodes.is_empty() {
-            for (id, &i) in spec.alloc_nodes.iter() {
-                a.nodes.insert(id, i);
-            }
+            a.nodes = copy_table(&spec.alloc_nodes);
             return a;
         }
         for &i in added {

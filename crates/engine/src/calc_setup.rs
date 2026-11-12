@@ -12,8 +12,9 @@ use crate::mod_parser::ModParser;
 use crate::mods::convert::{Converter, array, get, number, text};
 use crate::mods::list::{self, Precision};
 use crate::mods::{Mod, ModType, ModValue, Store, Sym, Tag};
-use crate::spec::{OrderedMap, PassiveSpec};
+use crate::spec::PassiveSpec;
 use crate::tree::{NodeType, PassiveTree};
+use lua::ljtab::LjMap;
 use lua::{Key, Value};
 use std::collections::HashMap;
 
@@ -27,7 +28,8 @@ pub struct SetupData {
     /// By monster level, from 1
     pub monster_accuracy: Vec<f64>,
     /// God to its souls' names and mod lines
-    pub pantheons: HashMap<String, Vec<(String, Vec<String>)>>,
+    /// By god: `souls[1].name` and each soul's mod lines, in `pairs` order
+    pub pantheons: HashMap<String, (String, Vec<Vec<String>>)>,
     pub mod_flags: HashMap<String, u32>,
     pub keyword_flags: HashMap<String, u32>,
     pub game_constants: HashMap<String, f64>,
@@ -178,15 +180,19 @@ impl SetupData {
         };
         let mut pantheons = HashMap::new();
         for (god, g) in pairs(&get(data, "pantheons")) {
-            let mut souls = Vec::new();
-            for (_, soul) in pairs(&get(&g, "souls")) {
-                let lines = pairs(&get(&soul, "mods"))
-                    .iter()
-                    .map(|(_, m)| Ok(text(&get(m, "line"))?.to_string()))
-                    .collect::<Result<_>>()?;
-                souls.push((text(&get(&soul, "name"))?.to_string(), lines));
+            let souls = get(&g, "souls");
+            let mut lines = Vec::new();
+            for (_, soul) in pairs(&souls) {
+                lines.push(
+                    pairs(&get(&soul, "mods"))
+                        .iter()
+                        .map(|(_, m)| Ok(text(&get(m, "line"))?.to_string()))
+                        .collect::<Result<_>>()?,
+                );
             }
-            pantheons.insert(key(&god)?, souls);
+            let first = souls.as_table().map(|t| t.get_int(1)).unwrap_or_default();
+            let name = text(&get(&first, "name"))?;
+            pantheons.insert(key(&god)?, (name.to_string(), lines));
         }
         Ok(SetupData {
             character_constants: numbers(&get(data, "characterConstants"))?,
@@ -1269,11 +1275,11 @@ pub fn base_dbs(d: &SetupData, parser: &ModParser, b: &BaseInput) -> Result<(Sto
             continue;
         }
         let god = god.map(|g| g.text()).unwrap_or_default();
-        let souls = d
+        let (god_name, souls) = d
             .pantheons
             .get(&god)
             .ok_or_else(|| format!("attempt to index a nil value (pantheon {god:?})"))?;
-        apply_soul_mods(&mut db, parser, souls)?;
+        apply_soul_mods(&mut db, parser, god_name, souls)?;
     }
 
     // The enemy
@@ -1312,11 +1318,11 @@ pub fn base_dbs(d: &SetupData, parser: &ModParser, b: &BaseInput) -> Result<(Sto
 fn apply_soul_mods(
     db: &mut Store,
     parser: &ModParser,
-    souls: &[(String, Vec<String>)],
+    god_name: &str,
+    souls: &[Vec<String>],
 ) -> Result<()> {
-    let god_name = souls.first().map(|(n, _)| n.as_str()).unwrap_or("");
     let conv = Converter::default();
-    for (_, lines) in souls {
+    for lines in souls {
         for line in lines {
             let (list, extra) = parser.parse(line.as_bytes());
             if let (Value::Table(t), false) = (&list, extra.truthy()) {
@@ -1374,7 +1380,7 @@ pub(crate) fn calc_mod(mods: &[Mod], name: &str) -> Result<f64> {
 pub fn build_mod_list_for_node(
     spec: &PassiveSpec,
     i: usize,
-    alloc: &OrderedMap<usize>,
+    alloc: &LjMap<usize>,
     rads: &mut [RadiusJewel],
     precision: &dyn Precision,
 ) -> Result<NodeMods> {
@@ -1473,7 +1479,7 @@ pub type NodeListMods = (Vec<Mod>, Vec<(u32, NodeMods)>);
 pub fn build_mod_list_for_node_list(
     spec: &PassiveSpec,
     nodes: &[usize],
-    alloc: &OrderedMap<usize>,
+    alloc: &LjMap<usize>,
     rads: &mut [RadiusJewel],
     extra: &[usize],
     finish: bool,

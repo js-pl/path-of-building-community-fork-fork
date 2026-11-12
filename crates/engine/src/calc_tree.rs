@@ -16,7 +16,7 @@ use crate::calc_setup::{NodeMods, build_mod_list_for_node_list};
 use crate::mods::list::{Precision, on_store};
 use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Mods, Store, Sym};
-use crate::spec::OrderedMap;
+use lua::ljtab::LjMap;
 use std::collections::{BTreeSet, HashMap};
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -25,7 +25,7 @@ pub type Result<T> = std::result::Result<T, String>;
 #[derive(Debug)]
 pub struct TreeSetup {
     /// `env.allocNodes`: each node's index in the spec, by id
-    pub alloc: OrderedMap<usize>,
+    pub alloc: LjMap<usize>,
     /// `env.grantedPassives`
     pub granted_passives: BTreeSet<u32>,
     /// The allocated nodes' mods, added to `env.modDB`

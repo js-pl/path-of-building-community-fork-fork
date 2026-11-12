@@ -458,10 +458,6 @@ fn pure(e: &Expr) -> bool {
     )
 }
 
-fn is_multi(e: &Expr) -> bool {
-    matches!(e, Expr::Call { .. } | Expr::Method { .. } | Expr::Vararg)
-}
-
 /// Number of statements, counting nested blocks but not nested functions.
 fn size(b: &Block) -> usize {
     b.stats
@@ -1177,14 +1173,13 @@ impl Gen<'_> {
                 self.line(&format!("if {v}.is_nil() {{ break; }}"));
                 [format!("Value::Number({i} as f64)"), v]
             } else {
-                let (tt, key) = (self.tmp(), self.tmp());
+                let (tt, pos) = (self.tmp(), self.tmp());
                 self.line(&format!("let {tt} = pairs_table(&{tv})?;"));
-                self.line(&format!("let mut {key} = Value::Nil;"));
+                self.line(&format!("let mut {pos} = 0usize;"));
                 self.line("loop {");
                 self.indent += 1;
                 let (nk, nv) = (self.tmp(), self.tmp());
-                self.line(&format!("let ({nk}, {nv}) = match next(&{tt}, &{key})? {{ Some(e) => e, None => break }};"));
-                self.line(&format!("{key} = {nk}.clone();"));
+                self.line(&format!("let ({nk}, {nv}) = match pairs_step(&{tt}, &mut {pos}) {{ Some(e) => e, None => break }};"));
                 [nk, nv]
             };
             self.enter_loop();
@@ -1576,14 +1571,17 @@ impl Gen<'_> {
                 positions[i] = n;
             }
         }
-        let order = constructor_order(fields);
-        let mut s = String::from("{ let mut tb = Table::new(); ");
-        if fields.len() <= TABLE_CHUNK {
-            s.push_str(&self.table_fields(fields, &order, &positions)?);
+        let plan = constructor_plan(fields);
+        let mut s = format!(
+            "{{ let mut tb = Table::with_sizes({}, {}); ",
+            plan.asize, plan.hbits
+        );
+        if plan.steps.len() <= TABLE_CHUNK {
+            s.push_str(&self.table_fields(fields, &plan.steps, &positions)?);
         } else {
             // Big constructors fill the table in chunk functions
             let id = self.ctx().id;
-            for chunk in order.chunks(TABLE_CHUNK) {
+            for chunk in plan.steps.chunks(TABLE_CHUNK) {
                 let body = self.table_fields(fields, chunk, &positions)?;
                 let c = {
                     let c = self.ctx_mut();
@@ -1601,38 +1599,45 @@ impl Gen<'_> {
         Ok(s)
     }
 
-    /// Code storing the constructor fields `which` in `tb`; `positions` are
-    /// the positions of positional fields.
-    fn table_fields(
-        &mut self,
-        fields: &[Field],
-        which: &[usize],
-        positions: &[usize],
-    ) -> R<String> {
+    /// Code for the constructor steps `steps` on `tb`; `positions` are the
+    /// positions of positional fields.
+    fn table_fields(&mut self, fields: &[Field], steps: &[Step], positions: &[usize]) -> R<String> {
         let mut s = String::new();
-        for &i in which {
-            match &fields[i] {
+        for step in steps {
+            let (i, template) = match *step {
+                Step::Template(i) => (i, true),
+                Step::Field(i) => (i, false),
+                Step::Reserve => {
+                    s.push_str("tb.reserve(); ");
+                    continue;
+                }
+                Step::Reasize(n) => {
+                    let _ = write!(s, "treasize(&mut tb, {n}); ");
+                    continue;
+                }
+            };
+            let (k, v) = match &fields[i] {
                 Field::Keyed(k, v) => {
                     let k = match k {
                         Expr::Str(st) => self.kstr(st),
                         k => self.expr(k)?,
                     };
-                    let v = self.expr(v)?;
-                    let _ = write!(s, "tset(&mut tb, {k}, {v})?; ");
+                    (k, self.expr(v)?)
                 }
                 Field::Item(e) => {
                     let n = positions[i];
-                    if i + 1 == fields.len() && is_multi(e) {
+                    if i + 1 == fields.len() && is_multi(e) && !template {
                         let m = self.expr_multi(e)?;
-                        let _ = write!(
-                            s,
-                            "for (j, v) in {m}.into_iter().enumerate() {{ tset(&mut tb, Value::Number(({n} + j) as f64), v)?; }} "
-                        );
-                    } else {
-                        let v = self.expr(e)?;
-                        let _ = write!(s, "tset(&mut tb, Value::Number({n}.0), {v})?; ");
+                        let _ = write!(s, "tb.set_multi({n}, {m}); ");
+                        continue;
                     }
+                    (format!("Value::Number({n}.0)"), self.expr(e)?)
                 }
+            };
+            if template {
+                let _ = write!(s, "tset_t(&mut tb, {k}, {v}); ");
+            } else {
+                let _ = write!(s, "tset(&mut tb, {k}, {v})?; ");
             }
         }
         Ok(s)

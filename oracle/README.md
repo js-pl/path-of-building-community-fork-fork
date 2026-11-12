@@ -31,6 +31,7 @@ if the files differ from what upstream produces.
 | `dump.lua` | Writes calc outputs as JSON |
 | `modparser.lua` | Writes mod parser outputs as JSON lines |
 | `data.lua` | Writes hashes of upstream's raw data tables |
+| `tables.lua` | Writes LuaJIT's `pairs` order for random number-keyed tables (`tables.jsonl`), which `lua::value::Table` reproduces |
 | `json.lua` | The exact JSON encoder both use |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |

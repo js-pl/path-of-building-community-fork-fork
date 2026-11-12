@@ -20,7 +20,8 @@ use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Store, Sym};
 use crate::pat;
 use crate::skills::SocketGroup;
-use crate::spec::{OrderedMap, PassiveSpec};
+use crate::spec::PassiveSpec;
+use lua::ljtab::LjMap;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -30,7 +31,7 @@ pub type Result<T> = std::result::Result<T, String>;
 pub struct ItemsInput<'a, 't> {
     pub spec: &'a PassiveSpec<'t>,
     /// `env.allocNodes` before the granted passives
-    pub alloc: &'a OrderedMap<usize>,
+    pub alloc: &'a LjMap<usize>,
     /// The calculation's override (`repItem`, `toggleFlask`, ...)
     pub ovr: &'a Override,
     pub tab: &'a ItemsTab,
@@ -86,7 +87,7 @@ pub struct ItemsSetup {
     pub radius_jewels: Vec<RadiusJewel>,
     /// `env.extraRadiusNodeList`: unallocated nodes in the radius of a jewel
     /// that is not `Self`
-    pub extra_radius_nodes: OrderedMap<()>,
+    pub extra_radius_nodes: LjMap<()>,
     /// `env.grantedSkillsItems`
     pub granted_skills: Vec<ItemSkill>,
     /// `env.explodeSources`: items whose base mods can explode enemies
@@ -572,7 +573,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         player_multipliers: HashMap::new(),
         player_mods: Vec::new(),
         radius_jewels: Vec::new(),
-        extra_radius_nodes: OrderedMap::default(),
+        extra_radius_nodes: LjMap::default(),
         granted_skills: Vec::new(),
         explode_sources: Vec::new(),
         flasks: Vec::new(),

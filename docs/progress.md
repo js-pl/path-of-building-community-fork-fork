@@ -203,6 +203,11 @@ the tests align these:
   the cfg again (`pcfg`) after setting outputs a later query reads
 - the Calcs tab's `SkillDPS` keeps `calcFullDPS`'s order: only the
   sidebar's table is sorted
+- `pairs` over number-keyed tables (allocated nodes, the spec's nodes,
+  mastery selections) visits keys in LuaJIT's hash order, which decides
+  the order float sums are taken in: keep such tables in
+  `lua::ljtab::LjMap`, filled in upstream's order, including `t[k] = nil`
+  on missing keys (`ResetNodes`), which gives the key a slot
 - a breakdown that upstream assigns from another (`breakdown.HitChance =
   handBreakdown.HitChance`) shares the table: setting `breakdownSource`
   on the actor's crit chance sets it on the hand's too

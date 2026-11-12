@@ -89,17 +89,14 @@ impl Live {
                 let Ok(t) = t.try_borrow() else {
                     return false;
                 };
-                for v in t.array() {
-                    value(v, f);
-                }
-                for (k, v) in t.raw_entries() {
+                t.for_each_ref(|k, v| {
                     match k {
-                        Key::Table(k) => f(&k.0.0.slot, 1),
-                        Key::Function(k) => f(&k.0.slot, 1),
+                        Some(Key::Table(k)) => f(&k.0.0.slot, 1),
+                        Some(Key::Function(k)) => f(&k.0.slot, 1),
                         _ => {}
                     }
                     value(v, f);
-                }
+                });
                 if let Some(m) = &t.meta {
                     f(&m.0.slot, 1);
                 }

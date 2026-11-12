@@ -9,82 +9,41 @@
 //! timeless jewels, Impossible Escape, Split Personality), tattoos, cluster
 //! jewel subgraphs, tree conversion and URLs.
 //!
-//! Upstream keeps the allocated nodes and mastery selections in tables keyed
-//! by node id and visits them with `pairs`; which paths win ties and the
-//! order of dependency lists follow that order. [`OrderedMap`] keeps it as
-//! the translated program's tables do (by when a key was first set), so
-//! results compare with it exactly.
+//! Upstream keeps the nodes, allocated nodes and mastery selections in
+//! tables keyed by node id and visits them with `pairs`; which paths win
+//! ties, the order of dependency lists and of mods follow that order.
+//! [`LjMap`] keeps LuaJIT's, so results compare exactly.
 
 use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Sym};
 use crate::tree::{self, NodeType, PassiveTree, StatLine};
+use lua::ljtab::LjMap;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-/// A map in the order its keys were first set: a removed key keeps its
-/// place, and setting it again puts it back there.
-#[derive(Clone, Debug, Default)]
-pub struct OrderedMap<V> {
-    slots: Vec<Option<(u32, V)>>,
-    index: HashMap<u32, usize>,
+/// A spec's `masteryEffects` attribute as upstream's table by mastery:
+/// (mastery node, effect) in its `pairs` order.
+pub fn mastery_effects(attr: &str) -> Vec<(u32, f64)> {
+    let mut effects = LjMap::default();
+    for c in crate::pat::gmatch(attr, "{(%d+),(%d+)}") {
+        effects.insert(
+            c[0].parse::<f64>().unwrap_or(0.0) as u32,
+            c[1].parse().unwrap_or(0.0),
+        );
+    }
+    effects.iter().map(|(k, &v)| (k, v)).collect()
 }
 
-impl<V> OrderedMap<V> {
-    pub fn get(&self, k: u32) -> Option<&V> {
-        let &i = self.index.get(&k)?;
-        self.slots[i].as_ref().map(|(_, v)| v)
+/// `copyTable(t, true)`: a new table filled in `t`'s `pairs` order, whose
+/// own order can differ (`env.allocNodes` is one of the spec's).
+pub fn copy_table<V: Clone>(t: &LjMap<V>) -> LjMap<V> {
+    let mut out = LjMap::default();
+    for (k, v) in t.iter() {
+        out.insert(k, v.clone());
     }
-
-    pub fn contains(&self, k: u32) -> bool {
-        self.get(k).is_some()
-    }
-
-    pub fn insert(&mut self, k: u32, v: V) {
-        match self.index.get(&k) {
-            Some(&i) => self.slots[i] = Some((k, v)),
-            None => {
-                self.index.insert(k, self.slots.len());
-                self.slots.push(Some((k, v)));
-            }
-        }
-    }
-
-    pub fn remove(&mut self, k: u32) {
-        if let Some(&i) = self.index.get(&k) {
-            self.slots[i] = None;
-        }
-    }
-
-    /// Removes every entry (`wipeTable`); keys keep their places.
-    pub fn clear(&mut self) {
-        for s in &mut self.slots {
-            *s = None;
-        }
-    }
-
-    /// The key at place `i`, if set: visiting places in order while removing
-    /// entries is how upstream's `pairs` loops behave.
-    pub fn at(&self, i: usize) -> Option<(u32, &V)> {
-        self.slots.get(i)?.as_ref().map(|(k, v)| (*k, v))
-    }
-
-    pub fn places(&self) -> usize {
-        self.slots.len()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (u32, &V)> {
-        self.slots.iter().flatten().map(|(k, v)| (*k, v))
-    }
-
-    pub fn len(&self) -> usize {
-        self.slots.iter().flatten().count()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+    out
 }
 
 /// A path to the nearest allocated node, nearest first; shared, as each
@@ -157,10 +116,12 @@ pub struct PassiveSpec<'t> {
     pub(crate) parser: &'t ModParser,
     pub nodes: Vec<SpecNode>,
     pub index: HashMap<u32, usize>,
+    /// `self.nodes` as upstream's table: node indices in `pairs` order
+    pub order: LjMap<usize>,
     /// Allocated nodes, by id
-    pub alloc_nodes: OrderedMap<usize>,
+    pub alloc_nodes: LjMap<usize>,
     /// Selected mastery effect by mastery node id
-    pub mastery_selections: OrderedMap<f64>,
+    pub mastery_selections: LjMap<f64>,
     /// Allocated node ids the spec does not have (in cluster subgraphs)
     pub alloc_subgraph_nodes: Vec<u32>,
     pub cur_class_id: Option<i64>,
@@ -193,8 +154,9 @@ impl<'t> PassiveSpec<'t> {
             parser,
             nodes: Vec::new(),
             index: HashMap::new(),
-            alloc_nodes: OrderedMap::default(),
-            mastery_selections: OrderedMap::default(),
+            order: LjMap::default(),
+            alloc_nodes: LjMap::default(),
+            mastery_selections: LjMap::default(),
             alloc_subgraph_nodes: Vec::new(),
             cur_class_id: None,
             cur_ascend_class_id: None,
@@ -220,6 +182,7 @@ impl<'t> PassiveSpec<'t> {
                 .is_some_and(|e| e.parent.is_some());
             if n.group.is_some() && !n.is_proxy && !group_proxy && !nested {
                 spec.index.insert(n.id, spec.nodes.len());
+                spec.order.insert(n.id, spec.nodes.len());
                 spec.nodes.push(SpecNode {
                     id: n.id,
                     tree: ti,
@@ -385,8 +348,10 @@ impl<'t> PassiveSpec<'t> {
 
     /// `ResetNodes()`: deallocates every node but the start nodes
     fn reset_nodes(&mut self) {
-        for i in 0..self.nodes.len() {
-            if !self.is_start(i) {
+        for p in 0..self.order.places() {
+            if let Some((_, &i)) = self.order.at(p)
+                && !self.is_start(i)
+            {
                 self.dealloc(i);
             }
         }
@@ -448,18 +413,7 @@ impl<'t> PassiveSpec<'t> {
             .filter_map(|h| crate::pat::to_number(h))
             .map(|h| h as u32)
             .collect();
-        // A table by mastery: a mastery listed again keeps its place
-        let mut effects: Vec<(u32, f64)> = Vec::new();
-        for c in crate::pat::gmatch(xml.attr("masteryEffects").unwrap_or(""), "{(%d+),(%d+)}") {
-            let (m, e) = (
-                c[0].parse::<f64>().unwrap_or(0.0) as u32,
-                c[1].parse().unwrap_or(0.0),
-            );
-            match effects.iter_mut().find(|(k, _)| *k == m) {
-                Some(slot) => slot.1 = e,
-                None => effects.push((m, e)),
-            }
-        }
+        let effects = mastery_effects(xml.attr("masteryEffects").unwrap_or(""));
         self.import_from_node_list(
             class_id as i64,
             ascend_class_id as i64,
@@ -471,8 +425,8 @@ impl<'t> PassiveSpec<'t> {
 
     /// `ImportFromNodeList(nil, classId, ascendClassId,
     /// secondaryAscendClassId, hashList, {}, masteryEffects)`, as loading a
-    /// build does. `mastery_effects` are (mastery node, effect) in the order
-    /// the build lists them.
+    /// build does. `mastery_effects` are (mastery node, effect) in the
+    /// `pairs` order of upstream's table.
     pub fn import_from_node_list(
         &mut self,
         class_id: i64,
@@ -637,8 +591,10 @@ impl<'t> PassiveSpec<'t> {
         self.allocated_keystone_count = 0;
         self.allocated_mastery_types.clear();
         self.allocated_mastery_type_count = 0;
-        for i in 0..self.nodes.len() {
-            let id = self.nodes[i].id;
+        for p in 0..self.order.places() {
+            let Some((id, &i)) = self.order.at(p) else {
+                continue;
+            };
             let kind = self.kind(i);
             if kind == NodeType::Mastery
                 && let Some(&sel) = self.mastery_selections.get(id)
