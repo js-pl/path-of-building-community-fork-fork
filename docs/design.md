@@ -141,8 +141,14 @@ manifest (`sync/check.py`).
 from upstream's source rather than copied: the importer evaluates the literal
 tables of `ModParser.lua`, and its closures are translated to Rust by
 `portgen` (`cargo run -p importer --bin portgen`) or ported by hand. Every
-ported closure records the hash of the Lua it came from, and the engine
-refuses to start when upstream's source no longer matches.
+ported closure records the hash of the Lua it came from, and the build
+fails when upstream's source no longer matches. `crates/gamedata` turns the
+tables (with the setup code around them and upstream's `ModCache.lua`)
+into typed ones at build time (`engine::mod_parser::rules`: patterns, forms,
+name, flag and tag fragments, special mods, closures by key), stored in the
+binary form of the game data. The parser runs on those: closures compute on
+a small value type of their own (`mod_parser::val`) and give typed mods, so
+no Lua value or evaluator is involved in parsing a line.
 
 **Whole-program translation.** `crates/upstream` is upstream's entire
 program (`src/Modules`, `src/Classes`, `Launch.lua`, the libraries in

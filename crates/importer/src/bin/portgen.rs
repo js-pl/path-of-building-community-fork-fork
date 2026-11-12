@@ -36,15 +36,16 @@ fn main() {
     out.push_str("// src/Modules/ModParser.lua; do not edit. Closures it cannot translate are\n");
     out.push_str("// ported by hand in `ported.rs`.\n\n");
     out.push_str("#![allow(unused_mut, unused_variables, non_snake_case, clippy::all)]\n\n");
-    out.push_str("use super::{Ctx, Port};\nuse crate::rt::*;\nuse lua::Value;\n\n");
+    out.push_str("use super::val::*;\nuse super::{Ctx, Port};\n\n");
     let mut bodies = String::new();
     let mut entries = String::new();
     let mut manual = Vec::new();
+    let mut data_fields = std::collections::BTreeSet::new();
     for (i, f) in refs.iter().enumerate() {
         let body = funcs
             .get(&(f.offset as usize))
             .unwrap_or_else(|| panic!("no function at {}", f.offset));
-        match portgen::translate(body, &MOD_PARSER) {
+        match portgen::translate(body, &MOD_PARSER, &mut data_fields) {
             Ok(code) => {
                 let name = format!("f{i:04}");
                 let _ = writeln!(
@@ -60,12 +61,21 @@ fn main() {
                 );
                 let _ = writeln!(
                     bodies,
-                    "fn {name}(c: &Ctx, a: &[Value]) -> Vec<Value> {{\n{code}}}\n"
+                    "fn {name}(c: &Ctx, a: &[V]) -> Vec<V> {{\n{code}}}\n"
                 );
             }
             Err(e) => manual.push((f.clone(), e.0)),
         }
     }
+    out.push_str("/// The fields of `data` the closures read\npub const DATA_FIELDS: &[&str] = &[");
+    out.push_str(
+        &data_fields
+            .iter()
+            .map(|f| format!("{f:?}"))
+            .collect::<Vec<_>>()
+            .join(", "),
+    );
+    out.push_str("];\n\n");
     out.push_str("pub(super) const PORTS: &[Port] = &[\n");
     out.push_str(&entries);
     out.push_str("];\n\n");

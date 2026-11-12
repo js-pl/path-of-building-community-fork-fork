@@ -6,13 +6,14 @@
 
 pub mod data_lua;
 mod jsonc;
+pub mod mod_parser;
 
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
 use engine::config_tab::OptionDefault;
 use engine::game_data::GameData;
 use engine::item_data::ItemData;
-use engine::mod_parser::ModParser;
+use engine::mod_parser::{ModParser, ParserData};
 use engine::skill_data::SkillData;
 use engine::tree::PassiveTree;
 use lua::Key;
@@ -119,16 +120,14 @@ impl Source {
             .collect()
     }
 
-    /// The mod parser, with upstream's mod cache preloaded
+    /// The mod parser's typed tables, with upstream's mod cache
+    pub fn mod_parser_data(&self) -> Result<ParserData> {
+        mod_parser::parser_data(&self.src_dir)
+    }
+
+    /// The mod parser, read from its binary form
     pub fn mod_parser(&self) -> Result<ModParser> {
-        let raw = importer::import(&self.src_dir).map_err(|e| e.to_string())?;
-        let data = engine::data::Data::new(raw.globals.clone(), raw.data.clone());
-        let mut im = importer::Importer::new(&self.src_dir);
-        let tables = importer::mod_parser::import(&mut im, &raw).map_err(|e| e.to_string())?;
-        let parser = ModParser::new(data, &tables).map_err(|e| e.to_string())?;
-        let cache = importer::mod_parser::import_mod_cache(&mut im).map_err(|e| e.to_string())?;
-        parser.preload(&cache);
-        Ok(parser)
+        ModParser::decode(&self.mod_parser_data()?.encode())
     }
 
     /// A tree version's passive tree, with the timeless jewels' keystones

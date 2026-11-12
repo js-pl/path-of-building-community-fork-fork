@@ -10,7 +10,7 @@
 //! as the translation does.
 
 use crate::mod_parser::ModParser;
-use crate::mods::convert::{Converter, get, number, text};
+use crate::mods::convert::{get, number, text};
 use crate::mods::{Mod, ModType, ModValue, Sym};
 use lua::{Key, Value};
 use std::collections::HashMap;
@@ -306,23 +306,9 @@ pub(crate) fn process_stats_from(
     start: usize,
     source: Option<&str>,
 ) -> Result<(Vec<Mod>, bool, bool)> {
-    let conv = Converter::default();
     let parse = |line: &str| -> Result<Parse> {
         let (list, extra) = parser.parse(line.as_bytes());
-        let list = match list {
-            Value::Table(t) => Some(
-                t.array()
-                    .iter()
-                    .map(|m| conv.mod_(m))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
-            ),
-            _ => None,
-        };
-        let extra = match extra {
-            Value::Str(s) => Some(s.to_str_lossy().into()),
-            _ => None,
-        };
-        Ok((list, extra))
+        Ok((list, extra.map(Into::into)))
     };
     let mut mods: Vec<Option<StatLine>> = out.drain(..).map(Some).collect();
     let (mut unknown, mut extra_flag) = (false, false);

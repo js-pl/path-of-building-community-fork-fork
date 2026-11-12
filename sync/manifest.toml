@@ -130,7 +130,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Data/IncursionDropOnly.lua" = { status = "todo" }
 "Data/Minions.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/Misc.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Data/ModCache.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Data/ModCache.lua" = { status = "data", port = "crates/importer crates/gamedata/src/mod_parser.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/ModCorrupted.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/ModDelve.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/ModEldritch.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
@@ -326,8 +326,8 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/ItemSlotHelper.lua" = { status = "todo" }
 "Modules/ItemTools.lua" = { status = "partial", port = "crates/engine/src/item_tools.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/Main.lua" = { status = "todo" }
-"Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/ModTools.lua" = { status = "partial", port = "crates/lua/src/modlib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs crates/gamedata/src/mod_parser.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/ModTools.lua" = { status = "partial", port = "crates/lua/src/modlib.rs crates/engine/src/mod_parser/ctx.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/PantheonTools.lua" = { status = "ported", port = "crates/engine/src/calc_setup.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/StatDescriber.lua" = { status = "todo" }
 "Modules/ToastNotification.lua" = { status = "todo" }
