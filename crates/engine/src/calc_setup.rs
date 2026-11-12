@@ -21,7 +21,7 @@ use std::collections::HashMap;
 pub type Result<T> = std::result::Result<T, String>;
 
 /// The game data the setup needs
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct SetupData {
     pub character_constants: HashMap<String, f64>,
     pub misc: HashMap<String, f64>,
@@ -87,7 +87,7 @@ pub struct WeaponTypeInfo {
 
 /// A minion's data (`data.minions[id]`): its numbers and names by field,
 /// its tags, skills and mods
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct MinionData {
     pub fields: crate::item::Fields,
     pub monster_tags: Vec<String>,
@@ -1557,3 +1557,49 @@ pub(crate) fn set_source(m: &mut Mod, source: &str) {
         inner.source = Some(source.into());
     }
 }
+
+crate::codec_struct!(Ailment {
+    default,
+    min,
+    max,
+    precision,
+    duration,
+    associated_type,
+    alt,
+});
+crate::codec_struct!(WeaponTypeInfo {
+    flag,
+    one_hand,
+    melee,
+    label
+});
+crate::codec_struct!(MinionData {
+    fields,
+    monster_tags,
+    skill_list,
+    mod_list
+});
+crate::codec_struct!(SetupData {
+    character_constants,
+    misc,
+    monster_accuracy,
+    pantheons,
+    mod_flags,
+    keyword_flags,
+    game_constants,
+    weapon_type_info,
+    minions,
+    monster_damage_table,
+    monster_ally_damage_table,
+    unarmed_weapon_data,
+    non_damaging_ailment,
+    curse_priority,
+    monster_constants,
+    ailment_types,
+    monster_phys_conversion_multi,
+    elemental_ailment_types,
+    non_damaging_ailment_types,
+    non_elemental_ailment_types,
+    tables,
+    cost_divisors,
+});
