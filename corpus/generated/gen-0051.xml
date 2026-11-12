@@ -392,9 +392,9 @@ Implicits: 1
 {tags:resistance}{variant:7}{range:0.5}+(50-60)% to Cold Resistance while affected by Herald of Ice
 {variant:4}{range:0.5}Herald of Ice has (70-100)% increased Buff Effect
 {variant:5}{range:0.5}Herald of Ice has (40-60)% increased Buff Effect
+{tags:resource}{variant:1}{range:0.5}Herald of Ice has (60-80)% reduced Mana Reservation Efficiency
 {tags:resource}{variant:2}{range:0.5}Herald of Ice has (30-40)% increased Mana Reservation Efficiency
 {tags:resistance}{variant:6}+1% to maximum Cold Resistance while affected by Herald of Ice
-{tags:resource}{variant:1}{range:0.5}Herald of Ice has (60-80)% reduced Mana Reservation Efficiency
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -652,9 +652,9 @@ Ward does not Break during Effect
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="5" clusterHashFormatVersion="2" masteryEffects="{12503,19422},{30393,65504},{13712,56471}" nodes="7388,4184,17352,33779,23215,20228,4568,36634,20261,44955,48362,41472,40010,35556,51804,6764,61525,30370,10575,8135,49254,12503,45657,26070,14151,11420,47251,62767,60554,37419,55146,39648,39728,32992,61217,46726,43689,29005,46340,27564,31875,63965,2913,39916,35958,59728,44465,409,54954,1346,26866,6237,15064,52742,34098,13712,42343,420,63558,58402,18239,44723,17821,1203,38516,22062,58453,33435,11128,1031,42668,30225,40366,10904,651,31931,31819,21262,4397,885,13009,32364,31758,4854,4494,24824,44529,35724,60648,36542,15599,55381,17735,63138,15365,44908,14057,42837,27611,40508,33923,30393,40927,19919,61308,7938,46952,12852,23456,9294,60398,29472" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="5" clusterHashFormatVersion="2" masteryEffects="{12503,19422},{13712,56471},{30393,65504}" nodes="409,420,651,885,1031,1203,1346,2913,4184,4397,4494,4568,4854,6237,6764,7388,7938,8135,9294,10575,10904,11128,11420,12503,12852,13009,13712,14057,14151,15064,15365,15599,17352,17735,17821,18239,19919,20228,20261,21262,22062,23215,23456,24824,26070,26866,27564,27611,29005,29472,30225,30370,30393,31758,31819,31875,31931,32364,32992,33435,33779,33923,34098,35556,35724,35958,36542,36634,37419,38516,39648,39728,39916,40010,40366,40508,40927,41472,42343,42668,42837,43689,44465,44529,44723,44908,44955,45657,46340,46726,46952,47251,48362,49254,51804,52742,54954,55146,55381,58402,58453,59728,60398,60554,60648,61217,61308,61525,62767,63138,63558,63965" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgUDbhzcEFhDyIPzWq9PBBHYjxpPJa-bvOqiAJxKiuTKXBpsdqIpTx_HwGYw17JZZdY3RyycuJP1L-yKkivXaprgmzCA4O8htoaqqXFNtQRrrHyD-d0LYZvsjHbpUK2x1qoFQmjyGF062M4GhTI1kKVnAaT4RuQiRz-us0WdBLOWdFYu5FWCmyt4BAemrHYRna4qmAKLfLt8S1MOES0DdTLRfmx8DhL2EY5g-K3xi4zs6I6-PO_YVUVH9qI8Ba9sNumnVWvbnjyEg3a5n99Nz-98HwK3aDI0W6AkTuvucyAAA0veMNfclzWQ_-B2uQ==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgUDbgGkAosDdQQHBLMFQgthEFgRLRGOEdgS9hhdGmwc3B8CH8ckTilPKpgreCycMNcyNDLRNZA26TdHOtg8BTzvQ8hFR0WdRz9Nz08ETyVTDlYuWq9boGD4ZdZo8musa9txTXMgdhF2ona5fA58S3yDfLt-bIDggpuD84SDhTKK5IuMjHaOvo8akiuWdJrgmzCb7JxKna6ePJ_fogClZ6asp1Wqqa2xrfGus69sr5uyWbUEtoa3aLiTvOrAZspczgbWqtdq2FXkIuRV6VDr7uyK7OjvIe989S_2ovhG-d0AA0veMNfclzWQ_-B2uQ==
 			</URL>
 			<Sockets/>
 			<Overrides/>

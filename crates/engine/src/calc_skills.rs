@@ -10,7 +10,7 @@
 //! that makes it. Not ported yet: whether supports are superseded, and
 //! the gems' requirements.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use crate::actor::{Actor, EnvActors};
 use crate::calc_items::ItemSkill;
@@ -956,11 +956,44 @@ fn active_skills(
                 .is_none_or(|w| w == if second_set { 2 } else { 1 })
         })
         .collect();
-    let socket_bonus = |g: &GemInstance| {
-        if g.matches_socket {
-            input.matching_socket_quality_bonus
-        } else {
-            0.0
+    // Each gem's socket in its slot's item, counting on from the groups before
+    let mut socket_index: Vec<Vec<usize>> = Vec::with_capacity(groups.len());
+    let mut slot_counts: HashMap<&str, usize> = HashMap::new();
+    for g in groups {
+        let offset = g
+            .slot
+            .as_deref()
+            .map_or(0, |s| slot_counts.get(s).copied().unwrap_or(0));
+        socket_index.push((0..g.gem_list.len()).map(|k| offset + k).collect());
+        if let Some(s) = g.slot.as_deref() {
+            slot_counts.insert(s, offset + g.gem_list.len());
+        }
+    }
+    // `getMatchingSocketQuality(env, groupCfg, gemInstance, socketIndex)`
+    let socket_bonus = |slot_name: &Option<String>, gi: usize, k: usize, g: &GemInstance| {
+        let Some(item) = slot_name
+            .as_deref()
+            .and_then(|s| input.item_list.get(s))
+            .and_then(|id| input.tab.item(*id))
+        else {
+            return 0.0;
+        };
+        if item.colour_always_matches {
+            return input.matching_socket_quality_bonus;
+        }
+        let colour = match g.effect().and_then(|e| e.color) {
+            Some(1.0) => Some('R'),
+            Some(2.0) => Some('G'),
+            Some(3.0) => Some('B'),
+            _ => None,
+        };
+        let socket = groups[gi]
+            .slot
+            .as_ref()
+            .and_then(|_| item.sockets.get(socket_index[gi][k]));
+        match (colour, socket) {
+            (Some(c), Some(s)) if s.color == c => input.matching_socket_quality_bonus,
+            _ => 0.0,
         }
     };
     let used = |i: usize| i + 1 == main_index || (groups[i].enabled && slot_enabled[i]);
@@ -1111,9 +1144,9 @@ fn active_skills(
                 if !e.support {
                     continue;
                 }
-                let mut s =
-                    SkillEffect::new(e, gem.level, gem.quality.unwrap_or(0.0) + socket_bonus(gem));
-                s.socket_quality = socket_bonus(gem);
+                let bonus = socket_bonus(&cfgs[gi].slot_name, gi, i, gem);
+                let mut s = SkillEffect::new(e, gem.level, gem.quality.unwrap_or(0.0) + bonus);
+                s.socket_quality = bonus;
                 s.gem = gem.gem.clone();
                 s.src = Some((gi, i));
                 if s.gem.is_some() {
@@ -1159,9 +1192,9 @@ fn active_skills(
                 if e.support || e.unsupported || (e.has_global_effect && !global) {
                     continue;
                 }
-                let mut active =
-                    SkillEffect::new(e, gem.level, gem.quality.unwrap_or(0.0) + socket_bonus(gem));
-                active.socket_quality = socket_bonus(gem);
+                let bonus = socket_bonus(&slot, gi, i, gem);
+                let mut active = SkillEffect::new(e, gem.level, gem.quality.unwrap_or(0.0) + bonus);
+                active.socket_quality = bonus;
                 active.gem = gem.gem.clone();
                 active.src = Some((gi, i));
                 if active.gem.is_some() {

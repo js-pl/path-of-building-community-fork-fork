@@ -6,7 +6,7 @@
 //!
 //! Not ported yet: the skills of minions (`calcs.createMinionSkills`).
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -892,16 +892,11 @@ fn build_skill_mod_list(
         0,
         vec![],
     ));
-    if src_instance.as_ref().is_some_and(|g| g.matches_socket) {
+    if active.socket_quality > 0.0 {
         mods.push(new_mod(
             "GemSocketQuality",
             ModType::Base,
-            input
-                .setup
-                .misc
-                .get("MatchingSocketQualityBonus")
-                .copied()
-                .unwrap_or(f64::NAN),
+            active.socket_quality,
             Some("Socket Quality"),
             0,
             vec![],
@@ -970,7 +965,12 @@ fn build_skill_mod_list(
             .get("value")
             .and_then(ModValue::as_number)
             .unwrap_or(f64::NAN);
-        let name = format!("GemItem{}", upper_first(&key));
+        let socketed = m
+            .tags
+            .iter()
+            .any(|t| matches!(t.kind, crate::mods::tag::TagKind::SocketedIn(_)));
+        let source_type = if socketed { "Item" } else { "Global" };
+        let name = format!("Gem{source_type}{}", upper_first(&key));
         mods.push(new_mod(
             &name,
             ModType::Base,

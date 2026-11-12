@@ -406,7 +406,7 @@ League: Settlers of Kalguur
 LevelReq: 50
 Implicits: 2
 50% increased Elemental Ailment Duration on you
-{tags:caster}50% reduced Effect of Curses on you
+50% reduced Effect of Curses on you
 Grants level 20 Affliction
 {tags:caster,speed}{range:0.5}(6-12)% increased Cast Speed
 {tags:defences}{range:0.5}+(30-60) to maximum Energy Shield
@@ -478,10 +478,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -574,6 +574,7 @@ Melee Strike Skills deal Splash Damage to surrounding targets
 			Rarity: UNIQUE
 Kurgal&apos;s Gaze
 Hypnotic Eye Jewel
+LevelReq: 40
 Implicits: 0
 {range:0.5}+(10-20) to Intelligence
 8% increased Effect of Arcane Surge on you per
@@ -685,9 +686,9 @@ Hypnotic Eye Jewel affecting you, up to a maximum of 40%
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="1" clusterHashFormatVersion="2" masteryEffects="{48267,36313},{42792,9074},{58728,5944},{4139,64381},{52462,48720}" nodes="55649,32245,41305,34130,61868,59861,31928,17988,14606,30335,48267,47175,36543,5819,44606,10542,15868,63417,44297,46127,38777,64077,58449,51998,62017,15451,34009,31033,50862,16093,26725,15405,22703,16380,62363,21650,53793,35663,62429,4139,36047,24383,39768,6718,32480,50197,2454,476,50422,15438,6981,63048,32482,48929,30691,9511,20966,26523,30380,58728,34590,21548,29353,24155,8426,63723,22285,45163,22627,63282,49178,40907,23881,18025,47785,34917,59928,53118,39786,34601,42792,10221,7828,7335,14056,49412,3167,24865,37884,25989,54396,2550,2355,42106,53816,5203,52462,6446,40535,15522,6359,21413,17765,31080,20551,33988,27195,44941,60169,65308,61198,44429,50904,31628,32115,50264,12795,5152,27166,10282,43374" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="1" clusterHashFormatVersion="2" masteryEffects="{4139,64381},{42792,9074},{48267,36313},{52462,48720},{58728,5944}" nodes="476,2355,2454,2550,3167,4139,5152,5203,5819,6359,6446,6718,6981,7335,7828,8426,9511,10221,10282,10542,12795,14056,14606,15405,15438,15451,15522,15868,16093,16380,17765,17988,18025,20551,20966,21413,21548,21650,22285,22627,22703,23881,24155,24383,24865,25989,26523,26725,27166,27195,29353,30335,30380,30691,31033,31080,31628,31928,32115,32245,32480,32482,33988,34009,34130,34590,34601,34917,35663,36047,36543,37884,38777,39768,39786,40535,40907,41305,42106,42792,43374,44297,44429,44606,44941,45163,46127,47175,47785,48267,48929,49178,49412,50197,50264,50422,50862,50904,51998,52462,53118,53793,53816,54396,55649,58449,58728,59861,59928,60169,61198,61868,62017,62363,62429,63048,63282,63417,63723,64077,65308" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgEBd9lhffWhWYVS8azp1Xy4RkQ5DnZ_vIuOvxa7rj4pLj3897mtCbQvl3n6TeRRyx7yQTxbhNl5OcauPt1oZTwtWK8__PObVJLSIYtP890QK4zPXz-bWBo-fuDEFQmWAdzE9jxOG0X2SH7ivyF34yUnUeZnm3as5WiHHlQscqleWyDq-OtXDbBrWGP3MsAan8tdSUZpuqmIZeoYz36baocppygn7R6UHKc26MEEDF9hIZP8ZYXUfAn2CTOketI4FFPM7hkunlc8ohjXU6V5aFBHhMRqO6-N6wn_HO8OrY3G2HuMfXPEWDH7FCBqHigqqW4ABY3ZvIv7fRArFzjlaCNypyi-UMzu
+				https://www.pathofexile.com/passive-skill-tree/AAAABgEBdwHcCTMJlgn2DF8QKxQgFFMWuxjXGS4aPhtFHKcelCDqJScn7SgqKS4x-zboOQ48LTxOPFs8oj38Pt0__EZERmlQR1HmU6VULFSSVw1YY1ivXUleW18_YSFlhWebaGVqHmo7cql2f3asd-N5OXloe4x8uH1zffV-4H7ihMSE2YVShx6HKYhli0-Mz46_k_yXeZtYm2qeV5_LoVmkeqcoqW6tCa2Nrj6vjbBrtC-6qbyLvyHAGsEExBXEWMT2xq7G2MsezO7PftIh0jjUfNlh5FHlaOnV6hjrCe8O8azyQfOb8932SPcy97n46_pN_xwABft9ECsjcqcojdm8i75QzO4XOOVo
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="26725"/>

@@ -2,7 +2,7 @@
 //! from the typed build, the slices of `calc_setup`, `calc_items`,
 //! `calc_tree`, `calc_skills` and `calc_skill_mods` in upstream's order.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use crate::build::Build;
 use crate::calc_items::{EnergyBlade, ItemsInput};

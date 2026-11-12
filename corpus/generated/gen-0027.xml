@@ -251,11 +251,11 @@ Quality: 20
 Sockets: B-B-B-B
 LevelReq: 48
 Implicits: 0
+{range:0.5}(60-80)% increased Critical Strike Chance for Spells
 {range:0.5}(200-250)% increased Energy Shield
 {range:0.5}+(50-70) to maximum Life
 Unaffected by Poison
 {range:0.5}(10-20)% of Damage taken Recouped as Life
-{range:0.5}(60-80)% increased Critical Strike Chance for Spells
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -310,9 +310,9 @@ Implicits: 0
 {range:0.5}(100-150)% increased Evasion and Energy Shield
 {range:0.5}(5-7)% increased Attack and Cast Speed
 {range:0.5}(20-25)% chance to inflict Withered for 2 seconds on Hit
-Your Hits cannot Penetrate or ignore Elemental Resistances
 Enemies take 4% increased Elemental Damage from your Hits for
 each Withered you have inflicted on them
+Your Hits cannot Penetrate or ignore Elemental Resistances
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -356,10 +356,9 @@ Night&apos;s Hold
 Black Maw Talisman
 League: Talisman Standard, Talisman Hardcore
 Talisman Tier: 1
-Sockets: G-G
+Sockets: G
 LevelReq: 12
-Implicits: 2
-{enchant}{crafted}Has 1 Socket
+Implicits: 1
 Has 1 Socket
 +2 to Level of Socketed Gems
 Socketed Gems are Supported by Level 10 Added Chaos Damage
@@ -371,7 +370,6 @@ Corrupted
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
-			<ModRange id="6" range="0.5"/>
 		</Item>
 		<Item id="7">
 			Rarity: UNIQUE
@@ -421,9 +419,9 @@ Implicits: 1
 {tags:resistance}{variant:7}{range:0.5}+(50-60)% to Cold Resistance while affected by Herald of Ice
 {variant:4}{range:0.5}Herald of Ice has (70-100)% increased Buff Effect
 {variant:5}{range:0.5}Herald of Ice has (40-60)% increased Buff Effect
+{tags:resource}{variant:1}{range:0.5}Herald of Ice has (60-80)% reduced Mana Reservation Efficiency
 {tags:resource}{variant:2}{range:0.5}Herald of Ice has (30-40)% increased Mana Reservation Efficiency
 {tags:resistance}{variant:6}+1% to maximum Cold Resistance while affected by Herald of Ice
-{tags:resource}{variant:1}{range:0.5}Herald of Ice has (60-80)% reduced Mana Reservation Efficiency
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -462,10 +460,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -678,9 +676,9 @@ Implicits: 2
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="6" clusterHashFormatVersion="2" masteryEffects="{10495,64875},{89,533},{10166,21313},{37616,43061},{1215,46099},{15409,33315},{12873,31331},{7488,62252}" nodes="45608,40644,6233,41689,60949,42686,51220,49308,33783,38129,23507,28535,40751,12189,30338,58244,52157,46136,10511,61320,7920,10495,63228,10166,9877,1767,3656,57175,60259,64785,16212,56276,63639,18635,14157,21575,25167,52522,15549,57746,27276,1215,89,8001,4011,48477,1822,21835,28012,35894,7488,46408,46896,12873,31583,4502,61834,42744,60737,62831,42623,41081,9355,47362,48778,64842,15409,45838,32710,40362,1891,37616,53213,46965,59009,21301,41989,55414,27962,33903,57044,62069,30205,51212,31703,13885,5823,42443,45272,28754,25058,8012,869,18182,39443,44683,1600,24050,54338,20546,42804,32176,7112,8640,31371,28758,10763,62791,58649,64501,35255,31501,59556,11018,57248,11334,37671" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="6" clusterHashFormatVersion="2" masteryEffects="{89,533},{1215,46099},{7488,62252},{10166,21313},{10495,64875},{12873,31331},{15409,33315},{37616,43061}" nodes="89,869,1215,1600,1767,1822,1891,3656,4011,4502,5823,6233,7112,7488,7920,8001,8012,8640,9355,9877,10166,10495,10511,10763,11018,11334,12189,12873,13885,14157,15409,15549,16212,18182,18635,20546,21301,21575,21835,23507,24050,25058,25167,27276,27962,28012,28535,28754,28758,30205,30338,31371,31501,31583,31703,32176,32710,33783,33903,35255,35894,37616,37671,38129,39443,40362,40644,40751,41081,41689,41989,42443,42623,42686,42744,42804,44683,45272,45608,45838,46136,46408,46896,46965,47362,48477,48778,49308,51212,51220,52157,52522,53213,54338,55414,56276,57044,57175,57248,57746,58244,58649,59009,59556,60259,60737,60949,61320,61834,62069,62791,62831,63228,63639,64501,64785,64842" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgYDc7IonsQYWaLZ7hWmvsgUwJyD95TxW9Nvd58vL512guOEy720OCkP74ge8Cj_9vwntiaVBucOSN9X62P9ET9U29T4lzdNVEdiT80qPL3hkmqMBL8AWR9BD6u9XQceVUttbIw2HUC1SLcwMkl7XxGW8Yqm-O1B9W-mf6B5JIu5Ar6K_Uo8MbMOf8adqgdjkvDP3bd15oFTNaQF2HZtOoRv3tTydXX9yAx71zY9Fr-ly7DYcFJh4h9MA2VHBpoTBkBd8tRCUEKnNH2wG8ghwHqLcFYqC_VH5Rn79Ym3ew3opCsK36AsRpMnAAj9ayj_U0EntrQTBL8CFQBZ8ywdQHpjMkmCIzwxqDWS8A==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgYDcwBZA2UEvwZABucHHgdjDkgPqxGWFr8YWRvIHUAe8B9BH0whwCSLJpUntij_KQ8qCysKLEYvnTJJNj03TTwxPL0_VEcGUEJTNVRHVUtb013yYeJiT2qMbTptbG93cFJwVnX9doJ6i3sNe197132wf8aD94RvibeMNpLwkyeU8ZoTnaqexJ8voHmi2aQFpcumf6a-pvinNLDYsiizDrQ4tUi3MLd1uQK9Xb6KwJzIDMgUy73NKs_d1ELYdtvU3tTfV9-g4ZLjhOUZ5oHopOtj7UHuFe-I8YrydfVH9W_2_PiX-_X9Ef1KAAgCFQBZtBMEv_MsHUBTQSe2_Wso_3pjMkmCIzwxqDWS8A==
 			</URL>
 			<Sockets/>
 			<Overrides/>

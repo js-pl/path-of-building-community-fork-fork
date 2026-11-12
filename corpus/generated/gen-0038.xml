@@ -214,8 +214,8 @@ Implicits: 1
 {variant:1}+1 to Level of Socketed Gems
 {variant:2}+2 to Level of Socketed Gems
 Socketed Gems are Supported by Level 10 Intensify
-Socketed Gems are Supported by Level 10 Controlled Destruction
 Socketed Gems are Supported by Level 10 Spell Echo
+Socketed Gems are Supported by Level 10 Controlled Destruction
 {range:0.5}+(10-30) to Intelligence
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
@@ -246,11 +246,11 @@ Implicits: 3
 {variant:3}{range:0.5}Adds (14-29) to (42-47) Cold Damage to Spells and Attacks
 {variant:3,4}{range:0.5}Adds (120-140) to (150-170) Cold Damage to Spells
 {variant:1,2}{range:0.5}(10-15)% increased Cast Speed
+{variant:1,2}50% chance to gain a Power Charge on Killing a Frozen Enemy
 {variant:3,4}Gain a Power Charge on Killing a Frozen Enemy
 {variant:1,2}Adds 10 to 20 Cold Damage to Spells per Power Charge
 {variant:3,4}Cold Exposure you inflict applies an extra -12% to Cold Resistance
 {range:0.5}+(20-25) Mana gained on Killing a Frozen Enemy
-{variant:1,2}50% chance to gain a Power Charge on Killing a Frozen Enemy
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -683,9 +683,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="2" classId="2" clusterHashFormatVersion="2" masteryEffects="{12518,2823},{44316,34242},{44179,19495},{6384,62252},{27371,61741},{19725,4842}" nodes="54922,32117,56646,44179,26067,63795,59837,65033,61306,5082,50338,3469,41536,17788,53086,64878,62712,31508,1729,94,12518,65053,51420,18707,32802,12801,30969,15842,30679,25209,19725,41866,50150,49481,52904,30894,27371,57240,33989,28995,56856,6538,19210,42964,2121,30626,33196,2715,19858,57819,56090,18670,6913,22845,7085,41137,1201,23438,9206,22266,29870,50459,51440,49978,52714,39718,41380,11239,60180,50690,24133,59606,2094,57259,25178,36221,43608,56814,44316,28503,43385,903,8938,3187,37619,39821,58474,60803,29104,59370,39861,41250,444,32555,49639,34660,27283,43457,45788,51235,65224,5616,65210,1427,56149,6542,54142,60942,59252,37504,9373,465,38662,45035,17608,45313,46694,64028,53574,38344,6384,10017,64709" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="2" classId="2" clusterHashFormatVersion="2" masteryEffects="{6384,62252},{12518,2823},{19725,4842},{27371,61741},{44179,19495},{44316,34242}" nodes="94,444,465,903,1201,1427,1729,2094,2121,2715,3187,3469,5082,5616,6384,6538,6542,6913,7085,8938,9206,9373,10017,11239,12518,12801,15842,17608,17788,18670,18707,19210,19725,19858,22266,22845,23438,24133,25178,25209,26067,27283,27371,28503,28995,29104,29870,30626,30679,30894,30969,31508,32117,32555,32802,33196,33989,34660,36221,37504,37619,38344,38662,39718,39821,39861,41137,41250,41380,41536,41866,42964,43385,43457,43608,44179,44316,45035,45313,45788,46694,49481,49639,49978,50150,50338,50459,50690,51235,51420,51440,52714,52904,53086,53574,54142,54922,56090,56149,56646,56814,56856,57240,57259,57819,58474,59252,59370,59606,59837,60180,60803,60942,61306,62712,63795,64028,64709,64878,65033,65053,65210,65224" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgICedaKfXXdRqyTZdP5M-m9_gnvehPaxKINjaJARXzPXv1u9Ph7FAbBAF4w5v4dyNxJE4AiMgF4-T3id9dieU0No4rD5sFJzqh4rmrr35iExXFDGYpLCqfUCEl3ooGsCptNkuHb2xpI7hsBWT0braCxBLFbjiP2Vvp0rsjwwzrN6psmoaQr5-sUxgJeRejWCC7fq2JajX2qWN3urRxvV6l5A4ci6gxzkvObjeRq7YNxsOfqm7WhIgG8fyvB54dkapOpwbLcyCP-yBXw_roFk9tVGY7Tfu4O53SSgCSdAdGXBq_rRMixAbZm-hzRRpXIGPAnIfzFAAZMJ6yTCwcw5hLqTQ3xLWrrhcKtHPMsGPA=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgICeQBeAbwB0QOHBLEFkwbBCC4ISQqbDHMNjRPaFfAY8BmKGY4bARutIuoj9iSdJyEr5zDmMgE94kTIRXxI7kkTSwpNDU2SVvpZPVuOXkViWmJ5ZdNqk2rrb1dxQ3GwdK53onfXeK54-XsUfXV_K4AigayExYdkjX2SgJLzlciXBpsmm42btaCxoSKhpKJAo4qn1Kl5qcGqWKyTrRyv67EBsty2ZsFJwefDOsPmxKLGAsgjyNzI8M3qzqjPXtFG037Witsa21XdRt3u35jfq-Hb5GrndOfq6NbpvesU7YPuDu969Pj5M_oc_MX9bv4J_h3-uv7IAAbzLBjwCwcw5hLqTQ3xLWrrTCesk4XCrRw=
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="33989"/>

@@ -6,7 +6,7 @@
 //! Not ported yet: the item warnings and the names of the skills items
 //! grant (`nameSpec`).
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use crate::calc_override::{Override, REP_ITEM_ID};
 use crate::calc_setup::WeaponTypeInfo;
@@ -595,11 +595,17 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
     {
         disable_items(input, &mut items)?;
     }
+    // `env.itemSlotIndex`: the number in the name of each item's slot
+    let mut slot_index: HashMap<i64, f64> = HashMap::new();
     for slot in &input.tab.ordered_slots {
         let slot_name = &slot.slot_name;
         let Some(&item) = items.get(slot_name) else {
             continue;
         };
+        let index = pat::capture(slot_name, "%d+")
+            .and_then(|n| pat::to_number(&n))
+            .unwrap_or(0.0);
+        slot_index.insert(item.id.unwrap_or(0.0) as i64, index);
         if typ(item) == "Flask" {
             out.set_cond(&format!(
                 "Have{}",
@@ -883,6 +889,13 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
                 None => list.push(id),
             }
         }
+    }
+    // Flasks and tinctures apply in slot order
+    for list in [&mut out.flasks, &mut out.tinctures] {
+        list.sort_by(|a, b| {
+            let pos = |id: &i64| slot_index.get(id).copied().unwrap_or(0.0);
+            pos(a).total_cmp(&pos(b)).then(a.cmp(b))
+        });
     }
     Ok(out)
 }

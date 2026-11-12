@@ -41,11 +41,11 @@
 		<PlayerStat stat="Int" value="134"/>
 		<PlayerStat stat="ReqInt" value="122"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4038.5939464507"/>
+		<PlayerStat stat="TotalEHP" value="4054.8110155102"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="4397"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="2872"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="2351"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2496"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2535"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="2059"/>
 		<PlayerStat stat="MainHandAccuracy" value="523"/>
 		<PlayerStat stat="Life" value="2010"/>
@@ -82,7 +82,7 @@
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="0"/>
 		<PlayerStat stat="FireResist" value="-35"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="-27"/>
+		<PlayerStat stat="ColdResist" value="-25"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="-10"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
@@ -403,7 +403,7 @@ LevelReq: 44
 Implicits: 1
 {tags:physical_damage}{range:0.5}(12-24)% increased Global Physical Damage
 {tags:resource}{range:0.5}+(60-80) to maximum Life
-{tags:resistance}{range:0.5}+(25-40)% to Cold Resistance
+{tags:resistance}{range:0.5}+(30-40)% to Cold Resistance
 {tags:resource,attack}0.4% of Physical Attack Damage Leeched as Life
 60% increased Flask Effect Duration
 30% reduced Flask Charges gained during any Flask Effect
@@ -466,6 +466,15 @@ Implicits: 0
 {variant:13}Recharges 1 Charge when you Consume an Ignited corpse
 {variant:15,16,17,18}Recharges 5 Charges when you Consume an Ignited corpse
 {variant:14}{range:0.5}(175-200)% increased Charges per use
+{variant:4,5}{crafted}50% Chance to Avoid being Stunned during Effect
+{variant:11}{crafted}Ignites you inflict during Effect spread to other Enemies within 1.5 metres
+{variant:9}{crafted}Enemies Ignited by you during Effect have Malediction
+{variant:3}{crafted}{range:0.5}(20-30)% increased Rarity of Items found during Effect
+{variant:12}{crafted}Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect
+{variant:2}{crafted}15% of Damage Taken from Hits is Leeched as Life during Effect
+{variant:6}{crafted}Regenerate 3% of Life per second during Effect
+{variant:10}{crafted}You can apply an additional Curse during Effect
+{variant:8}{crafted}Your Physical Damage can Ignite during Effect
 {variant:13}Enemies Ignited by you during Effect take 10% increased Damage
 {variant:14,15,16,17,18}{range:0.5}Enemies Ignited by you during Effect take (7-10)% increased Damage
 {variant:13,15,16}{range:0.5}Recover (1-3)% of Life when you Kill an Enemy during Effect
@@ -473,17 +482,8 @@ Implicits: 0
 {variant:13,15,18}{range:0.5}Recover (1-3)% of Energy Shield when you Kill an Enemy during Effect
 {variant:14}{crafted}{range:0.5}(60-80)% increased Critical Strike Chance during Effect
 {variant:1}{crafted}{range:0.5}(45-55)% increased Critical Strike Chance during Effect
-{variant:2}{crafted}15% of Damage Taken from Hits is Leeched as Life during Effect
-{variant:3}{crafted}{range:0.5}(20-30)% increased Rarity of Items found during Effect
 {variant:4}{crafted}{range:0.5}(8-12)% increased Movement Speed during Effect
-{variant:4,5}{crafted}50% Chance to avoid being Stunned during Effect
-{variant:6}{crafted}Regenerate 3% of Life per second during Effect
 {variant:7}{crafted}{range:0.5}(60-80)% reduced Reflected Damage taken during Effect
-{variant:8}{crafted}Your Physical Damage can Ignite during Effect
-{variant:9}{crafted}Enemies Ignited by you during Effect have Malediction
-{variant:10}{crafted}You can apply an additional Curse during Effect
-{variant:11}{crafted}Ignites you inflict during Effect spread to other Enemies within 1.5 metres
-{variant:12}{crafted}Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
@@ -660,9 +660,9 @@ Implicits: 2
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="4" clusterHashFormatVersion="2" masteryEffects="{26154,23021},{62235,43258},{25446,52876},{4327,1915},{48859,64875},{45372,28524},{47059,43308}" nodes="34031,34510,50041,27604,5237,64226,42911,13374,6982,14813,41433,5612,57257,60508,25355,47059,43725,49407,12236,25111,23834,47030,36704,31700,24377,25324,54862,39725,50986,54872,28498,29185,39085,30842,30691,25456,17201,23199,9171,35756,6741,59718,48438,8566,58851,35568,45372,58214,13019,43303,50515,42178,15027,42720,29089,48859,20010,60529,30155,46730,24984,34666,46344,63649,47389,34191,17818,2599,26154,48807,8904,5408,930,45227,1382,16245,43412,17020,36222,36972,62235,6580,58854,34009,26365,18703,54776,39530,11651,4565,49167,17383,19711,23237,24865,56920,33582,56589,25446,24641,23471,48823,4944,60002,36874,25933,4327,49806,53002,18302,50360,22423,34284,62694,39211,50306,51856,3009,19782,8410,19196,28265,476,40287,56803,49538,40867,48513" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="4" clusterHashFormatVersion="2" masteryEffects="{4327,1915},{25446,52876},{26154,23021},{45372,28524},{47059,43308},{48859,64875},{62235,43258}" nodes="476,930,1382,2599,3009,4327,4565,4944,5237,5408,5612,6580,6741,6982,8410,8566,8904,9171,11651,12236,13019,13374,14813,15027,16245,17020,17201,17383,17818,18302,18703,19196,19711,19782,20010,22423,23199,23237,23471,23834,24377,24641,24865,24984,25111,25324,25355,25446,25456,25933,26154,26365,27604,28265,28498,29089,29185,30155,30691,30842,31700,33582,34009,34031,34191,34284,34510,34666,35568,35756,36222,36704,36874,36972,39085,39211,39530,39725,40287,40867,41433,42178,42720,42911,43303,43412,43725,45227,45372,46344,46730,47030,47059,47389,48438,48513,48807,48823,48859,49167,49407,49538,49806,50041,50306,50360,50515,50986,51856,53002,54776,54862,54872,56589,56803,56920,57257,58214,58851,58854,59718,60002,60508,60529,62235,62694,63649,64226" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgQDfoTvhs7DeWvUFHX64qefND4bRjndodkV7N-p7FxjC7fTqs3A_y_MYhddGre2j2B71F85YuzWTpst1lhvUnIBmK14enfjY3BDMVqfI9OLrBpV6Ua9NiF25eOK8LE842Yy26knxVOkwjqzpuBxob7bTirscXXLtoqHarUI-KG5HYWPRZoKJ2YqvqciyBUgA6KwqwVmP3WplEJ8jX6QbPMbGbTl5oTZZv1JD9X4mmotgxHVwA9D50z_WsVhId5Ygy7dDWNmYEFbr763E1DqYpAKZU0Q58KOzwpHfsS4V5eF7PTmmSvEgsqQC8FNRiDaSvxuaQHcnV_d48GCn6O9gQAHqSy3029ssTz9a77bWe1mKqj68xvOjGNmB3sQ5w==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgQDfgHcA6IFZgonC8EQ5xHVE1AUdRUgFewZtBpVG0Yg2iF2Isgj0y2DL8wy2zQ-Od06sz91QnxDMUPnRZpHfkkPSvxM_01GTipXl1qfWsVbr10aXzlgQWEhYhdi7GMLY2ZjcGVNZipm_WvUbmlvUnGhcgF1y3fjeHp71IMuhNmE74WPheyGzodqivCLrI1-j2CQCpBsmK2ZK5pqmy2dX5-jodmkwqbgp5-pJ6mUqs2wq7E8tQi2ire2t9O5Hb02vYG-p763vtvAD8D_wYLCjsN5xILEuMVTypDPCtX41k7WWN0N3ePeWN-p42bl4-Xm6UbqYuxc7HHzG_Tm-KH64gAHB3sQ586MY2ZZ7WYqb2yxPKkst9P9a77bqPrzGw==
 			</URL>
 			<Sockets/>
 			<Overrides/>

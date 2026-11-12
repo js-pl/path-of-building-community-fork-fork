@@ -2,25 +2,24 @@
 <PathOfBuilding>
 	<Build ascendClassName="Hierophant" bandit="None" characterLevelAutoMode="false" className="Templar" level="80" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="ActiveMinionLimit" value="10"/>
-		<PlayerStat stat="AverageDamage" value="323.90710926327"/>
-		<PlayerStat stat="AverageBurstDamage" value="329.71444302654"/>
+		<PlayerStat stat="AverageDamage" value="276.29969755552"/>
+		<PlayerStat stat="AverageBurstDamage" value="305.48149411104"/>
 		<PlayerStat stat="Speed" value="2.2451614259819"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="16.15"/>
-		<PlayerStat stat="CritChance" value="11.7702"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="17.365"/>
+		<PlayerStat stat="CritChance" value="12.6558"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
 		<PlayerStat stat="HitChance" value="69.5"/>
-		<PlayerStat stat="TotalDPS" value="727.22374731919"/>
+		<PlayerStat stat="TotalDPS" value="620.33742296211"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="727.22374731919"/>
-		<PlayerStat stat="IgniteDPS" value="44.757586055879"/>
-		<PlayerStat stat="WithIgniteDPS" value="771.98133337507"/>
-		<PlayerStat stat="PoisonDPS" value="165.42895548857"/>
-		<PlayerStat stat="PoisonDamage" value="390.41233495303"/>
-		<PlayerStat stat="WithPoisonDPS" value="1005.0865198677"/>
-		<PlayerStat stat="TotalDotDPS" value="322.62035860439"/>
+		<PlayerStat stat="WithBleedDPS" value="620.33742296211"/>
+		<PlayerStat stat="WithIgniteDPS" value="620.33742296211"/>
+		<PlayerStat stat="PoisonDPS" value="179.53125625877"/>
+		<PlayerStat stat="PoisonDamage" value="423.6937647707"/>
+		<PlayerStat stat="WithPoisonDPS" value="921.88712734034"/>
+		<PlayerStat stat="TotalDotDPS" value="301.54970437823"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="1049.8441059236"/>
+		<PlayerStat stat="CombinedDPS" value="921.88712734034"/>
 		<PlayerStat stat="ManaCost" value="11"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
 		<PlayerStat stat="ManaPerSecondCost" value="24.696775685801"/>
@@ -35,26 +34,26 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
 		<PlayerStat stat="Str" value="228"/>
-		<PlayerStat stat="ReqStr" value="111"/>
+		<PlayerStat stat="ReqStr" value="173"/>
 		<PlayerStat stat="Dex" value="99"/>
-		<PlayerStat stat="ReqDex" value="293"/>
+		<PlayerStat stat="ReqDex" value="173"/>
 		<PlayerStat stat="Int" value="263"/>
 		<PlayerStat stat="ReqInt" value="113"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4889.825815212"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="4151"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2971"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="4222"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="3488"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2319"/>
+		<PlayerStat stat="TotalEHP" value="4340.7172406456"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="4426"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2692"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3825"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="3160"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2100"/>
 		<PlayerStat stat="MainHandAccuracy" value="435"/>
 		<PlayerStat stat="OffHandAccuracy" value="435"/>
-		<PlayerStat stat="Life" value="1884"/>
+		<PlayerStat stat="Life" value="1999"/>
 		<PlayerStat stat="Spec:LifeInc" value="25"/>
-		<PlayerStat stat="LifeUnreserved" value="1884"/>
-		<PlayerStat stat="LifeRecoverable" value="1884"/>
+		<PlayerStat stat="LifeUnreserved" value="1999"/>
+		<PlayerStat stat="LifeRecoverable" value="1999"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="340.3"/>
+		<PlayerStat stat="LifeRegenRecovery" value="344"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1398"/>
 		<PlayerStat stat="Spec:ManaInc" value="109"/>
@@ -67,15 +66,15 @@
 		<PlayerStat stat="Spec:EnergyShieldInc" value="39"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
-		<PlayerStat stat="Ward" value="417"/>
+		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="3803"/>
+		<PlayerStat stat="Evasion" value="2484"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
-		<PlayerStat stat="MeleeEvadeChance" value="28"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="28"/>
-		<PlayerStat stat="Armour" value="725"/>
+		<PlayerStat stat="MeleeEvadeChance" value="16"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="16"/>
+		<PlayerStat stat="Armour" value="4827"/>
 		<PlayerStat stat="Spec:ArmourInc" value="61"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="6"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="30"/>
 		<PlayerStat stat="EffectiveBlockChance" value="28"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="5"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -100,18 +99,18 @@
 		<PlayerStat stat="EnduranceChargesMax" value="3"/>
 		<PlayerStat stat="ActiveTotemLimit" value="1"/>
 		<PlayerStat stat="ActiveMinionLimit" value="10"/>
-		<MinionStat stat="AverageDamage" value="232.31446875"/>
+		<MinionStat stat="AverageDamage" value="257.206075"/>
 		<MinionStat stat="Speed" value="1.2735042735043"/>
 		<MinionStat stat="Speed" value="1.2735042735043"/>
-		<MinionStat stat="TotalDPS" value="295.85346875"/>
+		<MinionStat stat="TotalDPS" value="327.55303568376"/>
 		<MinionStat stat="TotalDot" value="0"/>
-		<MinionStat stat="WithBleedDPS" value="295.85346875"/>
-		<MinionStat stat="WithIgniteDPS" value="295.85346875"/>
-		<MinionStat stat="WithPoisonDPS" value="295.85346875"/>
+		<MinionStat stat="WithBleedDPS" value="327.55303568376"/>
+		<MinionStat stat="WithIgniteDPS" value="327.55303568376"/>
+		<MinionStat stat="WithPoisonDPS" value="327.55303568376"/>
 		<MinionStat stat="TotalDotDPS" value="0"/>
 		<MinionStat stat="CullingDPS" value="0"/>
 		<MinionStat stat="ReservationDPS" value="0"/>
-		<MinionStat stat="CombinedDPS" value="295.85346875"/>
+		<MinionStat stat="CombinedDPS" value="327.55303568376"/>
 		<MinionStat stat="Life" value="4063"/>
 		<MinionStat stat="LifeRegenRecovery" value="138.1"/>
 		<MinionStat stat="LifeLeechGainRate" value="0"/>
@@ -254,15 +253,19 @@ Implicits: 1
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
 		</Item>
-		<Item id="2">
+		<Item id="2" variant="2">
 			Rarity: UNIQUE
 Taproot
 Ambusher
+Variant: Pre 3.29.0
+Variant: Current
+Selected Variant: 2
 Quality: 20
 Sockets: G-G-G
 LevelReq: 60
-Implicits: 1
-30% increased Global Critical Strike Chance
+Implicits: 2
+{variant:2}{range:0.5}(40-45)% increased Global Critical Strike Chance
+{variant:1}30% increased Global Critical Strike Chance
 {range:0.5}(180-200)% increased Physical Damage
 {range:0.5}(10-15)% increased Attack Speed
 {range:0.5}(15-20)% increased Poison Duration
@@ -278,40 +281,45 @@ Implicits: 1
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
 			<ModRange id="8" range="0.5"/>
+			<ModRange id="9" range="0.5"/>
 		</Item>
 		<Item id="3">
 			Rarity: RARE
-Ward Helmet
-Runic Crown
-Ward: 417
-WardBasePercentile: 1
+Minion Helm
+Bone Helmet
+Armour: 272
+ArmourBasePercentile: 1
+Energy Shield: 55
+EnergyShieldBasePercentile: 1
 Crafted: true
-Prefix: {range:0.5}LocalIncreasedWardPercent3
-Prefix: {range:0.5}LocalIncreasedWard5___
+Prefix: {range:0.5}GlobalIncreaseMinionSpellSkillGemLevel2
 Prefix: {range:0.5}IncreasedLife7
+Prefix: None
 Suffix: None
 Suffix: None
 Suffix: None
 Quality: 20
-Sockets: G-G-G-G
-LevelReq: 68
-Implicits: 0
-{tags:defences}{prefix}+44 to Ward
-{tags:defences}{prefix}49% increased Ward
+Sockets: B-B-B-B
+LevelReq: 73
+Implicits: 1
+{tags:damage,minion}{range:0.5}Minions deal (15-20)% increased Damage
 {tags:resource,life}{prefix}+107 to maximum Life
+{tags:minion,gem}{prefix}+2 to Level of all Minion Skill Gems
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 		</Item>
 		<Item id="4">
 			Rarity: RARE
-Evasion Chest
-Syndicate&apos;s Garb
-Evasion: 3086
+Armour/Evasion Chest
+Conquest Lamellar
+Armour: 1977
+ArmourBasePercentile: 1
+Evasion: 1977
 EvasionBasePercentile: 1
 Crafted: true
-Prefix: {range:0.5}LocalIncreasedEvasionRating5
-Prefix: {range:0.5}LocalIncreasedEvasionRatingPercent5
+Prefix: {range:0.5}LocalBaseArmourAndEvasionRating5
+Prefix: {range:0.5}LocalIncreasedArmourAndEvasion5
 Prefix: {range:0.5}IncreasedLife9
 Suffix: {range:0.5}ChanceToSuppressSpellsHigh2__
 Suffix: None
@@ -321,43 +329,45 @@ Sockets: G-G-G-G-G-G
 LevelReq: 84
 Implicits: 0
 {suffix}+12% chance to Suppress Spell Damage
-{tags:defences,evasion}{prefix}+92 to Evasion Rating
-{tags:defences,evasion}{prefix}74% increased Evasion Rating
+{tags:defences,armour,evasion}{prefix}+116 to Armour
+{tags:defences,armour,evasion}{prefix}+116 to Evasion Rating
+{tags:defences,armour,evasion}{prefix}74% increased Armour and Evasion
 {tags:resource,life}{prefix}+137 to maximum Life
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
+			<ModRange id="5" range="0.5"/>
 		</Item>
-		<Item id="5" variant="2">
-			Rarity: UNIQUE
-Sadima&apos;s Touch
-Wool Gloves
-Energy Shield: 30
+		<Item id="5">
+			Rarity: RARE
+Armour/Energy Shield Gloves
+Apothecary&apos;s Gloves
+Armour: 299
+ArmourBasePercentile: 1
+Energy Shield: 88
 EnergyShieldBasePercentile: 1
-Variant: Pre 1.1.0
-Variant: Pre 3.5.0
-Variant: Pre 3.25.0
-Variant: Current
-Selected Variant: 2
+Crafted: true
+Prefix: {range:0.5}LocalBaseArmourAndEnergyShield2_
+Prefix: {range:0.5}LocalIncreasedArmourAndEnergyShield5
+Prefix: {range:0.5}IncreasedLife6
+Suffix: None
+Suffix: None
+Suffix: None
 Quality: 20
 Sockets: B-B-B-B
-LevelReq: 11
-Implicits: 0
-Adds 4 to 8 Fire Damage to Attacks
-Adds 1 to 13 Lightning Damage to Attacks
-+18 to maximum Energy Shield
-{variant:1}{range:0.5}(18-24)% increased Quantity of Items found
-{variant:2}{range:0.5}(12-16)% increased Quantity of Items found
-{variant:3}{range:0.5}(5-10)% increased Quantity of Items found
-{variant:4}{range:0.5}(10-15)% increased Rarity of Items found
+LevelReq: 70
+Implicits: 1
+{tags:damage}{range:0.5}(14-18)% increased Damage over Time
+{tags:defences,armour,energy_shield}{prefix}+19 to Armour
+{tags:defences,armour,energy_shield}{prefix}74% increased Armour and Energy Shield
+{tags:defences,armour,energy_shield}{prefix}+9 to maximum Energy Shield
+{tags:resource,life}{prefix}+92 to maximum Life
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
 			<ModRange id="5" range="0.5"/>
-			<ModRange id="6" range="0.5"/>
-			<ModRange id="7" range="0.5"/>
 		</Item>
 		<Item id="6" variant="3">
 			Rarity: UNIQUE
@@ -609,9 +619,9 @@ Radius: Medium
 Limited to: 2
 Implicits: 0
 {range:0.5}(10-15)% increased Cold Damage
-With at least 40 Dexterity in Radius, Frost Blades has 25% increased Projectile Speed
 With at least 40 Dexterity in Radius, Melee Damage
 dealt by Frost Blades Penetrates 15% Cold Resistance
+With at least 40 Dexterity in Radius, Frost Blades has 25% increased Projectile Speed
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -722,9 +732,9 @@ dealt by Frost Blades Penetrates 15% Cold Resistance
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="2" classId="5" clusterHashFormatVersion="2" masteryEffects="{38921,4500},{17127,46807},{30393,65504},{48290,43400},{54849,41544}" nodes="7388,17352,7444,20228,53677,4568,53018,37999,41472,42981,35556,6764,61525,3398,61217,34173,36915,49254,53802,29994,44797,26070,1105,14151,19919,922,30693,30940,38387,36678,11046,54849,38921,62303,54694,46726,43689,14057,55332,1203,31875,63965,15973,28076,35958,59728,44529,19732,1609,34098,26866,6237,25332,59005,23456,14870,34880,420,20987,58402,46897,38516,9149,5456,26270,22062,6967,33435,29005,31819,17735,17127,39916,10904,651,40291,11820,21262,4397,29199,13009,22472,42668,56029,26714,42760,61308,35724,60648,885,15599,26196,40366,63138,42343,44908,40776,58453,55563,40508,27564,30393,40927,42837,33923,62767,10575,9086,31758,9294,60398,48290" secondaryAscendClassId="7" treeVersion="3_29">
+		<Spec ascendClassId="2" classId="5" clusterHashFormatVersion="2" masteryEffects="{17127,46807},{30393,65504},{38921,4500},{48290,43400},{54849,41544}" nodes="420,651,885,922,1105,1203,1609,3398,4397,4568,5456,6237,6764,6967,7388,7444,9086,9149,9294,10575,10904,11046,11820,13009,14057,14151,14870,15599,15973,17127,17352,17735,19732,19919,20228,20987,21262,22062,22472,23456,25332,26070,26196,26270,26714,26866,27564,28076,29005,29199,29994,30393,30693,30940,31758,31819,31875,33435,33923,34098,34173,34880,35556,35724,35958,36678,36915,37999,38387,38516,38921,39916,40291,40366,40508,40776,40927,41472,42343,42668,42760,42837,42981,43689,44529,44797,44908,46726,46897,48290,49254,53018,53677,53802,54694,54849,55332,55563,56029,58402,58453,59005,59728,60398,60648,61217,61308,61525,62303,62767,63138,63965" secondaryAscendClassId="7" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgUebRzcQ8gdFE8E0a0R2M8alG-iAKfliuQabA1G7yGFfZAzwGbSKnUqrv1l1gRRN0dNzwOad-WV849GKybWQZgJ81_VpraGqqk26dgkBLN8g_ndPmVtrIx26VCt8U0UBkmFMmjyGF1i9OZ9W6A6FohAAaRR--QitzGWdCO9FVBmnlYuGzeCm3FNfEtFR0Lnm-wqmAKLnWMuLFMOES1yDzLRV8imrNrdaFqnCO98i4zs6AN1PO9mVJ2u9qKlZ69sn0jkVdkLnjxrrHa5n9-nVYSD9S8pT3wOJE7r7ryiAAWiSNZBEZSYCbbXQuf_4Ha5qYi8og==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgUebQGkAosDdQOaBFEEswZJDUYRLRHYFVAYXRpsGzcc3B0UI70kTilPKpgrJi4sMtE26TdHOhY87z5lQudDyEVHTRRNz08EUftTDlYuV8hboGL0ZdZmVGaeaFpo8musbaxxTXIPdSp2uXflfA58S3yDgpuEg4UyhX2IQIrki4yMdo9GkDOUb5XzlnSYCZvsnWOdrp48n0if36IApWemrKcIp1Wn5aqprfGu_a9stoa3MbyiwGbPGtGt0irVptZB2CTZC9rd5CLkVeZ96VDr7uzo7yHvfPNf9S_2ovndAAW210Ln_-B2uRGUmAmpiLyiokjWQQ==
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="26196"/>

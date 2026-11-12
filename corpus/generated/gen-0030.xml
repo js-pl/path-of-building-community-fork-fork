@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Reliquarian" bandit="None" characterLevelAutoMode="false" className="Scion" level="98" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageDamage" value="2419.8447"/>
-		<PlayerStat stat="AverageBurstDamage" value="2419.8447"/>
+		<PlayerStat stat="AverageDamage" value="2466.380175"/>
+		<PlayerStat stat="AverageBurstDamage" value="2466.380175"/>
 		<PlayerStat stat="Speed" value="1.75714"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="5"/>
 		<PlayerStat stat="CritChance" value="5"/>
-		<PlayerStat stat="CritMultiplier" value="1.8"/>
+		<PlayerStat stat="CritMultiplier" value="2.2"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="4252.005916158"/>
+		<PlayerStat stat="TotalDPS" value="4333.7752606995"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithDotDPS" value="4252.005916158"/>
+		<PlayerStat stat="WithDotDPS" value="4333.7752606995"/>
 		<PlayerStat stat="BleedDPS" value="993.24892360995"/>
-		<PlayerStat stat="WithBleedDPS" value="5245.2548397679"/>
+		<PlayerStat stat="WithBleedDPS" value="5327.0241843094"/>
 		<PlayerStat stat="IgniteDPS" value="14.678796132"/>
-		<PlayerStat stat="WithIgniteDPS" value="4266.68471229"/>
+		<PlayerStat stat="WithIgniteDPS" value="4348.4540568315"/>
 		<PlayerStat stat="PoisonDPS" value="889.908075"/>
 		<PlayerStat stat="CausticGroundDPS" value="29937.013866667"/>
 		<PlayerStat stat="PoisonDamage" value="1779.81615"/>
-		<PlayerStat stat="WithPoisonDPS" value="5033.8524536107"/>
+		<PlayerStat stat="WithPoisonDPS" value="5115.6217981522"/>
 		<PlayerStat stat="TotalDotDPS" value="31726.788123861"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="35978.794040019"/>
+		<PlayerStat stat="CombinedDPS" value="36060.563384561"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.3"/>
 		<PlayerStat stat="ManaCost" value="0"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -97,14 +97,14 @@
 		<PlayerStat stat="ChaosResist" value="-37"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.84"/>
-		<PlayerStat stat="FullDPS" value="42098.935311027"/>
+		<PlayerStat stat="FullDPS" value="42186.501501138"/>
 		<PlayerStat stat="FullDotDPS" value="37317.760206461"/>
 		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Caustic Ground DPS" value="29937.013866667"/>
 		<FullDPSSkill skillPart="" source="" stat="Full DoT DPS" value="5492.94075"/>
-		<FullDPSSkill skillPart="" source="" stat="Vaal Caustic Arrow" value="4252.005916158"/>
+		<FullDPSSkill skillPart="" source="" stat="Vaal Caustic Arrow" value="4333.7752606995"/>
 		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Bleed DPS" value="993.24892360995"/>
 		<FullDPSSkill skillPart="" source="" stat="Full Poison DPS" value="879.87787005195"/>
-		<FullDPSSkill skillPart="" source="" stat="Caustic Arrow" value="529.16918840844"/>
+		<FullDPSSkill skillPart="" source="" stat="Caustic Arrow" value="534.96603397786"/>
 		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Ignite DPS" value="14.678796132"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
@@ -226,8 +226,8 @@ Implicits: 0
 {range:0.5}(80-100)% increased Physical Damage
 {range:0.5}Adds (15-25) to (50-60) Physical Damage
 10% increased Attack Speed
-+30 to Accuracy Rating
 Gain 10 Mana per Enemy Killed
++30 to Accuracy Rating
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -377,8 +377,10 @@ Variant: Pre 3.29.0
 Variant: Current
 Selected Variant: 2
 {variant:1,2}Wereclaw Talisman
+{variant:3}Wolf Alpha Talisman
 LevelReq: 28
-Implicits: 2
+Implicits: 3
+{tags:damage,critical}{enchant}{crafted}+40% to Global Critical Strike Multiplier
 {tags:critical}{variant:1}{range:0.5}+(16-24)% to Global Critical Strike Multiplier
 {tags:critical}{variant:2}{range:0.5}+(24-36)% to Global Critical Strike Multiplier
 {tags:critical}{variant:1,2}+7% to Unarmed Melee Attack Critical Strike Chance
@@ -395,6 +397,7 @@ Implicits: 2
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
 			<ModRange id="8" range="0.5"/>
+			<ModRange id="9" range="0.5"/>
 		</Item>
 		<Item id="8" variant="1">
 			Rarity: UNIQUE
@@ -745,9 +748,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="2" classId="0" clusterHashFormatVersion="2" masteryEffects="{50757,25487},{18240,31556},{12239,18859},{29993,24352},{12382,21468},{41522,21730},{22959,35426}" nodes="17674,24472,52094,16994,15400,13191,36489,22441,35936,36634,35190,57736,14211,44103,63976,50757,9009,60090,20812,18033,13714,8643,65167,22497,32091,41026,28330,50288,33479,14182,62103,42731,45456,37078,10835,34906,33508,46910,52099,19144,47251,7614,1006,2081,49807,38048,48828,33545,62480,17814,13782,65034,24256,46340,48768,22473,6204,55485,19506,25237,29993,3992,25431,37575,14090,25732,37690,46092,45803,34098,7903,31683,55906,63845,16633,26740,45680,12702,38450,5560,18240,28878,6230,10108,19609,60648,918,51291,13322,43162,55373,12382,19939,59306,15073,35179,34207,45175,47312,47062,16167,3452,25959,58833,28221,12239,35503,7388,60532,48423,22893,45887,16775,4207,56153,2151,41522,23122,20310,10490,60204,22959,39773,62021,15144,60398,11688" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="2" classId="0" clusterHashFormatVersion="2" masteryEffects="{12239,18859},{12382,21468},{18240,31556},{22959,35426},{29993,24352},{41522,21730},{50757,25487}" nodes="918,1006,2081,2151,3452,3992,4207,5560,6204,6230,7388,7614,7903,8643,9009,10108,10490,10835,11688,12239,12382,12702,13191,13322,13714,13782,14090,14182,14211,15073,15144,15400,16167,16633,16775,16994,17674,17814,18033,18240,19144,19506,19609,19939,20310,20812,22441,22473,22497,22893,22959,23122,24256,24472,25237,25431,25732,25959,26740,28221,28330,28878,29993,31683,32091,33479,33508,33545,34098,34207,34906,35179,35190,35503,35936,36489,36634,37078,37575,37690,38048,38450,39773,41026,41522,42731,43162,44103,45175,45456,45680,45803,45887,46092,46340,46910,47062,47251,47312,48423,48768,48828,49807,50288,50757,51291,52094,52099,55373,55485,55906,56153,57736,58833,59306,60090,60204,60398,60532,60648,62021,62103,62480,63845,63976,65034,65167" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgACfUUKX5jLfkJiPCgzh46JV6mMYI8aiXbhiDeDrEf56MZFIzHqulFMRnE1kiHD_o9X4X1boEJuqsRwgsc3ZvKXpuuxkJDWKlOIWoLktz7Lg0rIuJMdvgPuCCHCj5SgvryDCfQQRZY11v4KXsC1BL6AV8kYPNi9TDJilXUpD5hjV5LHNwpkhJM6tAyy64UyHt97w9pi-WVA-Wh0snAxnpYyFbhHQHDOGFZMmezoA5bIWzQKqJrYTTBeTePnqjrhiWuFn7B3uNC31j8nDXxlZ249L8-Krxzc7HS9J1ltsz9BhxBv21kIZ6IyWlJPVij66yxZr5td8kU7KOvuLagAB2OPxkVfIHUpe0RHQFPcMF5Jqy_PVOKiMopiWa8=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgACfQOWA-4IIQhnDXwPmBBvFbgYPBhWHNwdvh7fIcMjMSj6KlMtqC_PMF4xnjOHNAo1kjXWNwo3ZjeDOuE7KDwoPydA-UGHQmJFCkWWRnFHQErITDJMmU3jT1ZRTFepV8lX4VltWa9aUl7AX5hilWNXZIRlZ2h0bj1uqnDOdSl7w31bgseC5IMJhTKFn4haiWuJdoqvjGCOiY8akNaSx5M6lKCWMptdoEKiMqbrqJqsR7B3sZCycLLrsz-0DLUEtz631riTuNC9J76AvrzCj8RwxkXIW8t-y4PYTdi92mLbWeGI56rquuss6-7sdOzo8kXyl_QQ-WX56P4K_o8AB0mrL89T3DBee0RHQIpiWa9fIHUpVOKiMmOPxkU=
 			</URL>
 			<Sockets>
 				<Socket itemId="19" nodeId="6230"/>

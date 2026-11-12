@@ -214,8 +214,8 @@ Implicits: 0
 Socketed Gems are Supported by Level 20 Increased Area of Effect
 +10 to Strength
 {range:0.5}(120-160)% increased Physical Damage
-{variant:1}{range:0.5}+(50-80) to Accuracy Rating
 Gain 10 Mana per Enemy Killed
+{variant:1}{range:0.5}+(50-80) to Accuracy Rating
 {variant:2}{range:0.5}+(120-150) to Accuracy Rating
 +0.2 metres to Weapon Range
 			<ModRange id="1" range="0.5"/>
@@ -308,8 +308,8 @@ Implicits: 0
 {range:0.5}(2-3)% of Physical Attack Damage Leeched as Life
 10% chance to gain Adrenaline for 2 Seconds when Leech is
 removed by Filling Unreserved Life
-removed by Filling Unreserved Life
 10% chance to gain Onslaught for 4 Seconds when Leech is
+removed by Filling Unreserved Life
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -438,8 +438,8 @@ Implicits: 1
 {tags:resistance}{variant:7}{range:0.5}+(31-43)% to Chaos Resistance while affected by Herald of Agony
 {variant:4}{range:0.5}Herald of Agony has (70-100)% increased Buff Effect
 {variant:5}{range:0.5}Herald of Agony has (40-60)% increased Buff Effect
-{tags:resource}{variant:2}{range:0.5}Herald of Agony has (30-40)% increased Mana Reservation Efficiency
 {tags:resource}{variant:1}{range:0.5}Herald of Agony has (60-80)% reduced Mana Reservation Efficiency
+{tags:resource}{variant:2}{range:0.5}Herald of Agony has (30-40)% increased Mana Reservation Efficiency
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -480,8 +480,8 @@ LevelReq: 27
 Implicits: 1
 Creates Consecrated Ground on Use
 Life Recovery from Flasks also applies to Energy Shield during Effect
-{range:0.5}(25-50)% increased Duration
 Eldritch Battery during Effect
+{range:0.5}(25-50)% increased Duration
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
@@ -513,10 +513,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -527,7 +527,7 @@ Grants Level 21 Vulnerability Curse Aura during Effect
 Wine of the Prophet
 Gold Flask
 Quality: 20
-LevelReq: 27
+LevelReq: 33
 Implicits: 0
 +60 to Maximum Charges
 {range:0.5}(20-100)% increased Charges per use
@@ -659,9 +659,9 @@ All Damage from Critical Strikes can apply Lightning Ailments during effect
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="1" clusterHashFormatVersion="2" masteryEffects="{48267,65020},{38377,60050},{53517,16013},{59013,17821},{2841,64642},{4139,38454},{52462,48720}" nodes="46636,55649,32245,63150,34130,56359,59861,37884,51998,31928,44297,30825,14606,63282,48267,47175,63417,32115,44606,10542,1572,17988,53332,53517,38777,64077,38508,5233,31961,36200,61868,34590,24155,16093,15163,44967,25168,54267,2550,33287,24157,35663,7399,4139,36047,24383,39768,6718,32480,50197,2454,55772,5152,2913,12795,63048,32482,40653,53757,9511,38377,26523,30380,53793,32739,40645,29353,15868,63723,49412,22285,45163,22627,30302,48822,62017,23881,63027,5819,2841,59928,53118,30335,59013,21650,10221,7828,31033,38538,38906,3167,55913,52462,2219,50570,21413,20966,30547,53816,7335,61198,6446,40535,12247,20551,50225,17765,33988,5430,50862,58449,44941,60169,65308,50422,44429,50904,31628,61007,50264,35288,54396,55854,10282,11431" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="1" clusterHashFormatVersion="2" masteryEffects="{2841,64642},{4139,38454},{38377,60050},{48267,65020},{52462,48720},{53517,16013},{59013,17821}" nodes="1572,2219,2454,2550,2841,2913,3167,4139,5152,5233,5430,5819,6446,6718,7335,7399,7828,9511,10221,10282,10542,11431,12247,12795,14606,15163,15868,16093,17765,17988,20551,20966,21413,21650,22285,22627,23881,24155,24157,24383,25168,26523,29353,30302,30335,30380,30547,30825,31033,31628,31928,31961,32115,32245,32480,32482,32739,33287,33988,34130,34590,35288,35663,36047,36200,37884,38377,38508,38538,38777,38906,39768,40535,40645,40653,44297,44429,44606,44941,44967,45163,46636,47175,48267,48822,49412,50197,50225,50264,50422,50570,50862,50904,51998,52462,53118,53332,53517,53757,53793,53816,54267,54396,55649,55772,55854,55913,56359,58449,59013,59861,59928,60169,61007,61198,61868,62017,63027,63048,63150,63282,63417,63723,64077,65308" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgEBe7Ys2WF99fauhVLcJ-nVk_zLHny4rQl4aTkO9zK8i_e5fXOuPikuBiRGRNBU0Q2XefpNlmwUcXzZjWjxrIceXls-3Ts7r6diUNP7CfaCB15di08c5xArjM9fP5tYGj5-4MQVCZbZ3BQgC2Ex-_ZIfuKezdH9JSeV6WebdqzSIX_jnsVyqT38-OvBBFcNsGtYY3ZevrbyQV1J9jMWuwsZ6hjPfnZ_5oVUkiftHpR5OZaKl_oMX9ppzO4Iq8WKU6VR5ndT0jgcp-8OGS6eVy_XUEfEMYTEFTbGruRRr43rCf8cxPatjcbYe4zuT8RYidjUfNouKCospwAH_fy8iz6N0Q2WNhAr6pKV6fyCCxlFneaFvlDM7g==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgEBewYkCKsJlgn2CxkLYQxfECsUIBRxFTYWuxkuGj4cpxznHpQlJyftKCopLiynL9cx-zkOOzs9_D7dRkRQR1HmU6VUklcNWGNdSV5bXl1fP2JQZ5tyqXZedn92rHdTeGl5OXuMfLh82X1zffV-4H7if-OCB4TEhVKHHonYi0-Mz41ok_yV6ZZsloqXeZf6m1ieV57Fns2tCa2Nrj6vja-nsGu2LLyLvrbBBMQVxDHEWMT2xYrGrsbYyx7M7s9-0FTRDdH90iHSONP71HzZYdnc2i7aadwn5FHmhenV6hjrCe5P7w7xrPJB9jP2SPau9zL3ufjr-k3_HAAH_IILGZY2ECvqkpXp_fy8i75QzO4-jdENRZ3mhQ==
 			</URL>
 			<Sockets/>
 			<Overrides/>

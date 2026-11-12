@@ -3,7 +3,7 @@
 //! number of hits to die (effective hit pool), recoup, the maximum hit
 //! taken and degens.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1185,7 +1185,7 @@ impl<'a> Perform<'a> {
                     ));
                 }
             }
-            if let Some(m) = d.missing_life
+            if let Some(m) = d.missing_life.filter(|m| *m != 0.0)
                 && pools.life.unwrap_or(0.0) > 0.0
             {
                 let l = pools.life.unwrap_or(0.0);
@@ -1194,7 +1194,7 @@ impl<'a> Perform<'a> {
                     life_recoverable,
                 ));
             }
-            if let Some(m) = d.missing_mana
+            if let Some(m) = d.missing_mana.filter(|m| *m != 0.0)
                 && pools.mana.unwrap_or(0.0) > 0.0
             {
                 let mn = pools.mana.unwrap_or(0.0);

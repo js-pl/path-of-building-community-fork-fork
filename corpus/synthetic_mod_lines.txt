@@ -1145,7 +1145,6 @@ critical strike chance is increased by lightning resistance
 critical strike chance is increased by uncapped lightning resistance
 critical strikes deal 10% increased damage
 critical strikes do not alwaysinherently freeze
-critical strikes do not inflict non-damaging ailments
 critical strikes with daggers have a 10% chance to poison the enemy
 culling strike during flask effect
 culling strike with melee weapons
@@ -1462,7 +1461,6 @@ immunety to shock
 immunety to shock during flask effect
 incinerate has +10 to maximum stages
 incinerate starts with 10 additional stages
-increase to cast speed from arcane surge also applies to movement speed
 increases and reductions to armour also apply to energy shield recharge rate at 10% of their value
 increases and reductions to cast speed apply to attack speed at 10% of their value
 increases and reductions to effect of flasks applied to you also applies to effect of arcane surge on you at 10% of their value
@@ -1678,6 +1676,8 @@ projectiles chain +1 times
 projectiles deal 10% increased damage for each remaining chain
 projectiles deal 10% increased damage with hits and ailments for each enemy pierced
 projectiles deal 10% increased damage with hits and ailments for each remaining chain
+projectiles deal 10% increased damage with hits and ailments for each remaining chain, up to 10%
+projectiles deal 10% increased damage with hits and ailments for each remaining chain, up to a maximum of 10%
 projectiles deal 10% increased damage with hits and ailments for each time they have chained
 projectiles deal 10% increased damage with hits to targets at the start of their movement, reducing to 10% as they travel farther
 projectiles from attacks can fork 10 additional times
@@ -2022,7 +2022,6 @@ when 10% of your hex's duration expires on an enemy, eat 10 soul per enemy power
 when an enemy hit deals elemental damage to you, their resistance to those elements becomes zero for 10 seconds
 when hit during effect, 10% of life loss from damage taken occurs over 4 seconds instead
 when hit, 10% increased damage
-when hit, gain a random movement speed modifier from 40% reduced to 100% increased until hit again
 when you attack, take 10% of life as fire damage for each warcry exerting the attack
 when you cast a spell, sacrifice all mana to gain added maximum lightning damage equal to 10% of sacrificed mana for 4 seconds
 when you kill an enemy affected by a non-aura hex, become immune to curses for remaining hex duration

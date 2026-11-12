@@ -7,7 +7,7 @@
 //! trigger, the helmet's Focus, and every configuration but those in
 //! [`Perform::trigger_config`].
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
