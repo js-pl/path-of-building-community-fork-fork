@@ -8,7 +8,7 @@
 //! `MainHand.` and `OffHand.`. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -93,6 +93,8 @@ pub(crate) struct Off {
     /// `activeSkill.conversionTable`, `weapon1Cfg.conversionTable`, ...
     pub conv: [Option<ConversionTable>; 3],
     pub can_deal: [bool; 5],
+    /// The mods disabling a damage type, for its breakdown
+    pub deal_no_mods: [Vec<crate::breakdown::ModEntry>; 5],
     pub is_attack: bool,
     pub debuff_duration_mult: f64,
     /// The damage passes (`passList`)
@@ -182,6 +184,7 @@ impl<'a> Perform<'a> {
             edb: self.c.db(crate::calc::ENEMY),
             conv: [None, None, None],
             can_deal: [true; 5],
+            deal_no_mods: Default::default(),
             is_attack: false,
             debuff_duration_mult: 1.0,
             passes: Vec::new(),
@@ -2055,6 +2058,12 @@ impl<'a> Perform<'a> {
                 set(self, "StrikeTargets", v);
             }
         }
+        if self.has_flag(i, "totem") {
+            let limit = self
+                .c
+                .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
+            set(self, "ActiveTotemLimit", limit);
+        }
         if self.has_flag(i, "area")
             || self.sd(i, "radius").is_some_and(ModValue::truthy)
             || (self.has_flag(i, "mine") && self.has_type(i, "Aura"))
@@ -2236,7 +2245,10 @@ impl<'a> Perform<'a> {
             if base_cooldown.is_some() || self.c.base(list, c, &["CooldownRecovery"])? != 0.0 {
                 let cd = match base_cooldown {
                     Some(b) => {
-                        let cd = b / self.c.calc_mod(list, c, &["CooldownRecovery"])?;
+                        let cd = match self.c.override_num(list, c, &["CooldownRecovery"])? {
+                            Some(v) => v,
+                            None => b / self.c.calc_mod(list, c, &["CooldownRecovery"])?,
+                        };
                         (cd * tick).ceil() / tick
                     }
                     None => self.skill_cooldown(list, &cfg, i)?.0,
@@ -2412,10 +2424,7 @@ impl<'a> Perform<'a> {
                 );
                 self.bd(actor).unwrap().set_lines("TotemPlacementTime", l);
             }
-            let limit = self
-                .c
-                .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
-            set(self, "ActiveTotemLimit", limit);
+            let limit = self.c.out(actor, "ActiveTotemLimit").unwrap_or(f64::NAN);
             let summoned = self
                 .c
                 .override_num(self.pdb(), None, &["TotemsSummoned"])?
@@ -3166,6 +3175,22 @@ impl<'a> Perform<'a> {
                 );
             }
         }
+        if let Some(pct) = self.sd_num(i, "sacrificeLifePercent") {
+            let life = if self.has_flag(i, "totem") {
+                self.c.out(actor, "TotemLife")
+            } else {
+                self.c.out(actor, "LifeUnreserved")
+            }
+            .unwrap_or(f64::NAN);
+            let as_chaos = self.sd_num(i, "sacrificeLifeAsChaos").unwrap_or(f64::NAN);
+            let add = (life * pct / 100.0 * (as_chaos / 100.0)).floor();
+            for n in ["ChaosMin", "ChaosMax"] {
+                self.c.add(
+                    list,
+                    new_mod(n, Base, add, Some("Sacrifice Support"), 0, 0, vec![]),
+                );
+            }
+        }
         Ok(())
     }
 
@@ -3274,10 +3299,17 @@ impl<'a> Perform<'a> {
         }
         let cfg = self.cfg(i);
         for (k, t) in DMG_TYPES.iter().enumerate() {
-            o.can_deal[k] =
-                !self
+            let names = [&format!("DealNo{t}") as &str, "DealNoDamage"];
+            let disabled = self.c.flag(list, Some(&cfg), &names)?;
+            o.can_deal[k] = !disabled;
+            if disabled && self.has_bd(o.actor) {
+                o.deal_no_mods[k] = self
                     .c
-                    .flag(list, Some(&cfg), &[&format!("DealNo{t}"), "DealNoDamage"])?;
+                    .tabulate(list, Some(ModType::Flag), Some(&cfg), &names)?
+                    .into_iter()
+                    .map(|(value, m)| crate::breakdown::ModEntry { m, value })
+                    .collect();
+            }
         }
         o.conv[0] = Some(self.conversion_table(list, Some(&cfg))?);
         for n in 0..2 {
@@ -3403,57 +3435,56 @@ impl<'a> Perform<'a> {
             let (level, list, cfg) = (e.level, self.lists[main].list, self.cfg(main));
             let c = Some(&cfg);
             let actor = crate::calc::PLAYER;
-            let sums = |p: &Self, names: [&str; 4]| -> Result<[f64; 4]> {
-                let mut out = [0.0; 4];
-                for (o, n) in out.iter_mut().zip(names) {
-                    if !n.is_empty() {
-                        *o = p.c.base(list, c, &[n])?;
+            let sum = |p: &Self, n: &str| p.c.base(list, c, &[n]);
+            // "+ 2 ^8(level from items)" for each source that adds any
+            let sources = |l: &mut Vec<String>, what: &str, sources: &[(f64, &str)]| {
+                for &(v, from) in sources {
+                    if v != 0.0 {
+                        let sign = if v > 0.0 { "+" } else { "-" };
+                        l.push(sf!("%s %d ^8(%s from %s)", sign, v.abs(), what, from));
                     }
                 }
-                Ok(out)
             };
-            if level.is_some() {
-                let [base, item, support, _] =
-                    sums(self, ["GemLevel", "GemItemLevel", "GemSupportLevel", ""])?;
-                let v = base + support + item;
+            if let Some(level) = level {
+                let base = sum(self, "GemLevel")?;
+                let item = sum(self, "GemItemLevel")?;
+                let global = sum(self, "GemGlobalLevel")?;
+                let support = sum(self, "GemSupportLevel")?;
                 self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
-                self.c.set_out(actor, "GemLevel", v);
+                self.c.set_out(actor, "GemLevel", level);
                 if let Some(b) = self.bd(actor) {
                     let mut l = vec![sf!("%d ^8(level from gem)", base)];
-                    if support > 0.0 {
-                        l.push(sf!("+ %d ^8(level from support)", support));
+                    let from = [
+                        (item, "items"),
+                        (global, "global modifiers"),
+                        (support, "support"),
+                    ];
+                    sources(&mut l, "level", &from);
+                    if level != base + item + global + support {
+                        l.push(sf!("^8Limited to Level %d", level));
                     }
-                    if item > 0.0 {
-                        l.push(sf!("+ %d ^8(level from items)", item));
-                    }
-                    l.push(sf!("= %d", v));
+                    l.push(sf!("= %d", level));
                     b.set_lines("GemLevel", l);
                 }
             }
-            let [base, item, support, socket] = sums(
-                self,
-                [
-                    "GemQuality",
-                    "GemItemQuality",
-                    "GemSupportQuality",
-                    "GemSocketQuality",
-                ],
-            )?;
-            let v = base + support + item + socket;
+            let base = sum(self, "GemQuality")?;
+            let item = sum(self, "GemItemQuality")?;
+            let global = sum(self, "GemGlobalQuality")?;
+            let support = sum(self, "GemSupportQuality")?;
+            let socket = sum(self, "GemSocketQuality")?;
+            let v = base + support + item + global + socket;
             self.c
                 .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
             self.c.set_out(actor, "GemQuality", v);
             if let Some(b) = self.bd(actor) {
                 let mut l = vec![sf!("%d ^8(quality from gem)", base)];
-                if support > 0.0 {
-                    l.push(sf!("+ %d ^8(quality from support)", support));
-                }
-                if item > 0.0 {
-                    l.push(sf!("+ %d ^8(quality from items)", item));
-                }
-                if socket > 0.0 {
-                    l.push(sf!("+ %d ^8(quality from socket)", socket));
-                }
+                let from = [
+                    (item, "items"),
+                    (global, "global modifiers"),
+                    (support, "support"),
+                    (socket, "socket colour"),
+                ];
+                sources(&mut l, "quality", &from);
                 l.push(sf!("= %d", v));
                 b.set_lines("GemQuality", l);
             }

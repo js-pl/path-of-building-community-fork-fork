@@ -39,14 +39,14 @@
 		<PlayerStat stat="ReqStr" value="114"/>
 		<PlayerStat stat="Dex" value="139"/>
 		<PlayerStat stat="ReqDex" value="129"/>
-		<PlayerStat stat="Int" value="104"/>
+		<PlayerStat stat="Int" value="64"/>
 		<PlayerStat stat="ReqInt" value="224"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="7732.9966600682"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="5034"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="9848"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="11059"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="9848"/>
+		<PlayerStat stat="TotalEHP" value="7671.2505639797"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="5002"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="9769"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="10971"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="9769"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="1697"/>
 		<PlayerStat stat="Life" value="2930"/>
 		<PlayerStat stat="Spec:LifeInc" value="78"/>
@@ -56,14 +56,14 @@
 		<PlayerStat stat="LifeRegenRecovery" value="213.9"/>
 		<PlayerStat stat="LifeRecharge" value="977"/>
 		<PlayerStat stat="LifeLeechGainRate" value="11.7154909872"/>
-		<PlayerStat stat="Mana" value="940"/>
+		<PlayerStat stat="Mana" value="912"/>
 		<PlayerStat stat="Spec:ManaInc" value="42"/>
-		<PlayerStat stat="ManaUnreserved" value="-1410"/>
+		<PlayerStat stat="ManaUnreserved" value="-1368"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="-150"/>
-		<PlayerStat stat="ManaRegenRecovery" value="54.3"/>
+		<PlayerStat stat="ManaRegenRecovery" value="52.7"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="1206"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="1206"/>
+		<PlayerStat stat="EnergyShield" value="1173"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="1173"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="36"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
@@ -356,7 +356,7 @@ Has 1 Socket
 +2 to Level of Socketed Aura Gems
 {tags:resource}Socketed Gems have no Reservation
 {tags:resource}Your Blessing Skills are Disabled
-{tags:resource}80% reduced Reservation Efficiency of Skills
+80% reduced Reservation Efficiency of Skills
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -429,7 +429,7 @@ League: Heist
 LevelReq: 22
 Implicits: 1
 {tags:defences}{range:0.5}+(9-20) to maximum Energy Shield
-{tags:attribute}{range:0.5}+(15-25) to Intelligence
+{tags:attribute}{range:0.5}-(25-15) to Intelligence
 10% increased Damage
 50% increased Fishing Pool Consumption
 20% increased Fishing Range
@@ -680,9 +680,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="2" classId="1" clusterHashFormatVersion="2" masteryEffects="{38595,51147},{59013,22542},{42792,9074},{55017,23557},{8460,63994},{58728,37307},{4139,38454},{52462,7137}" nodes="10989,55649,45350,32245,41305,34130,55772,1593,27137,5865,33988,48904,59920,63583,63673,30335,41472,47175,11088,42837,44606,64426,55913,39713,20832,33435,38777,64077,54396,30148,7374,50024,42861,61308,15868,10282,62879,44967,42792,54267,7335,40927,63306,61471,15405,4139,31819,38595,39768,62303,32480,50197,61198,15631,5152,2913,12795,63048,44799,48929,8460,9511,42106,26523,6981,26866,15599,44529,29353,59976,494,33631,38906,45163,22627,45646,64181,52462,23881,38836,43833,34917,38516,53118,58728,59013,21650,10221,7828,6237,24383,29294,3167,49445,46636,25989,50570,31758,7399,24155,46726,5203,33740,6446,58449,20551,6359,50225,21413,35556,44908,40535,27195,44941,50422,44429,24528,15880,50904,31628,61007,50264,19261,50862,27166,55017,11431" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="2" classId="1" clusterHashFormatVersion="2" masteryEffects="{4139,38454},{8460,63994},{38595,51147},{42792,9074},{52462,7137},{55017,23557},{58728,37307},{59013,22542}" nodes="494,1593,2913,3167,4139,5152,5203,5865,6237,6359,6446,6981,7335,7374,7399,7828,8460,9511,10221,10282,10989,11088,11431,12795,15405,15599,15631,15868,15880,19261,20551,20832,21413,21650,22627,23881,24155,24383,24528,25989,26523,26866,27137,27166,27195,29294,29353,30148,30335,31628,31758,31819,32245,32480,33435,33631,33740,33988,34130,34917,35556,38516,38595,38777,38836,38906,39713,39768,40535,40927,41305,41472,42106,42792,42837,42861,43833,44429,44529,44606,44799,44908,44941,44967,45163,45350,45646,46636,46726,47175,48904,48929,49445,50024,50197,50225,50264,50422,50570,50862,50904,52462,53118,54267,54396,55017,55649,55772,55913,58449,58728,59013,59920,59976,61007,61198,61308,61471,62303,62879,63048,63306,63583,63673,64077,64181,64426" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgECfSrt2WGxJn31oVmFUtncBjlqARbphMS_COoQ-F_4uXZ_ogArUKdVrj77qtppmyFRYIKbl3n6TdR8dcQczsNop23vfD38KCr1n6-npyjT-xynn9_3SvAfPC0QK3xLlsObWPNffuDEFe8OPQ8UIAthMfv2SK7_vyEhDCUnpHpnmxtFaPI8763xcqnqSAHug1-X-rBrWGOyTvq1zO5dSZe0qzmIZZZ0z37laOaFVJIn7R6UGF1fPwxfwSW2LGWFxYp8DhznXlu2hhRTg8wZLuRRUEcY18QxU6WK5K9snldqO6-NxPatjV_QPgjG2HuM7k_EWEs9xq5qHtbpLKcACCNypyiWNhArx8uWw_n6IQwb4czukbvlaFgO5oVcBdbp
+				https://www.pathofexile.com/passive-skill-tree/AAAABgECfQHuBjkLYQxfECsUIBRTFukYXRjXGS4bRRynHM4c5x6UIQwlJyftKCoq7StQLKcx-zwtPO89Dz38PghLPVBHUWBTpVSSWGNdSV5bXz9f0GWFZ5to8moBah5qO3KpdcR2f3uMfA58S331fuCCm4Nfg8yExIVSiGWK5JZ0lsOXeZe0l_qbIZtYnlef36FZogCkeqcop1Wnbas5rY2t8a4-rv-vbK-Nr6ewa7Emsk62LLaGvwi_IcElw2jEFcQxxFjE9sWKxq7G2Mzuz37T-9R81unZYdnc2mnkUeVo5oXqEOpI7k_vDu988B_zX_Wf9kj3Svhf-Ln6Tfq1-6oACJY2ECv5-iEMx8uWwyNypygb4czuXAXW6ZG75WhYDuaF
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="33631"/>

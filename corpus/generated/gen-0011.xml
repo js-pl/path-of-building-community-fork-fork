@@ -37,11 +37,11 @@
 		<PlayerStat stat="Int" value="74"/>
 		<PlayerStat stat="ReqInt" value="149"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2401.5386097764"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2850"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2835"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="1567"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="1765"/>
+		<PlayerStat stat="TotalEHP" value="2378.2441534185"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2825"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2808"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="1552"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="1747"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="1432"/>
 		<PlayerStat stat="Life" value="2062"/>
 		<PlayerStat stat="Spec:LifeInc" value="72"/>
@@ -56,8 +56,8 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="79.275653923541"/>
 		<PlayerStat stat="ManaRegenRecovery" value="22.6"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="209"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="209"/>
+		<PlayerStat stat="EnergyShield" value="187"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="187"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
@@ -400,7 +400,7 @@ Heartbound Loop
 Moonstone Ring
 LevelReq: 20
 Implicits: 1
-{tags:defences}{range:0.5}+(15-25) to maximum Energy Shield
+{tags:caster,speed}{range:0.5}(7-10)% increased Cast Speed
 {tags:resource}{range:0.5}Regenerate (10-15) Life per second
 {tags:resource}{range:0.5}(20-40)% increased Mana Regeneration Rate
 {tags:resource}Minions have 15% increased maximum Life
@@ -585,10 +585,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -693,9 +693,9 @@ Grants Level 21 Vulnerability Curse Aura during Effect
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="2" clusterHashFormatVersion="2" masteryEffects="{9458,20464},{46761,40906},{38568,7831},{44316,21468},{41016,59906},{53615,23621},{34317,30502},{65528,37190}" nodes="25511,32117,56646,57819,41016,17421,25067,36221,31315,11850,50338,57259,41536,4481,62712,64265,94,6038,38348,32662,63293,45593,36242,41866,3362,51101,52904,529,14156,57240,65528,20480,65210,6538,19210,42964,52714,17608,27283,720,19858,9458,1201,41137,46761,38568,7085,37619,43457,34317,9206,65033,29870,50459,51440,49978,23449,63843,48099,11239,17788,50690,24133,5616,6799,59800,25178,46694,45035,56814,15842,60180,53114,903,41250,3187,54354,39821,45491,60803,63194,59370,16602,64111,444,61306,12412,6654,44316,63795,60942,59606,65224,53615,2715,1427,56149,6542,54142,2094,59252,37504,9373,30894,38662,465,19228,42133,36849,64769,41380,38344,31508,10017,39718" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="2" clusterHashFormatVersion="2" masteryEffects="{9458,20464},{34317,30502},{38568,7831},{41016,59906},{44316,21468},{46761,40906},{53615,23621},{65528,37190}" nodes="94,444,465,529,720,903,1201,1427,2094,2715,3187,3362,4481,5616,6038,6538,6542,6654,6799,7085,9206,9373,9458,10017,11239,11850,12412,14156,15842,16602,17421,17608,17788,19210,19228,19858,20480,23449,24133,25067,25178,25511,27283,29870,30894,31315,31508,32117,32662,34317,36221,36242,36849,37504,37619,38344,38348,38568,38662,39718,39821,41016,41137,41250,41380,41536,41866,42133,42964,43457,44316,45035,45491,45593,46694,46761,48099,49978,50338,50459,50690,51101,51440,52714,52904,53114,53615,54142,54354,56149,56646,56814,57240,57259,57819,59252,59370,59606,59800,60180,60803,60942,61306,62712,63194,63293,63795,63843,64111,64265,64769,65033,65210,65224,65528" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgIDcWOnfXXdRuHboDhEDWHrjX16Uy5KxKLfq6JAEYH0-PsJAF4XlpXMf5b3PbIZjZKjig0ix53OqAIRN0zfmP_4UAD-uhmKSwqn1M3qRMhqkwLQTZIk8gSxoLG2qZaoG62S86nBhg0j9v4JdK7I8MM6W5n5Y7vjK-dFfMYCXkUV8BqP6ZhiWrZmr-vd7j3i6xTPegOHoSIMc9RSm42xs-2D9trn6kDaAbzvejB8Gf6tHPkz7g7o1v7I0W8KmwWT21UZjtN-CC7ndJKAJJ14rpcGAdFLHKSVj_H9AaGklch7FCchmyYACOoCoDiRRv_4T_Ak8p_Ktqkel5aodyaGDVPcrRxcRdFv
+				https://www.pathofexile.com/passive-skill-tree/AAAABgIDcQBeAbwB0QIRAtADhwSxBZMILgqbDHMNIhGBFfAXlhmKGY4Z_hqPG60j9iSdJPInISvnLkowfDdMPeJA2kQNRMhFfEsKSxxNklAAW5leRWHrYlpjp2qTdK54rnpTexR9dX-Whg2NfY2Sj_GSgJLzlciVzJaolwabJpuNoDigsaEioaSiQKOKpJWn1KnBrRyv67Gzshm2Zrapu-PDOsSixgLHncjwzerOqM960W_TftRS21XdRt3u35jfq-Hb53Tn6ujW6ZjrFO2D7g7vevT49tr3Pfkz-WP7Cf0B_gn-uv7I__gACE_wJPJ3JoYNHpeWqOoCoDhT3K0cn8q2qVxF0W-RRv_4
 			</URL>
 			<Sockets/>
 			<Overrides/>

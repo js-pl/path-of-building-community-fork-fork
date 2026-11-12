@@ -3,7 +3,7 @@
 //! native Rust over the program's own tables. [`install`] replaces the
 //! translated methods with these, so every calculation runs them.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 //!
 //! Stores are recognised by their class; anything else is called through
 //! its Lua methods, as upstream would. `EvalMod` hands mods with the rare

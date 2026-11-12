@@ -246,9 +246,9 @@ League: Allflame
 Quality: 20
 Sockets: B-B-B
 LevelReq: 45
-Implicits: 0
-{range:0.5}(15-20)% Chance to Block Spell Damage
+Implicits: 1
 {range:0.5}(5-10)% increased Spell Damage
+{range:0.5}(15-20)% Chance to Block Spell Damage
 {range:0.5}+(66-99) to maximum Life
 {range:0.5}Ignites you inflict deal Damage (15-20)% faster
 Draugurflames burn enemies around you for 8 seconds after you Ignite a target
@@ -656,62 +656,62 @@ Has Alt Variant Two: true
 Selected Alt Variant Two: 37
 Limited to: 1
 Implicits: 0
-{variant:14}{range:0.5}(10-20)% increased Cooldown Recovery Rate if 2 Shaper Items are Equipped
-{variant:13}{range:0.5}(1-3)% of Elemental Damage Leeched as Energy Shield if 2 Shaper Items are Equipped
-{variant:6}{range:0.5}(1-3)% of Physical Damage Leeched as Energy Shield if 2 Elder Items are Equipped
-{variant:9}Unaffected by Poison if 2 Hunter Items are Equipped
 {variant:1}Consecrated Ground around you while stationary if 2 Crusader Items are Equipped
-{variant:11}{range:0.5}(10-15)% increased Dexterity if 2 Redeemer Items are Equipped
-{variant:8}Every 4 seconds, Regenerate 35% of Life over one second if 2 Hunter Items are Equipped
 {variant:2}{range:0.5}(10-15)% increased Intelligence if 2 Crusader Items are Equipped
-{variant:4}{range:0.5}(10-15)% increased maximum Life if 2 Elder Items are Equipped
-{variant:15}{range:0.5}(10-15)% increased maximum Mana if 2 Shaper Items are Equipped
-{variant:10}Nearby Enemies are Blinded if 2 Redeemer Items are Equipped
-{variant:16}Nearby Enemies are Intimidated if 2 Warlord Items are Equipped
-{variant:5}Nearby Enemies are Unnerved if 2 Elder Items are Equipped
-{variant:7}Projectiles Pierce 2 additional Targets if 2 Hunter Items are Equipped
-{variant:17}{range:0.5}(10-15)% increased Strength if 2 Warlord Items are Equipped
-{variant:12}Unaffected by Chill if 2 Redeemer Items are Equipped
-{variant:18}Unaffected by Ignite if 2 Warlord Items are Equipped
 {variant:3}Unaffected by Shock if 2 Crusader Items are Equipped
-{variant:28}{range:0.5}(10-15)% chance to gain a Frenzy Charge on Hit if 4 Redeemer Items are Equipped
+{variant:4}{range:0.5}(10-15)% increased maximum Life if 2 Elder Items are Equipped
+{variant:5}Nearby Enemies are Unnerved if 2 Elder Items are Equipped
+{variant:6}{range:0.5}(1-3)% of Physical Damage Leeched as Energy Shield if 2 Elder Items are Equipped
+{variant:7}Projectiles Pierce 2 additional Targets if 2 Hunter Items are Equipped
+{variant:8}Every 4 seconds, Regenerate 35% of Life over one second if 2 Hunter Items are Equipped
+{variant:9}Unaffected by Poison if 2 Hunter Items are Equipped
+{variant:10}Nearby Enemies are Blinded if 2 Redeemer Items are Equipped
+{variant:11}{range:0.5}(10-15)% increased Dexterity if 2 Redeemer Items are Equipped
+{variant:12}Unaffected by Chill if 2 Redeemer Items are Equipped
+{variant:13}{range:0.5}(1-3)% of Elemental Damage Leeched as Energy Shield if 2 Shaper Items are Equipped
+{variant:14}{range:0.5}(10-20)% increased Cooldown Recovery Rate if 2 Shaper Items are Equipped
+{variant:15}{range:0.5}(10-15)% increased maximum Mana if 2 Shaper Items are Equipped
+{variant:16}Nearby Enemies are Intimidated if 2 Warlord Items are Equipped
+{variant:17}{range:0.5}(10-15)% increased Strength if 2 Warlord Items are Equipped
+{variant:18}Unaffected by Ignite if 2 Warlord Items are Equipped
+{variant:19}{range:0.5}+(2-3)% to maximum Lightning Resistance if 4 Crusader Items are Equipped
+{variant:20}{range:0.5}(5-10)% of Physical Damage taken as Lightning Damage if 4 Crusader Items are Equipped
 {variant:21}{range:0.5}(10-15)% chance to gain a Power Charge on Hit if 4 Crusader Items are Equipped
 {variant:22}{range:0.5}Attacks have +(1-1.5)% to Critical Strike Chance if 4 Elder Items are Equipped
-{variant:26}{range:0.5}+(2-3)% to maximum Chaos Resistance if 4 Hunter Items are Equipped
-{variant:29}{range:0.5}+(2-3)% to maximum Cold Resistance if 4 Redeemer Items are Equipped
-{variant:35}{range:0.5}+(2-3)% to maximum Fire Resistance if 4 Warlord Items are Equipped
-{variant:19}{range:0.5}+(2-3)% to maximum Lightning Resistance if 4 Crusader Items are Equipped
-{variant:33}+3% to maximum Chance to Block Spell Damage if 4 Shaper Items are Equipped
-{variant:27}{range:0.5}(10-15)% increased Movement Speed if 4 Hunter Items are Equipped
-{variant:32}Cannot take Reflected Elemental Damage if 4 Shaper Items are Equipped
+{variant:23}+3% to maximum Chance to Block Attack Damage if 4 Elder Items are Equipped
 {variant:24}Cannot take Reflected Physical Damage if 4 Elder Items are Equipped
 {variant:25}{range:0.5}(5-10)% of Elemental Damage taken as Chaos Damage if 4 Hunter Items are Equipped
+{variant:26}{range:0.5}+(2-3)% to maximum Chaos Resistance if 4 Hunter Items are Equipped
+{variant:27}{range:0.5}(10-15)% increased Movement Speed if 4 Hunter Items are Equipped
+{variant:28}{range:0.5}(10-15)% chance to gain a Frenzy Charge on Hit if 4 Redeemer Items are Equipped
+{variant:29}{range:0.5}+(2-3)% to maximum Cold Resistance if 4 Redeemer Items are Equipped
+{variant:30}{range:0.5}(5-10)% of Physical Damage taken as Cold Damage if 4 Redeemer Items are Equipped
+{variant:31}{range:0.5}+(1-1.5)% to Spell Critical Strike Chance if 4 Shaper Items are Equipped
+{variant:32}Cannot take Reflected Elemental Damage if 4 Shaper Items are Equipped
+{variant:33}+3% to maximum Chance to Block Spell Damage if 4 Shaper Items are Equipped
 {variant:34}Gain 1 Endurance Charge every second if you&apos;ve been Hit Recently and
 {variant:34}4 Warlord Items are Equipped
-{variant:23}+3% to maximum Chance to Block Attack Damage if 4 Elder Items are Equipped
-{variant:30}{range:0.5}(5-10)% of Physical Damage taken as Cold Damage if 4 Redeemer Items are Equipped
+{variant:35}{range:0.5}+(2-3)% to maximum Fire Resistance if 4 Warlord Items are Equipped
 {variant:36}{range:0.5}(5-10)% of Physical Damage taken as Fire Damage if 4 Warlord Items are Equipped
-{variant:20}{range:0.5}(5-10)% of Physical Damage taken as Lightning Damage if 4 Crusader Items are Equipped
-{variant:31}{range:0.5}+(1-1.5)% to Spell Critical Strike Chance if 4 Shaper Items are Equipped
-{variant:50}{range:0.5}+(1-2)% to all maximum Elemental Resistances if 6 Shaper Items are Equipped
-{variant:44}Skills fire an additional Projectile if 6 Hunter Items are Equipped
-{variant:42}{range:0.5}(10-15)% increased Attributes if 6 Elder Items are Equipped
-{variant:46}Cannot be Frozen if 6 Redeemer Items are Equipped
-{variant:40}Cannot be Stunned if 6 Elder Items are Equipped
-{variant:52}Melee Hits Fortify if 6 Warlord Items are Equipped
-{variant:45}+1 to Level of all Chaos Skill Gems if 6 Hunter Items are Equipped
-{variant:47}+1 to Level of all Cold Skill Gems if 6 Redeemer Items are Equipped
-{variant:53}+1 to Level of all Fire Skill Gems if 6 Warlord Items are Equipped
-{variant:39}{range:0.5}(1-3)% of Physical Damage Prevented Recently is Regenerated as Energy Shield Per Second if 6 Crusader Items are Equipped
 {variant:37}+1 to Level of all Lightning Skill Gems if 6 Crusader Items are Equipped
-{variant:54}+1 to Maximum Endurance Charges if 6 Warlord Items are Equipped
-{variant:48}+1 to Maximum Frenzy Charges if 6 Redeemer Items are Equipped
 {variant:38}+1 to Maximum Power Charges if 6 Crusader Items are Equipped
-{variant:43}You can apply an additional Curse if 6 Hunter Items are Equipped
+{variant:39}{range:0.5}(1-3)% of Physical Damage Prevented Recently is Regenerated as Energy Shield Per Second if 6 Crusader Items are Equipped
+{variant:40}Cannot be Stunned if 6 Elder Items are Equipped
 {variant:41}+1 to Level of all Physical Skill Gems if 6 Elder Items are Equipped
+{variant:42}{range:0.5}(10-15)% increased Attributes if 6 Elder Items are Equipped
+{variant:43}You can apply an additional Curse if 6 Hunter Items are Equipped
+{variant:44}Skills fire an additional Projectile if 6 Hunter Items are Equipped
+{variant:45}+1 to Level of all Chaos Skill Gems if 6 Hunter Items are Equipped
+{variant:46}Cannot be Frozen if 6 Redeemer Items are Equipped
+{variant:47}+1 to Level of all Cold Skill Gems if 6 Redeemer Items are Equipped
+{variant:48}+1 to Maximum Frenzy Charges if 6 Redeemer Items are Equipped
 {variant:49}+1 to Level of all non-Exceptional Support Gems if 6 Shaper Items are Equipped
+{variant:50}{range:0.5}+(1-2)% to all maximum Elemental Resistances if 6 Shaper Items are Equipped
 {variant:51}{range:0.5}Gain (10-15)% of Physical Damage as Extra Damage of each Element if
 {variant:51}6 Shaper Items are Equipped
+{variant:52}Melee Hits Fortify if 6 Warlord Items are Equipped
+{variant:53}+1 to Level of all Fire Skill Gems if 6 Warlord Items are Equipped
+{variant:54}+1 to Maximum Endurance Charges if 6 Warlord Items are Equipped
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -913,9 +913,9 @@ With at least 40 Strength in Radius, Heavy Strike has a
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="0" clusterHashFormatVersion="2" masteryEffects="{50757,28676},{18240,571},{46665,20464},{5348,48385},{12382,38454},{45019,59906}" nodes="45317,21602,10829,24798,16775,37690,58029,8930,65034,34483,607,7903,45019,23122,50757,11497,48423,34774,19958,13714,8643,65167,60090,28424,41026,28330,22551,44103,14182,62103,42731,10490,15073,35754,60247,41996,46910,25732,19144,47251,50288,33479,45403,49807,38048,48828,33545,62662,13191,13782,32091,41263,33631,48768,22473,6204,55485,18402,37078,63976,17849,42041,34907,14090,24256,57615,46092,51923,40100,22497,15405,55906,63845,48778,26740,21634,20310,38450,5560,18240,7614,6230,17674,45456,34906,56116,51291,36881,3452,55373,12382,41967,8139,14211,35179,238,45175,47312,60532,16167,12702,15144,58833,28221,13322,24643,39773,542,43162,28574,45887,31683,3992,918,2151,56153,35503,33740,19939,55866,46665,5348,62021,47062,17546,11688" secondaryAscendClassId="8" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="0" clusterHashFormatVersion="2" masteryEffects="{5348,48385},{12382,38454},{18240,571},{45019,59906},{46665,20464},{50757,28676}" nodes="238,542,607,918,2151,3452,3992,5348,5560,6204,6230,7614,7903,8139,8643,8930,10490,10829,11497,11688,12382,12702,13191,13322,13714,13782,14090,14182,14211,15073,15144,15405,16167,16775,17546,17674,17849,18240,18402,19144,19939,19958,20310,21602,21634,22473,22497,22551,23122,24256,24643,24798,25732,26740,28221,28330,28424,28574,31683,32091,33479,33545,33631,33740,34483,34774,34906,34907,35179,35503,35754,36881,37078,37690,38048,38450,39773,40100,41026,41263,41967,41996,42041,42731,43162,44103,45019,45175,45317,45403,45456,45887,46092,46665,46910,47062,47251,47312,48423,48768,48778,48828,49807,50288,50757,51291,51923,55373,55485,55866,55906,56116,56153,57615,58029,58833,60090,60247,60532,62021,62103,62662,63845,63976,65034,65167" secondaryAscendClassId="8" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgAhe7EFVGIqTWDeQYeTOuKtIuL-CoazAl8e36_bWlLGRSzpvSeH1k32NZIhw_6P6rpvCKBCbqpYF6xHN2byl6brKPo64etXpAy3PmSESsi4k8RwgsexW8KPlKC-vIMJ9MYzhzXWfVuhL4NfvoBXyRg82L1H4pDW-ehFuaQ5iFs3Cl7A4Q-0DMrTnKRX4Twt2mL5Zb6KaHRUgk9WljIVuEdAHb4YVkUKsZCIWts0yFuQEQ182E0wXqPvH8s3g4lrAO6wd7jQ7HQ_JzGeOyhuPTQKYEObXaiab56zP3vDD5gDlghn21mKr4PMTePaOrZJFOTyRbfWRIotqAAG6gKv23AExkUCO0dAljYwXk_wtkm9ARTk
+				https://www.pathofexile.com/passive-skill-tree/AAAABgAhewDuAl8DlghnDXwPmBTkFbgYPBhWHb4e3x_LIcMi4ij6Kk0s6S2oMF4xnjOHNAo1kjXWNwo3ZjeDOuE7KDwtPydBh0SKRQpFuUdAR-JKyE3jTfZPVlRiVIJXyVfhWBdaUl7AYENg3mSEaHRuPW6qbwhvnnvDfVuCx4MJg1-DzIazh9aIWohbiWuKr5ARkNaTOpSgljKbXZykoEKhL6PvpAykOabrqJqsR6_bsHexBbFbsZCzP7QMtkm3PrfWuJO40L0nvoC-ir68wo_EcMZFyFvK09hN2L3aOtpi2zTbWeEP4q3quutX7HTyRfKX9Mb5Zfno_gr-jwAGvQEU5JY2MF4CO0dA6gKv20_wtklwBMZF
 			</URL>
 			<Sockets>
 				<Socket itemId="19" nodeId="6230"/>

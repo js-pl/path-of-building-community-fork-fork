@@ -278,11 +278,11 @@ Quality: 20
 Sockets: B-B-B-B
 LevelReq: 48
 Implicits: 0
+{range:0.5}(60-80)% increased Critical Strike Chance for Spells
 {range:0.5}(200-250)% increased Energy Shield
 {range:0.5}+(50-70) to maximum Life
 Unaffected by Poison
 {range:0.5}(10-20)% of Damage taken Recouped as Life
-{range:0.5}(60-80)% increased Critical Strike Chance for Spells
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -399,10 +399,11 @@ Variant: Pre 3.11.0
 Variant: Current
 Selected Variant: 1
 LevelReq: 38
-Implicits: 1
-{tags:defences}{range:0.5}+(15-25) to maximum Energy Shield
-{tags:defences}{variant:2}{range:0.5}+(30-40) to maximum Energy Shield
+Implicits: 2
+{tags:caster,speed}{variant:2}{range:0.5}(7-10)% increased Cast Speed
+{tags:defences}{variant:1}{range:0.5}+(15-25) to maximum Energy Shield
 {tags:defences}{variant:1}{range:0.5}+(10-20) to maximum Energy Shield
+{tags:defences}{variant:2}{range:0.5}+(30-40) to maximum Energy Shield
 {tags:resistance}{variant:1}{range:0.5}+(20-30)% to Fire Resistance
 {tags:resistance}{variant:2}{range:0.5}+(30-40)% to Fire Resistance
 {tags:resistance}-40% to Cold Resistance
@@ -414,6 +415,7 @@ Stun Threshold is based on Energy Shield instead of Life
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
+			<ModRange id="8" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: RARE
@@ -675,9 +677,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="6" clusterHashFormatVersion="2" masteryEffects="{10166,21313},{53365,36475},{12873,19422},{15409,63223},{25281,47642}" nodes="40644,1891,43215,60949,42686,56648,21264,11334,33903,29844,46289,51402,60247,38129,5823,6064,28782,11018,32345,6538,40751,41635,27659,58244,52157,46136,10511,52095,7920,28012,48275,10166,9877,12873,265,12189,8948,21184,25281,61320,63639,58968,45945,21575,54338,33545,41263,57746,21602,32210,49978,8001,30338,48477,9014,21835,58229,35894,58198,46408,32176,57044,31583,56276,53365,46092,51923,45838,21678,43988,18033,47362,48778,23507,15409,59009,32710,46676,57248,10153,51517,46965,45456,9355,41989,17849,27962,62490,38520,62069,3656,14157,8640,13885,18865,6233,45272,28754,25058,8012,35283,4011,39443,27415,57615,24050,64501,63799,21170,44683,55247,15549,31371,28758,10763,20546,58649,31703,21301,30205,6109,1767,14209,1600,37671" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="6" clusterHashFormatVersion="2" masteryEffects="{10166,21313},{12873,19422},{15409,63223},{25281,47642},{53365,36475}" nodes="265,1600,1767,1891,3656,4011,5823,6064,6109,6233,6538,7920,8001,8012,8640,8948,9014,9355,9877,10153,10166,10511,10763,11018,11334,12189,12873,13885,14157,14209,15409,15549,17849,18033,18865,20546,21170,21184,21264,21301,21575,21602,21678,21835,23507,24050,25058,25281,27415,27659,27962,28012,28754,28758,28782,29844,30205,30338,31371,31583,31703,32176,32210,32345,32710,33545,33903,35283,35894,37671,38129,38520,39443,40644,40751,41263,41635,41989,42686,43215,43988,44683,45272,45456,45838,45945,46092,46136,46289,46408,46676,46965,47362,48275,48477,48778,49978,51402,51517,51923,52095,52157,53365,54338,55247,56276,56648,57044,57248,57615,57746,58198,58229,58244,58649,58968,59009,60247,60949,61320,62069,62490,63639,63799,64501" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgYBe57EB2Ooz-4Vpr7dSFMQLEaEb3SUtNHIyutXlPEWvxewcG4rCn5ZGYqfL6KjbAvjhMu9tDgpD8t_HvBtbLyTJ7YmlTJJAQkvnSL0UsBiwe-I-JfmWLN5VEfUQoMJoS_hklRifdLDOh9BdoK9XSM2VUuMNuNWtUh9sN7Ue1_b1NB1tAzK07MOVK6r1EZxuQK-ilvTPDHmgX_GtlTfoCepyT23dbGQJIukBUW5bTr0GpZ48nUOSDdNIcA2PUmxGFmw2HBSYeIfTInTD6uaE2sX4Q9d8vv1-TdSstfPPL16i3BWKgtQQuUZe9dTNXX9F90G5zeBBkCTJwAFU0EntkveMkm6GmLBjnvQdfb3PDE=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgYBewEJBkAG5wdjDkgPqxa_F7AX3RhZGYoe8B9BH0whwCL0IzYkiyaVJ6kntikPKgsrCixGL50ySTY9N003gTwxPL1FuUZxSbFQQlKyUsBTEFM1VEdUYlSuVUtb013yYeJiwWsXbAttOm1scFJwVnBudJR1_XaCeot7X3vXfbB90n5Zf8aDCYRvidOMNpMnlPGWeJoTnsSfL6EvoqOkBaa-qM-r1LDYsZCzDrN5tAy0OLTRtUi2VLd1uQK8k71dvorDOsjKyT3K08t_y73QddRC18_b1N1I3tTfoOEP4ZLjVuOE5RnmWOaB61fuFe-I8nX0GviX-Tf79QAFU0EntkveMkn29zwxuhpiwY570HU=
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="41263"/>

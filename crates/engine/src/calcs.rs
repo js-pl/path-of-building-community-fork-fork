@@ -10,7 +10,7 @@
 //! Configuration tab reads (`env.conditionsUsed`, ...; of them only
 //! `env.multipliersUsed`), the node and misc calculators.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use crate::actor::OutVal;
 use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
@@ -609,7 +609,8 @@ fn calcs_lists(p: &mut Perform, used: &HashSet<Sym>) -> Result<()> {
         }
     }
     let main_base = p.lists[p.main()].base;
-    if p.c.flag(main_base, None, &["Cruelty"])? {
+    let main_cfg = p.cfg(p.main());
+    if p.c.flag(main_base, Some(&main_cfg), &["Cruelty"])? {
         combat.push("Cruelty".to_string());
     }
     for (flag, label) in COMBAT_FLAGS {

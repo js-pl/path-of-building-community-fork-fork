@@ -59,8 +59,8 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="64.567392583873"/>
 		<PlayerStat stat="ManaRegenRecovery" value="57.3"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="1027"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="1027"/>
+		<PlayerStat stat="EnergyShield" value="998"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="998"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="41"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
@@ -81,15 +81,15 @@
 		<PlayerStat stat="FireResist" value="16"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
 		<PlayerStat stat="ColdResist" value="80"/>
-		<PlayerStat stat="ColdResistOverCap" value="19"/>
+		<PlayerStat stat="ColdResistOverCap" value="24"/>
 		<PlayerStat stat="LightningResist" value="16"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.25"/>
-		<PlayerStat stat="FullDPS" value="26994.094278222"/>
+		<PlayerStat stat="FullDPS" value="27935.869568997"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
-		<FullDPSSkill skillPart="" source="" stat="Bursting Toad" value="14963.762953425"/>
+		<FullDPSSkill skillPart="" source="" stat="Bursting Toad" value="15905.5382442"/>
 		<FullDPSSkill skillPart="" source="" stat="Stormblast Mine" value="11557.181883"/>
 		<FullDPSSkill skillPart="Animated Weapon: Default Attack" source="" stat="Animate Weapon" value="473.14944179688"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -242,9 +242,9 @@ Implicits: 0
 Socketed Warcry Skills have +1 Cooldown Use
 {range:0.5}(80-120)% increased Armour
 {range:0.5}+(50-70) to maximum Life
-{range:0.5}Skills deal (10-15)% more Damage for each Warcry Exerting them
 {range:0.5}When you Attack, take (15-20)% of Life as Physical Damage for
 each Warcry Exerting the Attack
+{range:0.5}Skills deal (10-15)% more Damage for each Warcry Exerting them
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -333,7 +333,7 @@ Selected Variant: 6
 {variant:10,11,12,13,14,15,16,17,18}Velour Boots
 Quality: 20
 Sockets: G-G-G-G
-LevelReq: 69
+LevelReq: 84
 Implicits: 0
 {variant:1,2,3,10,11,12}Grants Level 30 Purity of Fire Skill
 {variant:4,5,6,13,14,15}Grants Level 30 Purity of Ice Skill
@@ -388,7 +388,7 @@ Anathema
 Moonstone Ring
 LevelReq: 49
 Implicits: 1
-{tags:defences}{range:0.5}+(15-25) to maximum Energy Shield
+{tags:caster,speed}{range:0.5}(7-10)% increased Cast Speed
 {tags:attribute}{range:0.5}+(30-40) to Intelligence
 {tags:caster,speed}{range:0.5}(10-15)% increased Cast Speed
 (10-20)% chance to gain a Power Charge when you Cast a Curse Spell
@@ -460,8 +460,8 @@ LevelReq: 27
 Implicits: 1
 Creates Consecrated Ground on Use
 Life Recovery from Flasks also applies to Energy Shield during Effect
-{range:0.5}(25-50)% increased Duration
 Eldritch Battery during Effect
+{range:0.5}(25-50)% increased Duration
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
 			<ModRange id="4" range="0.5"/>
@@ -473,10 +473,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -644,9 +644,9 @@ Ignited Enemies Killed by your Hits are destroyed
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="3" clusterHashFormatVersion="2" masteryEffects="{13862,55886},{24481,36081},{56128,42540},{25281,38454},{41225,58106},{9083,61283},{41273,34420}" nodes="25222,17579,56128,2292,10115,44183,4105,57226,60247,27203,9650,50082,127,48719,60090,27659,21602,54447,18663,51923,51517,60547,63067,59650,27623,36774,54159,18574,5415,8948,15452,26298,61320,739,60554,38176,22972,21934,53652,41263,57457,6949,40637,34907,12379,7503,15711,31103,24481,12913,11551,19374,17849,39743,44723,1346,7938,60791,46092,18866,6109,21678,43988,13862,32024,48778,13753,33911,14021,31703,38900,36542,38805,8135,11128,27929,18865,55247,31619,41273,57264,22315,41225,1957,4397,65203,61982,37175,49047,9083,48514,27415,18309,25409,36371,30658,29171,57615,47085,25281,63799,33296,50472,27163,27611,36017,37569,55643,21075,32210,43000,11420,40126,9086,11784,14209,48362,37671" secondaryAscendClassId="7" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="3" clusterHashFormatVersion="2" masteryEffects="{9083,61283},{13862,55886},{24481,36081},{25281,38454},{41225,58106},{41273,34420},{56128,42540}" nodes="127,739,1346,1957,2292,4105,4397,5415,6109,6949,7503,7938,8135,8948,9083,9086,9650,10115,11128,11420,11551,11784,12379,12913,13753,13862,14021,14209,15452,15711,17579,17849,18309,18574,18663,18865,18866,19374,21075,21602,21678,21934,22315,22972,24481,25222,25281,25409,26298,27163,27203,27415,27611,27623,27659,27929,29171,30658,31103,31619,31703,32024,32210,33296,33911,34907,36017,36371,36542,36774,37175,37569,37671,38176,38805,38900,39743,40126,40637,41225,41263,41273,43000,43988,44183,44723,46092,47085,48362,48514,48719,48778,49047,50082,50472,51517,51923,53652,54159,54447,55247,55643,56128,57226,57264,57457,57615,59650,60090,60247,60547,60554,60791,61320,61982,63067,63799,65203" secondaryAscendClassId="7" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgMfc2KGRKvbQAj0J4OslxAJ34rrV2pDJbLDogB_vk_qumwLVGJI58rTyT3sg_Zb6QJr54-m049IjhUnIvQ8XGa674gC4-yKlSBZvFWu0ZShL-BxGyWevYhbMFsdTz1feX9foTJxLR9LrkW5mz-uswVCHwK0DEmyF91UrqvUNiZ9GL6KNbmEdzbFe9eX9I6-l5Ufxyt4bRlJsdfPe4OhOd-wVyuhCQelES3-s_IekTe_lyN7vYJrF0eFY0GOE3fCcfPhD7ftYsH5N4IQxShqG2vbjLGSwdlbUlN90qf4LJycvi4IN4G86pMnAAemLNtAjPFfodpONiaGdKE54vqhCe9jI3uWNmLB
+				https://www.pathofexile.com/passive-skill-tree/AAAABgMfcwB_AuMFQgelCPQQCREtFScX3RslHU8fAh_HIvQjeyWyJ4MreCycLR8uCDBbMnE1uTYmNsU3gTxcPV9Eq0W5R4VIjkjnSbFJskuuUlNUYlSuVa5XK1m8X6FihmLBY0FmumobakNrF2vba-dsC20ZcfN3wnl_e4N7130YfdKCEIR3iFuMsY4Tjr6PppE3ksGTJ5Ugl5WX9Js_nL6evaEJoS-hOaf4q9Ssl66ztAy37bzqvYK-T76Kv5fDosUoyT3K09GU04_Xz9lb20Dfit-w4HHhD-kC6rrrV-yD7IrviPIe9lv5N_6zAAfvYyN72k42JozxX6GWNmLB4vqhCYZ0oTmmLNtA
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="41263"/>

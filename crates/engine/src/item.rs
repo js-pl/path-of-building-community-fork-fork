@@ -2,7 +2,7 @@
 //! and text building. Parses an item's text into its base, properties and
 //! mod lines, and builds the mods it grants in each slot it can occupy.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // `m_max(m_min(x, hi), lo)` as upstream writes it, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -195,6 +195,10 @@ pub struct ModLine {
     pub flags: LineFlags,
     /// The stat order, for sorting crafted lines
     pub order: Option<f64>,
+    /// The range was read from a `value(min-max)` line (`rangeFromValue`)
+    pub range_from_value: bool,
+    /// An enchant of the base, not in the item text (`addedFromBase`)
+    pub added_from_base: bool,
     /// A Foulborn transformation: the line's mod and the one it turns into
     pub mod_id: Option<String>,
     pub new_mod_id: Option<String>,
@@ -307,6 +311,9 @@ pub struct Item {
     pub foulborn: bool,
     pub vestigial: bool,
     pub advanced_copy: bool,
+    /// Parsed from in-game advanced copy text (`{ ... }` headers), whose
+    /// lines are re-sorted into stat order
+    pub has_modifier_headers: bool,
     pub corruptible: bool,
     pub can_be_influenced: bool,
 
@@ -1042,6 +1049,7 @@ impl Item {
         self.explicit_mod_lines = vec![];
         self.crucible_mod_lines = vec![];
         self.advanced_copy = false;
+        self.has_modifier_headers = false;
         self.mod_magnitude_mods = vec![];
         let mut implicit_lines = 0.0;
         self.variant_list = None;
@@ -1114,6 +1122,7 @@ impl Item {
             } else if line.starts_with("{ ") {
                 // Advanced copy format
                 self.advanced_copy = true;
+                self.has_modifier_headers = true;
                 line_prefix.clear();
                 line_postfix.clear();
                 self.crafted = true;
@@ -1826,6 +1835,7 @@ impl Item {
                 );
             } else if (0.0..=1.0).contains(&best_range) {
                 ml.range = Some(best_range);
+                ml.range_from_value = true;
             }
         }
         let corrupted = ml.corrupted_range;
@@ -2180,7 +2190,7 @@ impl Item {
     ) -> Result<()> {
         let data = ctx.data;
         let unique = self.rarity == "UNIQUE" || self.rarity == "RELIC";
-        if self.advanced_copy && unique {
+        if self.has_modifier_headers && unique {
             for ml in &mut self.explicit_mod_lines {
                 let exact = ml.line.to_ascii_lowercase().replace('\n', " ");
                 ml.order = data
@@ -2225,7 +2235,7 @@ impl Item {
         if (self.advanced_copy || self.crafted) && !self.mod_magnitude_mods.is_empty() {
             self.apply_mod_magnitudes(ctx)?;
         }
-        if self.advanced_copy && self.explicit_mod_lines.len() > 1 {
+        if self.has_modifier_headers && self.explicit_mod_lines.len() > 1 {
             // sortCraftedModLines
             let group = |m: &ModLine| {
                 if m.flags.crafted || m.flags.custom {
@@ -2319,7 +2329,18 @@ impl Item {
             && let Some(enchant) = &base.enchant
             && self.enchant_mod_lines.is_empty()
         {
+            // Items saved before their base gained this enchant carry it as
+            // an implicit
+            let active: Vec<String> = self
+                .implicit_mod_lines
+                .iter()
+                .filter(|m| self.check_mod_line_variant(m))
+                .map(|m| m.line.clone())
+                .collect();
             for (i, line) in gmatch1(enchant, "[^\n]+").into_iter().enumerate() {
+                if active.contains(&line) {
+                    continue;
+                }
                 let (list, extra) = Item::parse_mod(ctx, &line)?;
                 self.enchant_mod_lines.push(ModLine {
                     line,
@@ -2329,6 +2350,7 @@ impl Item {
                         enchant: true,
                         ..LineFlags::default()
                     },
+                    added_from_base: true,
                     extra,
                     mod_list: list.unwrap_or_default(),
                     mod_tags: base
