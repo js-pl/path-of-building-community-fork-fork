@@ -106,7 +106,13 @@ What remains for the full migration, in order:
    translated 74 s in total). A typed load that fails (or the character
    level's auto mode) and any command only the translation has that
    changes the build hand the build to the translation until the next
-   load. Next: Calcs tab cells and breakdowns, node power, the simple
+   load. `nodePower` is typed (`engine::power::node_power` on a
+   `MiscCalculator`), equal to the translation's on gen-0001 and gen-0002
+   for combined offence/defence and Full DPS (`SESSION_POWER=<id>` runs
+   others); the browser's background worker, which only loads builds and
+   runs node power, no longer needs the translation. Next: Calcs tab
+   cells and breakdowns (they need the `CALCS` calculation's stores
+   kept for `{mod:}` cells and the breakdowns' mod lists), the simple
    edits, save and export.
 
 ## Done
