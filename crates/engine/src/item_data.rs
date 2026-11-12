@@ -7,6 +7,7 @@
 //! on the order (the best partial base name match, which affix a mod name
 //! picks); they are kept in the order the data lists them.
 
+use crate::codec::{self, Codec, Reader, Writer};
 use crate::mods::convert::{array, get, number, opt_number, text};
 use lua::{Key, Value};
 use std::collections::{HashMap, HashSet};
@@ -80,22 +81,31 @@ pub struct Affix {
 /// A table of affixes, in data order
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct AffixSet {
-    pub list: Vec<Affix>,
+    /// Sets share the affixes of the same table (`itemMods.Item` holds
+    /// the other groups')
+    pub list: Vec<Rc<Affix>>,
     index: HashMap<String, usize>,
 }
 
 impl AffixSet {
     pub fn get(&self, id: &str) -> Option<&Affix> {
-        self.index.get(id).map(|&i| &self.list[i])
+        self.index.get(id).map(|&i| &*self.list[i])
     }
 
-    fn from_lua(v: &Value) -> Result<AffixSet> {
+    /// `seen`: the affixes read so far, by table
+    fn from_lua(v: &Value, seen: &mut HashMap<usize, Rc<Affix>>) -> Result<AffixSet> {
         let mut set = AffixSet::default();
         for (k, m) in pairs(v) {
             let Key::Str(id) = k else {
                 return Err(format!("affix key {k:?}"));
             };
             let id = id.to_str_lossy().into_owned();
+            let addr = m.as_table().map(|t| Rc::as_ptr(&t.0) as usize);
+            if let Some(a) = addr.and_then(|p| seen.get(&p)).filter(|a| a.id == id) {
+                set.index.insert(id, set.list.len());
+                set.list.push(a.clone());
+                continue;
+            }
             let strings = |field: &str| -> Result<Vec<String>> {
                 array(&get(&m, field)).iter().map(string).collect()
             };
@@ -114,6 +124,10 @@ impl AffixSet {
                 weight_multiplier_key: strings("weightMultiplierKey")?,
                 weight_multiplier_val: numbers("weightMultiplierVal")?,
             };
+            let affix = Rc::new(affix);
+            if let Some(p) = addr {
+                seen.insert(p, affix.clone());
+            }
             set.index.insert(id, set.list.len());
             set.list.push(affix);
         }
@@ -163,7 +177,7 @@ pub struct Scalability {
     pub formats: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ItemData {
     bases: Vec<Rc<Base>>,
     base_index: HashMap<String, usize>,
@@ -358,11 +372,12 @@ impl ItemData {
         }
         // Tables shared between groups (and with rareLikeUniques) are read once
         let mut by_table: Vec<(Value, Rc<AffixSet>)> = Vec::new();
+        let mut affixes = HashMap::new();
         let mut set_of = |v: &Value| -> Result<Rc<AffixSet>> {
             if let Some((_, s)) = by_table.iter().find(|(t, _)| t.raw_eq(v)) {
                 return Ok(s.clone());
             }
-            let s = Rc::new(AffixSet::from_lua(v)?);
+            let s = Rc::new(AffixSet::from_lua(v, &mut affixes)?);
             by_table.push((v.clone(), s.clone()));
             Ok(s)
         };
@@ -525,6 +540,224 @@ impl crate::mods::list::Precision for ItemData {
 
     fn default_high_precision(&self) -> f64 {
         self.default_high_precision
+    }
+}
+
+crate::codec_struct!(Req {
+    level,
+    str,
+    dex,
+    int
+});
+crate::codec_struct!(FlaskBase {
+    life,
+    mana,
+    duration,
+    charges_used,
+    charges_max,
+    buff
+});
+crate::codec_struct!(TinctureBase {
+    mana_burn,
+    cooldown,
+    buff
+});
+crate::codec_struct!(Base {
+    name,
+    typ,
+    sub_type,
+    tags,
+    influence_tags,
+    req,
+    socket_limit,
+    weapon,
+    armour,
+    flask,
+    tincture,
+    enchant,
+    enchant_mod_types,
+});
+crate::codec_struct!(Affix {
+    id,
+    typ,
+    affix,
+    lines,
+    stat_order,
+    mod_tags,
+    weight_key,
+    weight_val,
+    weight_multiplier_key,
+    weight_multiplier_val,
+});
+crate::codec_struct!(ClusterSkill {
+    name,
+    stats,
+    mastery
+});
+crate::codec_struct!(ClusterJewel {
+    size,
+    size_index,
+    min_nodes,
+    max_nodes,
+    skills,
+    skill_data,
+    small_indicies,
+    notable_indicies,
+    socket_indicies,
+    total_indicies,
+});
+crate::codec_struct!(Scalability {
+    is_scalable,
+    formats
+});
+
+/// The affixes and affix sets, each written once however many sets and
+/// groups share it
+impl Codec for ItemData {
+    fn put(&self, w: &mut Writer) {
+        let mut affixes: Vec<&Rc<Affix>> = Vec::new();
+        let mut affix_index: HashMap<*const Affix, usize> = HashMap::new();
+        let mut sets: Vec<Rc<AffixSet>> = Vec::new();
+        let mut set_index = |s: &Rc<AffixSet>| match sets.iter().position(|x| Rc::ptr_eq(x, s)) {
+            Some(i) => i,
+            None => {
+                sets.push(s.clone());
+                sets.len() - 1
+            }
+        };
+        let mut groups: Vec<_> = self.item_mods.iter().collect();
+        groups.sort_unstable_by_key(|(k, _)| *k);
+        let groups: Vec<(&String, usize)> =
+            groups.into_iter().map(|(k, s)| (k, set_index(s))).collect();
+        let mut rare: Vec<_> = self.rare_like_uniques.iter().collect();
+        rare.sort_unstable_by_key(|(k, _)| *k);
+        let rare: Vec<_> = rare
+            .into_iter()
+            .map(|(k, u)| (k, set_index(&u.affixes), u))
+            .collect();
+        let sets: Vec<Vec<usize>> = sets
+            .iter()
+            .map(|s| {
+                s.list
+                    .iter()
+                    .map(|a| {
+                        *affix_index.entry(Rc::as_ptr(a)).or_insert_with(|| {
+                            affixes.push(a);
+                            affixes.len() - 1
+                        })
+                    })
+                    .collect()
+            })
+            .collect();
+        w.uint(affixes.len() as u64);
+        for a in affixes {
+            a.put(w);
+        }
+        sets.put(w);
+        w.uint(groups.len() as u64);
+        for (k, i) in groups {
+            k.put(w);
+            i.put(w);
+        }
+        w.uint(rare.len() as u64);
+        for (k, i, u) in rare {
+            k.put(w);
+            i.put(w);
+            u.valid_base_tags.put(w);
+            u.prefix_limit.put(w);
+            u.suffix_limit.put(w);
+            u.ignore_mod_type.put(w);
+        }
+        self.bases.put(w);
+        self.foulborn_map.put(w);
+        self.cluster_jewels.put(w);
+        self.cluster_notable_sort_order.put(w);
+        self.cluster_orbit_offsets.put(w);
+        self.mod_scalability.put(w);
+        self.high_precision_mods.put(w);
+        self.item_tag_special.put(w);
+        self.item_tag_special_exclusion.put(w);
+        self.default_high_precision.put(w);
+        self.color_codes.put(w);
+        self.caster_tag_crucible_uniques.put(w);
+        self.minion_tag_crucible_uniques.put(w);
+        self.unique_stat_order_exact.put(w);
+        self.unique_stat_order_normalised.put(w);
+    }
+
+    fn get(r: &mut Reader) -> codec::Result<Self> {
+        let affixes = Vec::<Rc<Affix>>::get(r)?;
+        let sets = Vec::<Vec<usize>>::get(r)?
+            .into_iter()
+            .map(|s| {
+                let list = s
+                    .into_iter()
+                    .map(|i| {
+                        affixes
+                            .get(i)
+                            .cloned()
+                            .ok_or_else(|| "bad affix index".into())
+                    })
+                    .collect::<codec::Result<Vec<_>>>()?;
+                let index = list
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| (a.id.clone(), i))
+                    .collect();
+                Ok(Rc::new(AffixSet { list, index }))
+            })
+            .collect::<codec::Result<Vec<_>>>()?;
+        let set = |i: usize| -> codec::Result<_> {
+            sets.get(i)
+                .cloned()
+                .ok_or_else(|| "bad affix set index".into())
+        };
+        let mut item_mods = HashMap::new();
+        for _ in 0..r.count()? {
+            let k = String::get(r)?;
+            item_mods.insert(k, set(usize::get(r)?)?);
+        }
+        let mut rare_like_uniques = HashMap::new();
+        for _ in 0..r.count()? {
+            let k = String::get(r)?;
+            let affixes = set(usize::get(r)?)?;
+            rare_like_uniques.insert(
+                k,
+                RareLikeUnique {
+                    affixes,
+                    valid_base_tags: Codec::get(r)?,
+                    prefix_limit: Codec::get(r)?,
+                    suffix_limit: Codec::get(r)?,
+                    ignore_mod_type: Codec::get(r)?,
+                },
+            );
+        }
+        let bases = Vec::<Rc<Base>>::get(r)?;
+        let base_index = bases
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (b.name.clone(), i))
+            .collect();
+        Ok(ItemData {
+            bases,
+            base_index,
+            item_mods,
+            rare_like_uniques,
+            foulborn_map: Codec::get(r)?,
+            cluster_jewels: Codec::get(r)?,
+            cluster_notable_sort_order: Codec::get(r)?,
+            cluster_orbit_offsets: Codec::get(r)?,
+            mod_scalability: Codec::get(r)?,
+            high_precision_mods: Codec::get(r)?,
+            item_tag_special: Codec::get(r)?,
+            item_tag_special_exclusion: Codec::get(r)?,
+            default_high_precision: Codec::get(r)?,
+            color_codes: Codec::get(r)?,
+            caster_tag_crucible_uniques: Codec::get(r)?,
+            minion_tag_crucible_uniques: Codec::get(r)?,
+            unique_stat_order_exact: Codec::get(r)?,
+            unique_stat_order_normalised: Codec::get(r)?,
+        })
     }
 }
 

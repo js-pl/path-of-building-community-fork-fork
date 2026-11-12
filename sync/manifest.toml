@@ -319,7 +319,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/ConfigModBrowser.lua" = { status = "todo" }
 "Modules/ConfigOptions.lua" = { status = "partial", port = "crates/engine/src/config.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/ConfigVisibility.lua" = { status = "todo" }
-"Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs crates/engine/src/power.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs crates/gamedata/src/data_lua.rs crates/engine/src/power.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/DataAbyssJewelLookUpTableHelper.lua" = { status = "todo" }
 "Modules/DataJewelFileLoader.lua" = { status = "todo" }
 "Modules/DataLegionLookUpTableHelper.lua" = { status = "todo" }

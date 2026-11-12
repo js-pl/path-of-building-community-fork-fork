@@ -81,7 +81,11 @@ What remains for the full migration, in order:
    environment built once (`node_power` keeps its API); parallelism
    needs the engine's `Rc` data shared or rebuilt per worker. Then item,
    gem and anoint comparisons on the calculator.
-4. `Data.lua` into the importer, so no Lua runs at load.
+4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
+   makes the typed data at build time (`engine::game_data::GameData`, in
+   `engine::codec`'s binary form). Done: the item data. Next: skills and
+   gems, the setup and config data, the trees; then `TypedData` loads
+   the binary and the `from_lua` paths go.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -155,9 +159,12 @@ minion's output (as the player's `output.Minion`), its database and its
 skills' mod lists at each stage, and after the minion's own defence and
 offence.
 
-Game data is still read from upstream's processed Lua `data` table
-(`SetupData`, `ItemData`, `SkillData`, `ConfigData` `from_lua`); porting
-`Data.lua` to the importer comes later.
+The equivalence tests still read the game data from upstream's processed
+Lua `data` table (`SetupData`, `ItemData`, `SkillData`, `ConfigData`
+`from_lua`). `crates/gamedata` makes it from the importer's tables
+instead, family by family; `tests/game_data.rs` compares the two (items
+so far: 4.3 MB, 1.0 MB compressed, read in about 0.1 s natively, where
+starting upstream's host takes about 10 s).
 
 ## Not ported yet in `initEnv`
 

@@ -71,8 +71,9 @@ straightforward path, see [Equivalence testing](#equivalence-testing).
 
 ```text
 web/ (TypeScript, Preact)               crates/
-+-- UI: tree, items, skills, config,    +-- importer  build time: upstream Lua data -> typed data
-|   calcs, notes, import/export         +-- engine    data model, mod parser, calcs, power calcs
++-- UI: tree, items, skills, config,    +-- importer  build time: evaluates upstream's Lua data
+|   calcs, notes, import/export         +-- gamedata  build time: Data.lua's processing -> typed data
+|                                       +-- engine    data model, mod parser, calcs, power calcs
 +-- engine client (RPC)                 +-- session   engine API: build sessions, JSON commands
 `-- worker pool --- engine.wasm ------> +-- wasm      C ABI over session for the browser
                                         +-- cli       `pob`: native runner, data bundles, benchmarks
@@ -96,6 +97,12 @@ web/ (TypeScript, Preact)               crates/
   (`core.bin`), and every tree version as separate files. The site serves them
   as static assets; files the engine finds missing (older trees) are fetched
   and the request retried. They are not compiled into the wasm module.
+  The typed engine's game data is made at build time by `crates/gamedata`
+  (the importer's tables with `Data.lua`'s processing, read into the
+  engine's typed tables) and stored in `engine::codec`'s binary form:
+  varints, interned strings, shared tables written once, compressed by the
+  bundle. The engine decodes it (`engine::game_data::GameData`) without
+  running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.
 - **Workers.** One engine instance per worker, communicating by messages: a
@@ -117,6 +124,7 @@ equivalence tests.
 | Upstream | Port |
 | --- | --- |
 | `src/Data`, `src/TreeData` | `crates/importer` (no port, read at build time) |
+| `src/Modules/Data.lua` | `crates/gamedata` (build time), `crates/engine/src/data.rs` |
 | `src/Modules/Calc*.lua`, `ModParser.lua`, `ModTools.lua`, `ItemTools.lua` | `crates/engine` |
 | Logic classes: `ModDB`, `ModList`, `ModStore`, `Item`, `PassiveSpec`, `PassiveTree`, ... | `crates/engine` |
 | UI classes: `*Tab.lua`, `*Control.lua`, `PassiveTreeView.lua`, ... | `web/` |
@@ -408,9 +416,9 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is
-   upstream's. The item data is read from upstream's processed `data`
-   table for now; porting `Data.lua`'s item processing makes it typed data
-   of the importer.
+   upstream's. The game data moves to `crates/gamedata` family by family:
+   `tests/game_data.rs` checks that what it makes, written and read back,
+   equals what the typed tables read from a started upstream's `data`.
 
    Upstream mutates shared data in a few places, and the typed engine does
    not copy that by accident: `modLib.mergeKeystones` sets the source of a

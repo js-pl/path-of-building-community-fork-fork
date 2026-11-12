@@ -1,0 +1,13 @@
+[package]
+name = "gamedata"
+description = "The engine's typed game data, made from upstream's data files at build time"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+lua.workspace = true
+importer.workspace = true
+engine.workspace = true
