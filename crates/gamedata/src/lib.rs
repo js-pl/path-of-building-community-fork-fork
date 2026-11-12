@@ -9,17 +9,22 @@ mod jsonc;
 
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
+use engine::config_tab::OptionDefault;
 use engine::game_data::GameData;
 use engine::item_data::ItemData;
+use engine::mod_parser::ModParser;
 use engine::skill_data::SkillData;
+use engine::tree::PassiveTree;
+use lua::Key;
 use lua::{TableRef, Value};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub type Result<T> = std::result::Result<T, String>;
 
 /// Upstream's `data` table as `Data.lua` leaves it (the parts ported so
 /// far), with the globals of `Data/Global.lua`
 pub struct Source {
+    pub src_dir: PathBuf,
     pub globals: TableRef,
     pub data: TableRef,
 }
@@ -30,12 +35,115 @@ impl Source {
     pub fn load(src_dir: &Path) -> Result<Source> {
         let raw = importer::import(src_dir).map_err(|e| e.to_string())?;
         let src = Source {
+            src_dir: src_dir.to_path_buf(),
             globals: raw.globals,
             data: raw.data,
         };
-        data_lua::process(&src, src_dir)?;
+        data_lua::process(&src)?;
         engine::data::Data::new(src.globals.clone(), src.data.clone());
         Ok(src)
+    }
+
+    /// An importer with the globals and `data` upstream's modules see
+    pub fn importer(&self) -> importer::Importer {
+        let mut im = importer::Importer::new(&self.src_dir);
+        for (k, v) in self.globals.entries() {
+            if let Key::Str(name) = k {
+                im.env.globals.insert(name.to_str_lossy().into_owned(), v);
+            }
+        }
+        im.env
+            .globals
+            .insert("data".into(), Value::Table(self.data.clone()));
+        im
+    }
+
+    /// `treeVersionList` of `GameVersions.lua`, oldest first
+    pub fn tree_versions(&self) -> Result<Vec<String>> {
+        let mut im = self.importer();
+        im.load("GameVersions", vec![]).map_err(|e| e.to_string())?;
+        let list = im.global("treeVersionList");
+        let list = list.as_table().ok_or("no treeVersionList")?.array();
+        let versions: Vec<String> = list
+            .iter()
+            .map(|v| v.as_str().map(|s| s.to_str_lossy().into_owned()))
+            .collect::<Option<_>>()
+            .ok_or("treeVersionList holds a non-string")?;
+        if versions.is_empty() {
+            return Err("treeVersionList is empty".into());
+        }
+        Ok(versions)
+    }
+
+    /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
+    /// data: its functions are ported by name in `engine::config`
+    pub fn option_defaults(&self) -> Result<Vec<OptionDefault>> {
+        let mut im = self.importer();
+        for g in ["string", "table"] {
+            im.env
+                .globals
+                .entry(g.into())
+                .or_insert_with(|| Value::Table(TableRef::new()));
+        }
+        let list = im
+            .load1("Modules/ConfigOptions", vec![])
+            .map_err(|e| e.to_string())?;
+        Ok(engine::config_tab::option_defaults(&list))
+    }
+
+    /// The labels of `data.jewelRadius` for a tree version
+    /// (`data.setJewelRadiiGlobally`)
+    pub fn jewel_radius(&self, version: &str) -> Result<Vec<String>> {
+        let mut nums = version.split('_').filter_map(|p| p.parse::<u32>().ok());
+        let (major, minor) = (nums.next().unwrap_or(0), nums.next().unwrap_or(0));
+        let set = if major <= 3 && minor <= 15 {
+            "3_15"
+        } else {
+            "3_16"
+        };
+        let radii = self.data.get_str("jewelRadii");
+        let list = radii.as_table().map(|t| t.get_str(set)).unwrap_or_default();
+        list.as_table()
+            .ok_or("no jewel radii")?
+            .array()
+            .iter()
+            .map(|r| {
+                r.as_table()
+                    .and_then(|r| {
+                        r.get_str("label")
+                            .as_str()
+                            .map(|s| s.to_str_lossy().into_owned())
+                    })
+                    .ok_or_else(|| "a jewel radius without a label".to_string())
+            })
+            .collect()
+    }
+
+    /// The mod parser, with upstream's mod cache preloaded
+    pub fn mod_parser(&self) -> Result<ModParser> {
+        let raw = importer::import(&self.src_dir).map_err(|e| e.to_string())?;
+        let data = engine::data::Data::new(raw.globals.clone(), raw.data.clone());
+        let mut im = importer::Importer::new(&self.src_dir);
+        let tables = importer::mod_parser::import(&mut im, &raw).map_err(|e| e.to_string())?;
+        let parser = ModParser::new(data, &tables).map_err(|e| e.to_string())?;
+        let cache = importer::mod_parser::import_mod_cache(&mut im).map_err(|e| e.to_string())?;
+        parser.preload(&cache);
+        Ok(parser)
+    }
+
+    /// A tree version's passive tree, with the timeless jewels' keystones
+    pub fn tree(&self, version: &str, parser: &ModParser, latest: bool) -> Result<PassiveTree> {
+        let mut im = importer::Importer::new(&self.src_dir);
+        let data = im
+            .load1(&format!("TreeData/{version}/tree"), vec![])
+            .map_err(|e| e.to_string())?;
+        let radii = engine::tree::jewel_radii(&self.data.get_str("jewelRadii"), version)?;
+        let mut tree = PassiveTree::new(version, &data, &radii, parser, latest)?;
+        let legion = im
+            .load1("Data/TimelessJewelData/LegionPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        tree.add_legion_keystones(&legion, parser)?;
+        Ok(tree)
     }
 
     pub fn global(&self, name: &str) -> Value {
@@ -75,11 +183,15 @@ impl Source {
     }
 
     pub fn game_data(&self) -> Result<GameData> {
+        let versions = self.tree_versions()?;
         Ok(GameData {
             items: self.items()?,
             skills: self.skills()?,
             setup: self.setup()?,
             config: self.config()?,
+            option_defaults: self.option_defaults()?,
+            jewel_radius: self.jewel_radius(versions.last().unwrap())?,
+            tree_versions: versions,
         })
     }
 }

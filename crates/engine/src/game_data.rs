@@ -5,6 +5,7 @@
 use crate::calc_setup::SetupData;
 use crate::codec;
 use crate::config::ConfigData;
+use crate::config_tab::OptionDefault;
 use crate::item_data::ItemData;
 use crate::skill_data::SkillData;
 
@@ -14,13 +15,22 @@ pub struct GameData {
     pub skills: SkillData,
     pub setup: SetupData,
     pub config: ConfigData,
+    /// What a new config set gives each option
+    pub option_defaults: Vec<OptionDefault>,
+    /// `data.jewelRadius` labels on the latest tree
+    pub jewel_radius: Vec<String>,
+    /// `treeVersionList`, oldest first; the last is the latest
+    pub tree_versions: Vec<String>,
 }
 
 crate::codec_struct!(GameData {
     items,
     skills,
     setup,
-    config
+    config,
+    option_defaults,
+    jewel_radius,
+    tree_versions,
 });
 
 impl GameData {
@@ -31,5 +41,11 @@ impl GameData {
 
     pub fn encode(&self) -> Vec<u8> {
         codec::encode(self)
+    }
+}
+
+impl GameData {
+    pub fn latest_tree_version(&self) -> &str {
+        self.tree_versions.last().map_or("", String::as_str)
     }
 }

@@ -289,3 +289,9 @@ impl ConfigTab {
         Ok(tab)
     }
 }
+
+crate::codec_struct!(OptionDefault {
+    var,
+    state,
+    placeholder
+});

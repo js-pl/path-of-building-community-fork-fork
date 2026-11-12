@@ -12,9 +12,10 @@ use engine::config::ConfigData;
 use engine::game_data::GameData;
 use engine::item_data::ItemData;
 use engine::skill_data::{GrantedEffect, SkillData};
+use engine::tree::PassiveTree;
 use equivalence::upstream_src;
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use upstream::host::Host;
 use upstream::imported::Imported;
 
@@ -252,6 +253,37 @@ fn typed_data_matches_upstream() {
     let config = ConfigData::from_lua(&ldata, &host.global("SkillType"))
         .unwrap_or_else(|e| panic!("config data: {e}"));
     let from_lua = t.elapsed();
+    let var_list = lua::rt::call(
+        &host.global("LoadModule"),
+        &[lua::Value::str("Modules/ConfigOptions")],
+    )
+    .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())))
+    .into_iter()
+    .next()
+    .unwrap();
+    assert_eq!(
+        data.option_defaults,
+        engine::config_tab::option_defaults(&var_list)
+    );
+    let radius: Vec<String> = ldata
+        .as_table()
+        .unwrap()
+        .get_str("jewelRadius")
+        .as_table()
+        .unwrap()
+        .array()
+        .iter()
+        .map(|r| {
+            lua::to_string(&r.as_table().unwrap().get_str("label"))
+                .to_str_lossy()
+                .into_owned()
+        })
+        .collect();
+    assert_eq!(data.jewel_radius, radius);
+    assert_eq!(
+        data.latest_tree_version(),
+        lua::to_string(&host.global("latestTreeVersion")).to_str_lossy()
+    );
     let packed = miniz_oxide::deflate::compress_to_vec_zlib(&bytes, 6);
     eprintln!(
         "typed data: {} bytes, {} compressed; made in {make:?}, read in {read:?}; \
@@ -267,4 +299,31 @@ fn typed_data_matches_upstream() {
     ]
     .concat();
     assert!(diffs.is_empty(), "typed data differs: {diffs:#?}");
+}
+
+/// Every tree version reads back equal from its binary form
+#[test]
+fn trees_round_trip() {
+    let src = gamedata::Source::load(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+    let parser = src.mod_parser().unwrap_or_else(|e| panic!("{e}"));
+    let versions = src.tree_versions().unwrap_or_else(|e| panic!("{e}"));
+    let (mut size, mut packed, mut make, mut read) = (0, 0, Duration::ZERO, Duration::ZERO);
+    for v in &versions {
+        let t = Instant::now();
+        let tree = src
+            .tree(v, &parser, v == versions.last().unwrap())
+            .unwrap_or_else(|e| panic!("{v}: {e}"));
+        make += t.elapsed();
+        let bytes = tree.encode();
+        let t = Instant::now();
+        let back = PassiveTree::decode(&bytes).unwrap_or_else(|e| panic!("{v}: {e}"));
+        read += t.elapsed();
+        assert!(back.encode() == bytes, "{v} reads back different");
+        size += bytes.len();
+        packed += miniz_oxide::deflate::compress_to_vec_zlib(&bytes, 6).len();
+    }
+    eprintln!(
+        "{} trees: {size} bytes, {packed} compressed; made in {make:?}, read in {read:?}",
+        versions.len()
+    );
 }

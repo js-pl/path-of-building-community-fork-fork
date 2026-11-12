@@ -8,7 +8,6 @@ use crate::{Result, Source};
 use engine::pat;
 use lua::{Key, TableRef, Value};
 use std::cmp::Ordering;
-use std::path::Path;
 
 /// The literal tables of `Data.lua` the typed data reads
 const LITERALS: &[&str] = &[
@@ -24,16 +23,8 @@ const LITERALS: &[&str] = &[
     "data.minionTagCrucibleUniques",
 ];
 
-pub fn process(src: &Source, src_dir: &Path) -> Result<()> {
-    let mut im = importer::Importer::new(src_dir);
-    for (k, v) in src.globals.entries() {
-        if let Key::Str(name) = k {
-            im.env.globals.insert(name.to_str_lossy().into_owned(), v);
-        }
-    }
-    im.env
-        .globals
-        .insert("data".into(), Value::Table(src.data.clone()));
+pub fn process(src: &Source) -> Result<()> {
+    let mut im = src.importer();
     let text = im.read("Modules/Data.lua").map_err(|e| e.to_string())?;
     im.env
         .eval_assigns("Modules/Data.lua", &text, LITERALS)

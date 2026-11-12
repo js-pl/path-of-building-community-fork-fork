@@ -84,9 +84,9 @@ What remains for the full migration, in order:
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData`, in
    `engine::codec`'s binary form). Done: the item, skill and gem, setup
-   and config data. Next: the trees, the Configuration tab's option
-   defaults and jewel radii; then `TypedData` loads the binary and the
-   `from_lua` paths go.
+   and config data, the Configuration tab's option defaults, jewel radii
+   and tree versions, and each tree version's passive tree (one file per
+   version, its stats parsed). Next: `TypedData` loads the binary.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -164,8 +164,10 @@ The equivalence tests still read the game data from upstream's processed
 Lua `data` table (`SetupData`, `ItemData`, `SkillData`, `ConfigData`
 `from_lua`). `crates/gamedata` makes it from the importer's tables
 instead, family by family; `tests/game_data.rs` compares the two (items,
-skills, setup and config so far: 6.2 MB, 1.6 MB compressed, read in
-about 0.15 s natively, where starting upstream's host takes about 10 s).
+skills, setup and config: 6.2 MB, 1.6 MB compressed, read in about
+0.15 s natively, where starting upstream's host takes about 10 s; the
+41 trees: 31 MB, 13.6 MB compressed, about 12 ms each to read, 0.5 s
+each to make).
 
 ## Not ported yet in `initEnv`
 
