@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Chieftain" bandit="None" characterLevelAutoMode="false" className="Marauder" level="81" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageDamage" value="371.291503968"/>
-		<PlayerStat stat="AverageBurstDamage" value="371.291503968"/>
+		<PlayerStat stat="AverageDamage" value="374.092743024"/>
+		<PlayerStat stat="AverageBurstDamage" value="374.092743024"/>
 		<PlayerStat stat="Speed" value="3.51168"/>
 		<PlayerStat stat="HitSpeed" value="1.75584"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="5.6"/>
 		<PlayerStat stat="CritChance" value="3.808"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
 		<PlayerStat stat="HitChance" value="68"/>
-		<PlayerStat stat="TotalDPS" value="651.92847432717"/>
+		<PlayerStat stat="TotalDPS" value="656.84700191126"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="651.92847432717"/>
-		<PlayerStat stat="IgniteDPS" value="96.422749888554"/>
-		<PlayerStat stat="WithIgniteDPS" value="748.35122421573"/>
-		<PlayerStat stat="WithPoisonDPS" value="651.92847432717"/>
-		<PlayerStat stat="TotalDotDPS" value="96.422749888554"/>
+		<PlayerStat stat="WithBleedDPS" value="656.84700191126"/>
+		<PlayerStat stat="IgniteDPS" value="97.042831881407"/>
+		<PlayerStat stat="WithIgniteDPS" value="753.88983379267"/>
+		<PlayerStat stat="WithPoisonDPS" value="656.84700191126"/>
+		<PlayerStat stat="TotalDotDPS" value="97.042831881407"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="748.35122421573"/>
+		<PlayerStat stat="CombinedDPS" value="753.88983379267"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.4"/>
-		<PlayerStat stat="ManaCost" value="5.3846153846154"/>
+		<PlayerStat stat="ManaCost" value="5"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="18.909046153846"/>
+		<PlayerStat stat="ManaPerSecondCost" value="17.5584"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -661,7 +661,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemLifeGainOnHit" level="20" nameSpec="Life Gain on Hit" quality="0" skillId="SupportLifeGainOnHit" variantId="SupportLifeGainOnHit"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemVaalAnimateWeapon" level="21" nameSpec="Vaal Animate Weapon of Ranged Arms" quality="20" skillId="VaalAnimateWeapon" skillMinion="AnimatedWeapon" skillMinionItemSet="1" skillMinionSkill="1" skillMinionSkillCalcs="1" variantId="VaalAnimateWeaponAltY"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemVaalAnimateWeapon" level="21" nameSpec="Vaal Animate Weapon of Self Reflection" quality="20" skillId="VaalAnimateWeapon" skillMinion="AnimatedWeapon" skillMinionItemSet="1" skillMinionSkill="1" skillMinionSkillCalcs="1" variantId="VaalAnimateWeaponAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemGenerosity" level="20" nameSpec="Generosity" quality="0" skillId="SupportGenerosity" variantId="SupportGenerosity"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">

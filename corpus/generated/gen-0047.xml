@@ -1,26 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Champion" bandit="None" characterLevelAutoMode="false" className="Duelist" level="84" mainSocketGroup="1" pantheonMajorGod="TheBrineKing" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageDamage" value="281.75454569219"/>
-		<PlayerStat stat="AverageBurstDamage" value="281.75454569219"/>
+		<PlayerStat stat="AverageDamage" value="281.75409134177"/>
+		<PlayerStat stat="AverageBurstDamage" value="281.75409134177"/>
 		<PlayerStat stat="Speed" value="6.6051"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="32.52032"/>
-		<PlayerStat stat="CritChance" value="15.9349568"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="32.52"/>
+		<PlayerStat stat="CritChance" value="15.9348"/>
 		<PlayerStat stat="CritMultiplier" value="2.23"/>
 		<PlayerStat stat="HitChance" value="49"/>
-		<PlayerStat stat="TotalDPS" value="1861.0169497515"/>
+		<PlayerStat stat="TotalDPS" value="1861.0139487215"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="BleedDPS" value="473.340437176"/>
-		<PlayerStat stat="WithBleedDPS" value="2334.3573869275"/>
-		<PlayerStat stat="IgniteDPS" value="140.9270696159"/>
-		<PlayerStat stat="WithIgniteDPS" value="2001.9440193674"/>
-		<PlayerStat stat="WithPoisonDPS" value="1861.0169497515"/>
-		<PlayerStat stat="TotalDotDPS" value="614.2675067919"/>
-		<PlayerStat stat="ImpaleDPS" value="24.374275611076"/>
-		<PlayerStat stat="WithImpaleDPS" value="1885.3912253625"/>
+		<PlayerStat stat="BleedDPS" value="473.34016222169"/>
+		<PlayerStat stat="WithBleedDPS" value="2334.3541109432"/>
+		<PlayerStat stat="IgniteDPS" value="140.92690311508"/>
+		<PlayerStat stat="WithIgniteDPS" value="2001.9408518366"/>
+		<PlayerStat stat="WithPoisonDPS" value="1861.0139487215"/>
+		<PlayerStat stat="TotalDotDPS" value="614.26706533677"/>
+		<PlayerStat stat="ImpaleDPS" value="24.374236305721"/>
+		<PlayerStat stat="WithImpaleDPS" value="1885.3881850272"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="2499.6587321544"/>
+		<PlayerStat stat="CombinedDPS" value="2499.655250364"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.4"/>
 		<PlayerStat stat="ManaCost" value="5"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -55,13 +55,13 @@
 		<PlayerStat stat="LifeRecoverable" value="1754"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="0"/>
-		<PlayerStat stat="LifeLeechGainRate" value="8.3020423005158"/>
+		<PlayerStat stat="LifeLeechGainRate" value="8.3020289128475"/>
 		<PlayerStat stat="Mana" value="1054"/>
 		<PlayerStat stat="Spec:ManaInc" value="55"/>
 		<PlayerStat stat="ManaUnreserved" value="583"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="55.313092979127"/>
 		<PlayerStat stat="ManaRegenRecovery" value="27.7"/>
-		<PlayerStat stat="ManaLeechGainRate" value="8.5165359258932"/>
+		<PlayerStat stat="ManaLeechGainRate" value="8.5165221923378"/>
 		<PlayerStat stat="EnergyShield" value="781"/>
 		<PlayerStat stat="EnergyShieldRecoveryCap" value="781"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>

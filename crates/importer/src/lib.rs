@@ -245,7 +245,11 @@ pub fn import(src_dir: &Path) -> Result<Raw> {
     let set = |k: &str, v: Value| data.set_str(k, v);
 
     im.load("Data/Global", vec![])?;
-    im.load("Data/Misc", vec![Value::Table(data.clone())])?;
+    if let Value::Table(misc) = im.load1("Data/Misc", vec![])? {
+        for (k, v) in misc.entries() {
+            data.set(k.to_value(), v);
+        }
+    }
     // Constants Modules/Data.lua defines itself
     let data_lua = im.read("Modules/Data.lua")?;
     im.env
@@ -305,12 +309,17 @@ pub fn import(src_dir: &Path) -> Result<Raw> {
     ] {
         set(key, im.load1(&format!("Data/{file}"), vec![])?);
     }
-    let bosses = TableRef::new();
-    im.load("Data/Bosses", vec![Value::Table(bosses.clone())])?;
-    set("bosses", Value::Table(bosses));
-    let mut boss_skills = im.load("Data/BossSkills", vec![])?.into_iter();
-    set("bossSkills", boss_skills.next().unwrap_or_default());
-    set("bossSkillsList", boss_skills.next().unwrap_or_default());
+    set("bosses", im.load1("Data/Bosses", vec![])?);
+    let boss_skills = im.load1("Data/BossSkills", vec![])?;
+    for k in ["bossSkills", "bossSkillsList"] {
+        set(
+            k,
+            boss_skills
+                .as_table()
+                .map(|t| t.get_str(k))
+                .unwrap_or_default(),
+        );
+    }
 
     let (skill_mod, flag_mod, data_mod) = skill_mod_natives(&mut im.env);
     set(
@@ -334,22 +343,14 @@ pub fn import(src_dir: &Path) -> Result<Raw> {
     }
     set("skills", Value::Table(skills));
     set("gems", im.load1("Data/Gems", vec![])?);
-    let minions = TableRef::new();
-    im.load(
-        "Data/Minions",
-        vec![
-            Value::Table(minions.clone()),
-            skill_mod.clone(),
-            flag_mod.clone(),
-        ],
-    )?;
-    set("minions", Value::Table(minions));
-    let spectres = TableRef::new();
-    im.load(
-        "Data/Spectres",
-        vec![Value::Table(spectres.clone()), skill_mod, flag_mod],
-    )?;
-    set("spectres", Value::Table(spectres));
+    set(
+        "minions",
+        im.load1("Data/Minions", vec![skill_mod.clone(), flag_mod.clone()])?,
+    );
+    set(
+        "spectres",
+        im.load1("Data/Spectres", vec![skill_mod, flag_mod])?,
+    );
 
     let item_bases = TableRef::new();
     for t in ITEM_TYPES {

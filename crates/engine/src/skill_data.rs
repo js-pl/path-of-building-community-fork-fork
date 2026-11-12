@@ -4,7 +4,7 @@
 //! upstream's processed `data` table for now. What the calculations need
 //! of a granted effect beyond its levels follows with them.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 use crate::item::Fields;
 use crate::mods::convert::{Converter, array, get, number, text};

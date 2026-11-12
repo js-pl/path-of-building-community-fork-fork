@@ -577,11 +577,11 @@ Implicits: 1
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemCastOnCrit" level="20" nameSpec="Cast On Critical Strike" quality="23" skillId="SupportCastOnCriticalStrike" variantId="SupportCastOnCriticalStrike"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCracklingLance" level="20" nameSpec="Crackling Lance" quality="20" skillId="CracklingLance" variantId="CracklingLance"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCorruptingFever" level="20" nameSpec="Corrupting Fever" quality="20" skillId="CorruptingFever" variantId="CorruptingFever"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemManaforgedArrows" level="20" nameSpec="Manaforged Arrows" quality="23" skillId="SupportManaforgedArrows" variantId="SupportManaforgedArrows"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemHolyStrike" level="20" nameSpec="Holy Strike" quality="0" skillId="HolyStrike" skillMinion="HolyStrikeMinion" skillMinionSkill="1" skillMinionSkillCalcs="1" variantId="HolyStrike"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemHolyHammers" level="20" nameSpec="Holy Hammers of Spirals" quality="0" skillId="HolyHammersAltX" variantId="HolyHammersAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemCullTheWeak" level="4" nameSpec="Cull the Weak" quality="23" skillId="SupportCullTheWeak" variantId="SupportCullTheWeak"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Weapon 1" source="Item:1:Jorrhast&apos;s Blacksteel, Steelhead">

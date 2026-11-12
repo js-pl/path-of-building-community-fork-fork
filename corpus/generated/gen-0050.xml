@@ -2,28 +2,28 @@
 <PathOfBuilding>
 	<Build ascendClassName="Hierophant" bandit="None" characterLevelAutoMode="false" className="Templar" level="80" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="ActiveMinionLimit" value="10"/>
-		<PlayerStat stat="AverageDamage" value="323.90686952708"/>
-		<PlayerStat stat="AverageBurstDamage" value="329.71381759666"/>
+		<PlayerStat stat="AverageDamage" value="323.90710926327"/>
+		<PlayerStat stat="AverageBurstDamage" value="329.71444302654"/>
 		<PlayerStat stat="Speed" value="3.4540945015106"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="16.14955"/>
-		<PlayerStat stat="CritChance" value="11.770055"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="16.15"/>
+		<PlayerStat stat="CritChance" value="11.7702"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
 		<PlayerStat stat="HitChance" value="69.5"/>
-		<PlayerStat stat="TotalDPS" value="1118.804937035"/>
+		<PlayerStat stat="TotalDPS" value="1118.8057651064"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="1118.804937035"/>
-		<PlayerStat stat="IgniteDPS" value="47.851881814076"/>
-		<PlayerStat stat="WithIgniteDPS" value="1166.6568188491"/>
-		<PlayerStat stat="PoisonDPS" value="165.47538939686"/>
-		<PlayerStat stat="PoisonDamage" value="390.5219189766"/>
-		<PlayerStat stat="WithPoisonDPS" value="1546.4061143739"/>
-		<PlayerStat stat="TotalDotDPS" value="475.45305915296"/>
+		<PlayerStat stat="WithBleedDPS" value="1118.8057651064"/>
+		<PlayerStat stat="IgniteDPS" value="47.851848494479"/>
+		<PlayerStat stat="WithIgniteDPS" value="1166.6576136009"/>
+		<PlayerStat stat="PoisonDPS" value="165.42895548857"/>
+		<PlayerStat stat="PoisonDamage" value="390.41233495303"/>
+		<PlayerStat stat="WithPoisonDPS" value="1546.2869536426"/>
+		<PlayerStat stat="TotalDotDPS" value="475.33303703065"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="1594.257996188"/>
-		<PlayerStat stat="ManaCost" value="11.034482758621"/>
+		<PlayerStat stat="CombinedDPS" value="1594.1388021371"/>
+		<PlayerStat stat="ManaCost" value="11"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="38.114146223565"/>
+		<PlayerStat stat="ManaPerSecondCost" value="37.995039516616"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -98,6 +98,7 @@
 		<PlayerStat stat="FrenzyChargesMax" value="3"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
 		<PlayerStat stat="EnduranceChargesMax" value="3"/>
+		<PlayerStat stat="ActiveTotemLimit" value="1"/>
 		<PlayerStat stat="ActiveMinionLimit" value="10"/>
 		<MinionStat stat="AverageDamage" value="427.66644375"/>
 		<MinionStat stat="Speed" value="1.2735042735043"/>
@@ -711,7 +712,7 @@ dealt by Frost Blades Penetrates 15% Cold Resistance
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemEnduranceChargeOnMeleeStun" level="20" nameSpec="Endurance Charge on Melee Stun" quality="0" skillId="SupportEnduranceChargeOnMeleeStun" variantId="SupportEnduranceChargeOnMeleeStun"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemHolyHammers" level="21" nameSpec="Holy Hammers" quality="0" skillId="HolyHammers" skillPart="1" variantId="HolyHammers"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemFlameTotem" level="21" nameSpec="Holy Flame Totem of Ire" quality="0" skillId="HolyFlameTotemAltX" variantId="HolyFlameTotemAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemGenerosity" level="20" nameSpec="Generosity" quality="23" skillId="SupportGenerosity" variantId="SupportGenerosity"/>
 			</Skill>
 		</SkillSet>

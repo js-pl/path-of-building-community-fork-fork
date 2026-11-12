@@ -244,11 +244,8 @@ fn every_option_matches_upstream() {
             };
             let lists: Vec<Value> = (0..2)
                 .map(|_| {
-                    rt::call(&new, &[s("ModList")])
-                        .unwrap()
-                        .into_iter()
-                        .next()
-                        .unwrap()
+                    let list = rt::first(rt::call(&new, &[s("ModList")]).unwrap());
+                    rt::first(rt::method(&list, &"ModList".into(), &[]).unwrap())
                 })
                 .collect();
             if let Err(e) = rt::call(

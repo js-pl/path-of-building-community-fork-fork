@@ -297,7 +297,7 @@ local function addSocketGroup(active, supportCount, label)
 end
 
 local function newItem(dbItem)
-	local item = new("Item", dbItem.raw)
+	local item = new("Item"):Item(dbItem.raw)
 	if item.variantList and #item.variantList > 1 then
 		item.variant = rng.int(1, #item.variantList)
 		if item.hasAltVariant then

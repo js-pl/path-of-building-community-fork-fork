@@ -13,13 +13,13 @@
 		<PlayerStat stat="TotalDPS" value="4849.8413333333"/>
 		<PlayerStat stat="TotalDot" value="0"/>
 		<PlayerStat stat="WithBleedDPS" value="4849.8413333333"/>
-		<PlayerStat stat="IgniteDPS" value="1068.832720815"/>
-		<PlayerStat stat="WithIgniteDPS" value="5918.6740541483"/>
+		<PlayerStat stat="IgniteDPS" value="1068.2059009616"/>
+		<PlayerStat stat="WithIgniteDPS" value="5918.0472342949"/>
 		<PlayerStat stat="WithPoisonDPS" value="4849.8413333333"/>
-		<PlayerStat stat="TotalDotDPS" value="1068.832720815"/>
-		<PlayerStat stat="CullingDPS" value="649.49166821826"/>
+		<PlayerStat stat="TotalDotDPS" value="1068.2059009616"/>
+		<PlayerStat stat="CullingDPS" value="649.4228835093"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="6568.1657223666"/>
+		<PlayerStat stat="CombinedDPS" value="6567.4701178042"/>
 		<PlayerStat stat="ManaCost" value="6"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
 		<PlayerStat stat="ManaPerSecondCost" value="24.2"/>

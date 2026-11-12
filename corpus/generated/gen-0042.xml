@@ -35,7 +35,7 @@
 		<PlayerStat stat="Dex" value="114"/>
 		<PlayerStat stat="ReqDex" value="114"/>
 		<PlayerStat stat="Int" value="302"/>
-		<PlayerStat stat="ReqInt" value="159"/>
+		<PlayerStat stat="ReqInt" value="131"/>
 		<PlayerStat stat="Devotion" value="0"/>
 		<PlayerStat stat="TotalEHP" value="3262.7632156605"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="3864"/>
@@ -680,7 +680,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemColdResistAura" level="21" nameSpec="Purity of Ice" quality="0" skillId="PurityOfIce" variantId="PurityOfIce"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="true" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPowerSiphon" level="21" nameSpec="Power Siphon" quality="0" skillId="PowerSiphon" variantId="PowerSiphon"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPortal" level="2" nameSpec="Portal" quality="0" skillId="Portal" variantId="Portal"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Boots" source="Item:6:Replica Lioneye&apos;s Paws, Bronzescale Boots">
 				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="5" nameSpec="Toxic Rain" quality="0" skillId="ToxicRain"/>

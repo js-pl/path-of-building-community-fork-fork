@@ -50,12 +50,32 @@ impl DataSource for Imported {
         }
         let src = std::fs::read(self.src_dir.join(&rel))
             .map_err(|e| LuaError::msg(format!("LoadModule() error loading '{rel}': {e}")))?;
-        evaluate(env, &rel, &src, args)
+        load_data(env, rel, Rc::new(src), args)
     }
 
     fn read_file(&self, path: &str) -> Option<Vec<u8>> {
         std::fs::read(self.src_dir.join(path.trim_start_matches("./"))).ok()
     }
+}
+
+/// `LoadModule` of a data file (path relative to upstream's `src/`): a
+/// file returning a function gives one that evaluates its body
+pub fn load_data(
+    env: &Rc<Env>,
+    rel: String,
+    src: Rc<Vec<u8>>,
+    args: &[Value],
+) -> LResult<Vec<Value>> {
+    let wrapped = lua::parser::parse(&src).is_ok_and(|b| lua::ast::data_wrapper(&b).is_some());
+    if !wrapped {
+        return evaluate(env, &rel, &src, args);
+    }
+    let env = Rc::downgrade(env);
+    let f = lua::rt::func(&rel.clone(), move |a| match env.upgrade() {
+        Some(env) => evaluate(&env, &rel, &src, a),
+        None => Ok(vec![]),
+    });
+    Ok(vec![f])
 }
 
 /// Evaluates a data file (path relative to upstream's `src/`) for the program.

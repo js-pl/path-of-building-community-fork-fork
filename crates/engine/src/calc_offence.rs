@@ -6,7 +6,7 @@
 //! Breakdowns are not built. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -15,6 +15,7 @@ use crate::actor::OutVal;
 use crate::calc::{floor, m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_perform::{Perform, converted_tags, new_mod};
+use crate::item_tools::round_symmetric;
 use crate::mods::{Cfg, Mod, ModType, ModValue, StoreId, Sym, Tag};
 use std::collections::BTreeMap;
 
@@ -42,9 +43,19 @@ pub(crate) fn dmg_index(t: &str) -> usize {
         .expect("a damage type")
 }
 
-/// `calcRadius(baseRadius, areaMod)`
-pub(crate) fn calc_radius(base: f64, area_mod: f64) -> f64 {
-    (base * (100.0 * area_mod.sqrt()).floor() / 100.0).floor()
+/// `calcAreaMod(incArea, moreArea)`: the client's integer rounding stages
+fn calc_area_mod(inc: f64, more: f64) -> f64 {
+    let base = round_symmetric(inc * 100.0, None);
+    let fin = round_symmetric(m_max(0.0, more) * 100.0, None);
+    let p = base * fin / 100.0;
+    let p = if p >= 0.0 { p.floor() } else { p.ceil() };
+    m_max(0.0, p) / 100.0
+}
+
+/// `calcRadius(baseRadius, areaMod, radiusMod)`
+pub(crate) fn calc_radius(base: f64, area_mod: f64, radius_mod: f64) -> f64 {
+    let pct = ((100.0 * area_mod.sqrt()).floor() * radius_mod).floor();
+    (base * pct / 100.0).floor()
 }
 
 /// `calcMoltenStrikeTertiaryRadius`
@@ -1258,8 +1269,9 @@ impl<'a> Perform<'a> {
         let names = ["AreaOfEffect", "AreaOfEffectPrimary"];
         let inc = 1.0 + self.c.inc(list, c, &names)? / 100.0;
         let more = self.c.more(list, c, &names)?;
-        let area_mod = round(round(inc * more, 10.0), 2.0);
+        let area_mod = calc_area_mod(inc, more);
         self.c.set_out(actor, "AreaOfEffectMod", area_mod);
+        let radius_mod = self.c.calc_mod(list, c, &["AreaOfEffectRadius"])?;
         if self.sd_truthy(i, "radiusIsWeaponRange") {
             let mut range: f64 = 0.0;
             if self.has_flag(i, "weapon1Attack") {
@@ -1276,16 +1288,16 @@ impl<'a> Perform<'a> {
         self.set_flag(i, "area", true);
         let extra = self.sd_num(i, "radiusExtra").unwrap_or(0.0);
         let base = radius + extra + self.c.base(list, c, &["AreaOfEffect"])?;
-        let r = calc_radius(base, area_mod);
+        let r = calc_radius(base, area_mod, radius_mod);
         self.c.set_out(actor, "AreaOfEffectRadius", r);
         self.c.set_out(actor, "AreaOfEffectRadiusMetres", r / 10.0);
         if let Some(secondary) = self.sd_num(i, "radiusSecondary") {
             let names = ["AreaOfEffect", "AreaOfEffectSecondary"];
             let inc = 1.0 + self.c.inc(list, c, &names)? / 100.0;
             let more = self.c.more(list, c, &names)?;
-            let m = round(round(inc * more, 10.0), 2.0);
+            let m = calc_area_mod(inc, more);
             self.c.set_out(actor, "AreaOfEffectModSecondary", m);
-            let r = calc_radius(secondary + extra, m);
+            let r = calc_radius(secondary + extra, m, radius_mod);
             self.c.set_out(actor, "AreaOfEffectRadiusSecondary", r);
             self.c
                 .set_out(actor, "AreaOfEffectRadiusSecondaryMetres", r / 10.0);
@@ -1294,7 +1306,7 @@ impl<'a> Perform<'a> {
             let names = ["AreaOfEffect", "AreaOfEffectTertiary"];
             let inc = 1.0 + self.c.inc(list, c, &names)? / 100.0;
             let more = self.c.more(list, c, &names)?;
-            let m = round(round(inc * more, 10.0), 2.0);
+            let m = calc_area_mod(inc, more);
             self.c.set_out(actor, "AreaOfEffectModTertiary", m);
             let base = tertiary + extra;
             let r = if self.sd_truthy(i, "projectileSpeedAppliesToMSAreaOfEffect") {
@@ -1323,7 +1335,7 @@ impl<'a> Perform<'a> {
                 let mut sum = 0.0;
                 let mut radii: BTreeMap<i64, f64> = BTreeMap::new();
                 for (b, n) in &occurrences {
-                    let r = calc_radius(*b, m);
+                    let r = calc_radius(*b, m, radius_mod);
                     sum += r * n;
                     *radii.entry(r as i64).or_default() += n;
                 }
@@ -1339,7 +1351,7 @@ impl<'a> Perform<'a> {
                 );
                 sum / width
             } else {
-                calc_radius(base, m)
+                calc_radius(base, m, radius_mod)
             };
             self.c.set_out(actor, "AreaOfEffectRadiusTertiary", r);
             self.c
@@ -1780,8 +1792,8 @@ impl<'a> Perform<'a> {
             }
             let inc = 1.0 + self.c.inc(list, c, &["TrapTriggerAreaOfEffect"])? / 100.0;
             let more = self.c.more(list, c, &["TrapTriggerAreaOfEffect"])?;
-            let area = round(round(inc * more, 10.0), 2.0);
-            let r = calc_radius(self.misc_data("TrapTriggerRadiusBase"), area);
+            let area = calc_area_mod(inc, more);
+            let r = calc_radius(self.misc_data("TrapTriggerRadiusBase"), area, 1.0);
             set(self, "TrapTriggerRadius", r);
             set(self, "TrapTriggerRadiusMetre", r / 10.0);
         } else if self.sd(i, "cooldown").is_some_and(ModValue::truthy)
@@ -1827,14 +1839,15 @@ impl<'a> Perform<'a> {
             self.sd_set(i, "timeOverride", over);
             let inc = 1.0 + self.c.inc(list, c, &["MineDetonationAreaOfEffect"])? / 100.0;
             let more = self.c.more(list, c, &["MineDetonationAreaOfEffect"])?;
-            let area = round(round(inc * more, 10.0), 2.0);
-            let r = calc_radius(self.misc_data("MineDetonationRadiusBase"), area);
+            let area = calc_area_mod(inc, more);
+            let r = calc_radius(self.misc_data("MineDetonationRadiusBase"), area, 1.0);
             set(self, "MineDetonationRadius", r);
             set(self, "MineDetonationRadiusMetre", r / 10.0);
             if self.has_type(i, "Aura") {
                 let r = calc_radius(
                     self.misc_data("MineAuraRadiusBase"),
                     self.c.out(actor, "AreaOfEffectMod").unwrap_or(f64::NAN),
+                    1.0,
                 );
                 set(self, "MineAuraRadius", r);
                 set(self, "MineAuraRadiusMetre", r / 10.0);
@@ -2184,7 +2197,13 @@ impl<'a> Perform<'a> {
                 match v.typ {
                     "Life" => {
                         let m = idx(&costs, &resource.replace("Life", "Mana"));
+                        let mana_cost = format!("{}Cost", costs[m].resource);
                         if self.c.flag(list, c, &["CostLifeInsteadOfMana"])? {
+                            if costs[k].upfront {
+                                let total = self.c.base(list, c, &[&mana_cost])?;
+                                costs[k].total_cost += m_max(0.0, total);
+                                costs[m].total_cost -= total;
+                            }
                             let mana = costs[m].clone();
                             let v = &mut costs[k];
                             v.base_cost += mana.base_cost;
@@ -2199,16 +2218,38 @@ impl<'a> Perform<'a> {
                             && !self.c.flag(list, c, &["CostESInsteadOfManaOrLife"])?
                         {
                             let mana = costs[m].clone();
+                            let added = if costs[k].upfront && hybrid_life > 0.0 {
+                                let total = self.c.base(list, c, &[&mana_cost])?;
+                                round(m_max(0.0, total) * hybrid_life, 0.0)
+                            } else {
+                                0.0
+                            };
                             let v = &mut costs[k];
                             v.base_cost = mana.base_cost;
                             v.final_base_cost +=
                                 round(mana.final_base_cost * (hybrid_life + additional_life), 0.0);
+                            v.total_cost += added;
                         }
                     }
                     "ES" => {
                         let m = idx(&costs, &resource.replace("ES", "Mana"));
                         let l = idx(&costs, &resource.replace("ES", "Life"));
                         if self.c.flag(list, c, &["CostESInsteadOfManaOrLife"])? {
+                            if costs[k].upfront {
+                                let mana = self.c.base(
+                                    list,
+                                    c,
+                                    &[&format!("{}Cost", costs[m].resource)],
+                                )?;
+                                let life = self.c.base(
+                                    list,
+                                    c,
+                                    &[&format!("{}Cost", costs[l].resource)],
+                                )?;
+                                costs[k].total_cost += m_max(0.0, mana) + m_max(0.0, life);
+                                costs[m].total_cost -= mana;
+                                costs[l].total_cost -= life;
+                            }
                             let (mana, life) = (costs[m].clone(), costs[l].clone());
                             let v = &mut costs[k];
                             v.base_cost += mana.base_cost + life.base_cost;
@@ -2291,6 +2332,9 @@ impl<'a> Perform<'a> {
                     x = scale(x, more_type, more_type < 1.0);
                     x = scale(x, more_cost, more_cost < 1.0);
                     x = m_max(0.0, x / eff);
+                    if v.upfront && !v.percent {
+                        x = round(x, 0.0);
+                    }
                     x = m_max(0.0, x + v.total_cost);
                     if v.typ == "Mana" && hybrid_life > 0.0 {
                         x = m_max(0.0, ((1.0 - hybrid_life) * x).floor());
@@ -2305,6 +2349,9 @@ impl<'a> Perform<'a> {
                     x = m_max(0.0, (1.0 + inc / 100.0) * x);
                     x = m_max(0.0, more_type * x);
                     x = m_max(0.0, x / eff);
+                    if v.upfront && !v.percent {
+                        x = round(x, 0.0);
+                    }
                     x = m_max(0.0, x + v.total_cost);
                     cost = x;
                     raw = v.base_cost_raw.map(|r| {
@@ -2324,6 +2371,13 @@ impl<'a> Perform<'a> {
                 }
             }
         }
+        let es = if self.c.flag(o.db, None, &["EnergyShieldProtectsMana"])? {
+            self.c.out(actor, "EnergyShield").unwrap_or(0.0)
+        } else {
+            0.0
+        };
+        let pool = self.c.out(actor, "ManaUnreserved").unwrap_or(0.0) + es;
+        self.c.set_out(actor, "ManaCostPayablePool", pool);
         // account for Sacrificial Zeal
         if self.c.flag(list, None, &["Condition:SacrificialZeal"])?
             && matches!(
@@ -2394,15 +2448,17 @@ impl<'a> Perform<'a> {
                 for g in global.iter_mut().skip(ti + 1) {
                     *g *= factor;
                 }
-                global_total *= factor;
             }
             let e = &mut table[ti];
+            let mut converted = 0.0;
             for oi in ti + 1..5 {
-                e.conversion[oi] = (global[oi] + skill[oi]) / 100.0;
+                let conversion = round(global[oi] + skill[oi], 0.0);
+                e.conversion[oi] = conversion / 100.0;
                 e.gain[oi] = add[oi] / 100.0;
-                e.total[oi] = (global[oi] + skill[oi] + add[oi]) / 100.0;
+                e.total[oi] = (conversion + add[oi]) / 100.0;
+                converted += conversion;
             }
-            e.mult = 1.0 - m_min((global_total + skill_total) / 100.0, 1.0);
+            e.mult = 1.0 - m_min(converted / 100.0, 1.0);
         }
         table[4].mult = 1.0;
         Ok(table)

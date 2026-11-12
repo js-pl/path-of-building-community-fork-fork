@@ -801,11 +801,11 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemPointBlank" level="21" nameSpec="Point Blank" quality="0" skillId="SupportPointBlank" variantId="SupportPointBlank"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemThrownWeapon" level="21" nameSpec="Spectral Throw of Trarthus" quality="20" skillId="SpectralThrowAltY" variantId="SpectralThrowAltY"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemThrownWeapon" level="21" nameSpec="Spectral Throw of Materialising" quality="20" skillId="SpectralThrowAltX" variantId="SpectralThrowAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemBrutalityPlus" level="6" nameSpec="Awakened Brutality" quality="0" skillId="SupportAwakenedBrutality" variantId="SupportAwakenedBrutality"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemSummonReaper" level="21" nameSpec="Summon Reaper of Revenants" quality="20" skillId="SummonReaperAltX" skillMinion="SummonedReaper" skillMinionSkill="1" skillMinionSkillCalcs="1" variantId="SummonReaperAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemSummonReaper" level="21" nameSpec="Summon Reaper" quality="20" skillId="SummonReaper" skillMinion="SummonedReaper" skillMinionSkill="1" skillMinionSkillCalcs="1" variantId="SummonReaper"/>
 			</Skill>
 		</SkillSet>
 	</Skills>

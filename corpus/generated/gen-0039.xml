@@ -31,7 +31,7 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="40"/>
 		<PlayerStat stat="Str" value="104"/>
-		<PlayerStat stat="ReqStr" value="114"/>
+		<PlayerStat stat="ReqStr" value="159"/>
 		<PlayerStat stat="Dex" value="427"/>
 		<PlayerStat stat="ReqDex" value="114"/>
 		<PlayerStat stat="Int" value="64"/>
@@ -681,7 +681,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemPierce" level="21" nameSpec="Pierce" quality="20" skillId="SupportPierce" variantId="SupportPierce"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="true" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemRiposte" level="21" nameSpec="Glacial Shield Swipe" quality="0" skillId="GlacialShieldSwipe" variantId="GlacialShieldSwipe"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemGlacialHammer" level="21" nameSpec="Glacial Hammer of Shattering" quality="0" skillId="GlacialHammerAltX" variantId="GlacialHammerAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemPinpoint" level="21" nameSpec="Pinpoint" quality="23" skillId="SupportPinpoint" variantId="SupportPinpoint"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemWeaponElementalDamagePlus" level="6" nameSpec="Awakened Elemental Damage with Attacks" quality="0" skillId="SupportAwakenedElementalDamageWithAttacks" variantId="SupportAwakenedElementalDamageWithAttacks"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemFasterCast" level="20" nameSpec="Faster Casting" quality="0" skillId="SupportFasterCasting" variantId="SupportFasterCasting"/>

@@ -31,7 +31,7 @@
 		<PlayerStat stat="RageCost" value="0"/>
 		<PlayerStat stat="SoulCost" value="0"/>
 		<PlayerStat stat="Str" value="337"/>
-		<PlayerStat stat="ReqStr" value="155"/>
+		<PlayerStat stat="ReqStr" value="114"/>
 		<PlayerStat stat="Dex" value="89"/>
 		<PlayerStat stat="ReqDex" value="111"/>
 		<PlayerStat stat="Int" value="114"/>
@@ -86,11 +86,10 @@
 		<PlayerStat stat="ChaosResist" value="-6"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.46"/>
-		<PlayerStat stat="FullDPS" value="7272.911075"/>
+		<PlayerStat stat="FullDPS" value="6585.6677"/>
 		<PlayerStat stat="FullDotDPS" value="4672.0677"/>
 		<FullDPSSkill skillPart="" source="" stat="Full DoT DPS" value="4672.0677"/>
 		<FullDPSSkill skillPart="" source="" stat="Ball Lightning of Static" value="1913.6"/>
-		<FullDPSSkill skillPart="Initial impact" source="" stat="Earthquake" value="687.243375"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
@@ -648,7 +647,7 @@ All Damage from Critical Strikes can apply Lightning Ailments during effect
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemPulverise" level="20" nameSpec="Pulverise" quality="0" skillId="SupportPulverise" variantId="SupportPulverise"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="true" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemEarthquake" level="20" nameSpec="Earthquake" quality="20" skillId="Earthquake" skillPart="1" variantId="Earthquake"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemDualStrike" level="20" nameSpec="Dual Strike of Ambidexterity" quality="20" skillId="DualStrikeAltX" variantId="DualStrikeAltX"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Boots" source="Item:5:Bubonic Trail, Murder Boots">
 				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="20" nameSpec="Death Walk" quality="0" skillId="DeathWalk"/>
