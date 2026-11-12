@@ -470,6 +470,13 @@ impl<'a> Perform<'a> {
         }
     }
 
+    pub(crate) fn config_str(&self, k: &str) -> Option<&str> {
+        match self.input.config.get(k) {
+            Some(Val::Str(s)) => Some(s),
+            _ => None,
+        }
+    }
+
     pub(crate) fn config_truthy(&self, k: &str) -> bool {
         match self.input.config.get(k) {
             Some(Val::Bool(b)) => *b,

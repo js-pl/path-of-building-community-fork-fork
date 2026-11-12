@@ -18,6 +18,7 @@ pub mod color {
     pub const NEGATIVE: &str = "^xDD0022";
     pub const POSITIVE: &str = "^x33FF77";
     pub const GEM: &str = "^x1AA29B";
+    pub const CUSTOM: &str = "^x5CF0BB";
 
     /// `colorCodes[rarity]`
     pub fn rarity(r: &str) -> Option<&'static str> {

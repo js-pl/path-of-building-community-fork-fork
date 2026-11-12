@@ -883,7 +883,7 @@ impl<'a> Perform<'a> {
             let mut l = Vec::new();
             if m.floor() != m {
                 l.push(sf!(
-                    "^x5CF0BBNOTE: First stage has a %.2fx channel time multiplier",
+                    &format!("{}NOTE: First stage has a %.2fx channel time multiplier", color::CUSTOM),
                     m - m.floor()
                 ));
             }
