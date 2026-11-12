@@ -5,11 +5,12 @@
 //! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 use crate::build::Build;
-use crate::calc_items::ItemsInput;
+use crate::calc_items::{EnergyBlade, ItemsInput};
 use crate::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use crate::calc_skill_mods::{self, ModsInput};
 use crate::calc_skills::{self, SkillsInput, SkillsSetup};
 use crate::calc_tree::{self, EnvSetup};
+use crate::item::ItemContext;
 use crate::item_data::ItemData;
 use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Store, Sym};
@@ -73,6 +74,23 @@ pub struct Env {
 /// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
 /// groups with the granted skills and the gems' selections.
 pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Result<Env> {
+    match init_env_pass(build, data, calc_mode, false)? {
+        Some(env) => Ok(env),
+        // An enabled Energy Blade: everything again, with its condition
+        None => init_env_pass(build, data, calc_mode, true)?
+            .ok_or_else(|| "Energy Blade asked for a second rerun".to_string()),
+    }
+}
+
+/// One pass of `calcs.initEnv`, with `override.conditions` holding
+/// `AffectedByEnergyBlade` or not; `None` when an enabled Energy Blade
+/// asks for the rerun
+fn init_env_pass(
+    build: &mut Build,
+    data: &CalcData,
+    calc_mode: CalcMode,
+    energy_blade: bool,
+) -> Result<Option<Env>> {
     let calcs = calc_mode == CalcMode::Calcs;
     let mode = calc_mode.buff_mode(build);
     let spec = &build.spec;
@@ -110,6 +128,17 @@ pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Resu
         mode,
     };
     let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
+    if energy_blade {
+        player_db
+            .conditions
+            .insert(Sym::new("AffectedByEnergyBlade"), true);
+    }
+    let item_ctx = ItemContext {
+        data: data.items,
+        parser: data.parser,
+        jewel_radius: data.jewel_radius,
+        default_affix_quality: 0.5,
+    };
     calc_setup::allocation_mods(spec, &mut player_db);
     // The tree before the items
     let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
@@ -135,11 +164,16 @@ pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Resu
         node_mods: &initial_node_mods,
         config: &config,
         precision: data.items,
-        energy_blade: false,
+        energy_blade: energy_blade.then_some(EnergyBlade {
+            ctx: &item_ctx,
+            weapon_types: &data.setup.weapon_type_info,
+        }),
         jewel_radius: data.jewel_radius,
         extra_jewel_funcs: &[],
     };
     let setup = calc_tree::setup(&player_db, &items_input, data.items)?;
+    // Energy Blade's weapons, where the calculations look items up
+    build.items.generated = setup.items.generated.clone();
     let mut player_db = setup.mod_db.clone();
     // The granted skills' socket groups
     let granted = calc_skills::granted_skills(
@@ -198,7 +232,9 @@ pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Resu
             .unwrap_or(f64::NAN),
         enemy_db: &enemy_db,
     };
-    let mut skills = calc_skills::create_active_skills(&skills_input, &mut player_db)?;
+    let Some(mut skills) = calc_skills::create_active_skills(&skills_input, &mut player_db)? else {
+        return Ok(None);
+    };
     let placeholders = build.config.active().placeholder.clone();
     let weapon_data = skills.weapon_data.clone();
     let mods_input = ModsInput {
@@ -237,7 +273,7 @@ pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Resu
     if calcs {
         build.calcs.skill_number = skills.main_socket_group as f64;
     }
-    Ok(Env {
+    Ok(Some(Env {
         calc_mode,
         mode,
         enemy_level,
@@ -248,5 +284,5 @@ pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Resu
         groups,
         skills,
         enemy_multipliers,
-    })
+    }))
 }

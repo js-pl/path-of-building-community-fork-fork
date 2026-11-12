@@ -78,6 +78,10 @@ pub struct ItemsTab {
     /// All slots in the tab's order: base slots with their swap and
     /// abyssal slots, then jewel sockets by node id
     pub ordered_slots: Vec<Slot>,
+    /// Items the calculations generate in place of equipped ones (Energy
+    /// Blade's weapons), by their reserved negative ids; no slot of the
+    /// tab holds them
+    pub generated: BTreeMap<i64, Item>,
 }
 
 /// `tonumber(slotName:match("%d+$") or slotName:match("%d+"))`
@@ -293,9 +297,11 @@ impl ItemsTab {
     }
 
     pub fn item(&self, id: f64) -> Option<&Item> {
-        (id.fract() == 0.0)
-            .then(|| self.items.get(&(id as i64)))
-            .flatten()
+        if id.fract() != 0.0 {
+            return None;
+        }
+        let id = id as i64;
+        self.items.get(&id).or_else(|| self.generated.get(&id))
     }
 
     /// `IsItemValidForSlot(item, slotName)`
