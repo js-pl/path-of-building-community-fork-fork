@@ -34,9 +34,9 @@
 		<PlayerStat stat="Str" value="174"/>
 		<PlayerStat stat="ReqStr" value="155"/>
 		<PlayerStat stat="Dex" value="327"/>
-		<PlayerStat stat="ReqDex" value="155"/>
+		<PlayerStat stat="ReqDex" value="96"/>
 		<PlayerStat stat="Int" value="144"/>
-		<PlayerStat stat="ReqInt" value="114"/>
+		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
 		<PlayerStat stat="TotalEHP" value="4559.4207031973"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="3335"/>
@@ -669,7 +669,7 @@ Implicits: 0
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemFreezeMine" level="20" nameSpec="Icicle Mine of Fanning" quality="20" skillId="IcicleMineAltX" variantId="IcicleMineAltX"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemMirrorArrow" level="20" nameSpec="Mirror Arrow" quality="0" skillId="MirrorArrow" variantId="MirrorArrow"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemManabond" level="20" nameSpec="Manabond" quality="0" skillId="Manabond" variantId="Manabond"/>
 			</Skill>
 		</SkillSet>
 	</Skills>

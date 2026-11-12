@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Deadeye" bandit="None" characterLevelAutoMode="false" className="Ranger" level="98" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageDamage" value="315.65375"/>
-		<PlayerStat stat="AverageBurstDamage" value="585.16125"/>
-		<PlayerStat stat="Speed" value="2.8581574736842"/>
+		<PlayerStat stat="AverageDamage" value="58.29"/>
+		<PlayerStat stat="AverageBurstDamage" value="108.0375"/>
+		<PlayerStat stat="Speed" value="2.3817978947368"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="0"/>
 		<PlayerStat stat="CritChance" value="0"/>
 		<PlayerStat stat="CritMultiplier" value="0"/>
 		<PlayerStat stat="HitChance" value="67"/>
-		<PlayerStat stat="TotalDPS" value="902.18812465895"/>
+		<PlayerStat stat="TotalDPS" value="138.83499928421"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="902.18812465895"/>
-		<PlayerStat stat="WithIgniteDPS" value="902.18812465895"/>
-		<PlayerStat stat="PoisonDPS" value="11.292225"/>
-		<PlayerStat stat="PoisonDamage" value="31.61823"/>
-		<PlayerStat stat="WithPoisonDPS" value="932.46203458597"/>
-		<PlayerStat stat="TotalDotDPS" value="30.273909927021"/>
+		<PlayerStat stat="WithBleedDPS" value="138.83499928421"/>
+		<PlayerStat stat="WithIgniteDPS" value="138.83499928421"/>
+		<PlayerStat stat="PoisonDPS" value="2.085825"/>
+		<PlayerStat stat="PoisonDamage" value="5.84031"/>
+		<PlayerStat stat="WithPoisonDPS" value="143.49499603519"/>
+		<PlayerStat stat="TotalDotDPS" value="4.6599967509745"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="932.46203458597"/>
+		<PlayerStat stat="CombinedDPS" value="143.49499603519"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="9"/>
-		<PlayerStat stat="ManaCost" value="9"/>
+		<PlayerStat stat="ManaCost" value="10"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="25.723417263158"/>
+		<PlayerStat stat="ManaPerSecondCost" value="23.817978947368"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -53,11 +53,11 @@
 		<PlayerStat stat="LifeRecoverable" value="2072"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="41.4"/>
-		<PlayerStat stat="LifeLeechGainRate" value="11.728445620566"/>
+		<PlayerStat stat="LifeLeechGainRate" value="1.8048549906947"/>
 		<PlayerStat stat="Mana" value="1275"/>
 		<PlayerStat stat="Spec:ManaInc" value="72"/>
-		<PlayerStat stat="ManaUnreserved" value="1275"/>
-		<PlayerStat stat="ManaUnreservedPercent" value="100"/>
+		<PlayerStat stat="ManaUnreserved" value="389"/>
+		<PlayerStat stat="ManaUnreservedPercent" value="30.509803921569"/>
 		<PlayerStat stat="ManaRegenRecovery" value="22.3"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
 		<PlayerStat stat="EnergyShield" value="984"/>
@@ -67,9 +67,9 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="3919"/>
+		<PlayerStat stat="Evasion" value="11135"/>
 		<PlayerStat stat="Spec:EvasionInc" value="149"/>
-		<PlayerStat stat="MeleeEvadeChance" value="93"/>
+		<PlayerStat stat="MeleeEvadeChance" value="95"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="95"/>
 		<PlayerStat stat="Armour" value="3014"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
@@ -627,17 +627,17 @@ Melee Weapon Damage Penetrates 1% Elemental Resistances per Mana Burn, up to a m
 	<Skills activeSkillSet="1" defaultGemLevel="normalMaximum" defaultGemQuality="nil" showLegacyGems="false" showSupportGemTypes="ALL" sortGemsByDPS="true" sortGemsByDPSField="CombinedDPS">
 		<SkillSet id="1">
 			<Skill enabled="true" includeInFullDPS="nil" label="Main" mainActiveSkill="1" mainActiveSkillCalcs="1">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemKineticRain" level="20" nameSpec="Kinetic Rain of Impact" quality="23" skillId="KineticRainAltX" variantId="KineticRainAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemKineticRain" level="20" nameSpec="Kinetic Rain" quality="23" skillId="KineticRain" variantId="KineticRain"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemRuthless" level="21" nameSpec="Ruthless" quality="23" skillId="SupportRuthless" variantId="SupportRuthless"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemBlasphemyPlus" level="5" nameSpec="Awakened Blasphemy" quality="0" skillId="SupportAwakenedBlasphemy" variantId="SupportAwakenedBlasphemy"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemVaalGroundSlam" level="20" nameSpec="Vaal Ground Slam" quality="0" skillId="VaalGroundSlam" variantId="VaalGroundSlam"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemVaalGrace" level="20" nameSpec="Vaal Grace" quality="0" skillId="VaalGrace" variantId="VaalGrace"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemMultiTotem" level="20" nameSpec="Multiple Totems" quality="20" skillId="SupportMultipleTotems" variantId="SupportMultipleTotems"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemGreaterDevour" level="3" nameSpec="Greater Devour" quality="20" skillId="SupportGreaterDevour" variantId="SupportGreaterDevour"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPoisonArrow" level="20" nameSpec="Caustic Arrow of Poison" quality="0" skillId="CausticArrowAltX" variantId="CausticArrowAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemChainHook" level="20" nameSpec="Chain Hook" quality="0" skillId="ChainHook" variantId="ChainHook"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Gloves" source="Item:5:Asenath&apos;s Gentle Touch, Silk Gloves">
 				<Gem count="nil" enableGlobal1="true" enableGlobal2="nil" enabled="true" level="1" nameSpec="Temporal Chains" quality="0" skillId="TemporalChains"/>

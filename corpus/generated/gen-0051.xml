@@ -24,13 +24,13 @@
 		<PlayerStat stat="ESPerSecondCost" value="0"/>
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
-		<PlayerStat stat="SoulCost" value="29.62962962963"/>
+		<PlayerStat stat="SoulCost" value="30"/>
 		<PlayerStat stat="Str" value="135"/>
 		<PlayerStat stat="ReqStr" value="173"/>
 		<PlayerStat stat="Dex" value="136"/>
 		<PlayerStat stat="ReqDex" value="173"/>
 		<PlayerStat stat="Int" value="234"/>
-		<PlayerStat stat="ReqInt" value="159"/>
+		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
 		<PlayerStat stat="TotalEHP" value="10335.126140696"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="6076"/>
@@ -78,12 +78,12 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="5"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.47"/>
-		<PlayerStat stat="FullDPS" value="30073.20557563"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.67"/>
+		<PlayerStat stat="FullDPS" value="23121.157234907"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<FullDPSSkill skillPart="Default Attack" source="" stat="Absolution of Inspiring" value="19982.49684963"/>
-		<FullDPSSkill skillPart="1 Projectile" source="" stat="Forbidden Rite" value="8237.1389755733"/>
-		<FullDPSSkill skillPart="Sentinel of Absolution: Default Attack" source="" stat="Absolution of Inspiring" value="1853.5697504274"/>
+		<FullDPSSkill skillPart="Sentinel of Absolution: Default Attack" source="" stat="Absolution of Inspiring" value="1853.1470940171"/>
+		<FullDPSSkill skillPart="" source="" stat="Flicker Strike of Power" value="1285.51329126"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
@@ -639,7 +639,7 @@ Ward does not Break during Effect
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemMultiTrap" level="21" nameSpec="Multiple Traps" quality="23" skillId="SupportMultipleTraps" variantId="SupportMultipleTraps"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="true" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemForbiddenRite" level="21" nameSpec="Forbidden Rite" quality="23" skillId="ForbiddenRite" skillPart="1" variantId="ForbiddenRite"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemFlickerStrike" level="21" nameSpec="Flicker Strike of Power" quality="23" skillId="FlickerStrikeAltX" variantId="FlickerStrikeAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemIncreasedDuration" level="20" nameSpec="More Duration" quality="23" skillId="SupportMoreDuration" variantId="SupportMoreDuration"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemVaalSacrifice" level="3" nameSpec="Vaal Sacrifice" quality="0" skillId="SupportVaalSacrifice" variantId="SupportVaalSacrifice"/>
 			</Skill>

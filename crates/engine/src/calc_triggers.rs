@@ -3,11 +3,11 @@
 //! (`configTable`) and `defaultTriggerHandler`, with the simulation of
 //! skill rotations (`calcMultiSpellRotationImpact`).
 //!
-//! Not ported yet: breakdowns, Doom Blast's sources, Arcanist Brand's
+//! Not ported yet: breakdowns, Arcanist Brand's
 //! activation, Manaforged Arrows, Cast while Channelling's handler, and every
 //! configuration but those in [`Perform::trigger_config`].
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -441,8 +441,21 @@ impl<'a> Perform<'a> {
                     ..TriggerConfig::default()
                 }
             }
+            "FieryImpactHeistMaceImplicit" => TriggerConfig {
+                source_weapon: true,
+                trigger_skill_cond: Some(|p, s| p.has_type(s, "Melee") || p.has_type(s, "Attack")),
+                ..TriggerConfig::default()
+            },
             k => return Err(format!("not ported: the trigger {k}")),
         }))
+    }
+
+    /// `env.build.configTab.input["doomBlastSource"]`
+    fn doom_blast_source(&self) -> Option<&'a str> {
+        match self.input.config.get("doomBlastSource") {
+            Some(crate::config::Val::Str(s)) => Some(s),
+            _ => None,
+        }
     }
 
     /// `findTriggerSkill(env, skill, source, triggerRate, comparer)`: the
@@ -797,12 +810,84 @@ impl<'a> Perform<'a> {
             cap = 1.0 / action_tick;
         }
         self.c.set_out(actor, "TriggerRateCap", cap);
-        if config.trigger_name.as_deref() == Some("Doom Blast")
-            || self.skill_name(player_main) == "Doom Blast"
-        {
-            return Err("not ported: Doom Blast's sources".into());
+        let doom_source = self.doom_blast_source();
+        let doom_trigger = config.trigger_name.as_deref() == Some("Doom Blast");
+        let pdb = self.pdb();
+        if doom_trigger && doom_source == Some("expiration") {
+            // The source curse's duration, from its own calculation
+            let duration = cached
+                .as_ref()
+                .ok_or("attempt to index a nil value (field '?')")?
+                .out("Duration")
+                .unwrap_or(f64::NAN);
+            let expiration = 1.0 / duration;
+            let rate = trig_rate.ok_or("attempt to compare nil with number")?;
+            if expiration > rate {
+                self.c.add(
+                    pdb,
+                    crate::calc_perform::src("UsesCurseOverlaps", ModType::Flag, true, "Config"),
+                );
+            } else {
+                trig_rate = Some(expiration);
+            }
+        } else if doom_trigger && doom_source == Some("hexblast") {
+            let (mut hexblast, mut rate) = (None, None);
+            for i in 0..self.n_player {
+                if self.skill_name(i) == "Hexblast" && !self.is_triggered(i) && i != main {
+                    (hexblast, rate) = self.find_trigger_skill(i, hexblast, rate, None)?;
+                }
+            }
+            if hexblast.is_some() {
+                let (t, r) = (
+                    trig_rate.ok_or("attempt to perform arithmetic on a nil value")?,
+                    rate.ok_or("attempt to perform arithmetic on a nil value")?,
+                );
+                trig_rate = Some(1.0 / (1.0 / t + 1.0 / r));
+            }
         }
-        let esr = if let Some(r) = trig_rate
+        let esr = if self.skill_name(player_main) == "Doom Blast" && doom_source == Some("vixen") {
+            let vixen = self.item(PLAYER, "Gloves").is_some_and(|g| {
+                g.title
+                    .as_deref()
+                    .is_some_and(|t| crate::pat::find(t, "Vixen's Entrapment").is_some())
+            });
+            if !vixen {
+                self.c.set_out_val(
+                    actor,
+                    "VixenModeNoVixenGlovesWarn",
+                    crate::actor::OutVal::Bool(true),
+                );
+            }
+            self.c.add(
+                pdb,
+                crate::calc_perform::src("UsesCurseOverlaps", ModType::Flag, true, "Config"),
+            );
+            let vixens_cd = self
+                .input
+                .data
+                .skills
+                .skills
+                .get("SupportUniqueCastCurseOnCurse")
+                .and_then(|g| g.level(1.0)?.field("cooldown"))
+                .ok_or("attempt to perform arithmetic on a nil value")?
+                / icdr;
+            let rate = trig_rate.ok_or("attempt to perform arithmetic on a nil value")?;
+            let rotation = vec![SimSkill {
+                uuid: self.skill_uuid(player_main),
+                cd: None,
+                cd_override: None,
+                adds_cast_time: None,
+                icdr,
+                added_cooldown: 0.0,
+            }];
+            let esr = self.rotation_impact(rotation, rate, vixens_cd, 100.0, PLAYER)?;
+            self.c.set_out_val(
+                actor,
+                "VixensTooMuchCastSpeedWarn",
+                crate::actor::OutVal::Bool(vixens_cd > 1.0 / rate),
+            );
+            esr
+        } else if let Some(r) = trig_rate
             && !global(self)
             && !config.ignore_source_rate
         {

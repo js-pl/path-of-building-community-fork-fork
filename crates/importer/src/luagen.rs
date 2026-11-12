@@ -348,7 +348,19 @@ pub fn translate_data_functions(src: &[u8], header: &str) -> R<(String, Vec<usiz
     });
     let mut top_locals: Vec<(String, String)> = Vec::new();
     let mut funcs: Vec<(&FuncBody, String)> = Vec::new();
-    for s in &block.stats {
+    // `return function(params) ... end`: the function's body is the top level
+    let body = match lua::ast::data_wrapper(&block) {
+        Some(f) => {
+            for (i, n) in f.params.iter().enumerate() {
+                g.caps.captured.insert((addr(f), i));
+                let l = g.declare(n, (addr(f), i));
+                top_locals.push((n.clone(), l.0));
+            }
+            &f.body
+        }
+        None => &block,
+    };
+    for s in &body.stats {
         if let Stat::Local { names, .. } = s {
             for (i, n) in names.iter().enumerate() {
                 // Force cells, so functions can capture them
@@ -359,7 +371,7 @@ pub fn translate_data_functions(src: &[u8], header: &str) -> R<(String, Vec<usiz
         }
         collect_functions_stat(s, &mut funcs);
     }
-    if let Some(LastStat::Return(es)) = &block.last {
+    if let Some(LastStat::Return(es)) = &body.last {
         es.iter()
             .for_each(|e| collect_functions_expr(e, "return", &mut funcs));
     }

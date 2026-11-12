@@ -1,7 +1,7 @@
 //! The skills' own offence functions (`initialFunc`, `preDamageFunc`, ...
 //! of `Data/Skills/*.lua`), ported by hand per granted effect id.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -837,11 +837,16 @@ impl<'a> Perform<'a> {
                     let inc = 1.0 + self.c.inc(list, c, &["ProjectileSpeed"])? / 100.0;
                     let more = self.c.more(list, c, &["ProjectileSpeed"])?;
                     let per = sd(self, "projectileSpeed") * (inc * more) * per_strike;
-                    let radius = out_req(self, "AreaOfEffectRadius")?;
+                    let enemy_radius = match self.c.override_num(list, c, &["EnemyRadius"])? {
+                        Some(r) => r,
+                        None => self.c.base(list, c, &["EnemyRadius"])?,
+                    };
+                    let base_radius = out_req(self, "AreaOfEffectRadius")?;
+                    let radius = base_radius + enemy_radius;
                     let dist = match cfg.skill_dist {
                         Some(d) => d,
-                        None if self.has_flag(i, "triggered") => (radius / 2.0).floor(),
-                        None => radius,
+                        None if self.has_flag(i, "triggered") => (base_radius / 2.0).floor(),
+                        None => base_radius,
                     };
                     let first = m_max(1.0, ((dist - radius) / per).ceil());
                     let last = (m_min(self.misc_data("ProjectileDistanceCap"), dist + radius)

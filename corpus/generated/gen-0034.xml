@@ -21,9 +21,9 @@
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="3501.4719677951"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.8"/>
-		<PlayerStat stat="ManaCost" value="20.952380952381"/>
+		<PlayerStat stat="ManaCost" value="21"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="34.920634920635"/>
+		<PlayerStat stat="ManaPerSecondCost" value="35"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
@@ -41,12 +41,12 @@
 		<PlayerStat stat="Int" value="87"/>
 		<PlayerStat stat="ReqInt" value="224"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="8374.0405516006"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="5726"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2747"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="3557"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="4506"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2343"/>
+		<PlayerStat stat="TotalEHP" value="8000.571768303"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="5555"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2637"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3415"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="4325"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2250"/>
 		<PlayerStat stat="Life" value="2632"/>
 		<PlayerStat stat="Spec:LifeInc" value="54"/>
 		<PlayerStat stat="LifeUnreserved" value="2632"/>
@@ -97,7 +97,6 @@
 		<PlayerStat stat="FrenzyChargesMax" value="3"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
 		<PlayerStat stat="EnduranceChargesMax" value="3"/>
-		<PlayerStat stat="ActiveTotemLimit" value="2"/>
 		<TimelessData devotionVariant1="1" devotionVariant2="1" searchList="" searchListFallback=""/>
 	</Build>
 	<Calcs>
@@ -610,7 +609,7 @@ Unholy Might during Effect
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPunishment" level="21" nameSpec="Punishment" quality="20" skillId="Punishment" variantId="Punishment"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPunishment" level="21" nameSpec="Punishment" quality="0" skillId="Punishment" variantId="Punishment"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemPuncture" level="21" nameSpec="Puncture of Shanking" quality="0" skillId="PunctureAltX" variantId="PunctureAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemOvercharge" level="20" nameSpec="Overcharge" quality="23" skillId="SupportOvercharge" variantId="SupportOvercharge"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemSpellTotem" level="20" nameSpec="Spell Totem" quality="23" skillId="SupportSpellTotem" variantId="SupportSpellTotem"/>
 			</Skill>

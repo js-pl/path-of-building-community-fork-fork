@@ -1,23 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Inquisitor" bandit="None" characterLevelAutoMode="false" className="Templar" level="80" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageDamage" value="4934.0690269542"/>
-		<PlayerStat stat="AverageBurstDamage" value="4934.0690269542"/>
+		<PlayerStat stat="AverageDamage" value="4933.86157925"/>
+		<PlayerStat stat="AverageBurstDamage" value="4933.86157925"/>
 		<PlayerStat stat="Speed" value="8.274"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="3.50498"/>
-		<PlayerStat stat="CritChance" value="3.50498"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="3.5"/>
+		<PlayerStat stat="CritChance" value="3.5"/>
 		<PlayerStat stat="CritMultiplier" value="1.87"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="40824.487129019"/>
+		<PlayerStat stat="TotalDPS" value="40822.770706715"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="40824.487129019"/>
-		<PlayerStat stat="IgniteDPS" value="6568.3705893051"/>
-		<PlayerStat stat="WithIgniteDPS" value="47392.857718324"/>
-		<PlayerStat stat="WithPoisonDPS" value="40824.487129019"/>
-		<PlayerStat stat="TotalDotDPS" value="6568.3705893051"/>
+		<PlayerStat stat="WithBleedDPS" value="40822.770706715"/>
+		<PlayerStat stat="IgniteDPS" value="6567.2066239283"/>
+		<PlayerStat stat="WithIgniteDPS" value="47389.977330643"/>
+		<PlayerStat stat="WithPoisonDPS" value="40822.770706715"/>
+		<PlayerStat stat="TotalDotDPS" value="6567.2066239283"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="47392.857718324"/>
+		<PlayerStat stat="CombinedDPS" value="47389.977330643"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.5"/>
 		<PlayerStat stat="ManaCost" value="0"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -31,7 +31,7 @@
 		<PlayerStat stat="ESPerSecondCost" value="0"/>
 		<PlayerStat stat="ESPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="RageCost" value="0"/>
-		<PlayerStat stat="SoulCost" value="23.809523809524"/>
+		<PlayerStat stat="SoulCost" value="24"/>
 		<PlayerStat stat="Str" value="278"/>
 		<PlayerStat stat="ReqStr" value="123"/>
 		<PlayerStat stat="Dex" value="109"/>

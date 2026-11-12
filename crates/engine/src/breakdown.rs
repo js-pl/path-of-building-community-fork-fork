@@ -6,7 +6,7 @@
 //! Not ported yet: `breakdown.leech` and the breakdowns of the triggers,
 //! mirages and offence.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 use crate::calc::Result;
 use crate::mods::{Mod, ModValue};
@@ -507,13 +507,14 @@ pub fn slot(
 }
 
 /// `breakdown.area(base, areaMod, total, incBreakpoint, moreBreakpoint,
-/// redBreakpoint, lessBreakpoint, label)`
+/// redBreakpoint, lessBreakpoint, label, radiusMod)`
 pub fn area(
     base: f64,
     area_mod: f64,
     total: f64,
     breakpoints: Option<[f64; 4]>,
     label: Option<&str>,
+    radius_mod: Option<f64>,
 ) -> Breakdown {
     let mut out = Vec::new();
     if let Some(l) = label {
@@ -525,6 +526,9 @@ pub fn area(
             "x %.2f ^8(square root of area of effect modifier)",
             (100.0 * area_mod.sqrt()).floor() / 100.0
         ));
+        if let Some(m) = radius_mod.filter(|m| *m != 1.0) {
+            out.push(sf!("x %.2f ^8(final radius modifier)", m));
+        }
         out.push(sf!("= %.1fm", total / 10.0));
     }
     if let Some([inc, more, red, less]) = breakpoints {

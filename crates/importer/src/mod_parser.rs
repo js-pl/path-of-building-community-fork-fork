@@ -98,7 +98,8 @@ pub fn import(im: &mut Importer, raw: &Raw) -> Result<TableRef> {
 /// Imports `Data/ModCache.lua`: line -> `{ modList, extra }`, the parse
 /// results upstream preloads into `modLib.parseMod`'s memo cache.
 pub fn import_mod_cache(im: &mut Importer) -> Result<TableRef> {
-    let cache = TableRef::new();
-    im.load("Data/ModCache", vec![Value::Table(cache.clone())])?;
-    Ok(cache)
+    match im.load1("Data/ModCache", vec![])? {
+        Value::Table(cache) => Ok(cache),
+        _ => Ok(TableRef::new()),
+    }
 }

@@ -46,9 +46,9 @@
 {"bytes":1325,"fnv":"11a19ccb97cff86f","key":"Bosses"}
 {"bytes":4006,"fnv":"bb718cc897a5a6cc","key":"BossSkills.1"}
 {"bytes":517,"fnv":"fac552200817c5f8","key":"BossSkills.2"}
-{"bytes":101782,"fnv":"a4d767e5de9c1f19","key":"SkillStatMap"}
-{"bytes":6187698,"fnv":"7d46d08b16cc79e2","key":"Skills"}
-{"bytes":354770,"fnv":"3f1afc71c292bf1d","key":"Gems"}
+{"bytes":101788,"fnv":"1777e477edd6a9db","key":"SkillStatMap"}
+{"bytes":6194377,"fnv":"d2d5baeff111ceab","key":"Skills"}
+{"bytes":355160,"fnv":"a30d73d4bef487a7","key":"Gems"}
 {"bytes":44247,"fnv":"480935c40b74f7d0","key":"Minions"}
 {"bytes":201748,"fnv":"6c546617fd8ee9cf","key":"Spectres"}
 {"bytes":653415,"fnv":"2579c998b56f7f00","key":"Bases"}
@@ -76,7 +76,7 @@
 {"bytes":2,"fnv":"08f44b07b5901a25","key":"Uniques/graft"}
 {"bytes":3188,"fnv":"8babb7263280b428","key":"Uniques/Special/race"}
 {"bytes":58114,"fnv":"9162e25c34f15829","key":"Uniques/Special/WatchersEye"}
-{"bytes":2423586,"fnv":"2a6632bf5a8168b1","key":"ModCache"}
+{"bytes":2423568,"fnv":"ac2bb3139bb6ae9f","key":"ModCache"}
 {"bytes":420,"fnv":"3133c9c9aac66375","key":"global.ModFlag"}
 {"bytes":449,"fnv":"a630d5fc725d4b42","key":"global.KeywordFlag"}
 {"bytes":2567,"fnv":"d8120649ec6cc7a6","key":"global.SkillType"}

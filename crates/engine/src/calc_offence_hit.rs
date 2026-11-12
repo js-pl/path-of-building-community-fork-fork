@@ -2,7 +2,7 @@
 //! often the skill hits (speed, accuracy, block), then its hit damage
 //! (exerts, crits, resistances, leech, gains on hit, DPS).
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1323,7 +1323,8 @@ impl<'a> Perform<'a> {
                         };
                     more = self.c.more(list, c, &["CritChance"])?;
                 }
-                let mut crit = (base_crit + base) * (1.0 + inc / 100.0) * more;
+                let mut crit =
+                    round((base_crit + base) * (1.0 + inc / 100.0) * more * 100.0, 0.0) / 100.0;
                 let cap = match self.c.override_num(list, None, &["CritChanceCap"])? {
                     Some(v) => v,
                     None => self.c.base(list, c, &["CritChanceCap"])?,
@@ -1477,6 +1478,19 @@ impl<'a> Perform<'a> {
         t: &str,
         type_flags: u32,
     ) -> Result<(f64, f64)> {
+        let (min, max) = self.calc_damage_raw(o, cfg, conv, t, type_flags)?;
+        Ok((round(min, 0.0), round(max, 0.0)))
+    }
+
+    /// `calcDamage` with `convDst`: converted paths stay fractional
+    fn calc_damage_raw(
+        &self,
+        o: &Off,
+        cfg: &Cfg,
+        conv: &crate::calc_offence::ConversionTable,
+        t: &str,
+        type_flags: u32,
+    ) -> Result<(f64, f64)> {
         let list = o.list;
         let flags = type_flags | type_flag(t);
         let ti = dmg_index(t);
@@ -1487,14 +1501,10 @@ impl<'a> Perform<'a> {
             }
             let conv_mult = conv[oi].total[ti];
             if conv_mult > 0.0 {
-                let (min, max) = self.calc_damage(o, cfg, conv, other, flags)?;
+                let (min, max) = self.calc_damage_raw(o, cfg, conv, other, flags)?;
                 add_min += min * conv_mult;
                 add_max += max * conv_mult;
             }
-        }
-        if add_min != 0.0 && add_max != 0.0 {
-            add_min = round(add_min, 0.0);
-            add_max = round(add_max, 0.0);
         }
         let base_min = self.po(o, &format!("{t}MinBase")).unwrap_or(f64::NAN);
         let base_max = self.po(o, &format!("{t}MaxBase")).unwrap_or(f64::NAN);
@@ -1514,14 +1524,8 @@ impl<'a> Perform<'a> {
         let inc_min = 1.0 + self.c.inc(list, c, &[&min_name])? / 100.0;
         let inc_max = 1.0 + self.c.inc(list, c, &[&max_name])? / 100.0;
         Ok((
-            round(
-                ((base_min * inc * more) * generic_min + add_min) * more_min * inc_min,
-                0.0,
-            ),
-            round(
-                ((base_max * inc * more) * generic_max + add_max) * more_max * inc_max,
-                0.0,
-            ),
+            ((base_min * inc * more) * generic_min + add_min) * more_min * inc_min,
+            ((base_max * inc * more) * generic_max + add_max) * more_max * inc_max,
         ))
     }
 

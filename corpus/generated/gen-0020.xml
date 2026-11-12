@@ -593,11 +593,11 @@ Implicits: 3
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemUnleashPlus" level="6" nameSpec="Awakened Unleash" quality="23" skillId="SupportAwakenedUnleash" variantId="SupportAwakenedUnleash"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCyclone" level="20" nameSpec="Cyclone of Tumult" quality="0" skillId="CycloneAltX" variantId="CycloneAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemCyclone" level="20" nameSpec="Cyclone" quality="0" skillId="Cyclone" variantId="Cyclone"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemFreshMeat" level="20" nameSpec="Fresh Meat" quality="0" skillId="SupportFreshMeat" variantId="SupportFreshMeat"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="Other 2" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemBurningArrow" level="20" nameSpec="Burning Arrow" quality="20" skillId="BurningArrow" variantId="BurningArrow"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemBurningArrow" level="20" nameSpec="Burning Arrow of Vigour" quality="20" skillId="BurningArrowAltX" variantId="BurningArrowAltX"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemInvention" level="3" nameSpec="Invention" quality="0" skillId="SupportInvention" variantId="SupportInvention"/>
 			</Skill>
 		</SkillSet>

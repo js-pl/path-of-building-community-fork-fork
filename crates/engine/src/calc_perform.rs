@@ -7,7 +7,7 @@
 //! from their own cached calculation (Blight, Penance Brand, Earthquake),
 //! the overcapped lightning resistance's mana and allies' life pools.
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -2560,7 +2560,8 @@ impl<'a> Perform<'a> {
             ] {
                 let names = [format!("{name}Reserved"), "Reserved".to_string()];
                 let names: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-                let more = self.c.more(list, Some(&cfg), &names)?;
+                let resource_more = self.c.more(list, Some(&cfg), &names[..1])?;
+                let generic_more = self.c.more(list, Some(&cfg), &names[1..])?;
                 let inc = self.c.inc(list, Some(&cfg), &names)?;
                 let eff_names = [
                     format!("{name}ReservationEfficiency"),
@@ -2575,17 +2576,10 @@ impl<'a> Perform<'a> {
                 let mut flat = match self.sd(i, &format!("{name}ReservationFlatForced")) {
                     Some(v) => number(v)?,
                     None => {
-                        let base = (base_flat * mult).floor();
-                        if more > 0.0 && inc > -100.0 && base != 0.0 {
-                            m_max(
-                                round(
-                                    base * (100.0 + inc) / 100.0 * more
-                                        / (1.0 + eff / 100.0)
-                                        / eff_more,
-                                    0.0,
-                                ),
-                                0.0,
-                            )
+                        let base = (base_flat * mult).trunc();
+                        if base != 0.0 {
+                            let v = reservation_stages(base, inc, resource_more, generic_more);
+                            m_max(round(v / (1.0 + eff / 100.0) / eff_more, 0.0), 0.0)
                         } else {
                             0.0
                         }
@@ -2594,17 +2588,10 @@ impl<'a> Perform<'a> {
                 let mut pct = match self.sd(i, &format!("{name}ReservationPercentForced")) {
                     Some(v) => number(v)?,
                     None => {
-                        let base = base_pct * mult;
-                        if more > 0.0 && inc > -100.0 && base != 0.0 {
-                            m_max(
-                                round(
-                                    base * (100.0 + inc) / 100.0 * more
-                                        / (1.0 + eff / 100.0)
-                                        / eff_more,
-                                    2.0,
-                                ),
-                                0.0,
-                            )
+                        let base = (base_pct * 100.0 * mult).trunc();
+                        if base != 0.0 {
+                            let v = reservation_stages(base, inc, resource_more, generic_more);
+                            m_max(round(v / (1.0 + eff / 100.0) / eff_more, 0.0) / 100.0, 0.0)
                         } else {
                             0.0
                         }
@@ -2620,6 +2607,7 @@ impl<'a> Perform<'a> {
                     flat *= n + 1.0;
                     pct *= n + 1.0;
                 }
+                let more = resource_more * generic_more;
                 let row = |p: &Self, base: crate::breakdown::Cell, total| {
                     let x = |c: bool, v: f64| c.then(|| format!("x {}", crate::pat::num(v)));
                     crate::breakdown::Reservation {
@@ -6267,4 +6255,12 @@ impl<'a> PerformInput<'a> {
             external: None,
         })
     }
+}
+
+/// Reservation's integer stages before efficiency: increased, the
+/// resource's more, then the generic more
+fn reservation_stages(base: f64, inc: f64, resource_more: f64, generic_more: f64) -> f64 {
+    let v = base + (base * inc / 100.0).trunc();
+    let v = v + (v * (resource_more - 1.0)).trunc();
+    v + (v * (generic_more - 1.0)).trunc()
 }

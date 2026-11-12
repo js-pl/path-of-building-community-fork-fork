@@ -673,10 +673,13 @@ fn items_match_upstream() {
                     .collect::<Vec<_>>()
                     .join(" / ");
                 let what = format!("{kind} {first_line}");
-                let lua_item = match rt::call(
-                    &new,
-                    &[s("Item"), raw.clone(), s(rarity), Value::Bool(true)],
-                ) {
+                let lua_item = match rt::call(&new, &[s("Item")]).and_then(|v| {
+                    rt::method(
+                        &rt::first(v),
+                        &"Item".into(),
+                        &[raw.clone(), s(rarity), Value::Bool(true)],
+                    )
+                }) {
                     Ok(v) => v.into_iter().next().unwrap_or_default(),
                     Err(e) => {
                         record(

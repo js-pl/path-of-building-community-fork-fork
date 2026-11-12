@@ -16,9 +16,9 @@
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="0"/>
 		<PlayerStat stat="Cooldown" value="3.003"/>
-		<PlayerStat stat="ManaCost" value="4.3165467625899"/>
+		<PlayerStat stat="ManaCost" value="4"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="1.437411509354"/>
+		<PlayerStat stat="ManaPerSecondCost" value="1.3320013320013"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>

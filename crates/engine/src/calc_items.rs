@@ -4,14 +4,15 @@
 //! conditions and multipliers it sets.
 //!
 //! Not ported yet: the overrides of the calculations (`override.repItem`),
-//! Energy Blade's weapons, the item warnings,
+//! the item warnings,
 //! and the names of the skills items grant (`nameSpec`).
 //!
-//! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
+//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
 
+use crate::calc_setup::WeaponTypeInfo;
 use crate::calc_setup::{RadiusJewel, calc_mod, set_source};
 use crate::config::Inputs;
-use crate::item::{Fields, GrantedSkill, Item};
+use crate::item::{Fields, GrantedSkill, Item, ItemContext};
 use crate::items_tab::ItemsTab;
 use crate::jewel::{RadiusData, RadiusFunc, RadiusType};
 use crate::mods::list::{self, Precision, merge_additive, merge_mod, scale_mod};
@@ -37,7 +38,7 @@ pub struct ItemsInput<'a, 't> {
     pub config: &'a Inputs,
     pub precision: &'a dyn Precision,
     /// `modDB.conditions.AffectedByEnergyBlade`
-    pub energy_blade: bool,
+    pub energy_blade: Option<EnergyBlade<'a>>,
     /// The labels of the jewel radii (`data.jewelRadius`)
     pub jewel_radius: &'a [String],
     /// `override.extraJewelFuncs`: the `ExtraJewelFunc` mods of the first
@@ -97,6 +98,35 @@ pub struct ItemsSetup {
     pub aegis_mods: Option<Vec<Mod>>,
     pub iron_mass_mods: Option<Vec<Mod>>,
     pub weapon1_mods: Option<Vec<Mod>>,
+    /// Energy Blade's weapons, by the ids `item_list` gives them (-1 in
+    /// the main hand, -2 in the off hand), for the items tab's `generated`
+    pub generated: BTreeMap<i64, Item>,
+}
+
+/// What Energy Blade needs to replace the weapons
+/// (`modDB.conditions.AffectedByEnergyBlade`)
+#[derive(Clone, Copy)]
+pub struct EnergyBlade<'a> {
+    pub ctx: &'a ItemContext<'a>,
+    /// `data.weaponTypeInfo`
+    pub weapon_types: &'a HashMap<String, WeaponTypeInfo>,
+}
+
+/// Energy Blade's weapon in place of `previous`: a normal item of the
+/// hidden base, with the previous weapon's sockets
+fn energy_blade_item(eb: &EnergyBlade, one_hand: bool, previous: &Item) -> Result<Item> {
+    let name = if one_hand {
+        "Energy Blade One Handed"
+    } else {
+        "Energy Blade Two Handed"
+    };
+    // `item:NormaliseQuality()` raises the quality of 0 to 20, then
+    // `item:BuildAndParseRaw()` writes this
+    let raw = format!("Rarity: NORMAL\n{name}\nQuality: 20\nImplicits: 0");
+    let mut item = Item::new(eb.ctx, &raw, None, false)?;
+    item.sockets = previous.sockets.clone();
+    item.abyssal_socket_count = previous.abyssal_socket_count;
+    Ok(item)
 }
 
 fn field_num(fields: &Option<Fields>, key: &str) -> Option<f64> {
@@ -527,6 +557,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         aegis_mods: None,
         iron_mass_mods: None,
         weapon1_mods: None,
+        generated: BTreeMap::new(),
     };
     let p = input.precision;
     let spec = input.spec;
@@ -577,7 +608,12 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             && sub_type(item) == Some("Abyss")
             && let Some(parent) = &slot.parent_slot
         {
-            let parent_item = out.item_list.get(parent).and_then(|&id| input.tab.item(id));
+            let parent_item = out.item_list.get(parent).and_then(|&id| {
+                input
+                    .tab
+                    .item(id)
+                    .or_else(|| out.generated.get(&(id as i64)))
+            });
             match parent_item {
                 Some(pi) if pi.abyssal_socket_count >= slot.slot_num.unwrap_or(f64::NAN) => {
                     scale = pi.socketed_jewel_effect_modifier;
@@ -644,8 +680,27 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
                 }
             }
             out.aegis_mods = Some(aegis_mods);
-        } else if weapon && input.energy_blade {
-            return Err("not ported: Energy Blade".into());
+        } else if weapon && let Some(eb) = &input.energy_blade {
+            // Energy Blade replaces the weapon with one of its own, which
+            // has none of the weapon's mods
+            let weapon_type = item
+                .weapon_data
+                .as_ref()
+                .and_then(|w| w.get(&1))
+                .and_then(|w| w.get("type"))
+                .and_then(|t| match t {
+                    ModValue::Str(s) => Some(s.to_string()),
+                    _ => None,
+                });
+            match weapon_type.and_then(|t| Some((eb.weapon_types.get(&t)?, t))) {
+                Some((info, t)) if t != "Bow" => {
+                    let blade = energy_blade_item(eb, info.one_hand, item)?;
+                    let id = if slot_name == "Weapon 1" { -1 } else { -2 };
+                    out.item_list.insert(slot_name.clone(), id as f64);
+                    out.generated.insert(id, blade);
+                }
+                _ => out.scale_add_list(src, scale, p),
+            }
         } else if slot_name == "Weapon 1" && item.name == "The Iron Mass, Gladius" {
             let mut iron_mass = Vec::new();
             for m in src {

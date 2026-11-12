@@ -204,3 +204,14 @@ pub fn constructor_order(fields: &[Field]) -> Vec<usize> {
     order.extend((0..fields.len()).filter(|&i| !template(&fields[i])));
     order
 }
+
+/// The function of a data file written as `return function(params) ... end`
+pub fn data_wrapper(b: &Block) -> Option<&FuncBody> {
+    match (&b.stats[..], &b.last) {
+        ([], Some(LastStat::Return(es))) => match &es[..] {
+            [Expr::Function(f)] => Some(f),
+            _ => None,
+        },
+        _ => None,
+    }
+}

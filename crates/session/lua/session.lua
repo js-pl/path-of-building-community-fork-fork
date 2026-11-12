@@ -38,7 +38,7 @@ local function tooltipLines(tooltip)
 end
 
 local function newTooltip()
-	return new("Tooltip")
+	return new("Tooltip"):Tooltip()
 end
 
 -- Controls: upstream's own controls, addressed as "<host>.<name>". Changing
@@ -837,7 +837,7 @@ end
 -- Tooltip of an item that is not in the build yet (pasted text)
 function api.previewItem(req)
 	local tab = build().itemsTab
-	local item = new("Item", req.text)
+	local item = new("Item"):Item(req.text)
 	if not item.base then
 		error("unrecognised item")
 	end
@@ -885,7 +885,7 @@ function api.editItem(req)
 	if not old then
 		error("no item " .. tostring(req.id))
 	end
-	local item = new("Item", req.text)
+	local item = new("Item"):Item(req.text)
 	if not item.base then
 		error("unrecognised item")
 	end
@@ -969,7 +969,7 @@ function api.setDisplayItem(req)
 		if not item then
 			error("no item " .. tostring(req.id))
 		end
-		local copy = new("Item", item:BuildRaw())
+		local copy = new("Item"):Item(item:BuildRaw())
 		copy.id = item.id
 		tab:SetDisplayItem(copy)
 	elseif req.text then

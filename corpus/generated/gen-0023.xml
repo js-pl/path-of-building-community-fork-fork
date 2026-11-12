@@ -17,13 +17,13 @@
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="11623.00625"/>
-		<PlayerStat stat="ManaCost" value="41"/>
+		<PlayerStat stat="ManaCost" value="40"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="68.333333333333"/>
+		<PlayerStat stat="ManaPerSecondCost" value="66.666666666667"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
-		<PlayerStat stat="LifeCost" value="8.8"/>
+		<PlayerStat stat="LifeCost" value="9"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
-		<PlayerStat stat="LifePerSecondCost" value="14.666666666667"/>
+		<PlayerStat stat="LifePerSecondCost" value="15"/>
 		<PlayerStat stat="LifePercentPerSecondCost" value="0"/>
 		<PlayerStat stat="ESCost" value="0"/>
 		<PlayerStat stat="ESPerSecondCost" value="0"/>

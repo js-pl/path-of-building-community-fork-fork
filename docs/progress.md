@@ -23,24 +23,26 @@ State at the handoff:
 
 - `engine::calcs::build_outputs` is `CalcsTab:BuildOutput`:
   `calcs.buildOutput(build, "MAIN")` with `calcs.calcFullDPS`, then
-  `calcs.buildOutput(build, "CALCS")` without breakdowns: 60 of the 61
-  corpus builds equal the oracle's `MAIN` and `CALCS` outputs
-  (`tests/build_output.rs`); skipped is Energy Blade (gen-0031).
-- Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
-  test has none.
+  `calcs.buildOutput(build, "CALCS")` without breakdowns: all 61 corpus
+  builds equal the oracle's `MAIN` and `CALCS` outputs
+  (`tests/build_output.rs`). Energy Blade (gen-0031) reruns the setup with
+  `AffectedByEnergyBlade` and swaps in generated weapons, which the items
+  tab holds under reserved negative ids (`ItemsTab::generated`). Doom
+  Blast's trigger sources are ported (all four `doomBlastSource` modes);
+  the corpus reaches only the default, Vixen's.
+- `perform.rs` and its variants test skip no build.
 - Breakdowns (`engine::breakdown`, `Actor::breakdown`, only in the Calcs
   tab's calculation): the helpers of `CalcBreakdown.lua` but `leech`, and
   every breakdown of `calcs.perform` before the triggers, `calcs.defence`,
   `calcs.buildDefenceEstimations` and `calcs.buildOutput`'s `SkillBuffs` and
   `SkillDebuffs`, for the player and the minion: equal to the translated
-  `calcs.buildOutput(build, "CALCS")` for 60 builds
+  `calcs.buildOutput(build, "CALCS")` for every corpus build
   (`tests/breakdown.rs`; it compares the breakdowns present when
   `calcs.triggers` starts, and those written after the offence).
 
 What remains for the full migration, in order:
 
-1. Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade`), Doom
-   Blast with a hex as its source, Tawhoa's Chosen, the rest of `configTable` in
+1. Tawhoa's Chosen, the rest of `configTable` in
    `CalcTriggers.lua` (only the configurations the corpus and variants
    reach are ported; a variants test per trigger support would cover
    them), overcapped lightning
@@ -92,16 +94,16 @@ covers everything from the items on; 61 builds compared).
 of the sidebar's and the Calcs tab's calculations, with the Full DPS table
 and the cost warnings, compared with the oracle's own `MAIN` and `CALCS`
 outputs (`tests/oracle/<id>.json`) in
-`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 60 of
-61 builds equal in both, the rest skipped (see the handoff).
+`crates/equivalence/tests/build_output.rs`, bitwise and key for key: all 61
+builds equal in both.
 
 `calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
 then `defence`, `defence_estimations` and `player_offence`), compared with
 the translated state at `calcs.defence`, `calcs.buildDefenceEstimations`,
 `calcs.triggers` and after `calcs.perform` (outputs, the player's and
 enemy's databases, every skill's mod list) in
-`crates/equivalence/tests/perform.rs`: 60 builds compared, 58 of them
-through the offence; the gaps below are skipped. `skill_functions_match_upstream`
+`crates/equivalence/tests/perform.rs`: all 61 builds compared through
+the offence; the gaps below would be skipped. `skill_functions_match_upstream`
 does the same for every gem with skill functions, in each of its parts, as
 the main skill of a corpus build with fitting weapons (238 variants, about
 13 minutes).
@@ -137,8 +139,6 @@ Game data is still read from upstream's processed Lua `data` table
 - Rebuilding cluster jewel subgraphs after an edit (they are built once,
   when the build loads); `initial_node_mods_match_upstream` skips the builds
   with subgraphs, as it loads no items
-- Energy Blade (`initEnv` reruns with `AffectedByEnergyBlade` and swaps in
-  generated weapons; gen-0031 is skipped)
 - Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
   node and item power calculators
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
@@ -155,13 +155,11 @@ a skip:
 - Trigger configurations other than those in `calc_triggers.rs`
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
-  mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
+  mana, PvP scaling, added damage redirection (Cryogenesis)
 - Breakdowns of the triggers, mirages and offence, and what `buildOutput`
   collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
-- Doom Blast with a hex as its source (curse expiration, Hexblast,
-  Vixen's)
 - The Calcs tab in a buff mode other than effective: `calcFullDPS` then
   sets up from that mode's databases
 

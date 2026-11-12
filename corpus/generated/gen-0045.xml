@@ -668,7 +668,7 @@ With at least 40 Intelligence in Radius, Cold Snap&apos;s Cooldown can be bypass
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemTrapAndMineDamage" level="20" nameSpec="Trap and Mine Damage" quality="0" skillId="SupportTrapAndMineDamage" variantId="SupportTrapAndMineDamage"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="false" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemFrostbite" level="20" nameSpec="Frostbite" quality="23" skillId="Frostbite" variantId="Frostbite"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemFrostWall" level="20" nameSpec="Frost Wall" quality="23" skillId="FrostWall" variantId="FrostWall"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemArcaneSurge" level="20" nameSpec="Arcane Surge" quality="0" skillId="SupportArcaneSurge" variantId="SupportArcaneSurge"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemCruelty" level="20" nameSpec="Cruelty" quality="20" skillId="SupportCruelty" variantId="SupportCruelty"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemSummonElementalResistance" level="21" nameSpec="Elemental Army" quality="0" skillId="SupportElementalArmy" variantId="SupportElementalArmy"/>

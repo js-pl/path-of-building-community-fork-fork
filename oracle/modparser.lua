@@ -100,7 +100,7 @@ end
 -- modifies some of its tables while parsing (the DOUBLED form writes into a
 -- modNameList entry), so results can depend on earlier lines; parsing in
 -- sorted order from a fresh state makes them reproducible.
-parseMod = LoadModule("Modules/ModParser", launch)
+parseMod = LoadModule("Modules/ModParser").parseMod
 
 local f = assert(io.open(outFile, "wb"))
 for _, line in ipairs(sorted) do

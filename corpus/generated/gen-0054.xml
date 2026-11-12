@@ -629,7 +629,7 @@ Creates Consecrated Ground on Use
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemUnholyTrinity" level="4" nameSpec="Unholy Trinity" quality="0" skillId="SupportUnholyTrinity" variantId="SupportUnholyTrinity"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="true" label="Other 1" mainActiveSkill="nil" mainActiveSkillCalcs="nil">
-				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemReave" level="21" nameSpec="Reave of Refraction" quality="0" skillId="ReaveAltX" variantId="ReaveAltX"/>
+				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SkillGemReave" level="21" nameSpec="Reave" quality="0" skillId="Reave" variantId="Reave"/>
 				<Gem count="1" enableGlobal1="true" enableGlobal2="true" enabled="true" gemId="Metadata/Items/Gems/SupportGemDeadlyAilments" level="21" nameSpec="Deadly Ailments" quality="0" skillId="SupportDeadlyAilments" variantId="SupportDeadlyAilments"/>
 			</Skill>
 			<Skill enabled="true" includeInFullDPS="nil" label="" mainActiveSkill="nil" mainActiveSkillCalcs="nil" slot="Body Armour" source="Item:3:Replica Eternity Shroud, Blood Raiment">

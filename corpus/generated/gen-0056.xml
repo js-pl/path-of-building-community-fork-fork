@@ -21,9 +21,9 @@
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="0.9"/>
 		<PlayerStat stat="BrandAttachmentRangeMetre" value="3"/>
 		<PlayerStat stat="BrandTicks" value="10"/>
-		<PlayerStat stat="ManaCost" value="25.217391304348"/>
+		<PlayerStat stat="ManaCost" value="25"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
-		<PlayerStat stat="ManaPerSecondCost" value="10.591304347826"/>
+		<PlayerStat stat="ManaPerSecondCost" value="10.5"/>
 		<PlayerStat stat="ManaPercentPerSecondCost" value="0"/>
 		<PlayerStat stat="LifeCost" value="0"/>
 		<PlayerStat stat="LifePercentCost" value="0"/>
