@@ -562,10 +562,11 @@ impl<'a> Perform<'a> {
 }
 
 /// `calcs.perform(env)` up to the defence and offence calculations
-pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
+pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
     let mut stores = crate::mods::Stores::default();
-    let pdb = stores.push(env.player_db.clone());
-    let edb = stores.push(env.enemy_db.clone());
+    // The databases move into the calculation's stores
+    let pdb = stores.push(std::mem::replace(&mut env.player_db, Store::db()));
+    let edb = stores.push(std::mem::replace(&mut env.enemy_db, Store::db()));
     let mut item_list = env.setup.items.item_list.clone();
     if env.setup.items.aegis_mods.is_some() {
         item_list.remove("Weapon 2");

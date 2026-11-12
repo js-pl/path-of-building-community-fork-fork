@@ -195,16 +195,16 @@ shared 4-core machine (expect noise of 10 to 30 %):
 Each column is typed ms (speedup over the translation in the same run,
 which is steadier than the ms on a shared machine), after each change:
 
-| operation | translation | baseline | shared build | cheap copies | names |
-|---|---|---|---|---|---|
-| load | - | 594 | 486 | 475 | 526 |
-| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) | 8.8 (5.4x) |
-| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) | 25.6 (4.0x) |
-| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) | 249 (2.6x) |
-| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) | 62.4 (4.4x) |
-| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) | 302 (2.9x) |
-| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) | 33.0 (5.6x) |
-| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) | 3407 (8.5x) |
+| operation | translation | baseline | shared build | cheap copies | names | setup reuse |
+|---|---|---|---|---|---|---|
+| load | - | 594 | 486 | 475 | 526 | 553 |
+| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) | 8.8 (5.4x) | 8.8 (6.1x) |
+| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) | 25.6 (4.0x) | 29.9 (4.1x) |
+| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) | 249 (2.6x) | 168 (3.8x) |
+| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) | 62.4 (4.4x) | 47.8 (5.8x) |
+| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) | 302 (2.9x) | 221 (4.2x) |
+| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) | 33.0 (5.6x) | 30.6 (6.5x) |
+| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) | 3407 (8.5x) | 2884 (10.9x) |
 
 - shared build: a build's copies share its spec and config (`Rc`); every
   calculation copies the build, and copying the spec's nodes and the
@@ -218,6 +218,13 @@ which is steadier than the ms on a shared machine), after each change:
   result without copying the list (each node's mods were copied for
   five queries); `Sym::new` went from 14 % to 8 % of node power in the
   profile (the bench gain is within its noise).
+- setup reuse: the setup's databases move into the calculation and the
+  main skill's cache instead of being copied; calculations that differ
+  only in their main skill (the Full DPS skills, the cost warnings' and
+  other lookups' recalculations) copy one setup instead of each running
+  `init_env` (`calc_env::reuse_setup`), and a build's base databases are
+  set up once per set of inputs (`calc_env::BaseDbs`).
+  `tests/fast_path.rs` checks both against setting each up afresh.
 
 ## Not ported yet in `initEnv`
 

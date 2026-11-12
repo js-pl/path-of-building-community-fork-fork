@@ -121,14 +121,17 @@ pub struct Build<'t> {
     /// Shared between a build's copies, as the calculations only read it
     pub config: Rc<ConfigTab>,
     /// The active config set's mods (`configTab.modList`, `enemyModList`)
-    pub config_mods: Vec<Mod>,
-    pub config_enemy_mods: Vec<Mod>,
+    pub config_mods: Rc<Vec<Mod>>,
+    pub config_enemy_mods: Rc<Vec<Mod>>,
     pub config_state: ConfigState,
     /// Shared between a build's copies, as the calculations only read it
     pub spec: Rc<PassiveSpec<'t>>,
     pub items: ItemsTab,
     pub skills: Option<Skills>,
     pub calcs: CalcsInput,
+    /// The base databases of the build's calculations, shared between its
+    /// copies
+    pub base_dbs: crate::calc_env::BaseDbs,
 }
 
 /// The version of the active spec's tree, which loading the build needs
@@ -208,13 +211,14 @@ impl<'t> Build<'t> {
         Ok(Build {
             info,
             config: Rc::new(config),
-            config_mods,
-            config_enemy_mods,
+            config_mods: Rc::new(config_mods),
+            config_enemy_mods: Rc::new(config_enemy_mods),
             config_state: state,
             spec: Rc::new(spec),
             items,
             skills,
             calcs,
+            base_dbs: Default::default(),
         })
     }
 }

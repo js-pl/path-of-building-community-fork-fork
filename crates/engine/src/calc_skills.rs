@@ -307,7 +307,7 @@ pub struct SkillsInput<'a> {
 }
 
 /// The active skills of the player and what creating them sets
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SkillsSetup {
     /// `env.player.activeSkillList`
     pub active_skills: Vec<ActiveSkill>,

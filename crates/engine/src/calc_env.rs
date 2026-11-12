@@ -11,12 +11,15 @@ use crate::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use crate::calc_skill_mods::{self, ModsInput};
 use crate::calc_skills::{self, SkillsInput, SkillsSetup};
 use crate::calc_tree::{self, EnvSetup};
+use crate::config_tab::ConfigTab;
 use crate::item::ItemContext;
 use crate::item_data::ItemData;
 use crate::mod_parser::ModParser;
 use crate::mods::{Mod, Store, Sym};
 use crate::skill_data::SkillData;
 use crate::skills::{ExplodeSource, SocketGroup, update_socket_groups};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -52,7 +55,7 @@ impl CalcMode {
 }
 
 /// A calculation's setup (`env` after `calcs.initEnv`)
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Env {
     pub calc_mode: CalcMode,
     pub mode: BuffMode,
@@ -62,13 +65,104 @@ pub struct Env {
     pub enemy_db: Store,
     /// `env.initialNodeModDB`
     pub initial_node_mods: Vec<Mod>,
-    /// The items and the tree with them
+    /// The items and the tree with them; its `mod_db` moved to `player_db`
     pub setup: EnvSetup,
     /// The Skills tab's socket groups with the granted ones
     pub groups: Vec<SocketGroup>,
     pub skills: SkillsSetup,
     /// Multipliers set on `env.enemyDB` by the skills
     pub enemy_multipliers: crate::mods::SymMap<f64>,
+}
+
+/// The base databases (`calc_setup::base_dbs`) of a build's calculations
+/// by their inputs, which the entries hold on to, so that a changed input
+/// is a new one
+#[derive(Clone, Default)]
+pub struct BaseDbs(Rc<RefCell<Vec<BaseEntry>>>);
+
+/// The player's and the enemy's databases
+type Dbs = (Store, Store);
+
+struct BaseEntry {
+    key: BaseKey,
+    dbs: Dbs,
+}
+
+struct BaseKey {
+    config: Rc<ConfigTab>,
+    mods: Rc<Vec<Mod>>,
+    enemy_mods: Rc<Vec<Mod>>,
+    setup: *const SetupData,
+    values: [u64; 5],
+    mode: BuffMode,
+}
+
+impl BaseKey {
+    fn same(&self, o: &BaseKey) -> bool {
+        Rc::ptr_eq(&self.config, &o.config)
+            && Rc::ptr_eq(&self.mods, &o.mods)
+            && Rc::ptr_eq(&self.enemy_mods, &o.enemy_mods)
+            && self.setup == o.setup
+            && self.values == o.values
+            && self.mode == o.mode
+    }
+}
+
+impl std::fmt::Debug for BaseDbs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "BaseDbs({})", self.0.borrow().len())
+    }
+}
+
+impl BaseDbs {
+    /// The base databases of a build's calculation, set up once for its
+    /// inputs with [`reuse_setup`]
+    fn get(&self, build: &Build, data: &CalcData, b: &BaseInput) -> Result<Dbs> {
+        if !reuse_setup() {
+            return calc_setup::base_dbs(data.setup, data.parser, b);
+        }
+        let [s, d, i] = b.class_stats.map(f64::to_bits);
+        let key = BaseKey {
+            config: build.config.clone(),
+            mods: build.config_mods.clone(),
+            enemy_mods: build.config_enemy_mods.clone(),
+            setup: data.setup,
+            values: [
+                s,
+                d,
+                i,
+                b.character_level.to_bits(),
+                b.enemy_level.to_bits(),
+            ],
+            mode: b.mode,
+        };
+        let mut cache = self.0.borrow_mut();
+        if let Some(e) = cache.iter().find(|e| e.key.same(&key)) {
+            return Ok(e.dbs.clone());
+        }
+        let dbs = calc_setup::base_dbs(data.setup, data.parser, b)?;
+        cache.push(BaseEntry {
+            key,
+            dbs: dbs.clone(),
+        });
+        Ok(dbs)
+    }
+}
+
+thread_local! {
+    static REUSE_SETUP: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Whether calculations that differ only in their main skill (the Full DPS
+/// skills, other skills' lookups) copy one setup instead of each setting
+/// up afresh; both give the same results
+pub fn reuse_setup() -> bool {
+    REUSE_SETUP.with(|r| r.get())
+}
+
+/// Sets [`reuse_setup`] on this thread, for comparing the two
+pub fn set_reuse_setup(reuse: bool) {
+    REUSE_SETUP.with(|r| r.set(reuse));
 }
 
 /// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
@@ -163,7 +257,7 @@ fn init_env_pass(
         config_enemy_mods: &build.config_enemy_mods,
         mode: base_mode,
     };
-    let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
+    let (mut player_db, enemy_db) = build.base_dbs.clone().get(build, data, &base)?;
     for c in ovr
         .conditions
         .iter()
@@ -213,10 +307,11 @@ fn init_env_pass(
         jewel_radius: data.jewel_radius,
         extra_jewel_funcs: &[],
     };
-    let setup = calc_tree::setup(&player_db, &items_input, data.items)?;
+    let mut setup = calc_tree::setup(&player_db, &items_input, data.items)?;
     // Energy Blade's weapons, where the calculations look items up
     build.items.generated = setup.items.generated.clone();
-    let mut player_db = setup.mod_db.clone();
+    // The database moves on to the skills
+    let mut player_db = std::mem::replace(&mut setup.mod_db, Store::db());
     // The granted skills' socket groups, which only the sidebar's
     // calculation updates
     let mut groups = groups;

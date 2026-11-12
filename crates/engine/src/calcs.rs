@@ -149,9 +149,15 @@ pub fn calc_full_dps_with(
         .with_override(ovr)
         .with_cache(cache);
     let setup = |b: &mut Build| init_env_with(b, data, CalcMode::Calculator, base, ovr);
-    let mut first = Some(setup(&mut build.clone())?);
+    // The setup does not depend on the main skill: each skill's
+    // calculation starts from a copy of the first setup and the build it
+    // leaves (`reuse_setup`), or sets up afresh
+    let mut set_up = build.clone();
+    let first_env = setup(&mut set_up)?;
+    let mut first = Some(first_env.clone());
+    let reuse = crate::calc_env::reuse_setup();
     let list: Vec<(usize, f64)> = {
-        let env = first.as_ref().unwrap();
+        let env = &first_env;
         env.skills
             .active_skills
             .iter()
@@ -177,10 +183,14 @@ pub fn calc_full_dps_with(
     ]: [Best; 5] = Default::default();
     let (mut poison, mut impale, mut decay, mut dot, mut culling) = (0.0, 0.0, 0.0, 0.0, 0.0);
     for (i, mut count) in list {
-        let mut b = build.clone();
-        let mut env = match first.take() {
-            Some(e) => e,
-            None => setup(&mut b)?,
+        let (b, mut env) = match first.take() {
+            Some(e) => (build.clone(), e),
+            None if reuse => (set_up.clone(), first_env.clone()),
+            None => {
+                let mut b = build.clone();
+                let e = setup(&mut b)?;
+                (b, e)
+            }
         };
         env.skills.main_skill = i;
         let mut input = PerformInput::new(&b, data, false)?;
