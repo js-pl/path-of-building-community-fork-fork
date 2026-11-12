@@ -494,6 +494,35 @@ pub fn lua_find(
     }))
 }
 
+/// `string.find(s, p, init, plain)` on 0-based positions, without Lua
+/// values: the match and its captures.
+pub fn find(s: &[u8], p: &[u8], init: usize, plain: bool) -> Result<Option<Match>> {
+    str_find_aux(s, p, init, plain, true)
+}
+
+/// `string.match(s, p, init)` on 0-based positions: the captures, or the
+/// whole match as one.
+pub fn find_match(s: &[u8], p: &[u8], init: usize) -> Result<Option<Match>> {
+    str_find_aux(s, p, init, false, false)
+}
+
+/// `string.gmatch(s, p)`: every match's captures, or whole matches.
+pub fn gmatch(s: &[u8], p: &[u8]) -> Result<Vec<Vec<Capture>>> {
+    let mut out = Vec::new();
+    let mut src = 0;
+    while src <= s.len() {
+        let mut ms = new_state(s, p);
+        match do_match(&mut ms, src, 0)? {
+            Some(e) => {
+                out.push(get_captures(&ms, src, e, true)?);
+                src = if e == src { src + 1 } else { e };
+            }
+            None => src += 1,
+        }
+    }
+    Ok(out)
+}
+
 /// `string.match(s, p, init)`: the captures, or the whole match.
 pub fn lua_match(s: &[u8], p: &[u8], init: i64) -> Result<Option<Vec<Value>>> {
     let start = init_pos(init, s.len());
@@ -503,21 +532,10 @@ pub fn lua_match(s: &[u8], p: &[u8], init: i64) -> Result<Option<Vec<Value>>> {
 
 /// `string.gmatch(s, p)`: every match's captures, or whole matches.
 pub fn lua_gmatch(s: &[u8], p: &[u8]) -> Result<Vec<Vec<Value>>> {
-    let mut out = Vec::new();
-    let mut src = 0;
-    while src <= s.len() {
-        let mut ms = new_state(s, p);
-        match do_match(&mut ms, src, 0)? {
-            Some(e) => {
-                let caps = get_captures(&ms, src, e, true)?;
-                out.push(caps.iter().map(|c| c.to_value(s)).collect());
-                // Empty match: advance by one
-                src = if e == src { src + 1 } else { e };
-            }
-            None => src += 1,
-        }
-    }
-    Ok(out)
+    Ok(gmatch(s, p)?
+        .iter()
+        .map(|caps| caps.iter().map(|c| c.to_value(s)).collect())
+        .collect())
 }
 
 /// Replacement for `gsub`.
@@ -527,6 +545,8 @@ pub enum Repl<'a> {
     /// Called with the captures (or the whole match); nil or false keeps the
     /// original text, a string or number replaces it
     Func(&'a mut dyn FnMut(&[Value]) -> Value),
+    /// `string.upper` (true) or `string.lower` (false) of the first capture
+    Case(bool),
 }
 
 /// `string.gsub(s, p, repl, n)`: the new string and the number of matches.
@@ -599,6 +619,19 @@ fn add_value(
                     out.push(news[i]);
                 }
                 i += 1;
+            }
+            Ok(())
+        }
+        Repl::Case(upper) => {
+            let cap = get_onecapture(ms, 0, s, e)?;
+            let text = match cap {
+                Capture::Str(a, b) => ms.src[a..b].to_vec(),
+                Capture::Pos(p) => crate::value::format_number((p + 1) as f64).into_bytes(),
+            };
+            if *upper {
+                out.extend(text.to_ascii_uppercase());
+            } else {
+                out.extend(text.to_ascii_lowercase());
             }
             Ok(())
         }

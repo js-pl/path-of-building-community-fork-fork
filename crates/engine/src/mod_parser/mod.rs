@@ -1,22 +1,35 @@
-//! Port of upstream `src/Modules/ModParser.lua` (v2.67.2).
+//! Port of upstream `src/Modules/ModParser.lua`.
 //!
-//! The pattern tables are imported from upstream's source by
-//! `importer::mod_parser`. Their closures are ported to Rust: most are
-//! translated by `cargo run -p importer --bin portgen` into `generated.rs`,
-//! the rest by hand in `ported.rs`. Each port records the hash of the Lua
-//! source it was made from, and [`ModParser::new`] fails if upstream's source
-//! changed, so a changed closure cannot go unnoticed.
+//! The pattern tables come typed from `gamedata` ([`rules`]), made at build
+//! time from upstream's source, with upstream's `Data/ModCache.lua`. Their
+//! closures are ported to Rust: most are translated by `cargo run -p
+//! importer --bin portgen` into `generated.rs`, the rest by hand in
+//! `ported.rs`, and the tables address them by key. Each port records the
+//! hash of the Lua source it was made from, and the tables are refused if
+//! upstream's source changed, so a changed closure cannot go unnoticed.
+//! Closures compute with [`val::V`] and give typed mods and fragments; the
+//! parse itself is typed.
 
+mod ctx;
 mod generated;
 mod ported;
+pub mod rules;
+pub mod val;
 
-use crate::data::Data;
-use crate::rt::*;
-use lua::modlib::create_mod_args;
-use lua::{Closure, LuaStr, TableRef, Value};
-use std::cell::RefCell;
-use std::collections::HashMap;
+pub use ctx::{Ctx, make_mod};
+pub use generated::DATA_FIELDS;
+pub use rules::{Entry, Form, Frag, GemKind, List, Parsed, ParserData, Rules};
+
+use crate::mods::convert::{Converter, DKey, Dyn, Kind};
+use crate::mods::tag::TagKind;
+use crate::mods::{Mod, ModType, ModValue, Record, Sym, Tag};
+use lua::pattern;
+use rules::FlagType;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{OnceLock, RwLock};
+use val::V;
 
 /// A Rust port of one upstream closure.
 pub struct Port {
@@ -24,378 +37,22 @@ pub struct Port {
     pub key: &'static str,
     /// FNV-1a of the closure's Lua source
     pub hash: u64,
-    pub f: fn(&Ctx, &[Value]) -> Vec<Value>,
+    pub f: fn(&Ctx, &[V]) -> Vec<V>,
 }
 
-type NativeFn = Rc<dyn Fn(&Ctx, &[Value]) -> Vec<Value>>;
-type ValueFn = Rc<dyn Fn(&Ctx, &[Value]) -> Value>;
-
-/// A value in a pattern table.
-#[derive(Clone)]
-enum Entry {
-    Value(Value),
-    Func(NativeFn),
+/// Every port, by key
+pub fn ports() -> &'static HashMap<&'static str, &'static Port> {
+    static PORTS: OnceLock<HashMap<&'static str, &'static Port>> = OnceLock::new();
+    PORTS.get_or_init(|| {
+        generated::PORTS
+            .iter()
+            .chain(ported::PORTS)
+            .map(|p| (p.key, p))
+            .collect()
+    })
 }
 
-impl Entry {
-    fn is_func(&self) -> bool {
-        matches!(self, Entry::Func(_))
-    }
-}
-
-/// A pattern table in source order.
-#[derive(Clone, Default)]
-struct List {
-    entries: Vec<(LuaStr, Entry)>,
-    index: HashMap<LuaStr, usize>,
-    /// Which entries a scan has selected, for rule coverage
-    hits: RefCell<Vec<bool>>,
-}
-
-impl List {
-    fn set(&mut self, k: LuaStr, v: Entry) {
-        match self.index.get(&k) {
-            Some(&i) => self.entries[i].1 = v,
-            None => {
-                self.index.insert(k.clone(), self.entries.len());
-                self.entries.push((k, v));
-            }
-        }
-    }
-
-    fn get(&self, k: &[u8]) -> Option<&Entry> {
-        self.index.get(&LuaStr::new(k)).map(|&i| &self.entries[i].1)
-    }
-}
-
-/// What closures can reach of their enclosing module.
-pub struct Ctx {
-    pub data: Data,
-    values: HashMap<&'static str, Value>,
-}
-
-impl Ctx {
-    /// A module-level value: `ModFlag`, `data`, `gemIdLookup`, ...
-    pub fn value(&self, name: &str) -> Value {
-        match self.values.get(name) {
-            Some(v) => v.clone(),
-            None => panic!("ModParser value {name} is not available"),
-        }
-    }
-
-    fn gem_id_lookup(&self) -> Value {
-        self.value("gemIdLookup")
-    }
-
-    /// `mod(...)`, i.e. `modLib.createMod`
-    pub fn mod_(&self, args: Vec<Value>) -> Vec<Value> {
-        vec![Value::Table(create_mod_args(&args))]
-    }
-
-    /// `flag(name, ...)`
-    pub fn flag(&self, args: Vec<Value>) -> Vec<Value> {
-        let mut a = vec![arg(&args, 0), s("FLAG"), Value::Bool(true)];
-        a.extend(args.into_iter().skip(1));
-        self.mod_(a)
-    }
-
-    /// `firstToUpper(str)`
-    pub fn first_to_upper(&self, args: Vec<Value>) -> Vec<Value> {
-        vec![first(gsub_fn(
-            &arg(&args, 0),
-            &s("^%l"),
-            &mut upper_fn,
-            &nil(),
-        ))]
-    }
-
-    /// `dealNoNonDamageType(dmgType, forMinion)`
-    pub fn deal_no_non_damage_type(&self, args: Vec<Value>) -> Vec<Value> {
-        let dmg_type = first(self.first_to_upper(vec![arg(&args, 0)]));
-        let for_minion = arg(&args, 1);
-        let list = self.value("damageTypeList");
-        if !is_value_in_array(&list, &dmg_type) {
-            return vec![];
-        }
-        let mods = tbl(vec![], vec![]);
-        for (_, damage_type) in ipairs(&list) {
-            if !damage_type.raw_eq(&dmg_type) {
-                let deal_no = first(self.flag(vec![concat(&s("DealNo"), &damage_type)]));
-                let m = if for_minion.truthy() {
-                    first(self.mod_(vec![
-                        s("MinionModifier"),
-                        s("LIST"),
-                        tbl(vec![(s("mod"), deal_no)], vec![]),
-                    ]))
-                } else {
-                    deal_no
-                };
-                t_insert(&mods, m);
-            }
-        }
-        vec![mods]
-    }
-
-    /// `grantedExtraSkill(name, level, noSupports)`
-    pub fn granted_extra_skill(&self, args: Vec<Value>) -> Vec<Value> {
-        let name = first(gsub(&arg(&args, 0), &s(" skill"), &s(""), &nil()));
-        let lookup = self.gem_id_lookup();
-        let id = index(&lookup, &name);
-        if id.truthy() {
-            let v = tbl(
-                vec![
-                    (s("skillId"), id),
-                    (s("level"), tonumber(&arg(&args, 1))),
-                    (s("noSupports"), arg(&args, 2)),
-                ],
-                vec![],
-            );
-            return vec![tbl(
-                vec![],
-                vec![first(self.mod_(vec![s("ExtraSkill"), s("LIST"), v]))],
-            )];
-        }
-        vec![]
-    }
-
-    /// `triggerExtraSkill(name, level, options)`
-    pub fn trigger_extra_skill(&self, args: Vec<Value>) -> Vec<Value> {
-        let options = arg(&args, 2);
-        let options = if options.truthy() {
-            options
-        } else {
-            tbl(vec![], vec![])
-        };
-        let name = first(gsub(&arg(&args, 0), &s(" skill"), &s(""), &nil()));
-        if field(&options, "sourceSkill").truthy() {
-            set_index(
-                &options,
-                s("sourceSkill"),
-                first(gsub(
-                    &field(&options, "sourceSkill"),
-                    &s(" skill"),
-                    &s(""),
-                    &nil(),
-                )),
-            );
-        }
-        let mods = tbl(vec![], vec![]);
-        let lookup = self.gem_id_lookup();
-        let id = index(&lookup, &name);
-        if id.truthy() {
-            let v = tbl(
-                vec![
-                    (s("skillId"), id.clone()),
-                    (s("level"), tonumber(&arg(&args, 1))),
-                    (s("noSupports"), field(&options, "noSupports")),
-                    (s("triggered"), Value::Bool(true)),
-                    (s("source"), field(&options, "sourceSkill")),
-                    (
-                        s("triggerChance"),
-                        tonumber(&field(&options, "triggerChance")),
-                    ),
-                ],
-                vec![],
-            );
-            t_insert(&mods, first(self.mod_(vec![s("ExtraSkill"), s("LIST"), v])));
-        }
-        let skill_tag = || {
-            tbl(
-                vec![(s("type"), s("SkillId")), (s("skillId"), id.clone())],
-                vec![],
-            )
-        };
-        if field(&options, "ignoreHexproof").truthy() {
-            let v = tbl(
-                vec![
-                    (s("key"), s("ignoreHexproof")),
-                    (s("value"), Value::Bool(true)),
-                ],
-                vec![],
-            );
-            t_insert(
-                &mods,
-                first(self.mod_(vec![s("SkillData"), s("LIST"), v, skill_tag()])),
-            );
-        }
-        if field(&options, "onCrit").truthy() {
-            let inner = tbl(
-                vec![
-                    (s("key"), s("triggerOnCrit")),
-                    (s("value"), Value::Bool(true)),
-                ],
-                vec![],
-            );
-            let inner = first(self.mod_(vec![s("SkillData"), s("LIST"), inner]));
-            let v = tbl(vec![(s("mod"), inner)], vec![]);
-            t_insert(
-                &mods,
-                first(self.mod_(vec![s("ExtraSkillMod"), s("LIST"), v, skill_tag()])),
-            );
-        }
-        vec![mods]
-    }
-
-    /// `extraSupport(name, level, slot)`
-    pub fn extra_support(&self, args: Vec<Value>) -> Vec<Value> {
-        let name = arg(&args, 0);
-        let lookup = self.gem_id_lookup();
-        let mut skill_id = index(&lookup, &name);
-        if !skill_id.truthy() {
-            skill_id = index(
-                &lookup,
-                &first(gsub(&name, &s("^increased "), &s(""), &nil())),
-            );
-        }
-        if !skill_id.truthy() {
-            skill_id = index(
-                &lookup,
-                &first(gsub(&name, &s(" support$"), &s(""), &nil())),
-            );
-        }
-        let mut slot = arg(&args, 2);
-        if slot.raw_eq(&s("main hand")) || slot.raw_eq(&s("main hand weapon")) {
-            slot = s("Weapon 1");
-        } else if slot.raw_eq(&s("off hand")) || slot.raw_eq(&s("off hand weapon")) {
-            slot = s("Weapon 2");
-        } else if slot.truthy() {
-            let spaced = concat(&s(" "), &slot);
-            slot = str_sub(
-                &first(gsub_fn(&spaced, &s("%W%l"), &mut upper_fn, &nil())),
-                &n(2.0),
-                &nil(),
-            );
-        } else {
-            slot = s("{SlotName}");
-        }
-        let level = tonumber(&arg(&args, 1));
-        if !skill_id.truthy() {
-            return vec![];
-        }
-        let applies = arg(&args, 3);
-        let support_value = |id: Value| {
-            let mut fields = vec![(s("skillId"), id), (s("level"), level.clone())];
-            if !applies.is_nil() {
-                fields.push((s("appliesToGrantedSkills"), applies.clone()));
-            }
-            tbl(fields, vec![])
-        };
-        let data = self.value("data");
-        let socketed = || {
-            tbl(
-                vec![(s("type"), s("SocketedIn")), (s("slotName"), slot.clone())],
-                vec![],
-            )
-        };
-        let skill_name = field(&index(&field(&data, "skills"), &skill_id), "name");
-        let gem_id = index(
-            &field(&data, "gemForBaseName"),
-            &lower(&concat(&skill_name, &s(" Support"))),
-        );
-        if gem_id.truthy() {
-            let gem = index(&field(&data, "gems"), &gem_id);
-            let v = support_value(field(&gem, "grantedEffectId"));
-            let mods = tbl(
-                vec![],
-                vec![first(self.mod_(vec![
-                    s("ExtraSupport"),
-                    s("LIST"),
-                    v,
-                    socketed(),
-                ]))],
-            );
-            let secondary = field(&gem, "secondaryGrantedEffect");
-            if secondary.truthy() {
-                let id = field(&gem, "secondaryGrantedEffectId");
-                if field(&secondary, "support").truthy() {
-                    let v = support_value(id);
-                    t_insert(
-                        &mods,
-                        first(self.mod_(vec![s("ExtraSupport"), s("LIST"), v, socketed()])),
-                    );
-                } else {
-                    let v = tbl(
-                        vec![(s("skillId"), id), (s("level"), level.clone())],
-                        vec![],
-                    );
-                    t_insert(&mods, first(self.mod_(vec![s("ExtraSkill"), s("LIST"), v])));
-                }
-            }
-            vec![mods]
-        } else {
-            let v = support_value(skill_id);
-            vec![tbl(
-                vec![],
-                vec![first(self.mod_(vec![
-                    s("ExtraSupport"),
-                    s("LIST"),
-                    v,
-                    socketed(),
-                ]))],
-            )]
-        }
-    }
-
-    /// `explodeFunc(chance, amount, type, ...)`
-    pub fn explode_func(&self, args: Vec<Value>) -> Vec<Value> {
-        let (chance, amount, typ) = (arg(&args, 0), arg(&args, 1), arg(&args, 2));
-        let mut amount_number = tonumber(&amount);
-        if !amount_number.truthy() {
-            amount_number = if amount.raw_eq(&s("tenth")) {
-                n(10.0)
-            } else if amount.raw_eq(&s("quarter")) {
-                n(25.0)
-            } else {
-                Value::Bool(false)
-            };
-        }
-        if !amount_number.truthy() {
-            return vec![];
-        }
-        let v = tbl(
-            vec![
-                (s("type"), first(self.first_to_upper(vec![typ]))),
-                (s("chance"), div(&chance, &n(100.0))),
-                (s("amount"), amount_number),
-                (s("keyOfScaledMod"), s("chance")),
-            ],
-            vec![],
-        );
-        let mut mod_args = vec![s("ExplodeMod"), s("LIST"), v];
-        mod_args.extend(args.into_iter().skip(3));
-        vec![tbl(
-            vec![],
-            vec![
-                first(self.mod_(mod_args)),
-                first(self.flag(vec![s("CanExplode")])),
-            ],
-        )]
-    }
-
-    /// `getSimpleConv(...)`: the jewel function is a closure run by the calcs.
-    pub fn get_simple_conv(&self, args: Vec<Value>) -> Vec<Value> {
-        vec![closure("getSimpleConv", args)]
-    }
-
-    /// `getPerStat(...)`, see [`Ctx::get_simple_conv`].
-    pub fn get_per_stat(&self, args: Vec<Value>) -> Vec<Value> {
-        vec![closure("getPerStat", args)]
-    }
-
-    /// `getThreshold(...)`, see [`Ctx::get_simple_conv`].
-    pub fn get_threshold(&self, args: Vec<Value>) -> Vec<Value> {
-        vec![closure("getThreshold", args)]
-    }
-}
-
-fn closure(name: &str, upvalues: Vec<Value>) -> Value {
-    Value::Closure(Rc::new(Closure {
-        name: name.into(),
-        upvalues,
-    }))
-}
-
-/// Error from [`ModParser::new`].
+/// Error in making the parser's tables
 #[derive(Debug)]
 pub enum InitError {
     /// An upstream closure has no Rust port
@@ -406,6 +63,8 @@ pub enum InitError {
         expected: u64,
         found: u64,
     },
+    /// A table holds what the typed form has no place for
+    Table(String),
 }
 
 impl std::fmt::Display for InitError {
@@ -421,1318 +80,1027 @@ impl std::fmt::Display for InitError {
                 "ModParser closure {key} changed upstream (ported from {expected:016x}, now {found:016x}); \
                  rerun portgen or update ported.rs"
             ),
+            InitError::Table(e) => write!(f, "ModParser table: {e}"),
         }
     }
 }
 
 impl std::error::Error for InitError {}
 
+/// The pattern tables a scan marks as hit, for rule coverage
+const SCANNED: [&str; 10] = [
+    "formList",
+    "modNameList",
+    "modFlagList",
+    "preFlagList",
+    "modTagList",
+    "specialModList",
+    "suffixTypes",
+    "flagTypes",
+    "skillNameList",
+    "preSkillNameList",
+];
+
+/// Coverage slot of a scan that is not reported
+const UNREPORTED: usize = SCANNED.len();
+
 pub struct ModParser {
+    rules: Rules,
     ctx: Ctx,
-    form_list: List,
-    mod_name_list: List,
-    mod_flag_list: List,
-    pre_flag_list: List,
-    mod_tag_list: List,
-    special_mod_list: List,
-    unsupported_mod_list: List,
-    suffix_types: List,
-    dmg_types: TableRef,
-    pen_types: List,
-    flag_types: List,
-    regen_types: TableRef,
-    degen_types: TableRef,
-    cost_types: List,
-    base_cost_types: List,
-    skill_name_list: List,
-    pre_skill_name_list: List,
-    jewel_func_list: List,
-    cluster_jewel_skills: List,
-    cache: RefCell<HashMap<Vec<u8>, (Value, Value)>>,
+    jewel_funcs: HashMap<String, usize>,
+    unsupported: HashSet<String>,
+    preloaded: HashMap<String, Parsed>,
+    cache: RwLock<HashMap<Vec<u8>, Parsed>>,
+    hits: Vec<Vec<AtomicBool>>,
+    /// `modName[2]` that DOUBLED lines wrote into `modNameList` entries
+    doubled: RwLock<HashMap<usize, Rc<str>>>,
 }
 
-/// Mod list and unparsed rest, as `modLib.parseMod` returns them.
-pub type Parsed = (Value, Value);
+/// Mods of an intermediate parse: a mod upstream would build with a nil
+/// value or name only fails when the parse is the one returned
+type Mods = Result<Vec<Mod>, String>;
 
-fn list_from(t: &Value, ports: &HashMap<&str, &Port>) -> Result<List, InitError> {
-    let mut list = List::default();
-    for (k, v) in t.as_table().expect("pattern table").entries() {
-        let key = match k.to_value() {
-            Value::Str(s) => s,
-            other => panic!("pattern table key {other:?}"),
-        };
-        let entry = match v {
-            Value::Func(f) => match ports.get(&*f.key) {
-                Some(p) if p.hash == f.source_hash => {
-                    let pf = p.f;
-                    Entry::Func(Rc::new(move |c: &Ctx, a: &[Value]| pf(c, a)))
-                }
-                Some(p) => {
-                    return Err(InitError::Changed {
-                        key: f.key.to_string(),
-                        expected: p.hash,
-                        found: f.source_hash,
-                    });
-                }
-                None => {
-                    return Err(InitError::Unported {
-                        key: f.key.to_string(),
-                    });
-                }
-            },
-            v => Entry::Value(v),
-        };
-        list.set(key, entry);
+/// A frag (or a plain name) from a closure's value
+pub fn frag<D: Dyn>(v: &D) -> Result<Frag, String> {
+    let conv = Converter::default();
+    match v.kind() {
+        Kind::Str(s) => return Ok(Frag::name(&s)),
+        Kind::Table => {}
+        _ => return Err("a pattern value that is neither a name nor a table".into()),
     }
-    Ok(list)
+    let mut f = Frag {
+        table: true,
+        ..Frag::default()
+    };
+    let bool_of = |x: &D, k: &str| -> Result<Option<bool>, String> {
+        match x.kind() {
+            Kind::Bool(b) => Ok(Some(b)),
+            _ => Err(format!("{k} is not a boolean")),
+        }
+    };
+    let tag_list = |x: &D| -> Result<Vec<Tag>, String> {
+        crate::mods::convert::d_array(x)
+            .iter()
+            .map(|t| conv.tag(t))
+            .collect()
+    };
+    let text = |x: &D| -> Result<Rc<str>, String> {
+        match x.kind() {
+            Kind::Str(s) => Ok(s.into()),
+            _ => Err("a name is not a string".into()),
+        }
+    };
+    let flag_bits = |x: &D| -> Result<u32, String> {
+        match x.kind() {
+            Kind::Num(n) => Ok(n.rem_euclid(4294967296.0) as u64 as u32),
+            _ => Err("flags are not a number".into()),
+        }
+    };
+    for (k, x) in v.entries() {
+        let k = match k {
+            DKey::Str(k) => k,
+            DKey::Int(_) => continue,
+            DKey::Other(k) => return Err(format!("pattern value key {k}")),
+        };
+        match k.as_str() {
+            "flags" => f.flags = flag_bits(&x)?,
+            "keywordFlags" => f.keyword_flags = flag_bits(&x)?,
+            "tag" => f.tag = Some(conv.tag(&x)?),
+            "tagList" => f.tag_list = Some(tag_list(&x)?),
+            "addToAura" => f.add_to_aura = bool_of(&x, &k)?,
+            "onlyAddToBanners" => f.only_add_to_banners = bool_of(&x, &k)?,
+            "newAura" => f.new_aura = bool_of(&x, &k)?,
+            "newAuraOnlyAllies" => f.new_aura_only_allies = bool_of(&x, &k)?,
+            "addToMinion" => f.add_to_minion = bool_of(&x, &k)?,
+            "applyToEnemy" => f.apply_to_enemy = bool_of(&x, &k)?,
+            "actorEnemy" => f.actor_enemy = bool_of(&x, &k)?,
+            "addToMinionTag" => f.add_to_minion_tag = Some(conv.tag(&x)?),
+            "playerTag" => f.player_tag = Some(conv.tag(&x)?),
+            "addToSkill" => f.add_to_skill = Some(conv.tag(&x)?),
+            "playerTagList" => f.player_tag_list = Some(tag_list(&x)?),
+            "modSuffix" => f.mod_suffix = Some(text(&x)?),
+            k => return Err(format!("pattern value field {k}")),
+        }
+    }
+    for x in crate::mods::convert::d_array(v) {
+        f.names.push(text(&x)?);
+    }
+    if f.names.len()
+        != v.entries()
+            .iter()
+            .filter(|(k, _)| matches!(k, DKey::Int(_)))
+            .count()
+    {
+        return Err("a pattern value with holes in its names".into());
+    }
+    Ok(f)
+}
+
+/// Mods from a closure's value: a list of `mod(...)`s, or nil
+fn mods_of(v: &V) -> Result<Option<Vec<Mod>>, String> {
+    match v {
+        V::Nil => Ok(None),
+        V::Tab(_) => {
+            let conv = Converter::default();
+            let arr = crate::mods::convert::d_array(v);
+            if arr.len() != v.len_pairs() {
+                return Err("special mod list with other keys".into());
+            }
+            arr.iter()
+                .map(|m| conv.mod_(m))
+                .collect::<Result<_, _>>()
+                .map(Some)
+        }
+        v => Err(format!("special mod list is a {} value", v.type_name())),
+    }
+}
+
+impl Dyn for V {
+    fn kind(&self) -> Kind<'_, V> {
+        match self {
+            V::Nil => Kind::Nil,
+            V::Bool(b) => Kind::Bool(*b),
+            V::Num(n) => Kind::Num(*n),
+            V::Str(s) => Kind::Str(String::from_utf8_lossy(s)),
+            V::Tab(_) => Kind::Table,
+            V::Mod(m) => Kind::Typed(ModValue::Mod(Box::new((**m).clone()))),
+            V::Func(f) => Kind::Typed(ModValue::Func(f.clone())),
+        }
+    }
+
+    fn get(&self, k: &str) -> V {
+        self.as_tab().map_or(V::Nil, |t| t.get_str(k).clone())
+    }
+
+    fn get_i(&self, i: i64) -> V {
+        self.as_tab().map_or(V::Nil, |t| t.get_int(i).clone())
+    }
+
+    fn border(&self) -> usize {
+        self.as_tab().map_or(0, |t| t.len())
+    }
+
+    fn len_pairs(&self) -> usize {
+        self.as_tab().map_or(0, |t| t.len_pairs())
+    }
+
+    fn entries(&self) -> Vec<(DKey, V)> {
+        self.as_tab().map_or(vec![], |t| {
+            t.entries()
+                .map(|(k, v)| {
+                    let k = match k {
+                        val::K::Str(s) => DKey::Str(String::from_utf8_lossy(&s).into_owned()),
+                        val::K::Int(i) => DKey::Int(i),
+                    };
+                    (k, v.clone())
+                })
+                .collect()
+        })
+    }
+}
+
+/// A scan's result: the entry's position, its captures and the rest of
+/// the line
+struct Found {
+    index: usize,
+    caps: Vec<V>,
+}
+
+/// Tags parseMod adds for the form: `modExtraTags`
+enum ExtraTags {
+    None,
+    Frag(Box<Frag>),
+    /// Tags by mod, for DOUBLED's two mods
+    PerMod(Vec<Vec<Tag>>),
+}
+
+fn hand_attack_tag() -> Frag {
+    Frag {
+        table: true,
+        tag: Some(Tag {
+            kind: TagKind::Condition {
+                vars: crate::mods::tag::Names::One(Sym::new("{Hand}Attack")),
+                neg: false,
+                actor: None,
+            },
+            global_limit: None,
+        }),
+        ..Frag::default()
+    }
+}
+
+fn text(b: &[u8]) -> String {
+    String::from_utf8_lossy(b).into_owned()
+}
+
+fn wrap(name: &str, inner: Mod, extra: Vec<(&str, ModValue)>, tags: Vec<Tag>) -> Mod {
+    let mut fields = vec![(Sym::new("mod"), ModValue::Mod(Box::new(inner)))];
+    fields.extend(extra.into_iter().map(|(k, v)| (Sym::new(k), v)));
+    Mod {
+        name: Sym::new(name),
+        typ: ModType::List,
+        value: ModValue::Record(Record { fields }),
+        flags: 0,
+        keyword_flags: 0,
+        source: None,
+        source_slot: None,
+        tags: tags.into(),
+        unreached_tags: vec![],
+    }
+}
+
+/// `actor = "enemy"` on a tag
+fn set_actor(tag: &mut Tag, actor: &str) {
+    let a = Some(Sym::new(actor));
+    match &mut tag.kind {
+        TagKind::Multiplier(x) => x.actor = a,
+        TagKind::MultiplierThreshold(x) => x.actor = a,
+        TagKind::PerStat(x) => x.actor = a,
+        TagKind::PercentStat(x) => x.actor = a,
+        TagKind::Condition { actor, .. } | TagKind::ActorCondition { actor, .. } => *actor = a,
+        k => panic!("ModParser: setting the actor of a {k:?} tag"),
+    }
 }
 
 impl ModParser {
-    /// Builds the parser from the imported tables, running the setup code
-    /// of ModParser.lua.
-    pub fn new(data: Data, tables: &TableRef) -> Result<ModParser, InitError> {
-        let mut ports: HashMap<&str, &Port> = HashMap::new();
-        for p in generated::PORTS.iter().chain(ported::PORTS) {
-            ports.insert(p.key, p);
-        }
-        let t = |name: &str| tables.get_str(name);
-        let mut values = HashMap::new();
-        for g in ["ModFlag", "KeywordFlag", "SkillType"] {
-            values.insert(g, data.global(g));
-        }
-        values.insert("data", Value::Table(data.data.clone()));
-        values.insert("damageTypeList", t("damageTypeList"));
-        values.insert("conquerorList", t("conquerorList"));
-        values.insert("dmgTypes", t("dmgTypes"));
-        let gem_id_lookup = t("gemIdLookup");
-        values.insert("gemIdLookup", gem_id_lookup.clone());
-        let ctx = Ctx { data, values };
-
-        // gemIdLookup: every non-hidden skill, plus hidden ones granted by items or the tree
-        let skills = ctx.data.get("skills");
-        let mut skill_ids: Vec<Value> = pairs(&skills).into_iter().map(|(k, _)| k).collect();
-        skill_ids.sort_by(|a, b| {
-            a.as_str()
-                .unwrap()
-                .as_bytes()
-                .cmp(b.as_str().unwrap().as_bytes())
-        });
-        for id in &skill_ids {
-            let ge = index(&skills, id);
-            if !field(&ge, "hidden").truthy()
-                || field(&ge, "fromItem").truthy()
-                || field(&ge, "fromTree").truthy()
-            {
-                set_index(&gem_id_lookup, lower(&field(&ge, "name")), field(&ge, "id"));
-            }
-        }
-
-        let mut special = list_from(&t("specialModList"), &ports)?;
-        for (_, name) in ipairs(&ctx.data.get("keystones")) {
-            let have = first(ctx.first_to_upper(vec![name.clone()]));
-            let have = first(gsub_fn(&have, &s(" %l"), &mut upper_fn, &nil()));
-            let have = first(gsub(&have, &s(" "), &s(""), &nil()));
-            let mods = tbl(
-                vec![],
-                vec![
-                    first(ctx.mod_(vec![s("Keystone"), s("LIST"), name.clone()])),
-                    first(ctx.flag(vec![concat(&s("Condition:Have"), &have)])),
-                ],
-            );
-            special.set(lua_str(&lower(&name)), Entry::Value(mods));
-        }
-        let cluster_jewels = ctx.data.get("clusterJewels");
-        for (_, name) in ipairs(&field(&cluster_jewels, "keystones")) {
-            let mods = tbl(
-                vec![],
-                vec![first(ctx.mod_(vec![
-                    s("Keystone"),
-                    s("LIST"),
-                    name.clone(),
-                ]))],
-            );
-            special.set(lua_str(&lower(&name)), Entry::Value(mods));
-        }
-        let mut anchored = List::default();
-        for (k, v) in special.entries {
-            let mut key = b"^".to_vec();
-            key.extend_from_slice(k.as_bytes());
-            key.push(b'$');
-            anchored.set(key.into(), v);
-        }
-        let mut special = anchored;
-
-        let resource_types = t("resourceTypes");
-        let maximum = TableRef::new();
-        for (resource, v) in pairs(&resource_types) {
-            maximum.set(concat(&s("maximum "), &resource), v);
-        }
-        for (resource, v) in maximum.entries() {
-            set_index(&resource_types, resource.to_value(), v);
-        }
-        let append_mod = |suffix: &str| {
-            let out = TableRef::new();
-            for (sub_line, mods) in pairs(&resource_types) {
-                if let Value::Str(_) = mods {
-                    out.set(sub_line, concat(&mods, &s(suffix)));
-                } else {
-                    let l = TableRef::new();
-                    for (_, m) in ipairs(&mods) {
-                        l.push(concat(&m, &s(suffix)));
-                    }
-                    out.set(sub_line, Value::Table(l));
-                }
-            }
-            out
-        };
-        let regen_types = append_mod("Regen");
-        let degen_types = append_mod("Degen");
-        let cost_types = list_from(&Value::Table(append_mod("Cost")), &ports)?;
-        let base_cost_types = list_from(&Value::Table(append_mod("CostNoMult")), &ports)?;
-
-        let mut skill_name_list = list_from(&t("skillNameList"), &ports)?;
-        let mut pre_skill_name_list = List::default();
-        ctx.add_gem_patterns(&mut skill_name_list, &mut pre_skill_name_list, &mut special);
-
-        let jewel_func_list = ctx.jewel_func_list(
-            &t("jewelOtherFuncs"),
-            &t("jewelSelfFuncs"),
-            &t("jewelSelfUnallocFuncs"),
-            &t("jewelThresholdFuncs"),
+    /// The parser on its typed tables.
+    pub fn new(data: ParserData) -> ModParser {
+        let ParserData { rules, cache } = data;
+        let jewel_funcs = rules
+            .jewel_func_list
+            .patterns
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.clone(), i))
+            .collect();
+        let unsupported = rules.unsupported_mod_list.iter().cloned().collect();
+        let lists: [usize; 10] = [
+            rules.form_list.len(),
+            rules.mod_name_list.len(),
+            rules.mod_flag_list.len(),
+            rules.pre_flag_list.len(),
+            rules.mod_tag_list.len(),
+            rules.special_mod_list.len(),
+            rules.suffix_types.len(),
+            rules.flag_types.len(),
+            rules.skill_name_list.len(),
+            rules.pre_skill_name_list.len(),
+        ];
+        let mut hits: Vec<Vec<AtomicBool>> = lists
+            .iter()
+            .map(|&n| (0..n).map(|_| AtomicBool::new(false)).collect())
+            .collect();
+        hits.push(
+            (0..rules.pen_types.len().max(rules.cost_types.len()))
+                .map(|_| AtomicBool::new(false))
+                .collect(),
         );
-        let cluster_jewel_skills = ctx.cluster_jewel_skills(&cluster_jewels);
+        ModParser {
+            ctx: Ctx::new(&rules),
+            rules,
+            jewel_funcs,
+            unsupported,
+            preloaded: cache,
+            cache: RwLock::new(HashMap::new()),
+            hits,
+            doubled: RwLock::new(HashMap::new()),
+        }
+    }
 
-        Ok(ModParser {
-            form_list: list_from(&t("formList"), &ports)?,
-            mod_name_list: list_from(&t("modNameList"), &ports)?,
-            mod_flag_list: list_from(&t("modFlagList"), &ports)?,
-            pre_flag_list: list_from(&t("preFlagList"), &ports)?,
-            mod_tag_list: list_from(&t("modTagList"), &ports)?,
-            special_mod_list: special,
-            unsupported_mod_list: list_from(&t("unsupportedModList"), &ports)?,
-            suffix_types: list_from(&t("suffixTypes"), &ports)?,
-            dmg_types: t("dmgTypes").as_table().expect("dmgTypes").clone(),
-            pen_types: list_from(&t("penTypes"), &ports)?,
-            flag_types: list_from(&t("flagTypes"), &ports)?,
-            regen_types,
-            degen_types,
-            cost_types,
-            base_cost_types,
-            skill_name_list,
-            pre_skill_name_list,
-            jewel_func_list,
-            cluster_jewel_skills,
-            ctx,
-            cache: RefCell::new(HashMap::new()),
-        })
+    /// The parser from its binary form
+    pub fn decode(bytes: &[u8]) -> crate::codec::Result<ModParser> {
+        Ok(ModParser::new(ParserData::decode(bytes)?))
     }
 
     /// Patterns no scan has selected so far, by table: rule coverage of the
     /// lines parsed with this parser.
     pub fn unhit_rules(&self) -> Vec<(&'static str, String)> {
-        let lists: [(&'static str, &List); 10] = [
-            ("formList", &self.form_list),
-            ("modNameList", &self.mod_name_list),
-            ("modFlagList", &self.mod_flag_list),
-            ("preFlagList", &self.pre_flag_list),
-            ("modTagList", &self.mod_tag_list),
-            ("specialModList", &self.special_mod_list),
-            ("suffixTypes", &self.suffix_types),
-            ("flagTypes", &self.flag_types),
-            ("skillNameList", &self.skill_name_list),
-            ("preSkillNameList", &self.pre_skill_name_list),
+        let r = &self.rules;
+        let patterns: [&Vec<String>; 10] = [
+            &r.form_list.patterns,
+            &r.mod_name_list.patterns,
+            &r.mod_flag_list.patterns,
+            &r.pre_flag_list.patterns,
+            &r.mod_tag_list.patterns,
+            &r.special_mod_list.patterns,
+            &r.suffix_types.patterns,
+            &r.flag_types.patterns,
+            &r.skill_name_list.patterns,
+            &r.pre_skill_name_list.patterns,
         ];
         let mut out = Vec::new();
-        for (name, list) in lists {
-            let hits = list.hits.borrow();
-            for (i, (pattern, _)) in list.entries.iter().enumerate() {
-                if !hits.get(i).copied().unwrap_or(false) {
-                    out.push((name, pattern.to_string()));
+        for (i, (name, list)) in SCANNED.iter().zip(patterns).enumerate() {
+            for (j, p) in list.iter().enumerate() {
+                if !self.hits[i][j].load(Ordering::Relaxed) {
+                    out.push((*name, p.clone()));
                 }
             }
         }
         out
     }
 
-    /// Preloads the memo cache with upstream's `Data/ModCache.lua` (line ->
-    /// `{ modList, extra }`), as upstream does on startup. Cached results are
-    /// what desktop PoB uses for every line it ships.
-    pub fn preload(&self, mod_cache: &TableRef) {
-        let mut cache = self.cache.borrow_mut();
-        for (line, entry) in mod_cache.entries() {
-            let line = line.to_value();
-            let line = line.as_str().expect("ModCache key").as_bytes().to_vec();
-            cache.insert(line, (index(&entry, &n(1.0)), index(&entry, &n(2.0))));
-        }
-    }
-
-    /// `modLib.parseMod(line, isComb)`: the mod list (or nil) and the part
-    /// of the line that was not understood (or nil). Results are cached and
-    /// returned as copies, as upstream does.
+    /// `modLib.parseMod(line)`: the mods (none when the line is not
+    /// understood) and the part of the line that was not understood.
+    /// Results are cached, as upstream does, starting from its ModCache.
+    /// Panics where upstream raises an error.
     pub fn parse(&self, line: &[u8]) -> Parsed {
-        if let Some((m, e)) = self.cache.borrow().get(line) {
-            return (copy_value(m), copy_value(e));
+        if let Some(r) = self.cache.read().expect("cache").get(line) {
+            return r.clone();
         }
-        let line_v = sb(line);
-        let (mut mod_list, mut extra) = self.parse_mod(&line_v, 1);
-        if mod_list.truthy() && extra.truthy() {
-            (mod_list, extra) = self.parse_mod(&line_v, 2);
+        if let Some(r) = std::str::from_utf8(line)
+            .ok()
+            .and_then(|l| self.preloaded.get(l))
+        {
+            return r.clone();
         }
-        let result = (copy_value(&mod_list), copy_value(&extra));
+        let (mut mods, mut extra) = self.parse_mod(line, 1);
+        if mods.is_some() && extra.is_some() {
+            (mods, extra) = self.parse_mod(line, 2);
+        }
+        let mods = mods.map(|m| m.unwrap_or_else(|e| panic!("ModParser: {e}")));
+        let result = (mods, extra);
         self.cache
-            .borrow_mut()
-            .insert(line.to_vec(), (mod_list, extra));
+            .write()
+            .expect("cache")
+            .insert(line.to_vec(), result.clone());
         result
     }
 
-    /// `scan(line, patternList, plain)`
-    fn scan<'a>(
+    /// `scan(line, patternList, plain)`: the earliest, then longest match
+    fn scan<T>(
         &self,
-        line: &Value,
-        list: &'a List,
+        line: &[u8],
+        list: &List<T>,
         plain: bool,
-    ) -> (Option<&'a Entry>, Value, Vec<Value>) {
-        let lower_line = lower(line);
-        let lower_bytes = lower_line.as_str().expect("string").as_bytes().to_vec();
-        let mut best: Option<(usize, usize, usize, &Entry, Vec<Value>)> = None;
-        let mut best_i = 0;
-        for (i, (pattern, val)) in list.entries.iter().enumerate() {
-            let found = lua::pattern::lua_find(&lower_bytes, pattern.as_bytes(), 1, plain)
-                .unwrap_or_else(|e| panic!("bad pattern {pattern:?}: {e:?}"));
-            if let Some((index, end, caps)) = found {
+        id: usize,
+    ) -> (Option<Found>, Vec<u8>) {
+        let lower = line.to_ascii_lowercase();
+        let mut best: Option<(usize, usize, usize, usize, Vec<pattern::Capture>)> = None;
+        for (i, p) in list.patterns.iter().enumerate() {
+            let m = pattern::find(&lower, p.as_bytes(), 0, plain)
+                .unwrap_or_else(|e| panic!("bad pattern {p:?}: {e:?}"));
+            if let Some(m) = m {
                 let better = match &best {
                     None => true,
-                    Some((bi, be, bl, _, _)) => {
-                        index < *bi
-                            || (index == *bi && (end > *be || (end == *be && pattern.len() > *bl)))
+                    Some((bs, be, bl, _, _)) => {
+                        m.start < *bs
+                            || (m.start == *bs && (m.end > *be || (m.end == *be && p.len() > *bl)))
                     }
                 };
                 if better {
-                    let mut caps = caps;
-                    caps.truncate(5);
-                    best = Some((index, end, pattern.len(), val, caps));
-                    best_i = i;
+                    best = Some((m.start, m.end, p.len(), i, m.captures));
                 }
             }
         }
-        if best.is_some() {
-            let mut hits = list.hits.borrow_mut();
-            if hits.len() < list.entries.len() {
-                hits.resize(list.entries.len(), false);
-            }
-            hits[best_i] = true;
+        let Some((start, end, _, index, mut caps)) = best else {
+            return (None, line.to_vec());
+        };
+        if let Some(h) = self.hits[id].get(index) {
+            h.store(true, Ordering::Relaxed);
         }
-        match best {
-            Some((start, end, _, val, caps)) => {
-                let bytes = line.as_str().expect("string").as_bytes();
-                let mut rest = bytes[..start - 1].to_vec();
-                rest.extend_from_slice(&bytes[end.min(bytes.len())..]);
-                (Some(val), sb(&rest), caps)
+        caps.truncate(5);
+        let caps = caps
+            .iter()
+            .map(|c| match *c {
+                pattern::Capture::Str(a, b) => val::sb(&lower[a..b]),
+                pattern::Capture::Pos(p) => val::n((p + 1) as f64),
+            })
+            .collect();
+        let mut rest = line[..start].to_vec();
+        rest.extend_from_slice(&line[end.min(line.len())..]);
+        (Some(Found { index, caps }), rest)
+    }
+
+    fn call(&self, c: &rules::Closure, args: &[V]) -> V {
+        val::first((c.port.f)(&self.ctx, args))
+    }
+
+    /// A scanned table's frag: its value, or its closure's on `args`
+    fn frag_of(&self, list: &List<Frag>, found: &Found, args: impl FnOnce(&[V]) -> Vec<V>) -> Frag {
+        match &list.entries[found.index] {
+            Entry::Value(f) => f.clone(),
+            Entry::Func(c) => {
+                let v = self.call(c, &args(&found.caps));
+                if v.is_nil() {
+                    return Frag::default();
+                }
+                frag(&v).unwrap_or_else(|e| panic!("ModParser: {e}"))
             }
-            None => (None, line.clone(), vec![]),
+            Entry::Gem(..) => panic!("gem rule outside the special mods"),
         }
     }
 
-    fn call(&self, entry: &Entry, args: &[Value]) -> Value {
-        match entry {
-            Entry::Func(f) => first(f(&self.ctx, args)),
-            Entry::Value(v) => v.clone(),
+    fn value_of<'a, T>(list: &'a List<T>, found: &Option<Found>) -> Option<&'a T> {
+        match found.as_ref().map(|f| &list.entries[f.index]) {
+            Some(Entry::Value(v)) => Some(v),
+            Some(_) => panic!("unexpected function entry"),
+            None => None,
         }
     }
 
-    fn entry_value(entry: Option<&Entry>) -> Value {
-        match entry {
-            Some(Entry::Value(v)) => v.clone(),
-            Some(Entry::Func(_)) => panic!("unexpected function entry"),
-            None => Value::Nil,
+    /// A gem loop rule's mods, with the line's number
+    fn gem_mods(&self, kind: GemKind, skill: &str, num: V) -> Vec<Mod> {
+        let tag = || {
+            val::tbl(
+                vec![
+                    (val::s("type"), val::s("SkillName")),
+                    (val::s("skillName"), val::s(skill)),
+                    (val::s("includeTransfigured"), V::Bool(true)),
+                ],
+                vec![],
+            )
+        };
+        let esm = |name: &str, args: Vec<V>| {
+            let mut a = vec![val::s(name), val::s("BASE"), num.clone()];
+            a.extend(args);
+            let inner = make_mod(&a);
+            make_mod(&[
+                val::s("ExtraSkillMod"),
+                val::s("LIST"),
+                val::tbl(vec![(val::s("mod"), V::Mod(Rc::new(inner)))], vec![]),
+                tag(),
+            ])
+        };
+        let arrow = || self.ctx.field("KeywordFlag", "Arrow");
+        let m = match kind {
+            GemKind::MineThrowingSpeed => {
+                let inner = make_mod(&[val::s("MineLayingSpeed"), val::s("INC"), num]);
+                return vec![self.extra_skill_mod(inner, tag())];
+            }
+            GemKind::TrapThrowingSpeed => {
+                let inner = make_mod(&[val::s("TrapThrowingSpeed"), val::s("INC"), num]);
+                return vec![self.extra_skill_mod(inner, tag())];
+            }
+            GemKind::Chains => esm("ChainCountMax", vec![]),
+            GemKind::FiresArrow => {
+                let inner = make_mod(&[
+                    val::s("ProjectileCount"),
+                    val::s("BASE"),
+                    val::n(1.0),
+                    V::Nil,
+                    val::n(0.0),
+                    arrow(),
+                ]);
+                return vec![self.extra_skill_mod(inner, tag())];
+            }
+            GemKind::FiresArrows => esm("ProjectileCount", vec![V::Nil, val::n(0.0), arrow()]),
+            GemKind::Pierces => make_mod(&[val::s("PierceCount"), val::s("BASE"), num, tag()]),
+            GemKind::FiresProjectiles => esm("ProjectileCount", vec![]),
+        };
+        vec![m]
+    }
+
+    fn extra_skill_mod(&self, inner: Mod, tag: V) -> Mod {
+        make_mod(&[
+            val::s("ExtraSkillMod"),
+            val::s("LIST"),
+            val::tbl(vec![(val::s("mod"), V::Mod(Rc::new(inner)))], vec![]),
+            tag,
+        ])
+    }
+
+    /// A `modNameList` entry, with what DOUBLED lines wrote into it
+    fn mod_name(&self, found: &Option<Found>) -> Option<(Frag, usize)> {
+        let f = found.as_ref()?;
+        let mut frag = Self::value_of(&self.rules.mod_name_list, found)?.clone();
+        if let Some(second) = self.doubled.read().expect("doubled").get(&f.index) {
+            match frag.names.len() {
+                0 | 1 => frag.names.push(second.clone()),
+                _ => frag.names[1] = second.clone(),
+            }
         }
+        Some((frag, f.index))
     }
 
     /// `parseMod(line, order)`
-    fn parse_mod(&self, line_in: &Value, order: u8) -> Parsed {
-        let ctx = &self.ctx;
-        let line_lower = lower(line_in);
-        let lower_bytes = line_lower.as_str().expect("string").as_bytes().to_vec();
+    fn parse_mod(&self, line_in: &[u8], order: u8) -> (Option<Mods>, Option<String>) {
+        let r = &self.rules;
+        let lower = line_in.to_ascii_lowercase();
+        let one = |m: Mod| (Some(Ok(vec![m])), None);
+        let jewel_mod = |v: ModValue| Mod {
+            name: Sym::new("JewelFunc"),
+            typ: ModType::List,
+            value: v,
+            flags: 0,
+            keyword_flags: 0,
+            source: None,
+            source_slot: None,
+            tags: Default::default(),
+            unreached_tags: vec![],
+        };
 
         // Jewel functions with captures
-        for (pattern, entry) in &self.jewel_func_list.entries {
-            let found = lua::pattern::lua_find(&lower_bytes, pattern.as_bytes(), 1, false)
-                .expect("jewel pattern");
-            if let Some((_, _, caps)) = found
-                && caps.first().is_some_and(Value::truthy)
-            {
-                let Entry::Value(pv) = entry else {
-                    unreachable!()
-                };
-                let func = jewel_func_call(pv, pattern, &caps);
-                let v = tbl(
-                    vec![(s("func"), func), (s("type"), field(pv, "type"))],
-                    vec![],
-                );
-                return (
-                    tbl(
-                        vec![],
-                        vec![first(ctx.mod_(vec![s("JewelFunc"), s("LIST"), v]))],
-                    ),
-                    nil(),
-                );
-            }
-        }
-        if let Some(Entry::Value(jewel_func)) = self.jewel_func_list.get(&lower_bytes) {
-            return (
-                tbl(
-                    vec![],
-                    vec![first(ctx.mod_(vec![
-                        s("JewelFunc"),
-                        s("LIST"),
-                        jewel_func.clone(),
-                    ]))],
-                ),
-                nil(),
-            );
-        }
-        if let Some(Entry::Value(skill)) = self.cluster_jewel_skills.get(&lower_bytes) {
-            return (skill.clone(), nil());
-        }
-        if self.unsupported_mod_list.get(&lower_bytes).is_some() {
-            return (tbl(vec![], vec![]), line_in.clone());
-        }
-        let (special_mod, special_line, cap) = self.scan(line_in, &self.special_mod_list, false);
-        if let Some(special_mod) = special_mod
-            && len(&special_line).as_number() == Some(0.0)
+        for (pattern, entry) in r
+            .jewel_func_list
+            .patterns
+            .iter()
+            .zip(&r.jewel_func_list.entries)
         {
-            return match special_mod {
-                Entry::Func(f) => {
-                    let mut args = vec![tonumber(&nth(&cap, 0))];
-                    args.extend(cap.iter().cloned());
-                    let r = f(ctx, &args);
-                    (nth(&r, 0), nth(&r, 1))
+            let m = pattern::find(&lower, pattern.as_bytes(), 0, false).expect("jewel pattern");
+            let Some(m) = m else { continue };
+            if m.captures.is_empty() {
+                continue;
+            }
+            let Entry::Value(jf) = entry else {
+                unreachable!()
+            };
+            let mut args = vec![Some(ModValue::Str(pattern.as_str().into()))];
+            args.extend(m.captures.iter().map(|c| {
+                Some(match *c {
+                    pattern::Capture::Str(a, b) => ModValue::Str(text(&lower[a..b]).into()),
+                    pattern::Capture::Pos(p) => ModValue::Number((p + 1) as f64),
+                })
+            }));
+            let func = ModValue::Func(Rc::new(crate::mods::Func {
+                name: "jewelFunc".into(),
+                args,
+            }));
+            let v = Record {
+                fields: vec![
+                    (Sym::new("func"), func),
+                    (Sym::new("type"), ModValue::Str(jf.typ.clone())),
+                ],
+            };
+            return one(jewel_mod(ModValue::Record(v)));
+        }
+        let lower_s = text(&lower);
+        if let Some(&i) = self.jewel_funcs.get(&lower_s)
+            && let Entry::Value(jf) = &r.jewel_func_list.entries[i]
+        {
+            return one(jewel_mod(jf.value.clone()));
+        }
+        if let Some(mods) = r.cluster_jewel_skills.get(&lower_s) {
+            return (Some(Ok(mods.clone())), None);
+        }
+        if self.unsupported.contains(&lower_s) {
+            return (Some(Ok(vec![])), Some(text(line_in)));
+        }
+        let (special, special_line) = self.scan(line_in, &r.special_mod_list, false, 5);
+        if let Some(found) = special
+            && special_line.is_empty()
+        {
+            let num = val::tonumber(&val::nth(&found.caps, 0));
+            return match &r.special_mod_list.entries[found.index] {
+                Entry::Func(c) => {
+                    let mut args = vec![num];
+                    args.extend(found.caps.iter().cloned());
+                    let out = (c.port.f)(&self.ctx, &args);
+                    let mods = mods_of(&val::nth(&out, 0)).map_err(|e| e.to_string());
+                    let extra = match val::nth(&out, 1) {
+                        V::Nil => None,
+                        V::Str(s) => Some(text(&s)),
+                        v => panic!("ModParser: special mod rest is a {} value", v.type_name()),
+                    };
+                    match mods {
+                        Ok(m) => (m.map(Ok), extra),
+                        Err(e) => (Some(Err(e)), extra),
+                    }
                 }
-                Entry::Value(v) => (copy_table(v), nil()),
+                Entry::Value(mods) => (Some(Ok(mods.clone())), None),
+                Entry::Gem(kind, skill) => (Some(Ok(self.gem_mods(*kind, skill, num))), None),
             };
         }
 
         // Add-to-cluster-jewel special
-        let add_to_cluster = first(str_match(
-            line_in,
-            &s("^Added Small Passive Skills also grant: (.+)$"),
-            &nil(),
-        ));
-        if add_to_cluster.truthy() {
-            return (
-                tbl(
-                    vec![],
-                    vec![first(ctx.mod_(vec![
-                        s("AddToClusterJewelNode"),
-                        s("LIST"),
-                        add_to_cluster,
-                    ]))],
-                ),
-                nil(),
-            );
+        if let Some(m) =
+            pattern::find_match(line_in, b"^Added Small Passive Skills also grant: (.+)$", 0)
+                .expect("pattern")
+            && let Some(pattern::Capture::Str(a, b)) = m.captures.first()
+        {
+            return one(make_mod(&[
+                val::s("AddToClusterJewelNode"),
+                val::s("LIST"),
+                val::sb(&line_in[*a..*b]),
+            ]));
         }
 
-        let mut line = concat(line_in, &s(" "));
+        let mut line = line_in.to_vec();
+        line.push(b' ');
 
         // Flag/tag specification at the start of the line
-        let (pre_flag_entry, rest, pre_flag_cap) = self.scan(&line, &self.pre_flag_list, false);
+        let (found, rest) = self.scan(&line, &r.pre_flag_list, false, 3);
         line = rest;
-        let pre_flag = match pre_flag_entry {
-            Some(e) if e.is_func() => self.call(e, &pre_flag_cap),
-            e => Self::entry_value(e),
-        };
+        let pre_flag = found.map(|f| self.frag_of(&r.pre_flag_list, &f, <[V]>::to_vec));
 
         // Skill name at the start of the line
-        let (skill_tag_entry, rest, _) = self.scan(&line, &self.pre_skill_name_list, false);
+        let (found, rest) = self.scan(&line, &r.pre_skill_name_list, false, 9);
         line = rest;
-        let mut skill_tag = Self::entry_value(skill_tag_entry);
+        let mut skill_tag = Self::value_of(&r.pre_skill_name_list, &found).cloned();
 
         // Modifier form
-        let (mod_form_entry, rest, mut form_cap) = self.scan(&line, &self.form_list, false);
+        let (found, rest) = self.scan(&line, &r.form_list, false, 0);
         line = rest;
-        let Some(mod_form_entry) = mod_form_entry else {
-            return (nil(), line);
+        let Some(form_found) = found else {
+            return (None, Some(text(&line)));
         };
-        let mod_form = Self::entry_value(Some(mod_form_entry));
-        let mod_form = mod_form.as_str().expect("form").to_string();
+        let Entry::Value(form) = r.form_list.entries[form_found.index] else {
+            panic!("unexpected function entry");
+        };
+        let mut form_cap = form_found.caps;
 
         // Tags (per-charge, conditionals)
-        let scan_tag = |line: &Value| -> (Value, Value) {
-            let (entry, rest, tag_cap) = self.scan(line, &self.mod_tag_list, false);
-            let tag = match entry {
-                Some(e) if e.is_func() => {
-                    let c1 = nth(&tag_cap, 0);
-                    let first_arg = if first(str_match(&c1, &s("%d+"), &nil())).truthy() {
-                        tonumber(&c1)
-                    } else {
-                        c1
-                    };
+        let scan_tag = |line: &[u8]| -> (Option<Frag>, Vec<u8>) {
+            let (found, rest) = self.scan(line, &r.mod_tag_list, false, 4);
+            let tag = found.map(|f| {
+                self.frag_of(&r.mod_tag_list, &f, |caps| {
+                    let c1 = val::nth(caps, 0);
+                    let first_arg =
+                        if val::first(val::str_match(&c1, &val::s("%d+"), &V::Nil)).truthy() {
+                            val::tonumber(&c1)
+                        } else {
+                            c1
+                        };
                     let mut args = vec![first_arg];
-                    args.extend(tag_cap.iter().cloned());
-                    self.call(e, &args)
-                }
-                e => Self::entry_value(e),
-            };
+                    args.extend(caps.iter().cloned());
+                    args
+                })
+            });
             (tag, rest)
         };
         let (mod_tag, rest) = scan_tag(&line);
         line = rest;
-        let mut mod_tag2 = nil();
-        if mod_tag.truthy() {
+        let mut mod_tag2 = None;
+        if mod_tag
+            .as_ref()
+            .is_some_and(|t| t.table || !t.names.is_empty())
+        {
             let (t2, rest) = scan_tag(&line);
             mod_tag2 = t2;
             line = rest;
         }
 
         // Modifier name and skill name
-        let mut mod_name;
-        if order == 2 && !skill_tag.truthy() {
-            let (e, rest, _) = self.scan(&line, &self.skill_name_list, false);
-            skill_tag = Self::entry_value(e);
+        if order == 2 && skill_tag.is_none() {
+            let (found, rest) = self.scan(&line, &r.skill_name_list, false, 8);
+            skill_tag = Self::value_of(&r.skill_name_list, &found).cloned();
             line = rest;
         }
-        let scan_rest_name =
-            |line: Value| -> Value { self.scan(&line, &self.mod_name_list, true).1 };
-        match mod_form.as_str() {
-            "PEN" | "BASECOST" | "TOTALCOST" => {
-                let list = match mod_form.as_str() {
-                    "PEN" => &self.pen_types,
-                    "BASECOST" => &self.base_cost_types,
-                    _ => &self.cost_types,
+        let mut mod_name: Option<(Frag, Option<usize>)>;
+        match form {
+            Form::Pen | Form::BaseCost | Form::TotalCost => {
+                let list = match form {
+                    Form::Pen => &r.pen_types,
+                    Form::BaseCost => &r.base_cost_types,
+                    _ => &r.cost_types,
                 };
-                let (e, rest, _) = self.scan(&line, list, true);
+                let (found, rest) = self.scan(&line, list, true, UNREPORTED);
                 line = rest;
-                mod_name = Self::entry_value(e);
-                if !mod_name.truthy() {
-                    return (tbl(vec![], vec![]), line);
+                mod_name = Self::value_of(list, &found).cloned().map(|f| (f, None));
+                if mod_name.is_none() {
+                    return (Some(Ok(vec![])), Some(text(&line)));
                 }
-                line = scan_rest_name(line);
+                line = self.scan(&line, &r.mod_name_list, true, 1).1;
             }
-            "FLAG" => {
-                let (e, rest, _) = self.scan(&line, &self.flag_types, false);
+            Form::Flag => {
+                let (found, rest) = self.scan(&line, &r.flag_types, false, 7);
                 line = rest;
-                let v = Self::entry_value(e);
+                let Some(flag) = Self::value_of(&r.flag_types, &found) else {
+                    return (None, Some(text(&line)));
+                };
                 if form_cap.is_empty() {
-                    form_cap.push(nil());
+                    form_cap.push(V::Nil);
                 }
-                form_cap[0] = v.clone();
-                if !v.truthy() {
-                    return (nil(), line);
-                }
-                let (e, rest, _) = self.scan(&line, &self.mod_name_list, true);
+                form_cap[0] = match flag {
+                    FlagType::Name(n) => val::s(n),
+                    FlagType::Mod { name, typ, value } => val::tbl(
+                        vec![
+                            (val::s("name"), val::s(name)),
+                            (val::s("type"), val::s(typ)),
+                            (val::s("value"), V::from(value.clone())),
+                        ],
+                        vec![],
+                    ),
+                };
+                let (found, rest) = self.scan(&line, &r.mod_name_list, true, 1);
                 line = rest;
-                mod_name = Self::entry_value(e);
+                mod_name = self.mod_name(&found).map(|(f, i)| (f, Some(i)));
             }
             _ => {
-                let (e, rest, _) = self.scan(&line, &self.mod_name_list, true);
+                let (found, rest) = self.scan(&line, &r.mod_name_list, true, 1);
                 line = rest;
-                mod_name = Self::entry_value(e);
+                mod_name = self.mod_name(&found).map(|(f, i)| (f, Some(i)));
             }
         }
-        if order == 1 && !skill_tag.truthy() {
-            let (e, rest, _) = self.scan(&line, &self.skill_name_list, false);
-            skill_tag = Self::entry_value(e);
+        if order == 1 && skill_tag.is_none() {
+            let (found, rest) = self.scan(&line, &r.skill_name_list, false, 8);
+            skill_tag = Self::value_of(&r.skill_name_list, &found).cloned();
             line = rest;
         }
 
         // Flags
-        let (e, rest, _) = self.scan(&line, &self.mod_flag_list, true);
-        let mut mod_flag = Self::entry_value(e);
+        let (found, rest) = self.scan(&line, &r.mod_flag_list, true, 2);
+        let mut mod_flag = Self::value_of(&r.mod_flag_list, &found).cloned();
         line = rest;
 
         // Value and type according to form
-        let cap0 = nth(&form_cap, 0);
-        let mut mod_value = {
-            let num = tonumber(&cap0);
-            if num.truthy() { num } else { cap0.clone() }
+        let cap0 = val::nth(&form_cap, 0);
+        let mut mod_value = match val::tonumber(&cap0) {
+            V::Nil => cap0.clone(),
+            x => x,
         };
-        let mut mod_type = s("BASE");
-        let mut mod_suffix = nil();
-        let mut mod_extra_tags = nil();
-        let scan_suffix = |line: &Value| -> (Value, Value) {
-            let (e, rest, _) = self.scan(line, &self.suffix_types, true);
-            (Self::entry_value(e), rest)
+        let mut mod_type = val::s("BASE");
+        let mut mod_suffix: Option<Rc<str>> = None;
+        let mut extra_tags = ExtraTags::None;
+        let scan_suffix = |line: &[u8]| -> (Option<Rc<str>>, Vec<u8>) {
+            let (found, rest) = self.scan(line, &r.suffix_types, true, 6);
+            (Self::value_of(&r.suffix_types, &found).cloned(), rest)
         };
-        let hand_attack_tag = || {
-            tbl(
-                vec![(
-                    s("tag"),
-                    tbl(
-                        vec![(s("type"), s("Condition")), (s("var"), s("{Hand}Attack"))],
-                        vec![],
-                    ),
-                )],
-                vec![],
-            )
+        let cap_text = |i: usize| match val::nth(&form_cap, i) {
+            V::Str(s) => Some(text(&s)),
+            _ => None,
         };
-        let damage = |i: usize| index(&Value::Table(self.dmg_types.clone()), &nth(&form_cap, i));
-        let min_max = |dt: &Value| tbl(vec![], vec![concat(dt, &s("Min")), concat(dt, &s("Max"))]);
-        let min_max_value = || {
-            tbl(
-                vec![],
-                vec![tonumber(&nth(&form_cap, 0)), tonumber(&nth(&form_cap, 1))],
-            )
+        let damage = |i: usize| cap_text(i).and_then(|c| r.dmg_types.get(&c).cloned());
+        let keyword = |name: &str| self.ctx.field("KeywordFlag", name);
+        let kw_frag = |v: V| Frag {
+            table: true,
+            keyword_flags: (val::to_number(&v)
+                .expect("keyword flags")
+                .rem_euclid(4294967296.0) as u64 as u32),
+            ..Frag::default()
         };
-        let keyword = |name: &str| field(&ctx.data.global("KeywordFlag"), name);
-        match mod_form.as_str() {
-            "INC" => mod_type = s("INC"),
-            "RED" => {
-                mod_value = neg(&mod_value);
-                mod_type = s("INC");
+        match form {
+            Form::Inc => mod_type = val::s("INC"),
+            Form::Red => {
+                mod_value = val::neg(&mod_value);
+                mod_type = val::s("INC");
             }
-            "MORE" => mod_type = s("MORE"),
-            "LESS" => {
-                mod_value = neg(&mod_value);
-                mod_type = s("MORE");
+            Form::More => mod_type = val::s("MORE"),
+            Form::Less => {
+                mod_value = val::neg(&mod_value);
+                mod_type = val::s("MORE");
             }
-            "BASE" | "GAIN" => (mod_suffix, line) = scan_suffix(&line),
-            "LOSE" => {
-                mod_value = neg(&mod_value);
+            Form::Base | Form::Gain | Form::GrantsGlobal => (mod_suffix, line) = scan_suffix(&line),
+            Form::Lose => {
+                mod_value = val::neg(&mod_value);
                 (mod_suffix, line) = scan_suffix(&line);
             }
-            "GRANTS" => {
-                mod_extra_tags = hand_attack_tag();
+            Form::Grants => {
+                extra_tags = ExtraTags::Frag(Box::new(hand_attack_tag()));
                 (mod_suffix, line) = scan_suffix(&line);
             }
-            "GRANTS_GLOBAL" => (mod_suffix, line) = scan_suffix(&line),
-            "REMOVES" => {
-                mod_value = neg(&mod_value);
-                mod_extra_tags = hand_attack_tag();
+            Form::Removes => {
+                mod_value = val::neg(&mod_value);
+                extra_tags = ExtraTags::Frag(Box::new(hand_attack_tag()));
                 (mod_suffix, line) = scan_suffix(&line);
             }
-            "CHANCE" => {}
-            "REGENPERCENT" => {
-                mod_name = self.regen_types.get(&nth(&form_cap, 1));
-                mod_suffix = s("Percent");
-            }
-            "REGENFLAT" => mod_name = self.regen_types.get(&nth(&form_cap, 1)),
-            "DEGENPERCENT" => {
-                mod_name = self.degen_types.get(&nth(&form_cap, 1));
-                mod_suffix = s("Percent");
-            }
-            "DEGENFLAT" => mod_name = self.degen_types.get(&nth(&form_cap, 1)),
-            "DEGEN" => {
-                let dt = damage(1);
-                if !dt.truthy() {
-                    return (tbl(vec![], vec![]), line);
-                }
-                mod_name = concat(&dt, &s("Degen"));
-                mod_suffix = s("");
-            }
-            "DMG" | "DMGATTACKS" | "DMGSPELLS" | "DMGBOTH" => {
-                let dt = damage(2);
-                if !dt.truthy() {
-                    return (tbl(vec![], vec![]), line);
-                }
-                mod_value = min_max_value();
-                mod_name = min_max(&dt);
-                if !mod_flag.truthy() {
-                    match mod_form.as_str() {
-                        "DMGATTACKS" => {
-                            mod_flag = tbl(vec![(s("keywordFlags"), keyword("Attack"))], vec![])
-                        }
-                        "DMGSPELLS" => {
-                            mod_flag = tbl(vec![(s("keywordFlags"), keyword("Spell"))], vec![])
-                        }
-                        "DMGBOTH" => {
-                            mod_flag = tbl(
-                                vec![(
-                                    s("keywordFlags"),
-                                    bor(&[keyword("Attack"), keyword("Spell")]),
-                                )],
-                                vec![],
-                            )
-                        }
-                        _ => {}
-                    }
+            Form::Chance | Form::Override | Form::Pen | Form::BaseCost | Form::TotalCost => {
+                if form == Form::Override {
+                    mod_type = val::s("OVERRIDE");
                 }
             }
-            "FLAG" => {
-                let is_table = matches!(mod_value, Value::Table(_));
-                mod_name = if is_table {
-                    field(&mod_value, "name")
+            Form::RegenPercent | Form::RegenFlat | Form::DegenPercent | Form::DegenFlat => {
+                let types = match form {
+                    Form::RegenPercent | Form::RegenFlat => &r.regen_types,
+                    _ => &r.degen_types,
+                };
+                mod_name = cap_text(1)
+                    .and_then(|c| types.get(&c).cloned())
+                    .map(|f| (f, None));
+                if matches!(form, Form::RegenPercent | Form::DegenPercent) {
+                    mod_suffix = Some("Percent".into());
+                }
+            }
+            Form::Degen => {
+                let Some(dt) = damage(1) else {
+                    return (Some(Ok(vec![])), Some(text(&line)));
+                };
+                mod_name = Some((Frag::name(&format!("{dt}Degen")), None));
+                mod_suffix = Some("".into());
+            }
+            Form::Dmg | Form::DmgAttacks | Form::DmgSpells | Form::DmgBoth => {
+                let Some(dt) = damage(2) else {
+                    return (Some(Ok(vec![])), Some(text(&line)));
+                };
+                mod_value = val::tbl(
+                    vec![],
+                    vec![
+                        val::tonumber(&val::nth(&form_cap, 0)),
+                        val::tonumber(&val::nth(&form_cap, 1)),
+                    ],
+                );
+                mod_name = Some((
+                    Frag::names(vec![format!("{dt}Min").into(), format!("{dt}Max").into()]),
+                    None,
+                ));
+                if mod_flag.is_none() {
+                    mod_flag = match form {
+                        Form::DmgAttacks => Some(kw_frag(keyword("Attack"))),
+                        Form::DmgSpells => Some(kw_frag(keyword("Spell"))),
+                        Form::DmgBoth => {
+                            Some(kw_frag(val::bor(&[keyword("Attack"), keyword("Spell")])))
+                        }
+                        _ => None,
+                    };
+                }
+            }
+            Form::Flag => {
+                let is_table = matches!(mod_value, V::Tab(_));
+                let name = if is_table {
+                    val::field(&mod_value, "name")
                 } else {
                     mod_value.clone()
                 };
+                mod_name = Some((Frag::name(&text(&val::to_bytes(&name))), None));
                 mod_type = if is_table {
-                    field(&mod_value, "type")
+                    val::field(&mod_value, "type")
                 } else {
-                    s("FLAG")
+                    val::s("FLAG")
                 };
                 mod_value = if is_table {
-                    field(&mod_value, "value")
+                    val::field(&mod_value, "value")
                 } else {
-                    Value::Bool(true)
+                    V::Bool(true)
                 };
             }
-            "OVERRIDE" => mod_type = s("OVERRIDE"),
-            "DOUBLED" => {
-                let mod_name_string;
-                if let Value::Table(_) = mod_name {
-                    mod_name_string = index(&mod_name, &n(1.0));
-                    set_index(
-                        &mod_name,
-                        n(2.0),
-                        concat(&concat(&s("Multiplier:"), &mod_name_string), &s("Doubled")),
-                    );
-                } else {
-                    mod_name_string = mod_name.clone();
-                    if mod_name.truthy() {
-                        let second = concat(&concat(&s("Multiplier:"), &mod_name), &s("Doubled"));
-                        mod_name = tbl(vec![], vec![mod_name.clone(), second]);
+            Form::Doubled => {
+                if let Some((name, index)) = &mut mod_name {
+                    let first_name = name
+                        .names
+                        .first()
+                        .cloned()
+                        .expect("attempt to concatenate a nil value");
+                    let second: Rc<str> = format!("Multiplier:{first_name}Doubled").into();
+                    if name.table {
+                        match name.names.len() {
+                            0 | 1 => name.names.push(second.clone()),
+                            _ => name.names[1] = second.clone(),
+                        }
+                        if let Some(i) = index {
+                            self.doubled.write().expect("doubled").insert(*i, second);
+                        }
+                    } else {
+                        *name = Frag::names(vec![first_name.clone(), second]);
                     }
-                }
-                if mod_name.truthy() {
-                    mod_type = tbl(vec![], vec![s("MORE"), s("OVERRIDE")]);
-                    mod_value = tbl(vec![], vec![n(100.0), n(1.0)]);
-                    mod_extra_tags = tbl(vec![(s("tag"), Value::Bool(true))], vec![]);
-                    let tag = tbl(
+                    mod_type = val::tbl(vec![], vec![val::s("MORE"), val::s("OVERRIDE")]);
+                    mod_value = val::tbl(vec![], vec![val::n(100.0), val::n(1.0)]);
+                    let tag = val::tbl(
                         vec![
-                            (s("type"), s("Multiplier")),
-                            (s("var"), concat(&mod_name_string, &s("Doubled"))),
-                            (s("globalLimit"), n(100.0)),
+                            (val::s("type"), val::s("Multiplier")),
+                            (val::s("var"), val::s(&format!("{first_name}Doubled"))),
+                            (val::s("globalLimit"), val::n(100.0)),
                             (
-                                s("globalLimitKey"),
-                                concat(&mod_name_string, &s("DoubledLimit")),
+                                val::s("globalLimitKey"),
+                                val::s(&format!("{first_name}DoubledLimit")),
                             ),
                         ],
                         vec![],
                     );
-                    set_index(&mod_extra_tags, n(1.0), tbl(vec![(s("tag"), tag)], vec![]));
+                    let tag = Converter::default()
+                        .tag(&tag)
+                        .unwrap_or_else(|e| panic!("ModParser: {e}"));
+                    extra_tags = ExtraTags::PerMod(vec![vec![tag]]);
                 }
             }
-            _ => {}
         }
 
-        if !mod_name.truthy() {
-            return (tbl(vec![], vec![]), line);
-        }
+        let Some((mod_name, _)) = mod_name else {
+            return (Some(Ok(vec![])), Some(text(&line)));
+        };
 
         // Combine flags and tags
-        let mut flags = n(0.0);
-        let mut keyword_flags = n(0.0);
-        let tag_list = TableRef::new();
-        let mut mod_tag_list: Option<TableRef> = None;
-        let misc = TableRef::new();
+        let mut flags = 0u32;
+        let mut keyword_flags = 0u32;
+        let mut tag_list: Vec<Tag> = Vec::new();
+        let mut mod_tag_list: Option<&Vec<Vec<Tag>>> = None;
+        let mut misc = Frag::default();
+        let extra_frag = match &extra_tags {
+            ExtraTags::Frag(f) => Some(&**f),
+            _ => None,
+        };
         for d in [
-            &mod_name,
-            &pre_flag,
-            &mod_flag,
-            &mod_tag,
-            &mod_tag2,
-            &skill_tag,
-            &mod_extra_tags,
-        ] {
-            if !matches!(d, Value::Table(_)) {
+            Some(&mod_name),
+            pre_flag.as_ref(),
+            mod_flag.as_ref(),
+            mod_tag.as_ref(),
+            mod_tag2.as_ref(),
+            skill_tag.as_ref(),
+            extra_frag,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if !d.table {
                 continue;
             }
-            let or_zero = |v: Value| if v.truthy() { v } else { n(0.0) };
-            flags = bor(&[flags, or_zero(field(d, "flags"))]);
-            keyword_flags = bor(&[keyword_flags, or_zero(field(d, "keywordFlags"))]);
-            let first_entry = index(d, &n(1.0));
-            if field(d, "tag").truthy() {
-                if first_entry.truthy() && field(&first_entry, "tag").truthy() {
-                    let l = TableRef::new();
-                    for (i, entry) in ipairs(d) {
-                        let sub = TableRef::new();
-                        if field(&entry, "tag").truthy() {
-                            sub.push(copy_table(&field(&entry, "tag")));
-                        }
-                        l.set(i, Value::Table(sub));
-                    }
-                    mod_tag_list = Some(l);
-                } else {
-                    tag_list.push(copy_table(&field(d, "tag")));
-                }
-            } else if field(d, "tagList").truthy() {
-                if first_entry.truthy() && field(&first_entry, "tagList").truthy() {
-                    let l = TableRef::new();
-                    for (i, entry) in ipairs(d) {
-                        let sub = TableRef::new();
-                        for (_, tag) in ipairs(&field(&entry, "tagList")) {
-                            sub.push(copy_table(&tag));
-                        }
-                        l.set(i, Value::Table(sub));
-                    }
-                    mod_tag_list = Some(l);
-                } else {
-                    for (_, tag) in ipairs(&field(d, "tagList")) {
-                        tag_list.push(copy_table(&tag));
-                    }
-                }
+            flags |= d.flags;
+            keyword_flags |= d.keyword_flags;
+            if let Some(t) = &d.tag {
+                tag_list.push(t.clone());
+            } else if let Some(l) = &d.tag_list {
+                tag_list.extend(l.iter().cloned());
             }
-            for (k, v) in pairs(d) {
-                misc.set(k, v);
-            }
+            d.merge_into(&mut misc);
+        }
+        if let ExtraTags::PerMod(l) = &extra_tags {
+            mod_tag_list = Some(l);
         }
 
-        // Generate modifier list
-        let names = if let Value::Table(_) = mod_name {
-            mod_name.clone()
-        } else {
-            tbl(vec![], vec![mod_name.clone()])
+        // Generate the mod list
+        let suffix = mod_suffix
+            .or_else(|| misc.mod_suffix.clone())
+            .unwrap_or_else(|| "".into());
+        let pick = |v: &V, i: usize| match v {
+            V::Tab(t) => t.get_int(i as i64 + 1).clone(),
+            v => v.clone(),
         };
-        let mod_list = TableRef::new();
-        let suffix = if mod_suffix.truthy() {
-            mod_suffix.clone()
-        } else if misc.get_str("modSuffix").truthy() {
-            misc.get_str("modSuffix")
-        } else {
-            s("")
-        };
-        for (i, name) in ipairs(&names) {
-            let m = tbl(
-                vec![
-                    (s("name"), concat(&name, &suffix)),
-                    (
-                        s("type"),
-                        if let Value::Table(_) = mod_type {
-                            index(&mod_type, &i)
-                        } else {
-                            mod_type.clone()
-                        },
-                    ),
-                    (
-                        s("value"),
-                        if let Value::Table(_) = mod_value {
-                            index(&mod_value, &i)
-                        } else {
-                            mod_value.clone()
-                        },
-                    ),
-                    (s("flags"), flags.clone()),
-                    (s("keywordFlags"), keyword_flags.clone()),
-                ],
-                tag_list.array(),
-            );
-            if let Some(l) = &mod_tag_list {
-                let sub = l.get(&i);
-                if sub.truthy() {
-                    // t_insert(modList[i], unpack(modTagList[i])): with one
-                    // value appends it, with none Lua raises an error, with
-                    // several the first is the position
-                    let vals = unpack(&sub);
-                    match vals.len() {
-                        1 => t_insert(&m, vals[0].clone()),
+        let build = || -> Mods {
+            let conv = Converter::default();
+            let mut list = Vec::new();
+            for (i, name) in mod_name.names.iter().enumerate() {
+                let typ = match pick(&mod_type, i) {
+                    V::Str(s) => ModType::new(&text(&s)),
+                    v => return Err(format!("mod type is a {} value", v.type_name())),
+                };
+                let value = conv.value(&pick(&mod_value, i))?;
+                let mut tags = tag_list.clone();
+                if let Some(l) = mod_tag_list
+                    && let Some(extra) = l.get(i)
+                {
+                    match extra.len() {
+                        1 => tags.push(extra[0].clone()),
                         0 => panic!("wrong number of arguments to 'insert'"),
                         _ => panic!("table.insert with a position in parseMod"),
                     }
                 }
+                list.push(Mod {
+                    name: Sym::new(&format!("{name}{suffix}")),
+                    typ,
+                    value,
+                    flags,
+                    keyword_flags,
+                    source: None,
+                    source_slot: None,
+                    tags: tags.into(),
+                    unreached_tags: vec![],
+                });
             }
-            mod_list.set(i, m);
-        }
-        let mod_list = Value::Table(mod_list);
-        if index(&mod_list, &n(1.0)).truthy() {
-            let misc_v = Value::Table(misc.clone());
-            let mf = |k: &str| field(&misc_v, k);
-            if mf("addToAura").truthy() {
-                for (i, effect_mod) in ipairs(&mod_list) {
-                    let v = tbl(vec![(s("mod"), effect_mod)], vec![]);
-                    let new_mod = if mf("onlyAddToBanners").truthy() {
-                        let tag = tbl(
+            Ok(list)
+        };
+        let mods = build().map(|list| {
+            let truthy = |b: Option<bool>| b == Some(true);
+            let wrap_all =
+                |list: Vec<Mod>, f: &dyn Fn(Mod) -> Mod| list.into_iter().map(f).collect();
+            if list.is_empty() {
+                list
+            } else if truthy(misc.add_to_aura) {
+                let banner: Vec<Tag> = truthy(misc.only_add_to_banners)
+                    .then(|| {
+                        let t = val::tbl(
                             vec![
-                                (s("type"), s("SkillType")),
-                                (s("skillType"), ctx.data.skill_type("Banner")),
+                                (val::s("type"), val::s("SkillType")),
+                                (val::s("skillType"), self.ctx.field("SkillType", "Banner")),
                             ],
                             vec![],
                         );
-                        first(ctx.mod_(vec![s("ExtraAuraEffect"), s("LIST"), v, tag]))
-                    } else {
-                        first(ctx.mod_(vec![s("ExtraAuraEffect"), s("LIST"), v]))
-                    };
-                    set_index(&mod_list, i, new_mod);
-                }
-            } else if mf("newAura").truthy() {
-                for (i, effect_mod) in ipairs(&mod_list) {
-                    let tags = ipairs(&effect_mod);
-                    for (j, _) in &tags {
-                        set_index(&effect_mod, j.clone(), nil());
-                    }
-                    let v = tbl(
-                        vec![
-                            (s("mod"), effect_mod.clone()),
-                            (s("onlyAllies"), mf("newAuraOnlyAllies")),
-                        ],
-                        vec![],
-                    );
-                    let mut args = vec![s("ExtraAura"), s("LIST"), v];
-                    args.extend(tags.into_iter().map(|(_, t)| t));
-                    set_index(&mod_list, i, first(ctx.mod_(args)));
-                }
-            } else if mf("addToMinion").truthy() {
-                for (i, effect_mod) in ipairs(&mod_list) {
-                    let mut tags = Vec::new();
-                    if mf("playerTag").truthy() {
-                        tags.push(mf("playerTag"));
-                    }
-                    if mf("addToMinionTag").truthy() {
-                        tags.push(mf("addToMinionTag"));
-                    }
-                    if mf("playerTagList").truthy() {
-                        tags.extend(ipairs(&mf("playerTagList")).into_iter().map(|(_, t)| t));
-                    }
-                    let mut args = vec![
-                        s("MinionModifier"),
-                        s("LIST"),
-                        tbl(vec![(s("mod"), effect_mod)], vec![]),
-                    ];
-                    args.extend(tags);
-                    set_index(&mod_list, i, first(ctx.mod_(args)));
-                }
-            } else if mf("addToSkill").truthy() {
-                for (i, effect_mod) in ipairs(&mod_list) {
-                    let args = vec![
-                        s("ExtraSkillMod"),
-                        s("LIST"),
-                        tbl(vec![(s("mod"), effect_mod)], vec![]),
-                        mf("addToSkill"),
-                    ];
-                    set_index(&mod_list, i, first(ctx.mod_(args)));
-                }
-            } else if mf("applyToEnemy").truthy() {
-                for (i, effect_mod) in ipairs(&mod_list) {
-                    let mut tags = Vec::new();
-                    if mf("playerTag").truthy() {
-                        tags.push(mf("playerTag"));
-                    }
-                    if mf("playerTagList").truthy() {
-                        tags.extend(ipairs(&mf("playerTagList")).into_iter().map(|(_, t)| t));
-                    }
-                    let mut new_mod = effect_mod.clone();
-                    if index(&effect_mod, &n(1.0)).truthy() && mf("actorEnemy").truthy() {
-                        new_mod = copy_table(&effect_mod);
-                        set_index(&index(&new_mod, &n(1.0)), s("actor"), s("enemy"));
-                    }
-                    let mut args = vec![
-                        s("EnemyModifier"),
-                        s("LIST"),
-                        tbl(vec![(s("mod"), new_mod)], vec![]),
-                    ];
-                    args.extend(tags);
-                    set_index(&mod_list, i, first(ctx.mod_(args)));
-                }
-            }
-        }
-        let rest = if first(str_match(&line, &s("%S"), &nil())).truthy() {
-            line
-        } else {
-            nil()
-        };
-        (mod_list, rest)
-    }
-}
-
-/// Calls a jewel function entry with captures: `patternVal.func(cap1, ...)`.
-/// The result is a closure the calcs run.
-fn jewel_func_call(entry: &Value, pattern: &LuaStr, caps: &[Value]) -> Value {
-    let mut upvalues = vec![Value::Str(pattern.clone())];
-    upvalues.extend(caps.iter().cloned());
-    let _ = entry;
-    closure("jewelFunc", upvalues)
-}
-
-fn lua_str(v: &Value) -> LuaStr {
-    v.as_str().expect("string").clone()
-}
-
-/// Copy of a parse result, as `copyTable(cache[line])` makes.
-fn copy_value(v: &Value) -> Value {
-    match v {
-        Value::Table(t) => Value::Table(t.deep_copy()),
-        v => v.clone(),
-    }
-}
-
-impl Ctx {
-    /// The gem loop of ModParser.lua: skill name lists and the gem-specific
-    /// special mods.
-    fn add_gem_patterns(
-        &self,
-        skill_name_list: &mut List,
-        pre_skill_name_list: &mut List,
-        special: &mut List,
-    ) {
-        let gems = self.data.get("gems");
-        let skill_type = |n: &str| self.data.skill_type(n);
-        for (_, gem) in pairs(&gems) {
-            let ge = field(&gem, "grantedEffect");
-            if field(&ge, "hidden").truthy() || field(&ge, "support").truthy() {
-                continue;
-            }
-            let skill_name = field(&ge, "name");
-            let lname = lower(&skill_name);
-            let lname_s = lname.as_str().expect("name").to_string();
-            let name_tag = || {
-                tbl(
-                    vec![
-                        (s("type"), s("SkillName")),
-                        (s("skillName"), skill_name.clone()),
-                        (s("includeTransfigured"), Value::Bool(true)),
-                    ],
-                    vec![],
-                )
-            };
-            let tag_entry = || Entry::Value(tbl(vec![(s("tag"), name_tag())], vec![]));
-            let buff_entry = || {
-                Entry::Value(tbl(
-                    vec![
-                        (s("addToSkill"), name_tag()),
-                        (
-                            s("tag"),
-                            tbl(
-                                vec![(s("type"), s("GlobalEffect")), (s("effectType"), s("Buff"))],
-                                vec![],
-                            ),
-                        ),
-                    ],
-                    vec![],
-                ))
-            };
-            let key = |k: String| LuaStr::from(k);
-            skill_name_list.set(key(format!(" {lname_s} ")), tag_entry());
-            pre_skill_name_list.set(key(format!("^{lname_s} ")), tag_entry());
-            pre_skill_name_list.set(key(format!("^{lname_s} has ?a? ")), tag_entry());
-            pre_skill_name_list.set(key(format!("^{lname_s} deals ")), tag_entry());
-            pre_skill_name_list.set(key(format!("^{lname_s} damage ")), tag_entry());
-            let tags = field(&gem, "tags");
-            let has = |t: &str| field(&tags, t).truthy();
-            if has("totem") {
-                pre_skill_name_list.set(key(format!("^{lname_s} totem deals ")), tag_entry());
-                pre_skill_name_list.set(key(format!("^{lname_s} totem grants ")), buff_entry());
-            }
-            if index(&field(&ge, "skillTypes"), &skill_type("Buff")).truthy()
-                || field(&field(&ge, "baseFlags"), "buff").truthy()
-            {
-                pre_skill_name_list.set(key(format!("^{lname_s} grants ")), buff_entry());
-                pre_skill_name_list.set(
-                    key(format!("^{lname_s} grants a?n? ?additional ")),
-                    buff_entry(),
-                );
-            }
-            if has("aura") || has("herald") {
-                let var = concat(
-                    &s("AffectedBy"),
-                    &first(gsub(&skill_name, &s(" "), &s(""), &nil())),
-                );
-                let cond = || {
-                    Entry::Value(tbl(
-                        vec![(
-                            s("tag"),
-                            tbl(
-                                vec![(s("type"), s("Condition")), (s("var"), var.clone())],
-                                vec![],
-                            ),
-                        )],
-                        vec![],
-                    ))
-                };
-                skill_name_list.set(key(format!("while affected by {lname_s}")), cond());
-                skill_name_list.set(key(format!("while using {lname_s}")), cond());
-            }
-            if has("curse") {
-                let v = first(gsub_fn(&skill_name, &s("^%l"), &mut upper_fn, &nil()));
-                let v = first(gsub_fn(&v, &s(" %l"), &mut upper_fn, &nil()));
-                let v = first(gsub(&v, &s(" "), &s(""), &nil()));
-                let v = first(gsub(&v, &s(" "), &s(""), &nil()));
-                let var = concat(&s("SelfCast"), &v);
-                let entry = Entry::Value(tbl(
-                    vec![(
-                        s("tag"),
-                        tbl(vec![(s("type"), s("Condition")), (s("var"), var)], vec![]),
-                    )],
-                    vec![],
-                ));
-                skill_name_list.set(
-                    key(format!(
-                        "if you've cast {lname_s} in the past (%d+) seconds"
-                    )),
-                    entry,
-                );
-            }
-            // Closures capturing the skill name
-            let sn = skill_name.clone();
-            let extra_skill_mod = move |c: &Ctx, inner: Value| -> Value {
-                let tag = tbl(
-                    vec![
-                        (s("type"), s("SkillName")),
-                        (s("skillName"), sn.clone()),
-                        (s("includeTransfigured"), Value::Bool(true)),
-                    ],
-                    vec![],
-                );
-                first(c.mod_(vec![
-                    s("ExtraSkillMod"),
-                    s("LIST"),
-                    tbl(vec![(s("mod"), inner)], vec![]),
-                    tag,
-                ]))
-            };
-            let esm = Rc::new(extra_skill_mod);
-            let func = |f: ValueFn| -> Entry {
-                Entry::Func(Rc::new(move |c: &Ctx, a: &[Value]| vec![f(c, a)]))
-            };
-            if has("mine") {
-                let esm = esm.clone();
-                special.set(
-                    key(format!("^{lname_s} has (%d+)%% increased throwing speed")),
-                    func(Rc::new(move |c, a| {
-                        tbl(
-                            vec![],
-                            vec![esm(
-                                c,
-                                first(c.mod_(vec![s("MineLayingSpeed"), s("INC"), arg(a, 0)])),
-                            )],
-                        )
-                    })),
-                );
-            }
-            if has("trap") {
-                let esm = esm.clone();
-                special.set(
-                    key(format!("(%d+)%% increased {lname_s} throwing speed")),
-                    func(Rc::new(move |c, a| {
-                        tbl(
-                            vec![],
-                            vec![esm(
-                                c,
-                                first(c.mod_(vec![s("TrapThrowingSpeed"), s("INC"), arg(a, 0)])),
-                            )],
-                        )
-                    })),
-                );
-            }
-            if has("chaining") {
-                special.set(
-                    key(format!("^{lname_s} chains an additional time")),
-                    Entry::Value(tbl(
-                        vec![],
-                        vec![esm(
-                            self,
-                            first(self.mod_(vec![s("ChainCountMax"), s("BASE"), n(1.0)])),
-                        )],
-                    )),
-                );
-                for pat in [
-                    format!("^{lname_s} chains an additional (%d+) times"),
-                    format!("^{lname_s} chains (%d+) additional times"),
-                ] {
-                    let esm = esm.clone();
-                    special.set(
-                        key(pat),
-                        func(Rc::new(move |c, a| {
-                            tbl(
-                                vec![],
-                                vec![esm(
-                                    c,
-                                    first(c.mod_(vec![s("ChainCountMax"), s("BASE"), arg(a, 0)])),
-                                )],
-                            )
-                        })),
-                    );
-                }
-            }
-            if has("bow") {
-                let arrow = field(&self.data.global("KeywordFlag"), "Arrow");
-                let esm1 = esm.clone();
-                let arrow1 = arrow.clone();
-                special.set(
-                    key(format!("^{lname_s} fires an additional arrow")),
-                    func(Rc::new(move |c, _a| {
-                        tbl(
-                            vec![],
-                            vec![esm1(
-                                c,
-                                first(c.mod_(vec![
-                                    s("ProjectileCount"),
-                                    s("BASE"),
-                                    n(1.0),
-                                    nil(),
-                                    n(0.0),
-                                    arrow1.clone(),
-                                ])),
-                            )],
-                        )
-                    })),
-                );
-                let esm2 = esm.clone();
-                special.set(
-                    key(format!("^{lname_s} fires (%d+) additional arrows?")),
-                    func(Rc::new(move |c, a| {
-                        tbl(
-                            vec![],
-                            vec![esm2(
-                                c,
-                                first(c.mod_(vec![
-                                    s("ProjectileCount"),
-                                    s("BASE"),
-                                    arg(a, 0),
-                                    nil(),
-                                    n(0.0),
-                                    arrow.clone(),
-                                ])),
-                            )],
-                        )
-                    })),
-                );
-            }
-            if has("projectile") {
-                special.set(
-                    key(format!("^{lname_s} pierces an additional target")),
-                    Entry::Value(tbl(
-                        vec![],
-                        vec![first(self.mod_(vec![
-                            s("PierceCount"),
-                            s("BASE"),
-                            n(1.0),
-                            name_tag(),
-                        ]))],
-                    )),
-                );
-                let sn = skill_name.clone();
-                special.set(
-                    key(format!("^{lname_s} pierces (%d+) additional targets?")),
-                    func(Rc::new(move |c, a| {
-                        let tag = tbl(
-                            vec![
-                                (s("type"), s("SkillName")),
-                                (s("skillName"), sn.clone()),
-                                (s("includeTransfigured"), Value::Bool(true)),
-                            ],
-                            vec![],
-                        );
-                        tbl(
-                            vec![],
-                            vec![first(c.mod_(vec![
-                                s("PierceCount"),
-                                s("BASE"),
-                                arg(a, 0),
-                                tag,
-                            ]))],
-                        )
-                    })),
-                );
-            }
-            if has("bow") || has("projectile") {
-                special.set(
-                    key(format!("^{lname_s} fires an additional projectile")),
-                    Entry::Value(tbl(
-                        vec![],
-                        vec![esm(
-                            self,
-                            first(self.mod_(vec![s("ProjectileCount"), s("BASE"), n(1.0)])),
-                        )],
-                    )),
-                );
-                for pat in [
-                    format!("^{lname_s} fires (%d+) additional projectiles"),
-                    format!("^{lname_s} fires (%d+) additional shard projectiles"),
-                ] {
-                    let esm = esm.clone();
-                    special.set(
-                        key(pat),
-                        func(Rc::new(move |c, a| {
-                            tbl(
-                                vec![],
-                                vec![esm(
-                                    c,
-                                    first(c.mod_(vec![s("ProjectileCount"), s("BASE"), arg(a, 0)])),
-                                )],
-                            )
-                        })),
-                    );
-                }
-            }
-        }
-    }
-
-    /// The unified `jewelFuncList`.
-    fn jewel_func_list(
-        &self,
-        other: &Value,
-        self_funcs: &Value,
-        unalloc: &Value,
-        threshold: &Value,
-    ) -> List {
-        let mut list = List::default();
-        let entry = |func: Value, typ: &str| {
-            Entry::Value(tbl(vec![(s("func"), func), (s("type"), s(typ))], vec![]))
-        };
-        for (k, v) in pairs(other) {
-            list.set(
-                lua_str(&lower(&k)),
-                entry(closure("jewelOtherWrapper", vec![v]), "Other"),
-            );
-        }
-        for (k, v) in pairs(self_funcs) {
-            list.set(lua_str(&lower(&k)), entry(v, "Self"));
-        }
-        for (k, v) in pairs(unalloc) {
-            list.set(lua_str(&lower(&k)), entry(v, "SelfUnalloc"));
-        }
-        for (k, v) in pairs(threshold) {
-            let func = if let Value::Table(_) = v {
-                closure("jewelThresholdMulti", vec![v])
-            } else {
-                v
-            };
-            list.set(lua_str(&lower(&k)), entry(func, "Threshold"));
-        }
-        list
-    }
-
-    fn cluster_jewel_skills(&self, cluster_jewels: &Value) -> List {
-        let mut list = List::default();
-        for (_, jewel) in pairs(&field(cluster_jewels, "jewels")) {
-            for (skill_id, skill) in pairs(&field(&jewel, "skills")) {
-                let enchant: Vec<Vec<u8>> = ipairs(&field(&skill, "enchant"))
+                        Converter::default()
+                            .tag(&t)
+                            .unwrap_or_else(|e| panic!("ModParser: {e}"))
+                    })
                     .into_iter()
-                    .map(|(_, l)| l.as_str().expect("enchant").as_bytes().to_vec())
                     .collect();
-                let k = lower(&sb(&enchant.join(&b" "[..])));
-                let v = tbl(
-                    vec![(s("key"), s("clusterJewelSkill")), (s("value"), skill_id)],
-                    vec![],
-                );
-                list.set(
-                    lua_str(&k),
-                    Entry::Value(tbl(
-                        vec![],
-                        vec![first(self.mod_(vec![s("JewelData"), s("LIST"), v]))],
-                    )),
-                );
+                wrap_all(list, &|m| {
+                    wrap("ExtraAuraEffect", m, vec![], banner.clone())
+                })
+            } else if truthy(misc.new_aura) {
+                wrap_all(list, &|mut m| {
+                    let tags: Vec<Tag> = std::mem::take(&mut *m.tags);
+                    let extra = misc
+                        .new_aura_only_allies
+                        .map(|b| ("onlyAllies", ModValue::Bool(b)))
+                        .into_iter()
+                        .collect();
+                    wrap("ExtraAura", m, extra, tags)
+                })
+            } else if truthy(misc.add_to_minion) {
+                let mut tags = vec![];
+                tags.extend(misc.player_tag.iter().cloned());
+                tags.extend(misc.add_to_minion_tag.iter().cloned());
+                tags.extend(misc.player_tag_list.iter().flatten().cloned());
+                wrap_all(list, &|m| wrap("MinionModifier", m, vec![], tags.clone()))
+            } else if let Some(skill) = &misc.add_to_skill {
+                wrap_all(list, &|m| {
+                    wrap("ExtraSkillMod", m, vec![], vec![skill.clone()])
+                })
+            } else if truthy(misc.apply_to_enemy) {
+                let mut tags = vec![];
+                tags.extend(misc.player_tag.iter().cloned());
+                tags.extend(misc.player_tag_list.iter().flatten().cloned());
+                wrap_all(list, &|mut m| {
+                    if truthy(misc.actor_enemy)
+                        && let Some(t) = m.tags.first_mut()
+                    {
+                        set_actor(t, "enemy");
+                    }
+                    wrap("EnemyModifier", m, vec![], tags.clone())
+                })
+            } else {
+                list
             }
-        }
-        for (notable, _) in pairs(&field(cluster_jewels, "notableSortOrder")) {
-            let k = concat(&s("1 added passive skill is "), &lower(&notable));
-            list.set(
-                lua_str(&k),
-                Entry::Value(tbl(
-                    vec![],
-                    vec![first(self.mod_(vec![
-                        s("ClusterJewelNotable"),
-                        s("LIST"),
-                        notable,
-                    ]))],
-                )),
-            );
-        }
-        for (_, keystone) in ipairs(&field(cluster_jewels, "keystones")) {
-            let k = concat(&s("adds "), &lower(&keystone));
-            let v = tbl(
-                vec![
-                    (s("key"), s("clusterJewelKeystone")),
-                    (s("value"), keystone),
-                ],
-                vec![],
-            );
-            list.set(
-                lua_str(&k),
-                Entry::Value(tbl(
-                    vec![],
-                    vec![first(self.mod_(vec![s("JewelData"), s("LIST"), v]))],
-                )),
-            );
-        }
-        list
+        });
+        let rest = line
+            .iter()
+            .any(|c| !matches!(c, b' ' | b'\t' | b'\n' | 0x0b | 0x0c | b'\r'))
+            .then(|| text(&line));
+        (Some(mods), rest)
     }
 }

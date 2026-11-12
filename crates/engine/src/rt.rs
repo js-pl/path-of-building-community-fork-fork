@@ -327,7 +327,24 @@ pub fn gmatch(v: &Value, p: &Value) -> Vec<Vec<Value>> {
 /// `string.format(fmt, ...)` for the conversions upstream uses.
 pub fn format(fmt: &Value, args: &[Value]) -> Value {
     let f = str_arg(fmt, "format");
-    let f = f.as_bytes();
+    let out = format_with(
+        f.as_bytes(),
+        |i| lua::to_number(&args.get(i).cloned().unwrap_or_default()),
+        |i| {
+            lua::to_string(&args.get(i).cloned().unwrap_or_default())
+                .to_str_lossy()
+                .into_owned()
+        },
+    );
+    Value::Str(out.into())
+}
+
+/// `string.format` with the arguments as numbers (`num(i)`) or text (`text(i)`)
+pub fn format_with(
+    f: &[u8],
+    num: impl Fn(usize) -> Option<f64>,
+    text: impl Fn(usize) -> String,
+) -> Vec<u8> {
     let mut out = Vec::new();
     let mut ai = 0;
     let mut i = 0;
@@ -355,7 +372,7 @@ pub fn format(fmt: &Value, args: &[Value]) -> Value {
         let rest = std::str::from_utf8(&f[rest_start..i]).expect("ascii");
         let conv = f[i];
         i += 1;
-        let arg = args.get(ai).cloned().unwrap_or_default();
+        let arg = ai;
         ai += 1;
         let (width, prec) = match rest.split_once('.') {
             Some((w, p)) => (
@@ -366,30 +383,21 @@ pub fn format(fmt: &Value, args: &[Value]) -> Value {
         };
         let body = match conv {
             b'd' | b'i' => {
-                let x = lua::to_number(&arg).expect("format: number expected");
+                let x = num(arg).expect("format: number expected");
                 format!("{}", x as i64)
             }
-            b'f' => lua::format::format_f(
-                lua::to_number(&arg).expect("format: number"),
-                prec.unwrap_or(6),
-            ),
-            b'g' => lua::format::format_g(
-                lua::to_number(&arg).expect("format: number"),
-                prec.unwrap_or(6),
-            ),
-            b'e' => lua::format::format_e(
-                lua::to_number(&arg).expect("format: number"),
-                prec.unwrap_or(6),
-            ),
+            b'f' => lua::format::format_f(num(arg).expect("format: number"), prec.unwrap_or(6)),
+            b'g' => lua::format::format_g(num(arg).expect("format: number"), prec.unwrap_or(6)),
+            b'e' => lua::format::format_e(num(arg).expect("format: number"), prec.unwrap_or(6)),
             b's' => {
-                let s = lua::to_string(&arg).to_string();
+                let s = text(arg);
                 match prec {
                     Some(p) => s.chars().take(p).collect(),
                     None => s,
                 }
             }
-            b'x' => format!("{:x}", lua::to_number(&arg).expect("format: number") as i64),
-            b'X' => format!("{:X}", lua::to_number(&arg).expect("format: number") as i64),
+            b'x' => format!("{:x}", num(arg).expect("format: number") as i64),
+            b'X' => format!("{:X}", num(arg).expect("format: number") as i64),
             c => panic!("format: unsupported conversion '%{}'", c as char),
         };
         let body = if flags.contains('+')
@@ -419,7 +427,7 @@ pub fn format(fmt: &Value, args: &[Value]) -> Value {
         };
         out.extend_from_slice(padded.as_bytes());
     }
-    Value::Str(out.into())
+    out
 }
 
 /// `math.floor`

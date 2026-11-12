@@ -1,11 +1,12 @@
 //! Translates upstream Lua functions into Rust that mirrors them line by line
-//! on dynamic [`lua::Value`]s, for the many small closures in ModParser's
-//! tables. It handles a subset of Lua; functions outside it are ported by
-//! hand. The generated code calls the helpers in `engine::rt` and the
-//! ModParser helpers through `c` (`engine::mod_parser::Ctx`).
+//! on the mod parser's closure values (`engine::mod_parser::val::V`), for
+//! the many small closures in ModParser's tables. It handles a subset of
+//! Lua; functions outside it are ported by hand. The generated code calls
+//! the helpers in `engine::mod_parser::val` and reaches the module's
+//! helpers and values through `c` (`engine::mod_parser::Ctx`).
 
 use lua::ast::*;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 
 #[derive(Debug)]
@@ -20,9 +21,10 @@ fn unsupported<T>(msg: impl Into<String>) -> R<T> {
 /// Names a closure may use from its enclosing module, and how they translate.
 pub struct Upvalues {
     /// Helper functions, called as `c.<rust name>(args)`; each takes and
-    /// returns `Vec<Value>`
+    /// returns `Vec<V>`
     pub helpers: &'static [(&'static str, &'static str)],
-    /// Module values read through `c.value("<name>")`
+    /// Module values, read through `c.index("<name>", key)` (or
+    /// `c.value("<name>")` as a whole)
     pub values: &'static [&'static str],
 }
 
@@ -59,20 +61,23 @@ pub struct Gen<'a> {
     indent: usize,
     scopes: Vec<HashSet<String>>,
     tmp: usize,
+    data_fields: &'a mut BTreeSet<String>,
 }
 
-/// Translates a function into the body of
-/// `fn(c: &Ctx, a: &[Value]) -> Vec<Value>`.
-pub fn translate(f: &FuncBody, up: &Upvalues) -> R<String> {
+/// Translates a function into the body of `fn(c: &Ctx, a: &[V]) -> Vec<V>`,
+/// adding the fields of `data` it reads to `data_fields`.
+pub fn translate(f: &FuncBody, up: &Upvalues, data_fields: &mut BTreeSet<String>) -> R<String> {
     if f.vararg {
         return unsupported("varargs");
     }
+    let mut fields = BTreeSet::new();
     let mut g = Gen {
         up,
         out: String::new(),
         indent: 1,
         scopes: vec![HashSet::new()],
         tmp: 0,
+        data_fields: &mut fields,
     };
     for (i, p) in f.params.iter().enumerate() {
         let v = g.declare(p);
@@ -82,7 +87,9 @@ pub fn translate(f: &FuncBody, up: &Upvalues) -> R<String> {
     if !matches!(f.body.last, Some(LastStat::Return(_))) {
         g.line("vec![]");
     }
-    Ok(g.out)
+    let out = g.out;
+    data_fields.extend(fields);
+    Ok(out)
 }
 
 /// Rust identifier for a Lua local.
@@ -203,9 +210,14 @@ impl Gen<'_> {
                     Expr::Name(n) if self.is_local(n) => self.line(&format!("{} = {v};", ident(n))),
                     Expr::Name(n) => return unsupported(format!("assignment to upvalue {n}")),
                     Expr::Index(obj, key) => {
-                        let o = self.expr(obj)?;
+                        let Expr::Name(o) = &**obj else {
+                            return unsupported("assignment into a computed table");
+                        };
+                        if !self.is_local(o) {
+                            return unsupported(format!("assignment into upvalue {o}"));
+                        }
                         let k = self.expr(key)?;
-                        self.line(&format!("set_index(&{o}, {k}, {v});"));
+                        self.line(&format!("set_index(&mut {}, {k}, {v});", ident(o)));
                     }
                     _ => return unsupported("assignment target"),
                 }
@@ -270,7 +282,7 @@ impl Gen<'_> {
         }
     }
 
-    /// Expressions as a `Vec<Value>`, expanding a trailing call.
+    /// Expressions as a `Vec<V>`, expanding a trailing call.
     fn exprlist(&mut self, es: &[Expr]) -> R<String> {
         match es {
             [] => Ok("vec![]".into()),
@@ -295,7 +307,7 @@ impl Gen<'_> {
         }
     }
 
-    /// An expression that may return several values, as `Vec<Value>`.
+    /// An expression that may return several values, as `Vec<V>`.
     fn expr_multi(&mut self, e: &Expr) -> R<String> {
         match e {
             Expr::Call { func, args } => self.call(func, args),
@@ -309,8 +321,8 @@ impl Gen<'_> {
     fn expr(&mut self, e: &Expr) -> R<String> {
         Ok(match e {
             Expr::Nil => "nil()".into(),
-            Expr::True => "Value::Bool(true)".into(),
-            Expr::False => "Value::Bool(false)".into(),
+            Expr::True => "V::Bool(true)".into(),
+            Expr::False => "V::Bool(false)".into(),
             Expr::Number(x) => num_lit(*x),
             Expr::Str(s) => str_lit(s),
             Expr::Vararg => return unsupported("varargs"),
@@ -318,6 +330,19 @@ impl Gen<'_> {
             Expr::Paren(e) => self.expr(e)?,
             Expr::Name(n) => self.name(n)?,
             Expr::Index(obj, key) => {
+                if let Expr::Name(n) = &**obj
+                    && !self.is_local(n)
+                    && self.up.values.contains(&n.as_str())
+                {
+                    if let (true, Expr::Str(k)) = (n == "data", &**key) {
+                        self.data_fields
+                            .insert(String::from_utf8_lossy(k).into_owned());
+                    } else if n == "data" {
+                        return unsupported("data indexed by a computed key");
+                    }
+                    let k = self.expr(key)?;
+                    return Ok(format!("c.index(\"{n}\", &{k})"));
+                }
                 let o = self.expr(obj)?;
                 match &**key {
                     Expr::Str(s) if s.iter().all(|c| c.is_ascii_alphanumeric() || *c == b'_') => {
@@ -335,7 +360,7 @@ impl Gen<'_> {
                 let a = self.expr(a)?;
                 match op {
                     UnOp::Neg => format!("neg(&{a})"),
-                    UnOp::Not => format!("Value::Bool(!({a}).truthy())"),
+                    UnOp::Not => format!("V::Bool(!({a}).truthy())"),
                     UnOp::Len => format!("len(&{a})"),
                 }
             }
@@ -350,12 +375,12 @@ impl Gen<'_> {
                     BinOp::Mod => format!("rem(&{x}, &{y})"),
                     BinOp::Pow => format!("pow(&{x}, &{y})"),
                     BinOp::Concat => format!("concat(&{x}, &{y})"),
-                    BinOp::Eq => format!("Value::Bool(eq(&{x}, &{y}))"),
-                    BinOp::Ne => format!("Value::Bool(!eq(&{x}, &{y}))"),
-                    BinOp::Lt => format!("Value::Bool(lt(&{x}, &{y}))"),
-                    BinOp::Le => format!("Value::Bool(le(&{x}, &{y}))"),
-                    BinOp::Gt => format!("Value::Bool(lt(&{y}, &{x}))"),
-                    BinOp::Ge => format!("Value::Bool(le(&{y}, &{x}))"),
+                    BinOp::Eq => format!("V::Bool(eq(&{x}, &{y}))"),
+                    BinOp::Ne => format!("V::Bool(!eq(&{x}, &{y}))"),
+                    BinOp::Lt => format!("V::Bool(lt(&{x}, &{y}))"),
+                    BinOp::Le => format!("V::Bool(le(&{x}, &{y}))"),
+                    BinOp::Gt => format!("V::Bool(lt(&{y}, &{x}))"),
+                    BinOp::Ge => format!("V::Bool(le(&{y}, &{x}))"),
                     BinOp::And => {
                         format!("{{ let v = {x}; if v.truthy() {{ {y} }} else {{ v }} }}")
                     }
@@ -373,6 +398,9 @@ impl Gen<'_> {
             return Ok("n(f64::INFINITY)".into());
         }
         if self.up.values.contains(&n) {
+            if n == "data" {
+                return unsupported("data as a whole");
+            }
             return Ok(format!("c.value(\"{n}\")"));
         }
         unsupported(format!("name {n}"))
@@ -442,14 +470,18 @@ impl Gen<'_> {
             "copyTable" => format!("vec![copy_table(&{})]", one(self, 0)?),
             "isValueInArray" => {
                 let (t, v) = (one(self, 0)?, one(self, 1)?);
-                format!("vec![Value::Bool(is_value_in_array(&{t}, &{v}))]")
+                format!("vec![V::Bool(is_value_in_array(&{t}, &{v}))]")
             }
             "t_insert" | "table.insert" => {
                 if args.len() != 2 {
                     return unsupported("table.insert with a position");
                 }
-                let (t, v) = (one(self, 0)?, one(self, 1)?);
-                format!("{{ t_insert(&{t}, {v}); vec![] }}")
+                let t = match &args[0] {
+                    Expr::Name(n) if self.is_local(n) => ident(n),
+                    _ => return unsupported("table.insert into a computed table"),
+                };
+                let v = one(self, 1)?;
+                format!("{{ t_insert(&mut {t}, {v}); vec![] }}")
             }
             "bor" | "bit.bor" => format!("vec![bor(&{})]", self.args(args)?),
             "band" | "bit.band" => format!("vec![band(&{})]", self.args(args)?),
@@ -478,12 +510,7 @@ impl Gen<'_> {
             Some(Expr::Index(o, k)) if matches!((&**o, &**k), (Expr::Name(o), Expr::Str(k)) if o == "string" && (k == b"upper" || k == b"lower")) =>
             {
                 let Expr::Str(k) = &**k else { unreachable!() };
-                let f = if k == b"upper" {
-                    "upper_fn"
-                } else {
-                    "lower_fn"
-                };
-                format!("gsub_fn(&{s}, &{p}, &mut {f}, &{n})")
+                format!("gsub_case(&{s}, &{p}, {}, &{n})", k == b"upper")
             }
             Some(e) => {
                 let r = self.expr(e)?;

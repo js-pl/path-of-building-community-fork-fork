@@ -10,7 +10,6 @@
 use crate::item_data::{Affix, AffixSet, Base, ItemData, normalise_mod_line};
 use crate::item_tools::{Range, apply_range, is_zero_value_line, round};
 use crate::mod_parser::ModParser;
-use crate::mods::convert::Converter;
 use crate::mods::tag::{Names, Tag, TagKind};
 use crate::mods::{Mod, ModType, ModValue, Record, Sym};
 use crate::pat::{self, capture, captures, gmatch, gmatch1, gsub, gsub_fn, is_match, num};
@@ -963,22 +962,7 @@ impl Item {
     /// Parses a mod line: its mods (none when the parser does not know it)
     /// and the part not understood
     fn parse_mod(ctx: &ItemContext, line: &str) -> Result<(Option<Vec<Mod>>, Option<String>)> {
-        let (list, extra) = ctx.parser.parse(line.as_bytes());
-        let conv = Converter::default();
-        let list = match list {
-            Value::Table(t) => Some(
-                t.array()
-                    .iter()
-                    .map(|m| conv.mod_(m))
-                    .collect::<Result<Vec<_>>>()?,
-            ),
-            _ => None,
-        };
-        let extra = match extra {
-            Value::Str(s) => Some(s.to_str_lossy().into_owned()),
-            _ => None,
-        };
-        Ok((list, extra))
+        Ok(ctx.parser.parse(line.as_bytes()))
     }
 
     /// `ParseRaw(raw, rarity, highQuality)`: parses an item's text.

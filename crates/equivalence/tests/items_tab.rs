@@ -10,7 +10,7 @@ use engine::item::ItemContext;
 use engine::items_tab::ItemsTab;
 use engine::spec::PassiveSpec;
 use engine::tree::{self, PassiveTree};
-use equivalence::{corpus, load_data, mod_parser, upstream_src};
+use equivalence::{corpus, load_data, mod_parser_preloaded, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -48,10 +48,8 @@ fn items_tabs_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
+    let parser = mod_parser_preloaded();
     let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
     let (data, _) = load_data();
     let item_data = equivalence::game_data().items;
     let latest = lua::to_string(&host.global("latestTreeVersion")).to_string();
