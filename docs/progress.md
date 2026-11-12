@@ -5,9 +5,8 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
-Last session's branch: `claude/typed-breakdowns`, the first of two PRs
-(perform, defence and defence estimation breakdowns). To pick the work
-up:
+Last session's branch: `claude/typed-offence-breakdowns` (the breakdowns
+of the triggers, mirages and offence). To pick the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule).
 2. Build the tests once: `cargo test --release -p equivalence --test
@@ -32,13 +31,17 @@ State at the handoff:
   the corpus reaches only the default, Vixen's.
 - `perform.rs` and its variants test skip no build.
 - Breakdowns (`engine::breakdown`, `Actor::breakdown`, only with
-  `env.buildBreakdown`): the helpers of `CalcBreakdown.lua` but `leech`, and
-  every breakdown of `calcs.perform` before the triggers, `calcs.defence`,
-  `calcs.buildDefenceEstimations` and `calcs.buildOutput`'s `SkillBuffs` and
-  `SkillDebuffs`, for the player and the minion: equal to the translated
-  `calcs.buildOutput(build, "CALCS")` for every corpus build
-  (`tests/breakdown.rs`; it compares the breakdowns present when
-  `calcs.triggers` starts, and those written after the offence).
+  `env.buildBreakdown`): all of `CalcBreakdown.lua`, and every breakdown of
+  `calcs.perform`, `calcs.defence`, `calcs.buildDefenceEstimations`, the
+  triggers, the offence (a weapon's pass under `MainHand.`/`OffHand.`, the
+  `damageTypes` tables, `applyDmgTakenConversion`), the skills' functions
+  and `calcs.buildOutput`, for the player and the minion: equal to the
+  translated `calcs.buildOutput(build, "CALCS")` for every corpus build,
+  key for key (`tests/breakdown.rs`), and for the skills whose functions
+  write breakdowns as the main skill of a corpus build, in each of their
+  parts (61 variants, `skill_function_breakdowns_match_upstream`).
+  Mirages calculate in `CALCULATOR` mode, without breakdowns, so the
+  player's stay.
 
 What remains for the full migration, in order:
 
@@ -48,14 +51,11 @@ What remains for the full migration, in order:
    them), overcapped lightning
    resistance's mana, PvP, Cryogenesis' added damage redirection, the
    party tab.
-2. Breakdowns of the triggers, mirages and offence (`breakdown.leech`,
-   the weapons' `MainHand.*` and `OffHand.*` breakdowns, `damageTypes`
-   tables, `applyDmgTakenConversion`); then drop the key filter of
-   `tests/breakdown.rs`. The corpus only has the Calcs tab on its first
-   socket group, effective, so a variants test of its inputs
+2. PvP scaling and its breakdowns. The corpus only has the Calcs tab on
+   its first socket group, effective, so a variants test of its inputs
    (`skill_number`, `misc_buffMode`, the `*Calcs` selections) is due.
-   `CalcSections.lua` (which breakdown each cell shows) belongs to the
-   session API.
+   `CalcSections.lua` (which breakdown each cell shows) belongs to
+   the session API.
 3. Calculation overrides and the power calculators (node power, item
    comparisons).
 4. `Data.lua` into the importer, so no Lua runs at load.
@@ -156,8 +156,7 @@ a skip:
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis)
-- Breakdowns of the triggers, mirages and offence, and what `buildOutput`
-  collects for the Configuration tab
+- What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
 - The Calcs tab in a buff mode other than effective: `calcFullDPS` then
@@ -193,6 +192,12 @@ the tests align these:
   the cfg again (`pcfg`) after setting outputs a later query reads
 - the Calcs tab's `SkillDPS` keeps `calcFullDPS`'s order: only the
   sidebar's table is sorted
+- a breakdown that upstream assigns from another (`breakdown.HitChance =
+  handBreakdown.HitChance`) shares the table: setting `breakdownSource`
+  on the actor's crit chance sets it on the hand's too
+- the self hit sources' breakdowns join in `pairs` order over upstream's
+  handler table; typed they join in a fixed order, equal while a build has
+  one source
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact

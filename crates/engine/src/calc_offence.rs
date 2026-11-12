@@ -3,7 +3,9 @@
 //! per pass (main hand, off hand or the skill), speed, accuracy, crits,
 //! leech, ailments and damage over time, and the combined DPS.
 //!
-//! Breakdowns are not built. Skill functions (`preDamageFunc`, ...) are
+//! Breakdowns are written only for an actor that has them (the sidebar's
+//! and the Calcs tab's calculations); a weapon's pass writes its own under
+//! `MainHand.` and `OffHand.`. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
@@ -12,6 +14,8 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::area as area_bd;
+use crate::breakdown::{Breakdown, Chain, Col, Row, area, f, multi_chain};
 use crate::calc::{floor, m_max, m_min, number, round};
 use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_perform::{Perform, converted_tags, new_mod};
@@ -212,6 +216,25 @@ impl<'a> Perform<'a> {
             }
         }
         result
+    }
+
+    /// `breakdown[k] = breakdown.mod(list, cfg, ...)`
+    pub(crate) fn bd_mod(
+        &mut self,
+        actor: usize,
+        k: &str,
+        list: StoreId,
+        cfg: Option<&Cfg>,
+        names: &[&str],
+    ) -> Result<()> {
+        if self.has_bd(actor) {
+            let l = crate::breakdown::mod_(
+                self.c.inc(list, cfg, names)?,
+                self.c.more(list, cfg, names)?,
+            );
+            self.bd(actor).unwrap().set_opt(k, l);
+        }
+        Ok(())
     }
 
     /// `runSkillFunc(name)`
@@ -1179,9 +1202,37 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "SealMax", max);
         self.c.set_out(actor, "AverageBurstHits", max);
         self.c.set_out(actor, "TimeMaxSeals", cooldown * max);
-        if self.sd(i, "hitTimeOverride").is_some_and(ModValue::truthy) {
-            return Ok(());
+        if !self.sd(i, "hitTimeOverride").is_some_and(ModValue::truthy) {
+            self.seal_repeats(o, cooldown, max)?;
         }
+        if self.has_bd(actor) {
+            let c = Some(&cfg);
+            let base = self.c.base(list, c, &["SealGainFrequency"])?;
+            let inc = 1.0 + self.c.inc(list, c, &["SealGainFrequency"])? / 100.0;
+            let action = self.c.out(actor, "ActionSpeedMod").unwrap_or(f64::NAN);
+            let mut l = Vec::new();
+            multi_chain(
+                &mut l,
+                Chain {
+                    label: Some("Gain frequency:"),
+                    base: Some(f("%.2fs ^8(base gain frequency)", base)),
+                    factors: vec![
+                        f("%.2f ^8(increased/reduced gain frequency)", inc),
+                        f("%.2f ^8(action speed modifier)", action),
+                    ],
+                    total: Some(sf!("= %.2fs ^8per Seal", cooldown)),
+                    ..Chain::default()
+                },
+            );
+            self.bd(actor).unwrap().set_lines("SealGainTime", l);
+        }
+        Ok(())
+    }
+
+    /// The seals' DPS multiplier and hit time on the player's main skill
+    fn seal_repeats(&mut self, o: &mut Off, cooldown: f64, max: f64) -> Result<()> {
+        let (i, list, actor) = (o.skill, o.list, o.actor);
+        let cfg = self.cfg(i);
         // upstream sets these on the player's main skill
         let main = self.main();
         let cast_time = self
@@ -1307,6 +1358,7 @@ impl<'a> Perform<'a> {
     /// `calcAreaOfEffect`
     pub(crate) fn area_of_effect(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor) = (o.skill, o.list, o.actor);
+        let bd = self.has_bd(actor);
         let cfg = self.cfg(i);
         let c = Some(&cfg);
         let names = ["AreaOfEffect", "AreaOfEffectPrimary"];
@@ -1325,25 +1377,89 @@ impl<'a> Perform<'a> {
             }
             self.sd_set(i, "radius", range + 2.0);
         }
-        let Some(radius) = self.sd_num(i, "radius") else {
-            return Ok(());
-        };
+        if let Some(radius) = self.sd_num(i, "radius") {
+            self.area_radii(o, radius, area_mod, radius_mod, [inc, more])?;
+        }
+        if bd {
+            let mut l = Vec::new();
+            if area_mod != 1.0 {
+                let inc = 1.0 + self.c.inc(list, c, &["AreaOfEffect"])? / 100.0;
+                let more = self.c.more(list, c, &["AreaOfEffect"])?;
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced)", inc),
+                            f("%.2f ^8(more/less)", more),
+                        ],
+                        total: Some(sf!("= %.2f", area_mod)),
+                        ..Chain::default()
+                    },
+                );
+            }
+            self.bd(actor).unwrap().set_lines("AreaOfEffectMod", l);
+        }
+        Ok(())
+    }
+
+    /// The radii of `calcAreaOfEffect`, for a skill with a radius
+    fn area_radii(
+        &mut self,
+        o: &mut Off,
+        radius: f64,
+        area_mod: f64,
+        radius_mod: f64,
+        [inc, more]: [f64; 2],
+    ) -> Result<()> {
+        let (i, list, actor) = (o.skill, o.list, o.actor);
+        let bd = self.has_bd(actor);
+        let cfg = self.cfg(i);
+        let c = Some(&cfg);
+        let label = |p: &Self, k: &str| p.sd_str(i, k);
         self.set_flag(i, "area", true);
         let extra = self.sd_num(i, "radiusExtra").unwrap_or(0.0);
         let base = radius + extra + self.c.base(list, c, &["AreaOfEffect"])?;
         let r = calc_radius(base, area_mod, radius_mod);
         self.c.set_out(actor, "AreaOfEffectRadius", r);
         self.c.set_out(actor, "AreaOfEffectRadiusMetres", r / 10.0);
+        if bd {
+            let b = area(
+                base,
+                area_mod,
+                r,
+                radius_breakpoints(base, inc, more, radius_mod),
+                label(self, "radiusLabel").as_deref(),
+                Some(radius_mod),
+            );
+            self.bd(actor).unwrap().set("AreaOfEffectRadius", b);
+        }
         if let Some(secondary) = self.sd_num(i, "radiusSecondary") {
             let names = ["AreaOfEffect", "AreaOfEffectSecondary"];
             let inc = 1.0 + self.c.inc(list, c, &names)? / 100.0;
             let more = self.c.more(list, c, &names)?;
             let m = calc_area_mod(inc, more);
             self.c.set_out(actor, "AreaOfEffectModSecondary", m);
-            let r = calc_radius(secondary + extra, m, radius_mod);
+            let base = secondary + extra;
+            let r = calc_radius(base, m, radius_mod);
             self.c.set_out(actor, "AreaOfEffectRadiusSecondary", r);
             self.c
                 .set_out(actor, "AreaOfEffectRadiusSecondaryMetres", r / 10.0);
+            if bd {
+                let bp = (!self.sd_truthy(i, "projectileSpeedAppliesToMSAreaOfEffect"))
+                    .then(|| radius_breakpoints(base, inc, more, radius_mod))
+                    .flatten();
+                let b = area(
+                    base,
+                    m,
+                    r,
+                    bp,
+                    label(self, "radiusSecondaryLabel").as_deref(),
+                    Some(radius_mod),
+                );
+                self.bd(actor)
+                    .unwrap()
+                    .set("AreaOfEffectRadiusSecondary", b);
+            }
         }
         if let Some(tertiary) = self.sd_num(i, "radiusTertiary") {
             let names = ["AreaOfEffect", "AreaOfEffectTertiary"];
@@ -1352,12 +1468,22 @@ impl<'a> Perform<'a> {
             let m = calc_area_mod(inc, more);
             self.c.set_out(actor, "AreaOfEffectModTertiary", m);
             let base = tertiary + extra;
+            let tlabel = label(self, "radiusTertiaryLabel");
             let r = if self.sd_truthy(i, "projectileSpeedAppliesToMSAreaOfEffect") {
-                let inc = 1.0 + self.c.inc(list, c, &["ProjectileSpeed"])? / 100.0;
-                let more = self.c.more(list, c, &["ProjectileSpeed"])?;
-                let speed = round(round(inc * more, 10.0), 2.0);
+                let s_inc = 1.0 + self.c.inc(list, c, &["ProjectileSpeed"])? / 100.0;
+                let s_more = self.c.more(list, c, &["ProjectileSpeed"])?;
+                let speed = round(round(s_inc * s_more, 10.0), 2.0);
                 self.c.set_out(actor, "SpeedModTertiary", speed);
                 let deadzone = self.sd_num(i, "radiusSecondary").unwrap_or(f64::NAN);
+                if bd {
+                    let b = molten_strike_breakdown(
+                        deadzone,
+                        base,
+                        tlabel.as_deref(),
+                        [inc, more, s_inc, s_more],
+                    );
+                    self.bd(actor).unwrap().set("AreaOfEffectRadiusTertiary", b);
+                }
                 molten_strike_tertiary_radius(base, deadzone, m, speed)
             } else if let Some(margin_pct) = self.sd_num(i, "radiusTertiaryBaseMargin") {
                 let margin = margin_pct / 100.0;
@@ -1392,15 +1518,213 @@ impl<'a> Perform<'a> {
                             .collect(),
                     )),
                 );
-                sum / width
+                let avg = sum / width;
+                if bd {
+                    let mut l = Vec::new();
+                    l.extend(tlabel.clone());
+                    l.push(sf!(
+                        "R ^8(base radius)^7 x %.2f ^8(square root of area of effect modifier)",
+                        (100.0 * m.sqrt()).floor() / 100.0
+                    ));
+                    if radius_mod != 1.0 {
+                        l.push(sf!("x %.2f ^8(final radius modifier)", radius_mod));
+                    }
+                    occurrences.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    let mut bps = [f64::INFINITY; 4];
+                    for (b, n) in &occurrences {
+                        l.push(sf!(
+                            "%.1f%% ^8chance of^7 %.1fm ^8base radius resulting in^7 %.1fm ^8final radius",
+                            n / width * 100.0,
+                            b / 10.0,
+                            calc_radius(*b, m, radius_mod) / 10.0
+                        ));
+                        let x = radius_breakpoints(*b, inc, more, radius_mod)
+                            .ok_or("attempt to compare nil with number")?;
+                        for (a, x) in bps.iter_mut().zip(x) {
+                            *a = m_min(*a, x);
+                        }
+                    }
+                    l.push(sf!(
+                        "^8Next closest 0.1m breakpoint: %d%% increased AoE / a %d%% more AoE multiplier",
+                        bps[0],
+                        bps[1]
+                    ));
+                    l.push(sf!(
+                        "^8Previous closest 0.1m breakpoint: %d%% reduced AoE / a %d%% less AoE multiplier",
+                        bps[2],
+                        bps[3]
+                    ));
+                    l.push(sf!("On average, the radius is %.2fm", avg / 10.0));
+                    self.bd(actor)
+                        .unwrap()
+                        .set_lines("AreaOfEffectRadiusTertiary", l);
+                }
+                avg
             } else {
-                calc_radius(base, m, radius_mod)
+                let r = calc_radius(base, m, radius_mod);
+                if bd {
+                    let b = area(
+                        base,
+                        m,
+                        r,
+                        radius_breakpoints(base, inc, more, radius_mod),
+                        tlabel.as_deref(),
+                        Some(radius_mod),
+                    );
+                    self.bd(actor).unwrap().set("AreaOfEffectRadiusTertiary", b);
+                }
+                r
             };
             self.c.set_out(actor, "AreaOfEffectRadiusTertiary", r);
             self.c
                 .set_out(actor, "AreaOfEffectRadiusTertiaryMetres", r / 10.0);
         }
         Ok(())
+    }
+}
+
+/// The throwing time of traps and mines
+fn throwing_time(speed: f64, time_mod: f64) -> Vec<String> {
+    let mut l = Vec::new();
+    multi_chain(
+        &mut l,
+        Chain {
+            label: Some("Throwing time:"),
+            base: Some(f("%.2f ^8(base throwing time)", 1.0 / (speed * time_mod))),
+            factors: vec![f("%.2f ^8(total modifier)", time_mod)],
+            total: Some(sf!("= %.2f ^8seconds per throw", 1.0 / speed)),
+            ..Chain::default()
+        },
+    );
+    l
+}
+
+/// `calcRadiusBreakpoints(baseRadius, incArea, moreArea, radiusMod)`:
+/// increased, more, reduced and less, as `breakdown.area` takes them
+pub(crate) fn radius_breakpoints(
+    base: f64,
+    inc: f64,
+    more: f64,
+    radius_mod: f64,
+) -> Option<[f64; 4]> {
+    let radius = calc_radius(base, calc_area_mod(inc, more), radius_mod);
+    if radius <= 0.0 {
+        return None;
+    }
+    let find = |f: &dyn Fn(f64) -> f64, up: bool| {
+        let mut n = 0.0;
+        loop {
+            n += 1.0;
+            let r = f(n);
+            if (up && r > radius) || (!up && r < radius) {
+                return n;
+            }
+        }
+    };
+    let r = |i: f64, m: f64| calc_radius(base, calc_area_mod(i, m), radius_mod);
+    Some([
+        find(&|n| r(inc + n / 100.0, more), true),
+        find(&|n| r(inc, more * (1.0 + n / 100.0)), true),
+        find(&|n| r(inc - n / 100.0, more), false),
+        find(&|n| r(inc, more * (1.0 - n / 100.0)), false),
+    ])
+}
+
+/// `setMoltenStrikeTertiaryRadiusBreakdown`
+fn molten_strike_breakdown(
+    deadzone: f64,
+    base: f64,
+    label: Option<&str>,
+    [inc_area, more_area, inc_spd, more_spd]: [f64; 4],
+) -> Breakdown {
+    let calc = |a: [f64; 4]| {
+        let area_mod = round(
+            round(
+                (inc_area + a[0] / 100.0) * more_area * (1.0 + a[1] / 100.0),
+                10.0,
+            ),
+            2.0,
+        );
+        let speed_mod = round(
+            round(
+                (inc_spd + a[2] / 100.0) * more_spd * (1.0 + a[3] / 100.0),
+                10.0,
+            ),
+            2.0,
+        );
+        (
+            molten_strike_tertiary_radius(base, deadzone, area_mod, speed_mod),
+            area_mod,
+            speed_mod,
+        )
+    };
+    let (dist, area_mod, speed_mod) = calc([0.0; 4]);
+    let mut l: Vec<String> = label.into_iter().map(String::from).collect();
+    l.push(" = (sqrt(R*R*a - r*r*(a-1)) - r) * s + r".into());
+    l.push(sf!(" = %d", dist));
+    if dist > 0.0 {
+        let find = |sign: f64, k: usize| {
+            let mut a = [0.0; 4];
+            loop {
+                a[k] += sign;
+                let d = calc(a).0;
+                if d != dist || d == 0.0 {
+                    return a[k] * sign;
+                }
+            }
+        };
+        for (fmt, sign, k) in [
+            ("^8Next AoE breakpoint: %d%% increased or %d%% more", 1.0, 0),
+            (
+                "^8Next Proj. Speed breakpoint: %d%% increased or %d%% more",
+                1.0,
+                2,
+            ),
+            (
+                "^8Previous AoE breakpoint: %d%% increased or %d%% more",
+                -1.0,
+                0,
+            ),
+            (
+                "^8Previous Proj. Speed breakpoint: %d%% increased or %d%% more",
+                -1.0,
+                2,
+            ),
+        ] {
+            l.push(sf!(fmt, find(sign, k), find(sign, k + 1)));
+        }
+    }
+    let row = |n: &str, v: String, d: &str| -> Row {
+        vec![
+            ("name", n.into()),
+            ("value", v.into()),
+            ("description", d.into()),
+        ]
+    };
+    Breakdown {
+        lines: l,
+        label: Some("Inputs".into()),
+        rows: Some(vec![
+            row("r", sf!("%d", deadzone), "fixed deadzone radius"),
+            row("R", sf!("%d", base), "base outer radius"),
+            row(
+                "a",
+                sf!("%.2f", area_mod),
+                "net AoE multiplier (scales area)",
+            ),
+            row(
+                "s",
+                sf!("%.2f", speed_mod),
+                "net projectile speed multiplier (scales range)",
+            ),
+        ]),
+        cols: Some(vec![
+            Col::new("Variable", "name"),
+            Col::new("Value", "value"),
+            Col::new("Description", "description"),
+        ]),
+        radius: Some(dist),
+        ..Breakdown::default()
     }
 }
 
@@ -1675,6 +1999,7 @@ impl<'a> Perform<'a> {
             }
             let v = self.c.calc_mod(list, c, &["ProjectileSpeed"])?;
             set(self, "ProjectileSpeedMod", v);
+            self.bd_mod(actor, "ProjectileSpeedMod", list, c, &["ProjectileSpeed"])?;
         }
         if self.has_flag(i, "melee") {
             for n in 0..2 {
@@ -1717,6 +2042,15 @@ impl<'a> Perform<'a> {
                 }
                 set(self, "WeaponRange", range + 2.0);
                 set(self, "WeaponRangeMetre", (range + 2.0) / 10.0);
+                if let Some(b) = self.bd(actor) {
+                    b.set(
+                        "WeaponRange",
+                        Breakdown {
+                            radius: Some(range + 2.0),
+                            ..Breakdown::default()
+                        },
+                    );
+                }
                 let v = 1.0 + self.c.base(list, c, &["AdditionalStrikeTarget"])?;
                 set(self, "StrikeTargets", v);
             }
@@ -1736,6 +2070,7 @@ impl<'a> Perform<'a> {
             }
             let v = self.c.calc_mod(list, c, &names)?;
             set(self, "AuraEffectMod", v);
+            self.bd_mod(actor, "AuraEffectMod", list, c, &names)?;
         }
         if self.has_type(i, "HasReservation") && !self.has_type(i, "ReservationBecomesCost") {
             for pool in ["Life", "Mana"] {
@@ -1756,11 +2091,39 @@ impl<'a> Perform<'a> {
                     )?;
                     set(self, &k, reserved * floor(support, 4.0) / m_max(0.0, eff));
                 }
+                if self.has_bd(actor) {
+                    let names = [
+                        &format!("{pool}Reserved") as &str,
+                        "Reserved",
+                        "SupportManaMultiplier",
+                    ];
+                    let inc = self.c.inc(list, c, &names)?;
+                    let more = self.c.more(list, c, &names)?;
+                    if inc != 0.0 && more != 1.0 {
+                        let eff = self.c.calc_mod(
+                            list,
+                            c,
+                            &[
+                                &format!("{pool}ReservationEfficiency"),
+                                "ReservationEfficiency",
+                            ],
+                        )?;
+                        let total = self.c.out(actor, &k).unwrap_or(f64::NAN);
+                        let l = vec![
+                            sf!("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                            sf!("x %.2f ^8(more/less)", more),
+                            sf!("/ %.2f ^8(reservation efficiency)", eff),
+                            sf!("= %.2f", total),
+                        ];
+                        self.bd(actor).unwrap().set_lines(k, l);
+                    }
+                }
             }
         }
         if self.has_type(i, "Hex") || self.has_type(i, "Mark") {
             let v = self.c.calc_mod(list, c, &["CurseEffect"])?;
             set(self, "CurseEffectMod", v);
+            self.bd_mod(actor, "CurseEffectMod", list, c, &["CurseEffect"])?;
         }
         if self.has_type(i, "Warcry") {
             let full = self.skill_duration(list, c, i)?;
@@ -1773,23 +2136,45 @@ impl<'a> Perform<'a> {
                         / self.c.calc_mod(list, c, &["CooldownRecovery"])?
                 }
             };
-            let uptime = if self.c.flag(self.pdb(), None, &["Condition:WarcryMaxHit"])? {
+            let max_hit = self.c.flag(self.pdb(), None, &["Condition:WarcryMaxHit"])?;
+            let uptime = if max_hit {
                 1.0
             } else {
                 m_min(full / cooldown, 1.0)
             };
             let effect = self.c.calc_mod(list, c, &["WarcryEffect", "BuffEffect"])?;
             set(self, "WarcryEffectMod", effect * uptime);
+            if let Some(b) = self.bd(actor) {
+                let mut l = vec![sf!("%.2f ^8(effect modifiers)", effect)];
+                if max_hit || uptime != 1.0 {
+                    l.push(if max_hit {
+                        "* 100% uptime (WarcryMaxHit Override)".into()
+                    } else {
+                        sf!("* %.2f%% ^8(uptime)", uptime * 100.0)
+                    });
+                    l.push(sf!("= %.1f%%", effect * uptime * 100.0));
+                }
+                b.set_lines("WarcryEffectMod", l);
+            }
         }
         if self.has_type(i, "Link") {
             let v = self.c.calc_mod(list, c, &["LinkEffect", "BuffEffect"])?;
             set(self, "LinkEffectMod", v);
+            self.bd_mod(
+                actor,
+                "LinkEffectMod",
+                list,
+                c,
+                &["LinkEffect", "BuffEffect"],
+            )?;
         }
         if self.has_type(i, "Buff") && self.has_type(i, "Herald") {
             let v = self
                 .c
                 .calc_mod(list, c, &["BuffEffect", "BuffEffectOnSelf"])?;
             set(self, "HeraldBuffEffectMod", v);
+            let names = ["BuffEffect", "BuffEffectOnSelf"];
+            self.bd_mod(actor, "HeraldBuffEffectMod", self.pdb(), c, &names)?;
         }
         let has_cooldown = self.sd(i, "trapCooldown").is_some_and(ModValue::truthy)
             || self.sd(i, "cooldown").is_some_and(ModValue::truthy);
@@ -1800,6 +2185,7 @@ impl<'a> Perform<'a> {
         }
         let action = self.c.out(actor, "ActionSpeedMod").unwrap_or(f64::NAN);
         let tick = self.misc_data("ServerTickRate");
+        let bd = self.has_bd(actor);
         if self.has_flag(i, "trap") {
             let mut base_speed = 1.0 / self.c.base(list, c, &["TrapThrowingTime"])?;
             let time_mod = self.c.calc_mod(list, c, &["SkillTrapThrowingTime"])?;
@@ -1820,6 +2206,30 @@ impl<'a> Perform<'a> {
             set(self, "TrapThrowingSpeed", speed);
             set(self, "TrapThrowingTime", 1.0 / speed);
             self.sd_set(i, "timeOverride", 1.0 / speed / count);
+            if bd {
+                let inc = 1.0 + self.c.inc(list, c, &["TrapThrowingSpeed"])? / 100.0;
+                let more = self.c.more(list, c, &["TrapThrowingSpeed"])?;
+                let mut l = Vec::new();
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("Throwing rate:"),
+                        base: Some(f("%.2f ^8(base throwing rate)", base_speed)),
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced throwing speed)", inc),
+                            f("%.2f ^8(more/less throwing speed)", more),
+                            f("%.2f ^8(action speed modifier)", action),
+                        ],
+                        total: Some(sf!("= %.2f ^8per second", speed)),
+                        ..Chain::default()
+                    },
+                );
+                let b = self.bd(actor).unwrap();
+                b.set_lines("TrapThrowingSpeed", l);
+                if time_mod > 0.0 {
+                    b.set_lines("TrapThrowingTime", throwing_time(speed, time_mod));
+                }
+            }
             let base_cooldown = self
                 .sd_num(i, "trapCooldown")
                 .or_else(|| self.sd_num(i, "cooldown"));
@@ -1832,24 +2242,63 @@ impl<'a> Perform<'a> {
                     None => self.skill_cooldown(list, &cfg, i)?.0,
                 };
                 set(self, "TrapCooldown", cd);
+                if bd {
+                    let inc = 1.0 + self.c.inc(list, c, &["CooldownRecovery"])? / 100.0;
+                    let l = vec![
+                        sf!("%.2fs ^8(base)", base_cooldown.unwrap_or(4.0)),
+                        sf!("/ %.2f ^8(increased/reduced cooldown recovery)", inc),
+                        "rounded up to nearest server tick".into(),
+                        sf!("= %.3fs", cd),
+                    ];
+                    self.bd(actor).unwrap().set_lines("TrapCooldown", l);
+                }
             }
             let inc = 1.0 + self.c.inc(list, c, &["TrapTriggerAreaOfEffect"])? / 100.0;
             let more = self.c.more(list, c, &["TrapTriggerAreaOfEffect"])?;
             let area = calc_area_mod(inc, more);
-            let r = calc_radius(self.misc_data("TrapTriggerRadiusBase"), area, 1.0);
+            let rb = self.misc_data("TrapTriggerRadiusBase");
+            let r = calc_radius(rb, area, 1.0);
             set(self, "TrapTriggerRadius", r);
             set(self, "TrapTriggerRadiusMetre", r / 10.0);
+            if let Some(b) = self.bd(actor) {
+                let bp = radius_breakpoints(rb, inc, more, 1.0);
+                b.set("TrapTriggerRadius", area_bd(rb, area, r, bp, None, None));
+            }
         } else if self.sd(i, "cooldown").is_some_and(ModValue::truthy)
             || self.c.base(list, c, &["CooldownRecovery"])? != 0.0
         {
-            let (cd, _, _) = self.skill_cooldown(list, &cfg, i)?;
+            let (cd, rounded, added) = self.skill_cooldown(list, &cfg, i)?;
             set(self, "Cooldown", cd);
+            if bd {
+                let inc = 1.0 + self.c.inc(list, c, &["CooldownRecovery"])? / 100.0;
+                let mut l = vec![
+                    sf!(
+                        "%.2fs ^8(base)",
+                        self.sd_num(i, "cooldown").unwrap_or(added)
+                    ),
+                    sf!("/ %.2f ^8(increased/reduced cooldown recovery)", inc),
+                ];
+                if rounded {
+                    l.push("rounded up to nearest server tick".into());
+                }
+                l.push(sf!("= %.3fs", cd));
+                self.bd(actor).unwrap().set_lines("Cooldown", l);
+            }
         }
         if let Some(base) = self.sd_num(i, "storedUses") {
             let add = self
                 .c
                 .base(list, c, &["AdditionalCooldownUses", "AdditionalUses"])?;
             set(self, "StoredUses", base + add);
+            if let Some(b) = self.bd(actor) {
+                let s = |n: f64| if n == 1.0 { "" } else { "s" };
+                let mut l = vec![sf!("%d ^8(skill use%s)", base, s(base))];
+                if add != 0.0 {
+                    l.push(sf!("+ %d ^8(additional use%s)", add, s(add)));
+                    l.push(sf!("= %d ^8(total use%s)", base + add, s(base + add)));
+                }
+                b.set_lines("StoredUses", l);
+            }
         }
         if self.has_flag(i, "mine") {
             let mut base_speed = 1.0 / self.c.base(list, c, &["MineLayingTime"])?;
@@ -1880,20 +2329,58 @@ impl<'a> Perform<'a> {
                 time / count
             };
             self.sd_set(i, "timeOverride", over);
+            if bd {
+                let inc = 1.0 + self.c.inc(list, c, &["MineLayingSpeed"])? / 100.0;
+                let more = self.c.more(list, c, &["MineLayingSpeed"])?;
+                let mut l = Vec::new();
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("Throwing rate:"),
+                        base: Some(f("%.2f ^8(base throwing rate)", base_speed)),
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced throwing speed)", inc),
+                            f("%.2f ^8(more/less throwing speed)", more),
+                            f("%.2f ^8(action speed modifier)", action),
+                            f(
+                                "%.2f ^8(additional mine thrown)",
+                                1.0 / (1.0 + (count - 1.0) * 0.1),
+                            ),
+                        ],
+                        total: Some(sf!("= %.2f ^8per second", speed)),
+                        ..Chain::default()
+                    },
+                );
+                let b = self.bd(actor).unwrap();
+                b.set_lines("MineLayingTime", l);
+                if time_mod > 0.0 {
+                    b.set_lines("MineThrowingTime", throwing_time(speed, time_mod));
+                }
+            }
             let inc = 1.0 + self.c.inc(list, c, &["MineDetonationAreaOfEffect"])? / 100.0;
             let more = self.c.more(list, c, &["MineDetonationAreaOfEffect"])?;
             let area = calc_area_mod(inc, more);
-            let r = calc_radius(self.misc_data("MineDetonationRadiusBase"), area, 1.0);
+            let rb = self.misc_data("MineDetonationRadiusBase");
+            let r = calc_radius(rb, area, 1.0);
             set(self, "MineDetonationRadius", r);
             set(self, "MineDetonationRadiusMetre", r / 10.0);
+            if let Some(b) = self.bd(actor) {
+                let bp = radius_breakpoints(rb, inc, more, 1.0);
+                b.set("MineDetonationRadius", area_bd(rb, area, r, bp, None, None));
+            }
             if self.has_type(i, "Aura") {
-                let r = calc_radius(
-                    self.misc_data("MineAuraRadiusBase"),
-                    self.c.out(actor, "AreaOfEffectMod").unwrap_or(f64::NAN),
-                    1.0,
-                );
+                let rb = self.misc_data("MineAuraRadiusBase");
+                let area = self.c.out(actor, "AreaOfEffectMod").unwrap_or(f64::NAN);
+                let r = calc_radius(rb, area, 1.0);
                 set(self, "MineAuraRadius", r);
                 set(self, "MineAuraRadiusMetre", r / 10.0);
+                if bd {
+                    let inc = 1.0 + self.c.inc(list, c, &["AreaOfEffect"])? / 100.0;
+                    let more = self.c.more(list, c, &["AreaOfEffect"])?;
+                    let bp = radius_breakpoints(rb, inc, more, 1.0);
+                    let b = area_bd(rb, area, r, bp, None, None);
+                    self.bd(actor).unwrap().set("MineAuraRadius", b);
+                }
             }
         }
         if self.has_flag(i, "totem") {
@@ -1905,6 +2392,26 @@ impl<'a> Perform<'a> {
             let speed = base_speed * self.c.calc_mod(list, c, &["TotemPlacementSpeed"])? * action;
             set(self, "TotemPlacementSpeed", speed);
             set(self, "TotemPlacementTime", 1.0 / speed);
+            if bd {
+                let inc = 1.0 + self.c.inc(list, c, &["TotemPlacementSpeed"])? / 100.0;
+                let more = self.c.more(list, c, &["TotemPlacementSpeed"])?;
+                let mut l = Vec::new();
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("Placement speed:"),
+                        base: Some(f("%.2f ^8(base placement speed)", base_speed)),
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced placement speed)", inc),
+                            f("%.2f ^8(more/less placement speed)", more),
+                            f("%.2f ^8(action speed modifier)", action),
+                        ],
+                        total: Some(sf!("= %.2f ^8per second", speed)),
+                        ..Chain::default()
+                    },
+                );
+                self.bd(actor).unwrap().set_lines("TotemPlacementTime", l);
+            }
             let limit = self
                 .c
                 .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
@@ -1914,6 +2421,18 @@ impl<'a> Perform<'a> {
                 .override_num(self.pdb(), None, &["TotemsSummoned"])?
                 .unwrap_or(limit);
             set(self, "TotemsSummoned", summoned);
+            if bd {
+                let note = if self.input.config.contains_key("TotemsSummoned") {
+                    " ^8(overridden from the Configuration tab)"
+                } else {
+                    " ^8(can be overridden in the Configuration tab)"
+                };
+                let l = vec![format!(
+                    "Totems Summoned: {}{note}",
+                    crate::pat::num(summoned)
+                )];
+                self.bd(actor).unwrap().set_lines("ActiveTotemLimit", l);
+            }
             let (life, life_mod) = self.totem_life(i)?;
             set(self, "TotemLife", life);
             set(self, "TotemLifeMod", life_mod);
@@ -1921,12 +2440,50 @@ impl<'a> Perform<'a> {
                 let v = self.c.base(list, c, &[k])?;
                 set(self, k, v);
             }
+            if bd {
+                self.bd_mod(actor, "TotemLifeMod", list, c, &["TotemLife"])?;
+                let num = crate::pat::num;
+                let level = self.sd_num(i, "totemLevel").unwrap_or(f64::NAN);
+                let base = self
+                    .data()
+                    .table("monsterAllyLifeTable", &format!("{}", level as i64))
+                    .unwrap_or(f64::NAN);
+                let id = self.mods(i).skill_totem_id.unwrap_or(f64::NAN);
+                let mult = self
+                    .data()
+                    .table("totemLifeMult", &format!("{}", id as i64))
+                    .unwrap_or(f64::NAN);
+                let l = vec![
+                    format!("Totem level: {}", num(level)),
+                    format!(
+                        "{} ^8(base life for a level {} monster)",
+                        num(base),
+                        num(level)
+                    ),
+                    format!("x {} ^8(life multiplier for this totem type)", num(mult)),
+                    format!("x {} ^8(totem life modifier)", num(life_mod)),
+                    format!("= {}", num(life)),
+                ];
+                self.bd(actor).unwrap().set_lines("TotemLife", l);
+                for k in ["TotemEnergyShield", "TotemBlockChance", "TotemArmour"] {
+                    self.bd_mod(actor, k, list, c, &[k])?;
+                }
+            }
         }
         if self.has_type(i, "Brand") {
             let r = self.misc_data("BrandAttachmentRangeBase")
                 * self.c.calc_mod(list, c, &["BrandAttachmentRange"])?;
             set(self, "BrandAttachmentRange", r);
             set(self, "BrandAttachmentRangeMetre", r / 10.0);
+            if let Some(b) = self.bd(actor) {
+                b.set(
+                    "BrandAttachmentRange",
+                    Breakdown {
+                        radius: Some(r),
+                        ..Breakdown::default()
+                    },
+                );
+            }
             let v = self.c.base(list, c, &["ActiveBrandLimit"])?;
             set(self, "ActiveBrandLimit", v);
             match self.sd_num(i, "attachedBrandCount") {
@@ -1968,6 +2525,28 @@ impl<'a> Perform<'a> {
             let inc = 1.0 + self.c.inc(list, c, &["CorpseLife"])? / 100.0;
             set(self, "CorpseLifeInc", inc);
             set(self, "CorpseLife", base * inc);
+            if bd {
+                let name = self.sd_str(i, "corpseMonsterVariety");
+                let enemy_level = self.env.enemy_level;
+                let l = vec![
+                    sf!("%d ^8(base life of a level %d monster)", life, level),
+                    sf!(
+                        "x %.2f ^8(%s variety multiplier)",
+                        variety.unwrap_or(1.0),
+                        name.as_deref().unwrap_or("nil")
+                    ),
+                    sf!(
+                        "x %.2f ^8(map level %d monster life multiplier from config)",
+                        map.unwrap_or(1.0),
+                        enemy_level
+                    ),
+                    sf!(" = %d ^8(base corpse life)", base),
+                    String::new(),
+                    sf!("x %.2f ^8(corpse maximum life increases)", inc),
+                    sf!(" = %d", base * inc),
+                ];
+                self.bd(actor).unwrap().set_lines("CorpseLife", l);
+            }
         }
         Ok(())
     }
@@ -1975,6 +2554,7 @@ impl<'a> Perform<'a> {
     /// Skill durations and uptimes
     fn offence_durations(&mut self, o: &mut Off) -> Result<()> {
         let (i, list, actor, edb) = (o.skill, o.list, o.actor, o.edb);
+        let bd = self.has_bd(actor);
         let cfg = self.cfg(i);
         let c = Some(&cfg);
         let tick = self.misc_data("ServerTickRate");
@@ -1994,12 +2574,45 @@ impl<'a> Perform<'a> {
             }
             v
         };
-        let dmod = m_max(
-            self.c
-                .calc_mod(list, c, &with_mine(vec!["Duration", "PrimaryDuration"]))?,
-            0.0,
-        );
+        let mod_lines = |p: &Self, names: &[&str], label: &str| -> Result<Option<Vec<String>>> {
+            let l = crate::breakdown::mod_(p.c.inc(list, c, names)?, p.c.more(list, c, names)?);
+            Ok(l.map(|mut l| {
+                if !label.is_empty() {
+                    l.insert(0, label.to_string());
+                }
+                l
+            }))
+        };
+        let duration_lines = |base: f64, m: f64, show_mod: bool, debuff: bool, total: f64| {
+            let mut l = vec![sf!("%.2fs ^8(base)", base)];
+            if show_mod {
+                l.push(sf!("x %.4f ^8(duration modifier)", m));
+            }
+            if debuff && debuff_mult != 1.0 {
+                l.push(sf!(
+                    "/ %.3f ^8(debuff expires slower/faster)",
+                    1.0 / debuff_mult
+                ));
+            }
+            l.push("rounded up to nearest server tick".into());
+            l.push(sf!("= %.3fs", total));
+            l
+        };
+        let names = with_mine(vec!["Duration", "PrimaryDuration"]);
+        let dmod = m_max(self.c.calc_mod(list, c, &names)?, 0.0);
         self.c.set_out(actor, "DurationMod", dmod);
+        if bd {
+            let label = if self
+                .sd(i, "durationSecondary")
+                .is_some_and(ModValue::truthy)
+            {
+                "Primary duration:"
+            } else {
+                ""
+            };
+            let l = mod_lines(self, &names, label)?;
+            self.bd(actor).unwrap().set_opt("DurationMod", l);
+        }
         let base = self.sd_num(i, "duration").unwrap_or(0.0)
             + self.c.base(list, c, &["Duration", "PrimaryDuration"])?;
         let permanent = match &self.mods(i).minion {
@@ -2010,38 +2623,52 @@ impl<'a> Perform<'a> {
         };
         if base > 0.0 && !permanent {
             let mut d = base * dmod;
-            if self.sd_truthy(i, "debuff") {
+            let debuff = self.sd_truthy(i, "debuff");
+            if debuff {
                 d *= debuff_mult;
             }
-            self.c.set_out(actor, "Duration", (d * tick).ceil() / tick);
+            let d = (d * tick).ceil() / tick;
+            self.c.set_out(actor, "Duration", d);
+            if bd && d != base {
+                let l = duration_lines(base, dmod, dmod != 1.0, debuff, d);
+                self.bd(actor).unwrap().set_lines("Duration", l);
+            }
         }
-        for (key, name, out, debuff) in [
+        for (key, name, out, debuff, label) in [
             (
                 "durationSecondary",
                 "SecondaryDuration",
                 "DurationSecondary",
                 "debuffSecondary",
+                "Secondary",
             ),
             (
                 "durationTertiary",
                 "TertiaryDuration",
                 "DurationTertiary",
                 "debuffTertiary",
+                "Tertiary",
             ),
         ] {
             let base =
                 self.sd_num(i, key).unwrap_or(0.0) + self.c.base(list, c, &["Duration", name])?;
             if base > 0.0 {
-                let m = m_max(
-                    self.c
-                        .calc_mod(list, c, &with_mine(vec!["Duration", name]))?,
-                    0.0,
-                );
+                let names = with_mine(vec!["Duration", name]);
+                let m = m_max(self.c.calc_mod(list, c, &names)?, 0.0);
                 let mut d = base * m;
-                if self.sd_truthy(i, debuff) {
+                let debuff = self.sd_truthy(i, debuff);
+                if debuff {
                     d *= debuff_mult;
                 }
-                self.c.set_out(actor, out, (d * tick).ceil() / tick);
+                let d = (d * tick).ceil() / tick;
+                self.c.set_out(actor, out, d);
+                if bd && d != base {
+                    let ml = mod_lines(self, &names, &format!("{label} duration:"))?;
+                    let l = duration_lines(base, m, dmod != 1.0, debuff, d);
+                    let b = self.bd(actor).unwrap();
+                    b.set_opt(format!("{label}DurationMod"), ml);
+                    b.set_lines(out, l);
+                }
             }
         }
         for (key, out) in [
@@ -2051,7 +2678,12 @@ impl<'a> Perform<'a> {
             let base = self.sd_num(i, key).unwrap_or(0.0);
             if base > 0.0 {
                 let m = m_max(self.c.calc_mod(list, c, &["Duration"])?, 0.0);
-                self.c.set_out(actor, out, (base * m * tick).ceil() / tick);
+                let d = (base * m * tick).ceil() / tick;
+                self.c.set_out(actor, out, d);
+                if bd && d != base {
+                    let l = duration_lines(base, m, true, false, d);
+                    self.bd(actor).unwrap().set_lines(out, l);
+                }
             }
         }
         let base = self.sd_num(i, "soulPreventionDuration").unwrap_or(0.0);
@@ -2066,20 +2698,48 @@ impl<'a> Perform<'a> {
             let m = m_max(self.c.calc_mod(list, c, &names)?, 0.0);
             let d = m_max((base * m * tick).ceil(), 1.0) / tick;
             self.c.set_out(actor, "SoulGainPreventionDuration", d);
+            if bd && d != base {
+                let l = duration_lines(base, m, true, false, d);
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines("SoulGainPreventionDuration", l);
+            }
         }
         let m = m_max(self.c.calc_mod(list, c, &["TotemDuration"])?, 0.0);
         self.c.set_out(actor, "TotemDurationMod", m);
         let base = self.c.base(list, c, &["TotemDuration"])?;
-        self.c
-            .set_out(actor, "TotemDuration", (base * m * tick).ceil() / tick);
+        let d = (base * m * tick).ceil() / tick;
+        self.c.set_out(actor, "TotemDuration", d);
+        if bd {
+            let ml = mod_lines(self, &["TotemDuration"], "")?;
+            let l = duration_lines(base, m, m != 1.0, false, d);
+            let b = self.bd(actor).unwrap();
+            b.set_opt("TotemDurationMod", ml);
+            b.set_lines("TotemDuration", l);
+        }
         let m = m_max(self.c.calc_mod(list, c, &["ImpaleDuration"])?, 0.0);
         self.c.set_out(actor, "ImpaleDurationMod", m);
         let base = self.data().character_constants["impaled_debuff_base_duration_ms"] / 1000.0;
-        self.c.set_out(
-            actor,
-            "ImpaleDuration",
-            (base * m * tick * debuff_mult).ceil() / tick,
-        );
+        let d = (base * m * tick * debuff_mult).ceil() / tick;
+        self.c.set_out(actor, "ImpaleDuration", d);
+        if bd {
+            let ml = mod_lines(self, &["ImpaleDuration"], "")?;
+            let mut l = vec![sf!("%.2fs ^8(base)", base)];
+            if debuff_mult != 1.0 {
+                l.push(sf!(
+                    "/ %.3f ^8(debuff expires slower/faster)",
+                    1.0 / debuff_mult
+                ));
+            }
+            if m != 1.0 {
+                l.push(sf!("x %.4f ^8(duration modifier)", m));
+            }
+            l.push("rounded up to nearest server tick".into());
+            l.push(sf!("= %.3fs", d));
+            let b = self.bd(actor).unwrap();
+            b.set_opt("ImpaleDurationMod", ml);
+            b.set_lines("ImpaleDuration", l);
+        }
         // Skill uptime
         if !self.has_type(i, "Vaal") {
             let cooldown = self.c.out(actor, "Cooldown").unwrap_or(0.0);
@@ -2092,13 +2752,25 @@ impl<'a> Perform<'a> {
             ] {
                 let d = self.c.out(actor, t).unwrap_or(0.0);
                 if d != 0.0 && cooldown != 0.0 {
-                    let uptime = if self.c.flag(list, c, &["NoCooldownRecoveryInDuration"])? {
-                        d / (cooldown + d)
-                    } else {
-                        d / cooldown
-                    };
-                    self.c
-                        .set_out(actor, &format!("{t}Uptime"), m_min(uptime, 1.0) * 100.0);
+                    let no_recovery = self.c.flag(list, c, &["NoCooldownRecoveryInDuration"])?;
+                    let uptime = m_min(
+                        if no_recovery {
+                            d / (cooldown + d)
+                        } else {
+                            d / cooldown
+                        },
+                        1.0,
+                    ) * 100.0;
+                    let k = format!("{t}Uptime");
+                    self.c.set_out(actor, &k, uptime);
+                    if let Some(b) = self.bd(actor) {
+                        let first = if no_recovery {
+                            sf!("%.2fs / (%.2fs + %.2fs)", d, cooldown, d)
+                        } else {
+                            sf!("%.2fs / %.2fs", d, cooldown)
+                        };
+                        b.set_lines(k, vec![first, sf!("= %d%%", uptime)]);
+                    }
                 }
             }
         }
@@ -2348,11 +3020,12 @@ impl<'a> Perform<'a> {
                     &[&format!("{}CostEfficiency", v.typ), "CostEfficiency"],
                 )?;
                 let type_cost = format!("{}Cost", v.typ);
-                let (cost, raw);
+                let (cost, raw, more_type, inc);
+                let mut more_cost = 1.0;
                 if !v.unaffected {
-                    let more_type = self.c.more(list, c, &[&type_cost])?;
-                    let more_cost = self.c.more(list, c, &["Cost"])?;
-                    let inc = self.c.inc(list, c, &[&type_cost, "Cost"])?;
+                    more_type = self.c.more(list, c, &[&type_cost])?;
+                    more_cost = self.c.more(list, c, &["Cost"])?;
+                    inc = self.c.inc(list, c, &[&type_cost, "Cost"])?;
                     let mut r = v.base_cost_raw.map(|r| {
                         m_max(
                             0.0,
@@ -2386,8 +3059,8 @@ impl<'a> Perform<'a> {
                     cost = x;
                     raw = r;
                 } else {
-                    let more_type = self.c.more(list, c, &[&type_cost])?;
-                    let inc = self.c.inc(list, c, &[&type_cost])?;
+                    more_type = self.c.more(list, c, &[&type_cost])?;
+                    inc = self.c.inc(list, c, &[&type_cost])?;
                     let mut x = (v.base_cost + v.base_cost_no_mult).floor();
                     x = m_max(0.0, (1.0 + inc / 100.0) * x);
                     x = m_max(0.0, more_type * x);
@@ -2411,6 +3084,62 @@ impl<'a> Perform<'a> {
                 match raw {
                     Some(r) => self.c.set_out(actor, &raw_name, r),
                     None => self.c.clear_out(actor, &raw_name),
+                }
+                if has_cost && self.has_bd(actor) {
+                    let pct = if v.percent { "%%" } else { "" };
+                    let text = v.text;
+                    let mut l = vec![sf!(&format!("%.2f{pct} ^8(base {text} cost)"), v.base_cost)];
+                    if mult != 1.0 {
+                        l.push(sf!("x %.4f ^8(cost multiplier)", mult));
+                    }
+                    if v.base_cost_no_mult != 0.0 {
+                        l.push(sf!(
+                            &format!("+ %d ^8(additional {text} cost)"),
+                            v.base_cost_no_mult
+                        ));
+                    }
+                    let life_instead = self.c.flag(list, c, &["CostLifeInsteadOfMana"])?;
+                    if v.typ == "Life" && hybrid_life + additional_life != 0.0 && !life_instead {
+                        l.push(sf!(
+                            "x %.2f ^8(mana cost conversion)",
+                            hybrid_life + additional_life
+                        ));
+                    }
+                    if v.typ == "ES"
+                        && additional_es != 0.0
+                        && !life_instead
+                        && !self.c.flag(list, c, &["CostESInsteadOfManaOrLife"])?
+                    {
+                        l.push(sf!("x %.2f ^8(mana cost conversion)", additional_es));
+                    }
+                    if inc != 0.0 {
+                        l.push(sf!(
+                            &format!("x %.2f ^8(increased/reduced {text} cost)"),
+                            1.0 + inc / 100.0
+                        ));
+                    }
+                    if more_cost != 1.0 {
+                        l.push(sf!("x %.2f ^8(more/less cost)", more_cost));
+                    }
+                    if more_type != 1.0 {
+                        l.push(sf!(&format!("x %.2f ^8(more/less {text} cost)"), more_type));
+                    }
+                    if eff != 1.0 {
+                        l.push(sf!(&format!("/ %.2f ^8({text} cost efficiency)"), eff));
+                    }
+                    if v.total_cost != 0.0 {
+                        l.push(sf!(&format!("%+d ^8(total {text} cost)"), v.total_cost));
+                    }
+                    if v.typ == "Mana" && hybrid_life > 0.0 {
+                        l.push(sf!(
+                            "x %.2f ^8(%d%% paid for with life)",
+                            1.0 - hybrid_life,
+                            hybrid_life * 100.0
+                        ));
+                    }
+                    let d = if v.upfront { "d" } else { ".2f" };
+                    l.push(sf!(&format!("= %{d}{pct}"), cost));
+                    self.bd(actor).unwrap().set_lines(name, l);
                 }
             }
         }

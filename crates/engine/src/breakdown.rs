@@ -4,8 +4,8 @@
 //! tab's calculations (`PerformInput::breakdown`, `env.buildBreakdown`);
 //! in calculators and Full DPS nothing of this runs.
 //!
-//! Not ported yet: `breakdown.leech` and the breakdowns of the triggers,
-//! mirages and offence.
+//! Mirages calculate in `CALCULATOR` mode, without breakdowns: upstream's
+//! replacing the player's breakdowns with the mirage's keeps the player's.
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
@@ -18,6 +18,7 @@ pub mod color {
     pub const NEGATIVE: &str = "^xDD0022";
     pub const POSITIVE: &str = "^x33FF77";
     pub const GEM: &str = "^x1AA29B";
+    pub const CUSTOM: &str = "^x5CF0BB";
 
     /// `colorCodes[rarity]`
     pub fn rarity(r: &str) -> Option<&'static str> {
@@ -293,6 +294,8 @@ pub struct Breakdown {
     pub reservations: Option<Vec<Reservation>>,
     pub damage_types: Option<Vec<Row>>,
     pub mod_list: Option<Vec<ModEntry>>,
+    /// The breakdown the Calcs tab shows for this one (`breakdownSource`)
+    pub breakdown_source: Option<String>,
 }
 
 impl Breakdown {
