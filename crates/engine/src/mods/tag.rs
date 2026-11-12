@@ -13,6 +13,43 @@ pub struct Tag {
     pub global_limit: Option<(f64, Sym)>,
 }
 
+/// A mod's tags, shared between its copies until one is changed
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Tags(Rc<Vec<Tag>>);
+
+impl std::ops::Deref for Tags {
+    type Target = Vec<Tag>;
+    fn deref(&self) -> &Vec<Tag> {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Tags {
+    fn deref_mut(&mut self) -> &mut Vec<Tag> {
+        Rc::make_mut(&mut self.0)
+    }
+}
+
+impl From<Vec<Tag>> for Tags {
+    fn from(v: Vec<Tag>) -> Tags {
+        Tags(Rc::new(v))
+    }
+}
+
+impl<'a> IntoIterator for &'a Tags {
+    type Item = &'a Tag;
+    type IntoIter = std::slice::Iter<'a, Tag>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl FromIterator<Tag> for Tags {
+    fn from_iter<I: IntoIterator<Item = Tag>>(i: I) -> Tags {
+        Tags(Rc::new(i.into_iter().collect()))
+    }
+}
+
 /// `var` or `varList` (`stat` or `statList`, ...)
 #[derive(Clone, Debug, PartialEq)]
 pub enum Names {

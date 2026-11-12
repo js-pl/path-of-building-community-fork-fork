@@ -9,6 +9,7 @@ use crate::item::{Item, ItemContext, ModLine};
 use crate::spec::PassiveSpec;
 use crate::xml::{Element, Node};
 use std::collections::{BTreeMap, HashMap};
+use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -83,7 +84,7 @@ pub struct ItemSet {
 
 #[derive(Clone, Debug, Default)]
 pub struct ItemsTab {
-    pub items: BTreeMap<i64, Item>,
+    pub items: BTreeMap<i64, Rc<Item>>,
     /// Item ids in the order the build lists them
     pub item_order_list: Vec<f64>,
     pub item_sets: BTreeMap<i64, ItemSet>,
@@ -95,7 +96,7 @@ pub struct ItemsTab {
     /// Items the calculations generate in place of equipped ones (Energy
     /// Blade's weapons), by their reserved negative ids; no slot of the
     /// tab holds them
-    pub generated: BTreeMap<i64, Item>,
+    pub generated: BTreeMap<i64, Rc<Item>>,
 }
 
 /// `tonumber(slotName:match("%d+$") or slotName:match("%d+"))`
@@ -259,7 +260,7 @@ impl ItemsTab {
                     if item.base.is_some() {
                         item.build_mod_list(ctx)?;
                         let id = id.ok_or("item without an id")?;
-                        tab.items.insert(id as i64, item);
+                        tab.items.insert(id as i64, Rc::new(item));
                         tab.item_order_list.push(id);
                     }
                 }
@@ -344,7 +345,10 @@ impl ItemsTab {
             return None;
         }
         let id = id as i64;
-        self.items.get(&id).or_else(|| self.generated.get(&id))
+        self.items
+            .get(&id)
+            .or_else(|| self.generated.get(&id))
+            .map(|i| &**i)
     }
 
     /// `IsItemValidForSlot(item, slotName)`
