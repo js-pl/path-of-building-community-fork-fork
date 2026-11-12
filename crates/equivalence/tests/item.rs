@@ -9,7 +9,6 @@
 //! the uniques and rares.
 
 use engine::item::{Fields, INFLUENCES, Item, ItemContext, LineFlags, ModLine};
-use engine::item_data::ItemData;
 use engine::item_tools::Range;
 use engine::mods::convert::Converter;
 use engine::mods::{Mod, ModValue};
@@ -628,8 +627,7 @@ fn items_match_upstream() {
     let mut im = importer::Importer::new(&upstream_src());
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
-    let data = ItemData::from_lua(&host.global("data"), &host.global("colorCodes"))
-        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let data = equivalence::game_data().items;
     let mut failures = Vec::new();
     let mut compared = 0;
     let record = |what: String, item_failures: Vec<String>, failures: &mut Vec<String>| {

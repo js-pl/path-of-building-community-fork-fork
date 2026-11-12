@@ -5,7 +5,7 @@
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
-use engine::config::{self, ConfigData, ConfigState, CustomBlock, Inputs, Val};
+use engine::config::{self, ConfigState, CustomBlock, Inputs, Val};
 use engine::mods::Mod;
 use engine::mods::convert::Converter;
 use equivalence::{corpus, mod_parser, typed_json, upstream_src};
@@ -97,8 +97,7 @@ fn config_matches_upstream() {
     let mut im = importer::Importer::new(&upstream_src());
     let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
     parser.preload(&cache);
-    let data = ConfigData::from_lua(&host.global("data"), &host.global("SkillType"))
-        .unwrap_or_else(|e| panic!("config data: {e}"));
+    let data = equivalence::game_data().config;
     let mut failures = Vec::new();
     let mut compared = 0;
     for (id, path) in corpus() {
@@ -192,8 +191,7 @@ fn every_option_matches_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let data = ConfigData::from_lua(&host.global("data"), &host.global("SkillType"))
-        .unwrap_or_else(|e| panic!("config data: {e}"));
+    let data = equivalence::game_data().config;
     host.new_build().unwrap();
     let build = host.build().unwrap();
     let var_list = rt::call(&host.global("LoadModule"), &[s("Modules/ConfigOptions")])

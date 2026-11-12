@@ -3,19 +3,16 @@
 //! the sidebar's calculation (`MAIN`) and the Calcs tab's (`CALCS`): the
 //! player's output with the Full DPS table and the main skill's minion's. Numbers compare bitwise; a missing or extra key fails.
 //! Builds that reach a part not ported yet are skipped and listed. The game
-//! data still comes from a started upstream host.
+//! data is `gamedata`'s, in its binary form: no Lua runs but the importer's.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::actor::OutVal;
 use engine::calcs::BuildOutput;
 use equivalence::typed_build::TypedData;
-use equivalence::{corpus, oracle_dir, upstream_src};
+use equivalence::{corpus, oracle_dir};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::rc::Rc;
-use upstream::host::Host;
-use upstream::imported::Imported;
 
 /// A JSON value with numbers parsed exactly
 #[derive(Clone, Debug)]
@@ -273,10 +270,7 @@ fn build_output_matches_oracle() {
         .filter(|(id, p)| id.contains(&filter) && p.extension().is_some_and(|e| e == "xml"))
         .collect();
     assert!(!builds.is_empty(), "no build matches CALCS_FILTER={filter}");
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", lua::to_string(e.value())));
-    let mut data = TypedData::load(&host);
+    let mut data = TypedData::load();
     let mut failures = Vec::new();
     let mut summary = Vec::new();
     let mut results: Vec<_> = builds

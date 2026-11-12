@@ -334,7 +334,7 @@ fn run(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let mut data = TypedData::load(&host);
+    let mut data = TypedData::load();
     let conv = Converter::default();
     let mut failures = Vec::new();
     let mut compared = 0;

@@ -69,6 +69,12 @@ pub fn load_data() -> (Data, importer::Raw) {
     (data, raw)
 }
 
+/// The typed game data, made by `gamedata` and read from its binary form.
+pub fn game_data() -> engine::game_data::GameData {
+    let bytes = gamedata::build(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+    engine::game_data::GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"))
+}
+
 /// Builds the mod parser from upstream's source.
 pub fn mod_parser() -> engine::mod_parser::ModParser {
     let (data, raw) = load_data();

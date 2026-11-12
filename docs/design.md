@@ -416,9 +416,10 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 
    Item text and data lines are matched with upstream's own patterns
    (`engine::pat`, Lua patterns on Rust strings), so the parse is
-   upstream's. The game data moves to `crates/gamedata` family by family:
-   `tests/game_data.rs` checks that what it makes, written and read back,
-   equals what the typed tables read from a started upstream's `data`.
+   upstream's. The game data and the passive trees come from
+   `crates/gamedata` in their binary form: `tests/game_data.rs` checks
+   that what it makes, written and read back, equals what the typed
+   tables read from a started upstream's `data`.
 
    Upstream mutates shared data in a few places, and the typed engine does
    not copy that by accident: `modLib.mergeKeystones` sets the source of a
