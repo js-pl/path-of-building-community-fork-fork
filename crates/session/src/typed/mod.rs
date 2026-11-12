@@ -3,6 +3,7 @@
 //! ported so far answered from it with the JSON the translated session
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
+mod calcs;
 pub mod display_stats;
 mod sidebar;
 
@@ -137,6 +138,12 @@ pub struct TypedSession<'d> {
     build: Build<'d>,
     name: String,
     main: BuildOutput,
+    /// The Calcs tab's calculation, once asked for
+    calcs: Option<BuildOutput>,
+    /// The Calcs tab's skill selection, and whether each of its control
+    /// rows was shown when last drawn
+    calcs_select: sidebar::SkillSelect,
+    calcs_rows: Vec<(&'static str, bool)>,
     pub ui: Ui,
     controls: Controls,
 }
@@ -155,11 +162,30 @@ impl<'d> TypedSession<'d> {
             build,
             name: name.unwrap_or("Imported build").to_string(),
             main,
+            calcs: None,
+            calcs_select: Default::default(),
+            calcs_rows: Vec::new(),
             ui: Ui::default(),
             controls: Controls::default(),
         };
         s.refresh_controls()?;
         Ok(s)
+    }
+
+    /// `controls`: the sidebar's and the Calcs tab's controls, `None`
+    /// when another is asked for
+    pub fn controls(&self, paths: &[&str]) -> Option<J> {
+        let state = self.state().ok()?;
+        let mut out = Map::new();
+        for p in paths {
+            let c = match p.split_once('.')? {
+                ("calcs", name) => self.calcs_control(name)?,
+                ("build", _) => state["controls"].get(*p)?.clone(),
+                _ => return None,
+            };
+            out.insert(p.to_string(), c);
+        }
+        Some(object(out))
     }
 
     /// `outputs`: the sidebar calculation's player and minion outputs

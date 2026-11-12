@@ -139,6 +139,23 @@ impl<'d> Dispatcher<'d> {
             }
             "state" => self.typed.as_ref()?.state().ok().map(ok),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
+            "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
+            "controls" => {
+                let paths: Vec<&str> = req["paths"]
+                    .as_array()?
+                    .iter()
+                    .map(|p| p.as_str())
+                    .collect::<Option<_>>()?;
+                self.typed.as_ref()?.controls(&paths).map(ok)
+            }
+            "breakdown" => {
+                let cell: Vec<usize> = req["cell"]
+                    .as_array()?
+                    .iter()
+                    .map(|v| v.as_u64().map(|n| n as usize))
+                    .collect::<Option<_>>()?;
+                self.typed.as_mut()?.breakdown(&cell).ok().map(ok)
+            }
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
                 self.typed.as_ref()?.node_power(index).ok().map(ok)

@@ -1,6 +1,10 @@
-//! Translates the engine API's Lua bridge (`lua/session.lua`) with luagen.
+//! Translates the engine API's Lua bridge (`lua/session.lua`) with luagen,
+//! and evaluates upstream's `Modules/CalcSections.lua` into JSON for the
+//! typed Calcs tab.
 
-use std::path::PathBuf;
+use lua::{Key, Value};
+use serde_json::{Map, Value as J};
+use std::path::{Path, PathBuf};
 
 fn main() {
     let dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -12,4 +16,70 @@ fn main() {
         .unwrap_or_else(|e| panic!("luagen: lua/session.lua: {}", e.0));
     std::fs::write(out.join("session_lua.rs"), code).unwrap();
     println!("cargo:rerun-if-changed={}", src_path.display());
+
+    let up = dir.join("../../upstream/PathOfBuilding/src");
+    let sections = calc_sections(&up);
+    std::fs::write(out.join("calc_sections.json"), sections.to_string()).unwrap();
+    println!(
+        "cargo:rerun-if-changed={}",
+        up.join("Modules/CalcSections.lua").display()
+    );
+    let tab = up.join("Classes/CalcsTab.lua");
+    std::fs::write(out.join("calcs_mode_tooltip.txt"), mode_tooltip(&tab)).unwrap();
+    println!("cargo:rerun-if-changed={}", tab.display());
+}
+
+/// The tooltip of the Calcs tab's calculation mode: the long string after
+/// its drop-down's function
+fn mode_tooltip(tab: &Path) -> String {
+    let s = std::fs::read_to_string(tab).unwrap().replace("\r\n", "\n");
+    let start = s
+        .find("self.input.misc_buffMode = value.buffMode")
+        .and_then(|i| s[i..].find("end, [[\n").map(|j| i + j + 8))
+        .expect("CalcsTab.lua: the calculation mode's tooltip");
+    let end = start
+        + s[start..]
+            .find("]]")
+            .expect("CalcsTab.lua: end of the tooltip");
+    s[start..end].to_string()
+}
+
+/// `LoadModule("Modules/CalcSections")` with the globals of
+/// `Data/Global.lua`
+fn calc_sections(up: &Path) -> J {
+    let mut im = importer::Importer::new(up);
+    im.load("Data/Global", vec![])
+        .unwrap_or_else(|e| panic!("Data/Global.lua: {e}"));
+    let v = im
+        .load1("Modules/CalcSections", vec![])
+        .unwrap_or_else(|e| panic!("Modules/CalcSections.lua: {e}"));
+    json(&v)
+}
+
+/// A table as an object with its sequence under `#`
+fn json(v: &Value) -> J {
+    match v {
+        Value::Nil => J::Null,
+        Value::Bool(b) => J::Bool(*b),
+        Value::Number(n) => serde_json::Number::from_f64(*n).map_or(J::Null, J::Number),
+        Value::Str(s) => J::String(s.to_str_lossy().into_owned()),
+        Value::Table(t) => {
+            let mut m = Map::new();
+            let list: Vec<J> = t.array().iter().map(json).collect();
+            for (k, x) in t.entries() {
+                match k {
+                    Key::Str(s) => {
+                        m.insert(s.to_str_lossy().into_owned(), json(&x));
+                    }
+                    Key::Int(i) if i >= 1 && (i as usize) <= list.len() => {}
+                    k => panic!("CalcSections.lua: unexpected key {k:?}"),
+                }
+            }
+            if !list.is_empty() {
+                m.insert("#".into(), J::Array(list));
+            }
+            J::Object(m)
+        }
+        _ => panic!("CalcSections.lua: unexpected function"),
+    }
 }

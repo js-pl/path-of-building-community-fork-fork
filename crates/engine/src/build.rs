@@ -72,6 +72,8 @@ pub struct CalcsInput {
     pub skill_number: f64,
     /// `misc_buffMode`
     pub buff_mode: String,
+    /// `showMinion`
+    pub show_minion: bool,
 }
 
 impl Default for CalcsInput {
@@ -79,6 +81,7 @@ impl Default for CalcsInput {
         CalcsInput {
             skill_number: 1.0,
             buff_mode: "EFFECTIVE".into(),
+            show_minion: false,
         }
     }
 }
@@ -93,6 +96,9 @@ impl CalcsInput {
                     input.skill_number = pat::to_number(n).unwrap_or(1.0)
                 }
                 (Some("misc_buffMode"), None, Some(s)) => input.buff_mode = s.into(),
+                (Some("showMinion"), None, None) => {
+                    input.show_minion = e.attr("boolean") == Some("true")
+                }
                 _ => {}
             }
         }

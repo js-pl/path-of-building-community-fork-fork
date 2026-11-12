@@ -917,6 +917,7 @@ impl<'a> Perform<'a> {
             }
         }
         let _ = db;
+        self.keep_ailment_cfg(o, "bleed", &dot);
         Ok(())
     }
 
@@ -1280,6 +1281,7 @@ impl<'a> Perform<'a> {
                 b.set_lines(Self::pkey(o, "PoisonDamage"), l);
             }
         }
+        self.keep_ailment_cfg(o, "poison", &dot);
         Ok(())
     }
 
@@ -1630,7 +1632,18 @@ impl<'a> Perform<'a> {
             }
             self.weigh_dot_multi(o, "Ignite", ailment_crit);
         }
+        self.keep_ailment_cfg(o, "ignite", &dot);
         Ok(())
+    }
+
+    /// `activeSkill[pass.label ~= "Off Hand" and name.."Cfg" or "OH"..name.."Cfg"]`
+    fn keep_ailment_cfg(&mut self, o: &Off, name: &str, dot: &Cfg) {
+        let oh = if o.passes[o.pass].weapon == Some(1) {
+            "OH"
+        } else {
+            ""
+        };
+        self.keep_cfg(o.skill, format!("{oh}{name}"), dot);
     }
 
     /// The Calcs tab's ailment DoT multiplier: the hits' and crits'
