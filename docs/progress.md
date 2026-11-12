@@ -195,16 +195,16 @@ shared 4-core machine (expect noise of 10 to 30 %):
 Each column is typed ms (speedup over the translation in the same run,
 which is steadier than the ms on a shared machine), after each change:
 
-| operation | translation | baseline | shared build | cheap copies | names | setup reuse |
-|---|---|---|---|---|---|---|
-| load | - | 594 | 486 | 475 | 526 | 553 |
-| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) | 8.8 (5.4x) | 8.8 (6.1x) |
-| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) | 25.6 (4.0x) | 29.9 (4.1x) |
-| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) | 249 (2.6x) | 168 (3.8x) |
-| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) | 62.4 (4.4x) | 47.8 (5.8x) |
-| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) | 302 (2.9x) | 221 (4.2x) |
-| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) | 33.0 (5.6x) | 30.6 (6.5x) |
-| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) | 3407 (8.5x) | 2884 (10.9x) |
+| operation | translation | baseline | shared build | cheap copies | names | setup reuse | mimalloc |
+|---|---|---|---|---|---|---|---|
+| load | - | 594 | 486 | 475 | 526 | 553 | 356 |
+| init_env | 50.4 | 25.1 (2.0x) | 13.8 (3.3x) | 11.3 (4.1x) | 8.8 (5.4x) | 8.8 (6.1x) | 2.9 (18.2x) |
+| perform | 108 | 55.5 (1.9x) | 27.6 (3.8x) | 24.3 (4.4x) | 25.6 (4.0x) | 29.9 (4.1x) | 9.4 (11.0x) |
+| build_outputs | 653 | 705 (0.9x) | 290 (2.0x) | 235 (2.5x) | 249 (2.6x) | 168 (3.8x) | 63.3 (9.2x) |
+| misc calculator | 298 | 230 (1.3x) | 84.6 (3.1x) | 60.9 (4.2x) | 62.4 (4.4x) | 47.8 (5.8x) | 19.2 (14.5x) |
+| recalc | 1069 | 793 (1.3x) | 371 (2.4x) | 286 (3.0x) | 302 (2.9x) | 221 (4.2x) | 81.8 (11.1x) |
+| override | 211 | 99.8 (2.1x) | 47.3 (3.9x) | 34.6 (5.1x) | 33.0 (5.6x) | 30.6 (6.5x) | 13.0 (13.9x) |
+| node power (depth 1) | 35836 | 8014 (4.5x) | 4341 (6.8x) | 3265 (8.6x) | 3407 (8.5x) | 2884 (10.9x) | 1413 (19.1x) |
 
 - shared build: a build's copies share its spec and config (`Rc`); every
   calculation copies the build, and copying the spec's nodes and the
@@ -225,6 +225,20 @@ which is steadier than the ms on a shared machine), after each change:
   `init_env` (`calc_env::reuse_setup`), and a build's base databases are
   set up once per set of inputs (`calc_env::BaseDbs`).
   `tests/fast_path.rs` checks both against setting each up afresh.
+- mimalloc: the native binaries (`pob`, the tests and the bench) use
+  mimalloc as the global allocator; glibc's malloc (`_int_malloc`,
+  `malloc_consolidate`) was a third of the calculations' time. The
+  browser keeps Rust's own allocator, so fewer allocations still count
+  there.
+
+Where the time goes now (perf, node power of gen-0049): `perform` about
+half (the offence a quarter), `init_env` a third (`calc_tree::setup`,
+the skills' mod lists), and `Sym::new` a fifth: the queries take their
+names as strings (`Calc::sum(.., &["Life"])`, often `format!`ed), so
+symbols made once per call site are the next step. Running candidates
+and Full DPS skills on threads needs the build, the calculation data and
+the mods `Send + Sync`: the engine shares them with `Rc`, and
+`ModParser` (which `base_dbs` and mastery nodes call) holds Lua tables.
 
 ## Not ported yet in `initEnv`
 

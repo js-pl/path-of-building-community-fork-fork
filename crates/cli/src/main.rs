@@ -8,6 +8,10 @@
 //!                             builds on other trees, which the browser fetches on demand
 //!   pob bench <xml>           times loading, editing and node power for a build
 
+#[cfg(not(target_arch = "wasm32"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use session::typed::TypedData;
 use session::{Dispatcher, Prefer, Recording, Session};
 use std::io::{BufRead, Write};

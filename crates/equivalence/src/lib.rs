@@ -2,6 +2,10 @@
 //! oracle outputs, the engine's inputs, and engine values encoded exactly as
 //! `oracle/json.lua` encodes upstream's.
 
+#[cfg(not(target_arch = "wasm32"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use engine::data::Data;
 use engine::skill_data::{Gem, GrantedEffect, SkillData};
 use lua::Value;
