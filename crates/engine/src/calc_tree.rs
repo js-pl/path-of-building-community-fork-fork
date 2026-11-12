@@ -16,7 +16,6 @@ use crate::calc_setup::{NodeMods, build_mod_list_for_node_list};
 use crate::mods::list::{Precision, on_store};
 use crate::mods::tag::TagKind;
 use crate::mods::{Mod, ModType, ModValue, Mods, Store, Sym};
-use crate::spec::PassiveSpec;
 use lua::ljtab::LjMap;
 use std::collections::{BTreeSet, HashMap};
 
@@ -75,13 +74,15 @@ fn merge_items(db: &mut Store, items: &ItemsSetup) {
 
 /// The passives the player's mods grant, and the tree's mods with them
 pub fn setup_tree(
-    spec: &PassiveSpec,
+    input: &ItemsInput,
     db: &Store,
     items: &mut ItemsSetup,
     precision: &dyn Precision,
 ) -> Result<TreeSetup> {
+    let spec = input.spec;
     let tree = spec.tree;
-    let mut alloc = crate::spec::copy_table(&spec.alloc_nodes);
+    let mut alloc = input.alloc.clone();
+    let removed = |id: u32| input.ovr.remove_granted.contains(&id);
     let mut granted_passives = BTreeSet::new();
     // Anoints and the like
     for passive in db_list(db, "GrantedPassive")? {
@@ -94,6 +95,7 @@ pub fn setup_tree(
             .or_else(|| tree.ascendancy_map.get(&*name));
         if let Some(&id) = id
             && let Some(&i) = spec.index.get(&id)
+            && !removed(id)
         {
             alloc.insert(id, i);
             granted_passives.insert(id);
@@ -125,6 +127,7 @@ pub fn setup_tree(
                 *done = true;
                 if let Some(&id) = tree.ascendancy_map.get(&*name)
                     && let Some(&i) = spec.index.get(&id)
+                    && !removed(id)
                     && both_for_class
                 {
                     alloc.insert(id, i);
@@ -191,7 +194,7 @@ pub fn setup(base: &Store, input: &ItemsInput, precision: &dyn Precision) -> Res
     let mut items = setup_items(input)?;
     let mut db = base.clone();
     merge_items(&mut db, &items);
-    let tree = setup_tree(input.spec, &db, &mut items, precision)?;
+    let tree = setup_tree(input, &db, &mut items, precision)?;
     for m in &tree.mods {
         db.add(m.clone());
     }

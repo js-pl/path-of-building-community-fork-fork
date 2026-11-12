@@ -3,12 +3,12 @@
 //! radius jewels and merges the items' mods into `env.itemModDB`, with the
 //! conditions and multipliers it sets.
 //!
-//! Not ported yet: the overrides of the calculations (`override.repItem`),
-//! the item warnings,
-//! and the names of the skills items grant (`nameSpec`).
+//! Not ported yet: the item warnings and the names of the skills items
+//! grant (`nameSpec`).
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
+use crate::calc_override::{Override, REP_ITEM_ID};
 use crate::calc_setup::WeaponTypeInfo;
 use crate::calc_setup::{RadiusJewel, calc_mod, set_source};
 use crate::config::Inputs;
@@ -30,6 +30,10 @@ pub type Result<T> = std::result::Result<T, String>;
 #[derive(Clone, Copy)]
 pub struct ItemsInput<'a, 't> {
     pub spec: &'a PassiveSpec<'t>,
+    /// `env.allocNodes` before the granted passives
+    pub alloc: &'a LjMap<usize>,
+    /// The calculation's override (`repItem`, `toggleFlask`, ...)
+    pub ovr: &'a Override,
     pub tab: &'a ItemsTab,
     /// The active skill set's socket groups
     pub socket_groups: &'a [SocketGroup],
@@ -326,7 +330,7 @@ fn add_radius_jewels(
         if typ != RadiusType::Self_ && socket.nodes_in_radius.is_some() {
             let ids = ids.ok_or("a jewel function without a radius")?;
             for &id in ids {
-                if !spec.alloc_nodes.contains(id) {
+                if !input.alloc.contains(id) {
                     out.extra_radius_nodes.insert(id, ());
                 }
             }
@@ -369,17 +373,38 @@ fn equip<'a>(
         if slot_name == "Ring 3" && !ring3 {
             continue;
         }
-        let item = tab.item(slot.sel_item_id);
+        let mut item_id = slot.sel_item_id;
+        if let Some((rep_slot, rep)) = &input.ovr.rep_item {
+            if slot_name == *rep_slot {
+                item_id = if rep.is_some() {
+                    REP_ITEM_ID as f64
+                } else {
+                    0.0
+                };
+            } else if rep.as_ref().is_some_and(|r| {
+                rep_slot.starts_with("Weapon 1")
+                    && slot_name.starts_with("Weapon 2")
+                    // `item` is still nil where upstream checks for a quiver
+                    // beside a bow
+                    && matches!(
+                        r.base.as_ref().map(|b| b.typ.as_str()),
+                        Some("Staff" | "Two Handed Sword" | "Two Handed Axe" | "Two Handed Mace")
+                    )
+            }) {
+                continue;
+            }
+        }
+        let item = tab.item(item_id);
         if let Some(item) = item {
             for skill in &item.granted_skills {
                 out.granted_skills.push(ItemSkill {
                     skill: skill.clone(),
-                    item_id: slot.sel_item_id,
+                    item_id,
                     slot_name: slot_name.clone(),
                 });
             }
             if list::flag(&item.base_mod_list, "CanExplode")? {
-                out.explode_sources.push(slot.sel_item_id);
+                out.explode_sources.push(item_id);
             }
         }
         if slot
@@ -392,7 +417,7 @@ fn equip<'a>(
             slot_name = slot_name.replace(" Swap", "");
         }
         if let Some(node_id) = slot.node_id {
-            if !spec.alloc_nodes.contains(node_id) {
+            if !input.alloc.contains(node_id) {
                 continue;
             }
             if let Some(item) = item {
@@ -420,7 +445,7 @@ fn equip<'a>(
                     }
                     *count += 1.0;
                 }
-                add_radius_jewels(out, input, node_id, item, slot.sel_item_id)?;
+                add_radius_jewels(out, input, node_id, item, item_id)?;
             }
         }
         if let Some(item) = item
@@ -669,7 +694,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             }
             out.add_mult(&mult, 1.0);
         }
-        let aegis = spec.alloc_nodes.contains(45175)
+        let aegis = input.alloc.contains(45175)
             && spec
                 .tree
                 .node(45175)
@@ -850,6 +875,19 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
     ] {
         if let Some(v) = input.config.get(option).filter(|v| v.truthy()) {
             out.set_mult(&format!("Empty{color}SocketsInAnySlot"), v.num());
+        }
+    }
+    for (toggle, list) in [
+        (input.ovr.toggle_flask, &mut out.flasks),
+        (input.ovr.toggle_tincture, &mut out.tinctures),
+    ] {
+        if let Some(id) = toggle.map(|id| id as i64) {
+            match list.iter().position(|&x| x == id) {
+                Some(i) => {
+                    list.remove(i);
+                }
+                None => list.push(id),
+            }
         }
     }
     // Flasks and tinctures apply in slot order

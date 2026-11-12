@@ -5,8 +5,8 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
-Last session's branch: `claude/typed-offence-breakdowns` (the breakdowns
-of the triggers, mirages and offence). To pick the work up:
+Last session's branch: `claude/typed-power-calcs` (calculation overrides
+and the calculators, then node power). To pick the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule).
 2. Build the tests once: `cargo test --release -p equivalence --test
@@ -47,6 +47,24 @@ State at the handoff:
   that mode's conditions, `calc_env::init_env_on`), another main socket
   group, a gem's own skill part and second active skill (46 variants).
   PvP scaling is ported, offence and defence.
+- Calculation overrides (`engine::calc_override::Override`: nodes added
+  and removed, an item replaced or taken off, a flask or tincture
+  toggled, conditions) run through the typed `initEnv`
+  (`calc_env::init_env_with`), and `engine::calculator::MiscCalculator`
+  is `calcs.getMiscCalculator`: its base and override calculations equal
+  the translated `calcFunc`'s for every corpus build, over a sample of
+  overrides each (`tests/calculator.rs`, 1063 overrides, about 2
+  minutes).
+- Node power (`engine::power::node_power`, `CalcsTab:PowerBuilder` with
+  `data.powerStatList`, `CalculatePowerStat` and the combined offence and
+  defence): every spec node's power, the masteries' by effect, cluster
+  notables and `powerMax` equal the translated `PowerBuilder`'s
+  (`tests/power.rs`, a build in ten with a depth of one point and three
+  cluster notables; `POWER_FULL=1` runs every node). Full node power of
+  gen-0004 (2618 nodes with power): typed 14 to 22 s with the build's
+  own calculations, the translation 42 to 51 s (one thread, a loaded
+  machine). Builds with Intuitive Leap and the
+  like return `not ported` (the spec does not port them).
 
 What remains for the full migration, in order:
 
@@ -59,8 +77,10 @@ What remains for the full migration, in order:
    the session API.
 2. A variants test per trigger support and per helmet focus, and of
    the Calcs tab's other minion and stage selections.
-3. Calculation overrides and the power calculators (node power, item
-   comparisons).
+3. The fast path of node power: candidates as a job list run on a base
+   environment built once (`node_power` keeps its API); parallelism
+   needs the engine's `Rc` data shared or rebuilt per worker. Then item,
+   gem and anoint comparisons on the calculator.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData`, in
    `engine::codec`'s binary form). Done: the item, skill and gem, setup
@@ -128,6 +148,8 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
+| `calcs.getMiscCalculator`, `CalcOverride` in `initEnv` | `calculator.rs`, `calc_override.rs` (the override and the allocation it gives) |
+| `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs` |
 | `CalcBreakdown.lua`, the calculations' `breakdown.*` | `breakdown.rs` (types and helpers); the breakdowns where each calculation writes them, into `Actor::breakdown` |
 
 Every skill with a minion has an actor of its own after the player and the
@@ -152,8 +174,8 @@ each to make).
 - Rebuilding cluster jewel subgraphs after an edit (they are built once,
   when the build loads); `initial_node_mods_match_upstream` skips the builds
   with subgraphs, as it loads no items
-- Calculation overrides (`override.repItem`, `addNodes`, ...), used by the
-  node and item power calculators
+- `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
+  given by the caller; tattoo counts
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
   skills, the character level's auto mode, timeless jewel data
 - Passives granted only by the latest tree
@@ -214,6 +236,14 @@ the tests align these:
 - the self hit sources' breakdowns join in `pairs` order over upstream's
   handler table; typed they join in a fixed order, equal while a build has
   one source
+- only the sidebar's calculation (`MAIN`) adds and removes the socket
+  groups of granted skills; a calculator with an item taken off keeps
+  the skills it granted
+- a calculator's lookups of other skills' results share `GlobalCache`
+  with every calculation before in `CALCULATOR` mode, and Saviour's
+  mirages take a cached result without calculating it again: typed,
+  each calculator calculation starts from the cache of the calculator's
+  base calculation, so calculations stay independent of their order
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
