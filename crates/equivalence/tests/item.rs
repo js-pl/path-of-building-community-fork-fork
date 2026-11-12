@@ -12,7 +12,7 @@ use engine::item::{Fields, INFLUENCES, Item, ItemContext, LineFlags, ModLine};
 use engine::item_tools::Range;
 use engine::mods::convert::Converter;
 use engine::mods::{Mod, ModValue};
-use equivalence::{corpus, mod_parser, typed_json, upstream_src};
+use equivalence::{corpus, mod_parser_preloaded, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -623,10 +623,7 @@ fn items_match_upstream() {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-    let parser = mod_parser();
-    let mut im = importer::Importer::new(&upstream_src());
-    let cache = importer::mod_parser::import_mod_cache(&mut im).unwrap_or_else(|e| panic!("{e}"));
-    parser.preload(&cache);
+    let parser = mod_parser_preloaded();
     let data = equivalence::game_data().items;
     let mut failures = Vec::new();
     let mut compared = 0;

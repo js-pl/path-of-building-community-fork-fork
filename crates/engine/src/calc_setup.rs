@@ -1321,13 +1321,10 @@ fn apply_soul_mods(
     god_name: &str,
     souls: &[Vec<String>],
 ) -> Result<()> {
-    let conv = Converter::default();
     for lines in souls {
         for line in lines {
-            let (list, extra) = parser.parse(line.as_bytes());
-            if let (Value::Table(t), false) = (&list, extra.truthy()) {
-                for m in t.array() {
-                    let mut m = conv.mod_(&m)?;
+            if let (Some(list), None) = parser.parse(line.as_bytes()) {
+                for mut m in list {
                     m.source = Some(format!("Pantheon:{god_name}").into());
                     db.add(m);
                 }

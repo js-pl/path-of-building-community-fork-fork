@@ -84,11 +84,15 @@ What remains for the full migration, in order:
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),
-   and the equivalence tests' `TypedData` reads it from there. Left: the
-   mod parser still takes the importer's tables of `ModParser.lua` and
-   `ModCache.lua` at load; the `from_lua` constructors only run at build
-   time now and can move into `gamedata`; `pob bundle` should ship the
-   binary once the engine API uses the typed engine.
+   and the equivalence tests' `TypedData` reads it from there. The mod
+   parser too: `gamedata::mod_parser` makes its typed tables and upstream's
+   ModCache at build time (`engine::mod_parser::rules`, 2.8 MB, 0.6 MB
+   compressed, read in about 30 ms, where evaluating `ModParser.lua` and
+   `ModCache.lua` at load took about 1.1 s), and parsing a line runs no Lua
+   (closures compute on `mod_parser::val`, results are typed mods). Left:
+   the `from_lua` constructors only run at build time now and can move
+   into `gamedata`; `pob bundle` should ship the binary once the engine
+   API uses the typed engine.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -310,8 +314,16 @@ the skills' mod lists), and `Sym::new` a fifth: the queries take their
 names as strings (`Calc::sum(.., &["Life"])`, often `format!`ed), so
 symbols made once per call site are the next step. Running candidates
 and Full DPS skills on threads needs the build, the calculation data and
-the mods `Send + Sync`: the engine shares them with `Rc`, and
-`ModParser` (which `base_dbs` and mastery nodes call) holds Lua tables.
+the mods `Send + Sync`: the engine shares them with `Rc`; `ModParser`
+(which `base_dbs` and mastery nodes call) no longer holds Lua tables.
+
+The mod parser (`cargo run --release -p equivalence --example
+parser_bench`): its typed data is made in about 2 s at build time and
+read in 25 to 45 ms (before: 1.1 s of Lua evaluation at load); the
+48668 oracle lines parse at about 2000 to 2800 lines/s from a fresh
+parser (before: about 2600; the scan over every pattern dominates) and
+at 2 to 3 million lines/s from its cache (before: 0.6 to 0.75 million,
+copying Lua tables).
 
 ## Not ported yet in `initEnv`
 

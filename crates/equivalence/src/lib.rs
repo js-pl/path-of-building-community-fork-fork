@@ -80,12 +80,21 @@ pub fn game_data() -> engine::game_data::GameData {
     engine::game_data::GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// Builds the mod parser from upstream's source.
+/// The mod parser's typed data, made by `gamedata`
+pub fn parser_data() -> engine::mod_parser::ParserData {
+    gamedata::mod_parser::parser_data(&upstream_src()).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The mod parser from its binary form, without upstream's mod cache
 pub fn mod_parser() -> engine::mod_parser::ModParser {
-    let (data, raw) = load_data();
-    let mut im = importer::Importer::new(&upstream_src());
-    let tables = importer::mod_parser::import(&mut im, &raw).unwrap_or_else(|e| panic!("{e}"));
-    engine::mod_parser::ModParser::new(data, &tables).unwrap_or_else(|e| panic!("{e}"))
+    let mut data = parser_data();
+    data.cache.clear();
+    engine::mod_parser::ModParser::decode(&data.encode()).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The mod parser from its binary form, with upstream's mod cache
+pub fn mod_parser_preloaded() -> engine::mod_parser::ModParser {
+    engine::mod_parser::ModParser::decode(&parser_data().encode()).unwrap_or_else(|e| panic!("{e}"))
 }
 
 /// JSON as `oracle/json.lua` writes it: `%.17g` numbers, sorted keys, arrays

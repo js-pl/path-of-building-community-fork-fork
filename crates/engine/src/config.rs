@@ -388,15 +388,12 @@ pub fn build_mod_list(
     let (mut mods, enemy_mods) = (o.mods, o.enemy_mods);
 
     // Custom modifiers
-    let conv = Converter::default();
     let mut parse_lines = |text: &str, source: &str| -> Result<()> {
         for line in pat::gmatch1(text, "([^\n]*)\n?") {
             let stripped = pat::gsub(&pat::gsub(&line, "%^%d", ""), "%^x%x%x%x%x%x%x", "");
             let stripped = pat::capture(&stripped, "^%s*(.-)%s*$").unwrap_or_default();
-            let (list, extra) = parser.parse(stripped.as_bytes());
-            if let (Value::Table(t), false) = (&list, extra.truthy()) {
-                for m in t.array() {
-                    let mut m = conv.mod_(&m)?;
+            if let (Some(list), None) = parser.parse(stripped.as_bytes()) {
+                for mut m in list {
                     m.source = Some(source.into());
                     if let ModValue::Record(r) = &mut m.value
                         && let Some(ModValue::Mod(inner)) = r.get_mut(Sym::new("mod"))
