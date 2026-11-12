@@ -405,7 +405,7 @@ pub fn node_power_with(
     opts: &PowerOptions,
     threads: Option<usize>,
 ) -> Result<NodePowers> {
-    check_tree_jewels(calc)?;
+    check_tree_jewels(calc.build())?;
     let full_dps = opts
         .stat
         .as_ref()
@@ -690,8 +690,7 @@ fn power_pass(
 
 /// Jewels that change the tree's paths (Intuitive Leap and the like) are
 /// not ported in the spec
-fn check_tree_jewels(calc: &MiscCalculator) -> Result<()> {
-    let b = calc.build();
+pub fn check_tree_jewels(b: &crate::build::Build) -> Result<()> {
     for (&socket, &id) in &b.spec.jewels {
         if !b.spec.alloc_nodes.contains(socket) {
             continue;

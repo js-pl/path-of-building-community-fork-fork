@@ -80,11 +80,24 @@ fn data() -> &'static TypedData {
     data
 }
 
+fn session() -> Session {
+    Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
+}
+
+/// The typed engine's commands on one session (one data and one translated
+/// session keep the memory down): the sidebar and outputs, the Calcs tab
+/// and tree edits, each over the corpus
 #[test]
-fn typed_commands_match_translated() {
+fn typed_session_matches_translated() {
     let data = data();
-    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    commands_match(data, &mut d);
+    calcs_match(data, &mut d);
+    tree_edits_match(&mut d);
+}
+
+/// `loadXml`, `loadCode`, `state` and `outputs`
+fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut skipped, mut compared) = (Vec::new(), Vec::new(), 0);
     let mut times = [Duration::ZERO; 4];
     for (id, path) in corpus() {
@@ -235,7 +248,14 @@ fn node_power_matches_translated() {
 
 /// The Calcs tab's cells, its controls and every cell's breakdown on the
 /// dispatcher's build: where they differ, as paths
-fn compare_calcs(d: &mut Dispatcher, id: &str, times: &mut [Duration; 2]) -> (usize, Vec<String>) {
+fn compare_calcs(
+    data: &TypedData,
+    d: &mut Dispatcher,
+    id: &str,
+    times: &mut [Duration; 2],
+) -> (usize, Vec<String>, usize) {
+    let latest = data.tree(data.game.latest_tree_version()).unwrap();
+    let mut aligned = 0;
     let mut reqs = vec![json!({"cmd": "calcs"})];
     let mut paths = vec![json!("build.mainSkill"), json!("build.mainSocketGroup")];
     let typed = answer(d.request(r#"{"cmd":"calcs"}"#), "typed calcs");
@@ -261,27 +281,52 @@ fn compare_calcs(d: &mut Dispatcher, id: &str, times: &mut [Duration; 2]) -> (us
         let typed = answer(d.request(&req), "typed");
         times[0] += t.elapsed();
         let t = Instant::now();
-        let tr = answer(d.translated_request(&req), "translated");
+        let mut tr = answer(d.translated_request(&req), "translated");
         times[1] += t.elapsed();
+        aligned += align_keystone_sources(&typed, &mut tr, latest);
         let n = out.len();
         diff(&typed, &tr, &req, &mut out);
         if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
             eprintln!("{id} {req}:\ntyped {typed}\ntranslated {tr}");
         }
     }
-    (reqs.len() - 2, out)
+    (reqs.len() - 2, out, aligned)
 }
 
-/// The Calcs tab gives the translation's JSON, for every corpus build.
 /// Upstream's tree keeps the source `modLib.mergeKeystones` last gave a
-/// keystone's mods, also from builds loaded before: a build that differs
-/// is compared again on a fresh translated session.
-#[test]
-fn calcs_match_translated() {
-    let data = data();
-    let session = || Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    let (mut failures, mut compared, mut cells) = (Vec::new(), 0, 0);
+/// keystone's own mods, also from builds loaded before in the session: a
+/// tree keystone's mod row that the translation shows as another source's
+/// (an item or a configuration of an earlier build that granted the
+/// keystone) takes the typed source. The number of rows so aligned.
+fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTree) -> usize {
+    let mut n = 0;
+    let (Some(ts), Some(rs)) = (
+        typed["ok"]["sections"].as_array(),
+        tr["ok"]["sections"].as_array_mut(),
+    ) else {
+        return 0;
+    };
+    for (t, r) in ts.iter().zip(rs) {
+        let (Some(trows), Some(rrows)) = (t["rows"].as_array(), r["rows"].as_array_mut()) else {
+            continue;
+        };
+        for (a, b) in trows.iter().zip(rrows) {
+            let keystone = a["sourceName"]
+                .as_str()
+                .is_some_and(|k| tree.keystone_map.contains_key(k));
+            if a["source"] == "Tree" && b["source"] != "Tree" && keystone {
+                b["source"] = a["source"].clone();
+                b["sourceName"] = a["sourceName"].clone();
+                n += 1;
+            }
+        }
+    }
+    n
+}
+
+/// The Calcs tab gives the translation's JSON, for every corpus build
+fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
     for (id, path) in corpus() {
         let xml = std::fs::read_to_string(&path).unwrap();
@@ -290,12 +335,8 @@ fn calcs_match_translated() {
         if !d.typed_active() {
             continue;
         }
-        let (n, mut out) = compare_calcs(&mut d, &id, &mut times);
-        if !out.is_empty() {
-            let mut fresh = Dispatcher::new(session(), Some(data), Prefer::Typed);
-            answer(fresh.request(&load), "load");
-            out = compare_calcs(&mut fresh, &id, &mut [Duration::ZERO; 2]).1;
-        }
+        let (n, mut out, a) = compare_calcs(data, d, &id, &mut times);
+        aligned += a;
         cells += n;
         compared += 1;
         if !out.is_empty() {
@@ -305,8 +346,183 @@ fn calcs_match_translated() {
         }
     }
     eprintln!(
-        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load)",
+        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load); {aligned} keystone sources aligned",
         times[0], times[1]
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// A small deterministic random number generator for edit sequences
+struct Lcg(u64);
+
+impl Lcg {
+    fn below(&mut self, n: usize) -> usize {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((self.0 >> 33) as usize) % n.max(1)
+    }
+}
+
+/// Random sequences of tree edits (clicks on allocated and unallocated
+/// nodes, ascendancies and masteries with an effect chosen, a reset) give
+/// the translation's sidebar, outputs and tree state after each step
+fn tree_edits_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    for (k, (id, path)) in corpus().into_iter().enumerate() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let tree = answer(d.translated_request(r#"{"cmd":"tree"}"#), "tree");
+        let ids: Vec<u64> = tree["ok"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|n| n["id"].as_u64())
+            .collect();
+        // Large cluster sockets, whose edits rebuild the subgraphs
+        let sockets: Vec<u64> = tree["ok"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|n| n["kind"] == "ClusterSocket")
+            .filter_map(|n| n["id"].as_u64())
+            .filter(|&i| i < 0x10000)
+            .collect();
+        let mut rng = Lcg(k as u64 + 1);
+        let mut out = Vec::new();
+        let compare = |d: &mut Dispatcher, reqs: &[J], step: &str, out: &mut Vec<String>| {
+            for req in reqs {
+                let edit = req["cmd"] == "selectMastery";
+                let req = req.to_string();
+                let typed = answer(d.request(&req), "typed");
+                if edit {
+                    // The translation replays the typed edit
+                    answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+                    assert!(d.typed_active(), "{step} {req}: {:?}", d.typed_error);
+                    continue;
+                }
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{step} {req}"), out);
+            }
+        };
+        let mut socket_clicks = Vec::new();
+        {
+            let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+            let alloc = &state["ok"]["alloc"];
+            for s in &sockets {
+                if alloc
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|a| a.as_u64() == Some(*s))
+                {
+                    socket_clicks.push(*s);
+                    socket_clicks.push(*s);
+                    break;
+                }
+            }
+        }
+        let total = steps_per_build + socket_clicks.len();
+        for step in 0..=total {
+            let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+            let alloc: Vec<u64> = state["ok"]["alloc"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(J::as_u64)
+                .collect();
+            let req = if let Some(s) = (step < socket_clicks.len()).then(|| socket_clicks[step]) {
+                json!({"cmd": "clickNode", "id": s})
+            } else if step == total {
+                json!({"cmd": "resetTree"})
+            } else if rng.below(2) == 0 && alloc.len() > 2 {
+                json!({"cmd": "clickNode", "id": alloc[rng.below(alloc.len())]})
+            } else {
+                // A node next to the allocation more often than not
+                let mut pick = ids[rng.below(ids.len())];
+                for _ in 0..40 {
+                    let p = answer(
+                        d.request(&json!({"cmd": "nodePath", "id": pick}).to_string()),
+                        "nodePath",
+                    );
+                    let n = p["ok"]["path"].as_array().map_or(0, Vec::len);
+                    if (1..=4).contains(&n) {
+                        break;
+                    }
+                    pick = ids[rng.below(ids.len())];
+                }
+                json!({"cmd": "clickNode", "id": pick})
+            };
+            let label = format!("step {step} {req}");
+            let r = req.to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            let tr = answer(
+                d.translated_request(r#"{"cmd":"treeState"}"#),
+                "translated edit",
+            );
+            times[1] += t.elapsed();
+            let _ = tr;
+            let mut follow = vec![
+                json!({"cmd": "treeState"}),
+                json!({"cmd": "state"}),
+                json!({"cmd": "outputs"}),
+            ];
+            if let Some(i) = req.get("id") {
+                follow.push(json!({"cmd": "nodePath", "id": i}));
+            }
+            if let Some(opts) = typed["ok"]["mastery"].as_array() {
+                follow.push(json!({"cmd": "masteryOptions", "id": req["id"]}));
+                if !opts.is_empty() {
+                    let e = &opts[rng.below(opts.len())]["id"];
+                    follow.push(json!({"cmd": "selectMastery", "id": req["id"], "effect": e}));
+                    follow.push(json!({"cmd": "treeState"}));
+                    follow.push(json!({"cmd": "state"}));
+                    follow.push(json!({"cmd": "outputs"}));
+                }
+            }
+            compare(d, &follow, &label, &mut out);
+            steps += 1;
+            if !out.is_empty() {
+                break;
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
     );
     assert!(
         failures.is_empty(),
