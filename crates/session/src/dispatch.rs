@@ -57,6 +57,8 @@ pub struct Dispatcher<'d> {
     typed: Option<TypedSession<'d>>,
     /// Requests the typed engine answered that the translation has not seen
     pending: Vec<String>,
+    /// Why the typed engine last gave a request to the translation
+    pub typed_error: Option<String>,
 }
 
 fn ok(v: J) -> String {
@@ -71,6 +73,7 @@ impl<'d> Dispatcher<'d> {
             prefer,
             typed: None,
             pending: Vec::new(),
+            typed_error: None,
         }
     }
 
@@ -140,6 +143,23 @@ impl<'d> Dispatcher<'d> {
             "state" => self.typed.as_ref()?.state().ok().map(ok),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
             "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
+            "treeState" => self.typed.as_ref()?.tree_state().ok().map(ok),
+            "nodePath" => self.typed.as_ref()?.node_path(id(&req)?).ok().map(ok),
+            "masteryOptions" => self.typed.as_ref()?.mastery_options(id(&req)?).ok().map(ok),
+            "treeSpecs" => Some(ok(self.typed.as_ref()?.tree_specs())),
+            "powerStats" => {
+                self.typed.as_ref()?;
+                Some(ok(TypedSession::power_stats()))
+            }
+            "clickNode" => {
+                let id = id(&req)?;
+                self.edit(json, |s| s.click_node(id))
+            }
+            "selectMastery" => {
+                let (id, effect) = (id(&req)?, req["effect"].as_f64()?);
+                self.edit(json, |s| s.select_mastery(id, effect))
+            }
+            "resetTree" => self.edit(json, |s| s.reset_tree()),
             "controls" => {
                 let paths: Vec<&str> = req["paths"]
                     .as_array()?
@@ -164,6 +184,27 @@ impl<'d> Dispatcher<'d> {
         }
     }
 
+    /// A request that changes the typed build: queued for the translation.
+    /// A typed edit that fails leaves the build to the translation.
+    fn edit(
+        &mut self,
+        json: &str,
+        f: impl FnOnce(&mut TypedSession<'d>) -> crate::typed::Result<J>,
+    ) -> Option<String> {
+        let r = f(self.typed.as_mut()?);
+        match r {
+            Ok(v) => {
+                self.pending.push(json.to_string());
+                Some(ok(v))
+            }
+            Err(e) => {
+                self.typed = None;
+                self.typed_error = Some(e);
+                None
+            }
+        }
+    }
+
     fn load(
         &mut self,
         data: &'d TypedData,
@@ -178,12 +219,18 @@ impl<'d> Dispatcher<'d> {
                 self.pending = vec![json.to_string()];
                 Some(ok(json!([])))
             }
-            Err(_) => {
+            Err(e) => {
                 self.typed = None;
+                self.typed_error = Some(e);
                 None
             }
         }
     }
+}
+
+/// A request's node id
+fn id(req: &J) -> Option<u32> {
+    req["id"].as_f64().map(|n| n as u32)
 }
 
 /// A build code's XML: URL-safe base64 of a zlib stream, as the import tab

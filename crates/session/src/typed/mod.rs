@@ -6,6 +6,7 @@
 mod calcs;
 pub mod display_stats;
 mod sidebar;
+mod tree;
 
 use engine::build::{Build, LoadContext};
 use engine::calc_env::{CalcData, CalcMode};
@@ -144,6 +145,8 @@ pub struct TypedSession<'d> {
     /// rows was shown when last drawn
     calcs_select: sidebar::SkillSelect,
     calcs_rows: Vec<(&'static str, bool)>,
+    /// The tree tab's active spec and the specs' titles
+    specs: (usize, Vec<String>),
     pub ui: Ui,
     controls: Controls,
 }
@@ -165,6 +168,7 @@ impl<'d> TypedSession<'d> {
             calcs: None,
             calcs_select: Default::default(),
             calcs_rows: Vec::new(),
+            specs: tree::spec_titles(&engine::xml::parse(xml)?),
             ui: Ui::default(),
             controls: Controls::default(),
         };

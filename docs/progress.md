@@ -129,22 +129,41 @@ What remains for the full migration, in order:
    `modLib.mergeKeystones` last gave a keystone's mods, also across
    builds: a session that loaded another build with an item granting
    the keystone shows that item as the source of the tree's keystone
-   mods; the test compares such builds again on a fresh translated
-   session. Not followed either: the slots of energy shield converted
+   mods; the test takes the typed source for such tree keystone rows (46
+   rows over the corpus, counted). The session tests share one typed
+   data and one translated session (`typed_session_matches_translated`,
+   about 3.5 GB). Not followed either: the slots of energy shield converted
    to ward, whose `inc` upstream leaves nil (typed: `false`).
 
+   Tree edits are typed (`session::typed::tree`): `clickNode`
+   (`PassiveSpec:AllocNode` with its path, `DeallocNode` with its
+   dependents, ascendancy and bloodline selection, multiple choice
+   options), `selectMastery`, `resetTree`, with the cluster jewel
+   subgraphs rebuilt after an edit
+   (`PassiveSpec::rebuild_cluster_jewel_graphs`), then both calculations
+   again as a frame does; and the views `treeState`, `nodePath`,
+   `masteryOptions`, `treeSpecs`, `powerStats`. A typed edit is queued
+   for the translation, which replays it when it next answers.
+   `tree_edits_match_translated`: random click sequences (6 per build,
+   masteries with a random effect, large cluster sockets taken off and
+   put back, then a reset) on every corpus build give the translation's
+   `treeState`, `state`, `outputs`, `nodePath` and `masteryOptions` after
+   each step (417 edits: typed 16 s, translated 89 s with its replays).
+   Builds with Intuitive Leap and the like (2 of the corpus) fall back.
+   Bloodline nodes are told by their ascendancy being an alternate one
+   (the typed tree has no `isBloodline`). `tree` (geometry: positions,
+   icons, connectors, which the typed tree does not import yet) and
+   `nodeTooltip` stay on the translation.
+
    Still on the translation, before it can be dropped:
-   - Edits on the typed model with a recalculation: `clickNode`,
-     `selectMastery`, `resetTree` (`PassiveSpec:AllocNode`,
-     `DeallocNode`, cluster jewel rebuilds), `setMainSocketGroup`,
+   - Edits on the typed model with a recalculation: `setMainSocketGroup`,
      `setGem`, `removeGem`, `setSocketGroup`, `addSocketGroup`,
      `removeSocketGroup`, `equipItem`, `selectItemSet`,
      `selectSkillSet`, `selectConfigSet`, `selectTreeSpec`, `control`
      (sidebar and config options), `undo`, `newBuild`.
    - Save: `saveXml`, `saveCode` (`buildMode:SaveDB` and every tab's
      `Save`), equal to upstream's.
-   - Read-only views: `tree`, `treeState`, `treeSpecs`, `nodePath`,
-     `masteryOptions`, `powerStats`, `skills`, `copySocketGroup`,
+   - Read-only views: `tree`, `skills`, `copySocketGroup`,
      `gemList`, `items`, `itemDb`, `config`, `party`, `notes`,
      `controls` of other tabs.
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
@@ -313,9 +332,8 @@ copying Lua tables).
 
 ## Not ported yet in `initEnv`
 
-- Rebuilding cluster jewel subgraphs after an edit (they are built once,
-  when the build loads); `initial_node_mods_match_upstream` skips the builds
-  with subgraphs, as it loads no items
+- `initial_node_mods_match_upstream` skips the builds with cluster jewel
+  subgraphs, as it loads no items
 - `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
   given by the caller; tattoo counts
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
