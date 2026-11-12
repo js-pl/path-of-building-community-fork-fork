@@ -17,6 +17,7 @@ use crate::calc_defence::{DMG_TYPES, is_elemental};
 use crate::calc_perform::{Perform, converted_tags, new_mod};
 use crate::item_tools::round_symmetric;
 use crate::mods::{Cfg, Mod, ModType, ModValue, StoreId, Sym, Tag};
+use crate::sf;
 use std::collections::BTreeMap;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -2673,20 +2674,60 @@ impl<'a> Perform<'a> {
             let (level, list, cfg) = (e.level, self.lists[main].list, self.cfg(main));
             let c = Some(&cfg);
             let actor = crate::calc::PLAYER;
+            let sums = |p: &Self, names: [&str; 4]| -> Result<[f64; 4]> {
+                let mut out = [0.0; 4];
+                for (o, n) in out.iter_mut().zip(names) {
+                    if !n.is_empty() {
+                        *o = p.c.base(list, c, &[n])?;
+                    }
+                }
+                Ok(out)
+            };
             if level.is_some() {
-                let v = self.c.base(list, c, &["GemLevel"])?
-                    + self.c.base(list, c, &["GemSupportLevel"])?
-                    + self.c.base(list, c, &["GemItemLevel"])?;
+                let [base, item, support, _] =
+                    sums(self, ["GemLevel", "GemItemLevel", "GemSupportLevel", ""])?;
+                let v = base + support + item;
                 self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
                 self.c.set_out(actor, "GemLevel", v);
+                if let Some(b) = self.bd(actor) {
+                    let mut l = vec![sf!("%d ^8(level from gem)", base)];
+                    if support > 0.0 {
+                        l.push(sf!("+ %d ^8(level from support)", support));
+                    }
+                    if item > 0.0 {
+                        l.push(sf!("+ %d ^8(level from items)", item));
+                    }
+                    l.push(sf!("= %d", v));
+                    b.set_lines("GemLevel", l);
+                }
             }
-            let v = self.c.base(list, c, &["GemQuality"])?
-                + self.c.base(list, c, &["GemSupportQuality"])?
-                + self.c.base(list, c, &["GemItemQuality"])?
-                + self.c.base(list, c, &["GemSocketQuality"])?;
+            let [base, item, support, socket] = sums(
+                self,
+                [
+                    "GemQuality",
+                    "GemItemQuality",
+                    "GemSupportQuality",
+                    "GemSocketQuality",
+                ],
+            )?;
+            let v = base + support + item + socket;
             self.c
                 .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
             self.c.set_out(actor, "GemQuality", v);
+            if let Some(b) = self.bd(actor) {
+                let mut l = vec![sf!("%d ^8(quality from gem)", base)];
+                if support > 0.0 {
+                    l.push(sf!("+ %d ^8(quality from support)", support));
+                }
+                if item > 0.0 {
+                    l.push(sf!("+ %d ^8(quality from items)", item));
+                }
+                if socket > 0.0 {
+                    l.push(sf!("+ %d ^8(quality from socket)", socket));
+                }
+                l.push(sf!("= %d", v));
+                b.set_lines("GemQuality", l);
+            }
         }
         Ok(())
     }

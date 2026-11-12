@@ -9,6 +9,18 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::{Breakdown, Cell, Chain, Col, f, f2, multi_chain};
+use crate::pat::num;
+use crate::sf;
+
+/// `colorCodes` the breakdowns use
+const CUSTOM: &str = "^x5CF0BB";
+const GEM: &str = "^x1AA29B";
+const SCOURGE: &str = "^xFF6E25";
+const WARD: &str = "^xFFFF77";
+const ES: &str = "^x88FFFF";
+const MANA: &str = "^x7070FF";
+const LIFE: &str = "^xE05030";
 use crate::calc::{m_max, m_min, round};
 use crate::calc_defence::{DMG_TYPES, armour_reduction, armour_reduction_f, is_elemental};
 use crate::calc_perform::Perform;
@@ -22,6 +34,8 @@ use ModType::{Base, More};
 /// An ally whose life is spent before the actor's (`allyLifePoolList`)
 struct AllyPool {
     life: &'static str,
+    /// The name the breakdowns give the pool
+    label: &'static str,
     mitigation: &'static str,
     redirect: Option<&'static str>,
     fallback: Option<&'static str>,
@@ -31,6 +45,7 @@ struct AllyPool {
 const ALLY_POOLS: [AllyPool; 9] = [
     AllyPool {
         life: "TotalMinionLife",
+        label: "Minion Life",
         mitigation: "MinionAllyDamageMitigation",
         redirect: Some("takenFromMinionBeforeYou"),
         fallback: Some("Multiplier:MinionLife"),
@@ -38,6 +53,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalRadianceSentinelLife",
+        label: "Total Sentinel of Radiance Life",
         mitigation: "RadianceSentinelAllyDamageMitigation",
         redirect: Some("takenFromRadianceSentinelBeforeYou"),
         fallback: None,
@@ -45,6 +61,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalSpectreLife",
+        label: "Total Spectre Life",
         mitigation: "SpectreAllyDamageMitigation",
         redirect: Some("takenFromSpectresBeforeYou"),
         fallback: None,
@@ -52,6 +69,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalTotemLife",
+        label: "Nearest Totem Life",
         mitigation: "TotemAllyDamageMitigation",
         redirect: Some("takenFromTotemsBeforeYou"),
         fallback: None,
@@ -59,6 +77,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalVaalRejuvenationTotemLife",
+        label: "Total Vaal Rejuvenation Totem Life",
         mitigation: "VaalRejuvenationTotemAllyDamageMitigation",
         redirect: Some("takenFromVaalRejuvenationTotemsBeforeYou"),
         fallback: None,
@@ -66,6 +85,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalVoidSpawnLife",
+        label: "Total Void Spawn Life",
         mitigation: "VoidSpawnAllyDamageMitigation",
         redirect: Some("takenFromVoidSpawnBeforeYou"),
         fallback: None,
@@ -73,6 +93,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "TotalStoneGolemLife",
+        label: "Total Stone Golem Life",
         mitigation: "StoneGolemAllyDamageMitigation",
         redirect: Some("takenFromStoneGolemBeforeYou"),
         fallback: None,
@@ -80,6 +101,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "AlliedEnergyShield",
+        label: "Total Allied Energy shield",
         mitigation: "SoulLinkMitigation",
         redirect: None,
         fallback: None,
@@ -87,6 +109,7 @@ const ALLY_POOLS: [AllyPool; 9] = [
     },
     AllyPool {
         life: "FrostShieldLife",
+        label: "Frost Shield Life",
         mitigation: "FrostShieldDamageMitigation",
         redirect: None,
         fallback: None,
@@ -124,6 +147,44 @@ struct Pools {
     life_below_half_loss_lost_over_time: Option<f64>,
     overkill: f64,
     hit_pool_remaining: f64,
+    /// What each damage type took from each pool, for the breakdowns
+    lost: Option<Box<[Lost; 5]>>,
+}
+
+/// What a damage type took from each pool (`resourcesLostToTypeDamage`),
+/// amounts below 1 left out
+#[derive(Clone, Copy, Debug, Default)]
+struct Lost {
+    allies: [Option<f64>; 9],
+    aegis: Option<f64>,
+    shared_elemental_aegis: Option<f64>,
+    shared_aegis: Option<f64>,
+    guard: Option<f64>,
+    shared_guard: Option<f64>,
+    ward: Option<f64>,
+    energy_shield: Option<f64>,
+    mana: Option<f64>,
+    life_loss_prevented: Option<f64>,
+    life: Option<f64>,
+    overkill: Option<f64>,
+}
+
+/// A type's entry of the pools' losses, or a scratch entry when they are
+/// not tracked
+fn lost_entry<'l>(
+    all: &'l mut Option<Box<[Lost; 5]>>,
+    scratch: &'l mut Lost,
+    t: usize,
+) -> &'l mut Lost {
+    match all.as_deref_mut() {
+        Some(l) => &mut l[t],
+        None => scratch,
+    }
+}
+
+/// `x >= 1 and x or nil`
+fn at_least_one(x: f64) -> Option<f64> {
+    (x >= 1.0).then_some(x)
 }
 
 fn kv_get(v: &[(String, f64)], k: &str) -> f64 {
@@ -162,13 +223,118 @@ fn calc_life_hit_pool(life: f64, max_life: f64, prevented: f64, below_half: f64)
         + m_min(life, half) / (1.0 - below_half / 100.0) / (1.0 - prevented / 100.0)
 }
 
+/// The lines of a pool that takes a part of the damage before life
+fn protected_lines(what: &str, limit: f64, rate: f64) -> Vec<String> {
+    vec![
+        "Total life protected:".to_string(),
+        sf!("%d ^8(%s limit)", limit, what),
+        sf!("/ %.2f ^8(portion taken from %s)", rate / 100.0, what),
+        sf!(
+            "x %.2f ^8(portion taken from life and energy shield)",
+            1.0 - rate / 100.0
+        ),
+        sf!("= %d", limit / (rate / 100.0) * (1.0 - rate / 100.0)),
+    ]
+}
+
+/// The pools a degen drains, with their names in the breakdowns
+const POOLS3: [(&str, &str); 3] = [
+    ("Life", "life"),
+    ("Mana", "mana"),
+    ("EnergyShield", "energy shield"),
+];
+
+/// The tables of the net regenerations: each type's degen of life, mana
+/// and energy shield
+fn net_regen_tables(rows: &[(&str, [f64; 3])]) -> [Breakdown; 3] {
+    let labels = [
+        "Total Life Degen",
+        "Total Mana Degen",
+        "Total Energy Shield Degen",
+    ];
+    labels
+        .map(|label| {
+            let mut b = Breakdown::table(cols(&[("Type", "type"), ("Degen", "degen")]));
+            b.label = Some(label.into());
+            b
+        })
+        .into_iter()
+        .enumerate()
+        .map(|(k, mut b)| {
+            for (t, v) in rows {
+                b.push_row(vec![
+                    ("type", (*t).into()),
+                    ("degen", sf!("%.2f", v[k]).into()),
+                ]);
+            }
+            b
+        })
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap()
+}
+
+/// Adds a degen's rows to the total's table and the final type's
+/// (`[base, percent, multiplier, total]`), creating them if needed
+fn degen_rows(
+    b: &mut crate::breakdown::Breakdowns,
+    total_key: &str,
+    type_key: &str,
+    source: Option<&str>,
+    t: &str,
+    to: &str,
+    [base, pct, mult, total]: [f64; 4],
+) {
+    let src = source.map(|s| ("source", Cell::from(s)));
+    let cells = |with_to: bool| -> crate::breakdown::Row {
+        let mut r: crate::breakdown::Row = src.clone().into_iter().collect();
+        r.push(("type", t.into()));
+        if with_to {
+            r.push(("type2", to.into()));
+        }
+        r.push(("base", sf!("%.1f", base).into()));
+        r.push(("conv", sf!("x %.2f%%", pct).into()));
+        r.push(("mult", sf!("x %.2f", mult).into()));
+        r.push(("total", sf!("%.1f", total).into()));
+        r
+    };
+    let columns = |with_to: bool| {
+        let mut c = Vec::new();
+        if source.is_some() {
+            c.push(("Source", "source"));
+        }
+        c.push(("Base Type", "type"));
+        if with_to {
+            c.push(("Final Type", "type2"));
+        }
+        c.extend([
+            ("Base", "base"),
+            ("Taken As Percent", "conv"),
+            ("Multiplier", "mult"),
+            ("Total", "total"),
+        ]);
+        cols(&c)
+    };
+    for (k, with_to) in [(total_key, true), (type_key, false)] {
+        if b.get(k).is_none() {
+            b.set(k, Breakdown::table(columns(with_to)));
+        }
+        b.entry(k).push_row(cells(with_to));
+    }
+}
+
+/// Columns of a breakdown's table by label and key
+fn cols(c: &[(&str, &'static str)]) -> Vec<Col> {
+    c.iter().map(|(l, k)| Col::new(*l, k)).collect()
+}
+
 impl<'a> Perform<'a> {
-    fn o(&self, actor: usize, k: &str) -> f64 {
+    pub(crate) fn o(&self, actor: usize, k: &str) -> f64 {
         self.c.out(actor, k).unwrap_or(f64::NAN)
     }
 
     /// `output[k] or default`
-    fn o_or(&self, actor: usize, k: &str, d: f64) -> f64 {
+    pub(crate) fn o_or(&self, actor: usize, k: &str, d: f64) -> f64 {
         self.c.out(actor, k).unwrap_or(d)
     }
 
@@ -277,8 +443,281 @@ impl<'a> Perform<'a> {
         Ok((sum, damages))
     }
 
+    /// `incomingDamageBreakdown(breakdownTable, poolsRemaining, output)`:
+    /// the resources a hit drains
+    fn incoming_damage_lines(&self, actor: usize, p: &Pools, l: &mut Vec<String>) {
+        let o = |k: &str| self.c.out(actor, k);
+        if let Some(allies) = &p.allies {
+            for (a, pool) in ALLY_POOLS.iter().zip(allies) {
+                if let Some(pool) = pool {
+                    let life = o(a.life).unwrap_or(f64::NAN);
+                    l.push(sf!(
+                        &format!("\t%d {GEM}{} ^7(%d remaining)", a.label),
+                        life - pool.remaining,
+                        pool.remaining
+                    ));
+                }
+            }
+        }
+        let lost = p.lost.as_deref();
+        let aegis = |k: &str| p.aegis.as_deref().map_or(0.0, |a| kv_get(a, k));
+        let guard = |k: &str| p.guard.as_deref().map_or(0.0, |a| kv_get(a, k));
+        for (k, t) in DMG_TYPES.iter().enumerate() {
+            if let Some(v) = lost.and_then(|l| l[k].aegis) {
+                l.push(sf!(
+                    &format!("\t%d {GEM}%s Aegis charge ^7(%d remaining)"),
+                    v,
+                    *t,
+                    aegis(t)
+                ));
+            }
+        }
+        if let Some(v) = o("sharedElementalAegis")
+            && v != aegis("sharedElemental")
+        {
+            let left = aegis("sharedElemental");
+            l.push(sf!(
+                &format!("\t%d {GEM}Elemental Aegis charge ^7(%d remaining)"),
+                v - left,
+                left
+            ));
+        }
+        if let Some(v) = o("sharedAegis").filter(|v| *v > 0.0) {
+            let left = aegis("shared");
+            l.push(sf!(
+                &format!("\t%d {GEM}Shared Aegis charge ^7(%d remaining)"),
+                v - left,
+                left
+            ));
+        }
+        for (k, t) in DMG_TYPES.iter().enumerate() {
+            if let Some(v) = lost.and_then(|l| l[k].guard) {
+                l.push(sf!(
+                    &format!("\n\t%d {SCOURGE}%s Guard charge ^7(%d remaining)"),
+                    v,
+                    *t,
+                    guard(t)
+                ));
+            }
+        }
+        if let Some(v) = o("sharedGuardAbsorb").filter(|v| *v > 0.0) {
+            let left = guard("shared");
+            l.push(sf!(
+                &format!("\t%d {SCOURGE}Shared Guard charge ^7(%d remaining)"),
+                v - left,
+                left
+            ));
+        }
+        if let Some(v) = o("Ward").filter(|v| *v > 0.0) {
+            l.push(sf!(&format!("\t%d {WARD}Ward"), v));
+        }
+        let es = p.energy_shield.unwrap_or(f64::NAN);
+        if let Some(cap) = o("EnergyShieldRecoveryCap").filter(|c| *c != es && *c > 0.0) {
+            l.push(sf!(
+                &format!("\t%d {ES}Energy Shield ^7(%d remaining)"),
+                cap - es,
+                es
+            ));
+        }
+        let mana = p.mana.unwrap_or(f64::NAN);
+        if let Some(m) = o("ManaUnreserved").filter(|m| *m != mana && *m > 0.0) {
+            l.push(sf!(
+                &format!("\t%d {MANA}Mana ^7(%d remaining)"),
+                m - mana,
+                mana
+            ));
+        }
+        let prevented = p.life_loss_lost_over_time.unwrap_or(0.0)
+            + p.life_below_half_loss_lost_over_time.unwrap_or(0.0);
+        if prevented > 0.0 {
+            l.push(sf!(&format!("\t%d {LIFE}Life ^7Loss Prevented"), prevented));
+        }
+        let life = p.life.unwrap_or(f64::NAN);
+        l.push(sf!(
+            &format!("\t%d {LIFE}Life ^7(%d remaining)"),
+            o("LifeRecoverable").unwrap_or(f64::NAN) - life,
+            life
+        ));
+        if p.overkill >= 1.0 {
+            l.push(sf!(
+                &format!("\t%d {}Overkill damage", crate::breakdown::color::NEGATIVE),
+                p.overkill
+            ));
+        }
+    }
+
+    /// The breakdown of a damage type's maximum hit
+    fn max_hit_breakdown(
+        &self,
+        actor: usize,
+        t: &str,
+        shift: &[(&'static str, f64)],
+        final_max: f64,
+        enemy_mult: f64,
+        smoothing: bool,
+    ) -> Result<Breakdown> {
+        let mut b = Breakdown::table(cols(&[
+            ("Type", "type"),
+            ("Pool", "pool"),
+            ("Incoming", "incoming"),
+            ("Multi", "multi"),
+            ("Taken", "taken"),
+        ]));
+        b.label = Some("Maximum hit damage breakdown".into());
+        let (full, mut damages) =
+            self.taken_hit_from_damage(actor, final_max * enemy_mult, t, shift)?;
+        let full = if full.is_nan() { 0.0 } else { full };
+        for (tt, amount) in damages.iter_mut() {
+            let conversion = shift
+                .iter()
+                .find(|(k, _)| k == tt)
+                .map_or(f64::NAN, |(_, v)| *v);
+            let incoming = final_max * enemy_mult * conversion / 100.0;
+            let nz = if amount.is_nan() { 0.0 } else { *amount };
+            *amount = nz;
+            b.push_row(vec![
+                ("type", sf!("%d%% as %s", conversion, *tt).into()),
+                (
+                    "pool",
+                    sf!("%d", self.o(actor, &format!("{tt}TotalHitPool"))).into(),
+                ),
+                ("incoming", sf!("%.0f", incoming).into()),
+                ("multi", sf!("x%.3f", nz / incoming).into()),
+                ("taken", sf!("%.0f", nz).into()),
+            ]);
+        }
+        let full_multi = full / final_max / enemy_mult;
+        let l = &mut b.lines;
+        l.push("^8Maximum hit is calculated in reverse -".into());
+        l.push("^8from health pools, via damage reductions, to the max hit:".into());
+        l.push(sf!("%d ^8(used pool)", full));
+        if round(full_multi, 2.0) != 1.0 {
+            l.push(sf!("/ %.2f ^8(modifiers to damage taken)", full_multi));
+        }
+        if enemy_mult != 1.0 {
+            l.push(sf!("/ %.2f ^8(modifiers to enemy damage)", enemy_mult));
+        }
+        l.push(sf!(
+            "= %.0f ^8maximum survivable enemy damage%s",
+            final_max,
+            if smoothing { " (approximate)" } else { "" }
+        ));
+        l.push("^8Such a hit would drain the following resources:".into());
+        let pools = self.reduce_pools_tracked(actor, None, &damages, true)?;
+        self.incoming_damage_lines(actor, &pools, &mut b.lines);
+        Ok(b)
+    }
+
+    /// The rows of `totalTakenHit` and each type's `TakenHit` breakdown:
+    /// the resources the configured hit drains
+    fn taken_hit_breakdowns(&mut self, actor: usize) -> Result<()> {
+        let o = |p: &Self, k: &str| p.o(actor, k);
+        let mut hits: Damage = Vec::new();
+        let mut rows = Vec::new();
+        for t in DMG_TYPES {
+            let hit = o(self, &format!("{t}TakenHit"));
+            if hit > 0.0 {
+                hits.push((t, hit));
+            }
+            rows.push(vec![
+                ("type", Cell::from(t)),
+                (
+                    "incoming",
+                    sf!("%.1f incoming damage", o(self, &format!("{t}TakenDamage"))).into(),
+                ),
+                (
+                    "mult",
+                    sf!("x %.3f damage mult", o(self, &format!("{t}TakenHitMult"))).into(),
+                ),
+                ("value", sf!("%d", hit.ceil()).into()),
+            ]);
+        }
+        let pools = self.reduce_pools_tracked(actor, None, &hits, true)?;
+        let mut lines = vec!["Such a hit would drain the following resources:".to_string()];
+        self.incoming_damage_lines(actor, &pools, &mut lines);
+        let lost = pools.lost.as_deref().copied().unwrap_or_default();
+        let mut per_type = Vec::new();
+        for (k, t) in DMG_TYPES.iter().enumerate() {
+            let r = &lost[k];
+            let mut l = vec![
+                sf!("Final %s Damage taken:", *t),
+                sf!("%.1f incoming damage", o(self, &format!("{t}TakenDamage"))),
+                sf!("x %.3f damage mult", o(self, &format!("{t}TakenHitMult"))),
+                sf!("= %.1f", o(self, &format!("{t}TakenHit"))),
+                "This part of the hit drains the following resources:".to_string(),
+            ];
+            let mut sum = 0.0;
+            let mut add = |l: &mut Vec<String>, v: Option<f64>, f: String| {
+                if let Some(v) = v {
+                    sum += v;
+                    l.push(sf!(&f, v));
+                }
+            };
+            for (a, v) in ALLY_POOLS.iter().zip(r.allies) {
+                add(&mut l, v, format!("\t%d {GEM}{}", a.label));
+            }
+            add(&mut l, r.aegis, format!("\t%d {GEM}{t} Aegis charge"));
+            add(
+                &mut l,
+                r.shared_elemental_aegis,
+                format!("\t%d {GEM}Elemental Aegis charge"),
+            );
+            add(
+                &mut l,
+                r.shared_aegis,
+                format!("\t%d {GEM}Shared Aegis charge"),
+            );
+            add(&mut l, r.guard, format!("\n\t%d {SCOURGE}{t} Guard charge"));
+            add(
+                &mut l,
+                r.shared_guard,
+                format!("\t%d {SCOURGE}Shared Guard charge"),
+            );
+            add(&mut l, r.ward, format!("\t%d {WARD}Ward"));
+            add(&mut l, r.energy_shield, format!("\t%d {ES}Energy Shield"));
+            add(&mut l, r.mana, format!("\t%d {MANA}Mana"));
+            let positive = |v: Option<f64>| v.filter(|v| *v > 0.0);
+            add(
+                &mut l,
+                positive(r.life_loss_prevented),
+                format!("\t%d {LIFE}Life ^7Loss Prevented"),
+            );
+            add(&mut l, positive(r.life), format!("\t%d {LIFE}Life"));
+            add(
+                &mut l,
+                r.overkill,
+                format!("\t%d {}Overkill damage", crate::breakdown::color::NEGATIVE),
+            );
+            l.push(sf!("\t^8(%d total)", sum));
+            per_type.push(l);
+        }
+        let b = self.bd(actor).unwrap();
+        let total = b.existing("totalTakenHit")?;
+        for r in rows {
+            total.push_row(r);
+        }
+        total.lines.extend(lines);
+        for (t, l) in DMG_TYPES.iter().zip(per_type) {
+            b.set_lines(format!("{t}TakenHit"), l);
+        }
+        Ok(())
+    }
+
     /// `calcs.reducePoolsByDamage(poolTable, damageTable, actor)`
     fn reduce_pools(&self, actor: usize, pools: Option<Pools>, damage: &Damage) -> Result<Pools> {
+        self.reduce_pools_tracked(actor, pools, damage, false)
+    }
+
+    /// `calcs.reducePoolsByDamage`, with what each type took from each
+    /// pool when `track`
+    fn reduce_pools_tracked(
+        &self,
+        actor: usize,
+        pools: Option<Pools>,
+        damage: &Damage,
+        track: bool,
+    ) -> Result<Pools> {
+        let mut lost_all = track.then(|| Box::new([Lost::default(); 5]));
         let db = self.c.db(actor);
         let o = |k: &str| self.o(actor, k);
         let p = pools.unwrap_or_default();
@@ -405,18 +844,23 @@ impl<'a> Perform<'a> {
                 .map_or(f64::NAN, |(_, x)| *x)
         };
         let ward_bypass_mod = self.c.base(db, None, &["WardBypass"])?;
-        for t in DMG_TYPES {
+        let mut no_lost = Lost::default();
+        for (ti, t) in DMG_TYPES.into_iter().enumerate() {
             let Some(mut rem) = dmg_get(&table, t) else {
                 continue;
             };
-            for (a, ally) in ALLY_POOLS.iter().zip(allies.iter_mut()) {
-                let _ = a;
+            let lost = match lost_all.as_deref_mut() {
+                Some(l) => &mut l[ti],
+                None => &mut no_lost,
+            };
+            for (k, ally) in allies.iter_mut().enumerate() {
                 if let Some(v) = ally
                     && v.remaining > 0.0
                 {
                     let temp = m_min(rem * v.percent, v.remaining);
                     v.remaining = (v.remaining - temp).floor();
                     rem -= temp;
+                    lost.allies[k] = at_least_one(temp);
                 }
             }
             match recoupable.iter_mut().find(|(k, _)| *k == t) {
@@ -428,30 +872,35 @@ impl<'a> Perform<'a> {
                 let temp = m_min(rem, a);
                 kv_set(&mut aegis, t, a - temp);
                 rem -= temp;
+                lost.aegis = at_least_one(temp);
             }
             let se = kv_get(&aegis, "sharedElemental");
             if is_elemental(t) && se > 0.0 {
                 let temp = m_min(rem, se);
                 kv_set(&mut aegis, "sharedElemental", se - temp);
                 rem -= temp;
+                lost.shared_elemental_aegis = at_least_one(temp);
             }
             let sh = kv_get(&aegis, "shared");
             if sh > 0.0 {
                 let temp = m_min(rem, sh);
                 kv_set(&mut aegis, "shared", sh - temp);
                 rem -= temp;
+                lost.shared_aegis = at_least_one(temp);
             }
             let g = kv_get(&guard, t);
             if g > 0.0 {
                 let temp = m_min(rem * o(&format!("{t}GuardAbsorbRate")) / 100.0, g);
                 kv_set(&mut guard, t, (g - temp).floor());
                 rem -= temp;
+                lost.guard = at_least_one(temp);
             }
             let gs = kv_get(&guard, "shared");
             if gs > 0.0 {
                 let temp = m_min(rem * o("sharedGuardAbsorbRate") / 100.0, gs);
                 kv_set(&mut guard, "shared", (gs - temp).floor());
                 rem -= temp;
+                lost.shared_guard = at_least_one(temp);
             }
             if ward > 0.0
                 && (ward_bypass_below == 0.0 || damage_total >= ward_before * ward_bypass_below)
@@ -460,6 +909,7 @@ impl<'a> Perform<'a> {
                 ward -= temp;
                 temp *= ward_active;
                 rem -= temp;
+                lost.ward = at_least_one(temp);
             }
             let mom = m_min(
                 o("sharedMindOverMatter") + o(&format!("{t}MindOverMatter")),
@@ -474,6 +924,7 @@ impl<'a> Perform<'a> {
                 }
                 es -= temp;
                 rem -= temp;
+                lost.energy_shield = at_least_one(temp);
             }
             if mom > 0.0 {
                 let mut mom_damage = (rem * mom).ceil();
@@ -485,6 +936,7 @@ impl<'a> Perform<'a> {
                     es -= temp;
                     rem -= temp;
                     mom_damage -= temp;
+                    lost.energy_shield = at_least_one(temp);
                 }
                 let temp = m_min(mom_damage, get(&mom_left, t)).ceil();
                 for (_, x) in mom_left.iter_mut() {
@@ -492,6 +944,7 @@ impl<'a> Perform<'a> {
                 }
                 mana -= temp;
                 rem -= temp;
+                lost.mana = at_least_one(temp);
             }
             let prevented_total = o("preventedLifeLossTotal");
             if prevented_total > 0.0 {
@@ -515,6 +968,7 @@ impl<'a> Perform<'a> {
                     rem -= split;
                     lost_over_time += prevented;
                     life -= lost;
+                    let mut prevented_all = prevented;
                     if life <= half {
                         let unspecific = rem * prevent;
                         lost_over_time += unspecific;
@@ -522,19 +976,28 @@ impl<'a> Perform<'a> {
                         let specific = rem * below_pct;
                         below_half_lost += specific;
                         rem -= specific;
+                        prevented_all += unspecific + specific;
                     }
+                    let l = &mut *lost_entry(&mut lost_all, &mut no_lost, ti);
+                    l.life = Some(lost);
+                    l.life_loss_prevented = at_least_one(prevented_all);
                 } else {
                     let temp = rem * o("preventedLifeLoss") / 100.0;
                     lost_over_time += temp;
                     rem -= temp;
+                    lost_entry(&mut lost_all, &mut no_lost, ti).life_loss_prevented =
+                        at_least_one(temp);
                 }
             }
+            let lost = lost_entry(&mut lost_all, &mut no_lost, ti);
             if life > 0.0 {
                 let temp = m_min(rem, life);
                 life -= temp;
                 rem -= temp;
+                lost.life = Some(lost.life.unwrap_or(0.0) + if temp > 0.0 { temp } else { 0.0 });
             }
             overkill += rem;
+            lost.overkill = at_least_one(rem);
         }
         let mut mom_remaining = f64::INFINITY;
         let mut es_remaining = f64::INFINITY;
@@ -584,6 +1047,7 @@ impl<'a> Perform<'a> {
             life_below_half_loss_lost_over_time: Some(below_half_lost.ceil()),
             overkill: overkill.ceil(),
             hit_pool_remaining: hit_pool.floor(),
+            lost: lost_all,
         })
     }
 
@@ -650,6 +1114,7 @@ impl<'a> Perform<'a> {
             )),
             overkill: 0.0,
             hit_pool_remaining: 0.0,
+            lost: None,
         };
         if d.cycles != 1.0 {
             d.track_recoupable = false;
@@ -921,6 +1386,19 @@ impl<'a> Perform<'a> {
                 set(self, &format!("{t}EnemyDamage"), 0.0);
             }
         } else {
+            if let Some(b) = self.bd(actor) {
+                let mut t = Breakdown::table(cols(&[
+                    ("Type", "type"),
+                    ("Value", "value"),
+                    ("Mult", "mult"),
+                    ("Crit", "crit"),
+                    ("Conversion", "convMult"),
+                    ("Final", "final"),
+                    ("From", "from"),
+                ]));
+                t.label = Some("Total damage from the enemy".into());
+                b.set("totalEnemyDamage", t);
+            }
             let crit_chance = if self.c.flag(edb, None, &["NeverCrit"])? {
                 0.0
             } else if self.c.flag(edb, None, &["AlwaysCrit"])? {
@@ -972,6 +1450,11 @@ impl<'a> Perform<'a> {
             for t in DMG_TYPES {
                 let mult = enemy_mult(self, &names_for(t))?;
                 let mut damage = self.input_num(&format!("enemy{t}Damage"));
+                let source = if damage.is_none() {
+                    "Default"
+                } else {
+                    "Config"
+                };
                 let pen = self.input_num(&format!("enemy{t}Pen"));
                 let overwhelm = self.input_num(&format!("enemy{t}Overwhelm"));
                 if damage.is_none() {
@@ -1060,6 +1543,7 @@ impl<'a> Perform<'a> {
                 let v = o(self, "totalEnemyDamageIn") + damage;
                 set(self, "totalEnemyDamageIn", v);
                 let mut ed = damage * (1.0 - conversion_total / 100.0) * mult * crit_effect;
+                let mut conversion_extra = -damage * mult * crit_effect + ed;
                 if let Some((_, froms)) = conversion.iter().find(|(k, _)| *k == t) {
                     for &(from, amount) in froms {
                         let mut names = vec![
@@ -1075,11 +1559,47 @@ impl<'a> Perform<'a> {
                         }
                         let m = enemy_mult(self, &names)?;
                         ed += amount * m * crit_effect;
+                        conversion_extra += amount * m * crit_effect;
                     }
                 }
                 set(self, &format!("{t}EnemyDamage"), ed);
                 let v = o(self, "totalEnemyDamage") + ed;
                 set(self, "totalEnemyDamage", v);
+                if let Some(b) = self.bd(actor) {
+                    let abs = if conversion_extra >= 0.0 {
+                        conversion_extra
+                    } else {
+                        -conversion_extra
+                    };
+                    let mut l = vec![
+                        sf!("from %s: %d", source, damage),
+                        sf!("* %.2f (modifiers to enemy damage)", mult),
+                        sf!("* %.3f (enemy crit effect)", crit_effect),
+                    ];
+                    if conversion_extra != 0.0 {
+                        let sign = if conversion_extra > 0.0 { "+" } else { "-" };
+                        l.push(sf!("%s %d (enemy damage conversion)", sign, abs));
+                    }
+                    l.push(sf!("= %d", ed));
+                    b.set_lines(format!("{t}EnemyDamage"), l);
+                    let sign = if conversion_extra > 0.0 {
+                        "+"
+                    } else if conversion_extra < 0.0 {
+                        "-"
+                    } else {
+                        ""
+                    };
+                    let row = vec![
+                        ("type", Cell::from(t)),
+                        ("value", sf!("%d", damage).into()),
+                        ("mult", sf!("%.2f", mult).into()),
+                        ("crit", sf!("%.2f", crit_effect).into()),
+                        ("convMult", sf!("%s%d", sign, abs).into()),
+                        ("final", sf!("%d", ed).into()),
+                        ("from", source.into()),
+                    ];
+                    b.existing("totalEnemyDamage")?.push_row(row);
+                }
             }
         }
 
@@ -1118,6 +1638,12 @@ impl<'a> Perform<'a> {
             shift.push((t, st));
             let v = o(self, &format!("{t}EnemyDamage")) * own / 100.0;
             set(self, &format!("{t}TakenDamage"), v);
+            if let Some(b) = self.bd(actor) {
+                let mut table = Breakdown::table(cols(&[("Type", "type"), ("Value", "value")]));
+                table.label = Some("Taken".into());
+                table.push_row(vec![("type", t.into()), ("value", sf!("%d", v).into())]);
+                b.set(format!("{t}TakenDamage"), table);
+            }
         }
         let shift_of = |t: &str| -> Vec<(&'static str, f64)> {
             shift
@@ -1136,13 +1662,29 @@ impl<'a> Perform<'a> {
                     let d = o(self, &format!("{t}EnemyDamage")) * pct / 100.0;
                     let v = o(self, &format!("{c}TakenDamage")) + d;
                     set(self, &format!("{c}TakenDamage"), v);
+                    if let Some(b) = self.bd(actor)
+                        && d > 0.0
+                    {
+                        let row = vec![("type", t.into()), ("value", sf!("%d", d).into())];
+                        b.existing(&format!("{c}TakenDamage"))?.push_row(row);
+                    }
                 }
             }
         }
         set(self, "totalTakenDamage", 0.0);
+        if let Some(b) = self.bd(actor) {
+            let mut table = Breakdown::table(cols(&[("Type", "type"), ("Value", "value")]));
+            table.label = Some("Total damage taken from the enemy after taken as".into());
+            b.set("totalTakenDamage", table);
+        }
         for t in DMG_TYPES {
-            let v = o(self, "totalTakenDamage") + o(self, &format!("{t}TakenDamage"));
+            let taken = o(self, &format!("{t}TakenDamage"));
+            let v = o(self, "totalTakenDamage") + taken;
             set(self, "totalTakenDamage", v);
+            if let Some(b) = self.bd(actor) {
+                let row = vec![("type", t.into()), ("value", sf!("%d", taken).into())];
+                b.existing("totalTakenDamage")?.push_row(row);
+            }
         }
 
         // Damage taken multipliers
@@ -1234,10 +1776,43 @@ impl<'a> Perform<'a> {
                 0.0,
             );
             set(self, &format!("{t}TakenDotMult"), v);
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                let lower = t.to_ascii_lowercase();
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("DoT Multiplier:"),
+                        factors: vec![
+                            f("%.2f ^8(resistance)", 1.0 - resist / 100.0),
+                            f2(
+                                "%.2f ^8(%s damage reduction)",
+                                1.0 - reduction / 100.0,
+                                &lower,
+                            ),
+                            f("%.2f ^8(increased/reduced damage taken)", 1.0 + inc / 100.0),
+                            f("%.2f ^8(more/less damage taken)", more),
+                        ],
+                        total: Some(sf!("= %.2f", v)),
+                        ..Chain::default()
+                    },
+                );
+                b.set_lines(format!("{t}TakenDotMult"), l);
+            }
         }
 
         // Incoming hit damage
         set(self, "totalTakenHit", 0.0);
+        if let Some(b) = self.bd(actor) {
+            let mut t = Breakdown::table(cols(&[
+                ("Type", "type"),
+                ("Incoming", "incoming"),
+                ("Mult", "mult"),
+                ("Value", "value"),
+            ]));
+            t.label = Some("Total damage taken after mitigation".into());
+            b.set("totalTakenHit", t);
+        }
         let impale_flags = if matches!(category, "Melee" | "Projectile" | "Average") {
             self.mf("Attack")
         } else {
@@ -1422,6 +1997,47 @@ impl<'a> Perform<'a> {
                 impale =
                     impale * impale_chance / 100.0 * 5.0 * o(self, &format!("{t}TakenReflect"));
             }
+            let armour_lines = |l: &mut Vec<String>, last: String| {
+                if res_mult != 1.0 {
+                    l.push(sf!(
+                        "Enemy Hit Damage After Resistance: %d ^8(total incoming damage)",
+                        damage * res_mult
+                    ));
+                } else {
+                    l.push(sf!(
+                        "Enemy Hit Damage: %d ^8(total incoming damage)",
+                        damage
+                    ));
+                }
+                if pct_armour != 100.0 && !ward_based {
+                    l.push(sf!("%d%% percent of armour applies", pct_armour));
+                }
+                l.push(last);
+            };
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                if armour_reduct != 0.0 {
+                    armour_lines(&mut l, sf!("Reduction from Armour: %d%%", armour_reduct));
+                }
+                if reduction != 0.0 {
+                    l.push(sf!("Base %s Damage Reduction: %d%%", t, reduction));
+                }
+                if overwhelm != 0.0 {
+                    l.push(sf!("Enemy Overwhelm %s Damage: %d%%", t, overwhelm));
+                }
+                let n = [armour_reduct, reduction, overwhelm]
+                    .iter()
+                    .filter(|v| **v != 0.0)
+                    .count();
+                if n >= 2 {
+                    l.push(sf!(
+                        "Total %s Damage Reduction: %d%%",
+                        t,
+                        100.0 - reduct_mult * 100.0
+                    ));
+                }
+                b.set_lines(format!("{t}DamageReduction"), l);
+            }
             let mut taken_mult = o(self, &format!("{t}TakenHitMult"));
             let mut suppress_mult = 1.0;
             let suppress_full = o(self, "EffectiveSpellSuppressionChance") == 100.0;
@@ -1463,6 +2079,60 @@ impl<'a> Perform<'a> {
             );
             let v = o(self, "totalTakenHit") + taken_hit;
             set(self, "totalTakenHit", v);
+            if self.has_bd(actor) {
+                let mut l = Vec::new();
+                if resist != 0.0 {
+                    l.push(sf!("Resistance: %.2f", 1.0 - resist / 100.0));
+                }
+                if pen != 0.0 {
+                    l.push(sf!("+ Enemy Pen: %.2f", pen / 100.0));
+                }
+                if resist != 0.0 && pen != 0.0 {
+                    l.push(sf!("= %.2f", res_mult));
+                }
+                if reduction != 0.0 {
+                    l.push(sf!(
+                        "Base %s Damage Taken: %.2f",
+                        t,
+                        1.0 - reduction / 100.0
+                    ));
+                }
+                if armour_reduct != 0.0 {
+                    let last = sf!("Reduction from Armour: %.2f", 1.0 - armour_reduct / 100.0);
+                    armour_lines(&mut l, last);
+                }
+                if overwhelm != 0.0 {
+                    l.push(sf!(
+                        "+ Enemy Overwhelm %s Damage: %.2f",
+                        t,
+                        overwhelm / 100.0
+                    ));
+                }
+                if reduction != 0.0 || armour_reduct != 0.0 || overwhelm != 0.0 {
+                    l.push(sf!("= %.2f", reduct_mult));
+                }
+                if res_mult != 1.0 && reduct_mult != 1.0 {
+                    l.push(sf!("%.2f x %.2f = %.3f", res_mult, reduct_mult, base_mult));
+                }
+                if taken_flat != 0.0 {
+                    l.push(sf!("+ Flat: %d", taken_flat));
+                }
+                if taken_mult != 1.0 {
+                    l.push(sf!("x Taken: %.3f", taken_mult));
+                }
+                if suppress_mult != 1.0 {
+                    l.push(sf!("x Spell Suppression: %.3f", suppress_mult));
+                }
+                if impale != 0.0 {
+                    l.push(sf!("+ Impale: %.1f", impale));
+                }
+                if taken_mult != 1.0 || taken_flat != 0.0 || suppress_mult != 1.0 || impale != 0.0 {
+                    l.push(sf!("= %.3f", o(self, &format!("{t}TakenHitMult"))));
+                }
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines(format!("{t}TakenHitMult"), l);
+            }
         }
 
         self.stun(actor, category)?;
@@ -1475,42 +2145,64 @@ impl<'a> Perform<'a> {
         self.pvp(actor)?;
         self.maximum_hit(actor, &shift)?;
         for t in DMG_TYPES {
-            let v = o(self, &format!("{t}TotalPool")) / o(self, &format!("{t}TakenDotMult"));
+            let pool = o(self, &format!("{t}TotalPool"));
+            let mult = o(self, &format!("{t}TakenDotMult"));
+            let v = pool / mult;
             set(self, &format!("{t}DotEHP"), v);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines(
+                    format!("{t}DotEHP"),
+                    vec![
+                        sf!("Total Pool: %d", pool),
+                        sf!("Dot Damage Taken modifier: %.2f", mult),
+                        sf!("Total Effective Dot Pool: %d", v),
+                    ],
+                );
+            }
         }
         self.degens(actor, category, &dot_shift)?;
+        if self.has_bd(actor) {
+            self.taken_hit_breakdowns(actor)?;
+        }
         Ok(())
     }
 
     fn stun(&mut self, actor: usize, category: &str) -> Result<()> {
         let db = self.c.db(actor);
         let o = |p: &Self, k: &str| p.o(actor, k);
-        let mut base =
+        let (mut base, mut source) =
             if self
                 .c
                 .flag(db, None, &["StunThresholdBasedOnEnergyShieldInsteadOfLife"])?
             {
-                o(self, "EnergyShield")
-                    * self
-                        .c
-                        .base(db, None, &["StunThresholdEnergyShieldPercent"])?
-                    / 100.0
+                let m = self
+                    .c
+                    .base(db, None, &["StunThresholdEnergyShieldPercent"])?;
+                (
+                    o(self, "EnergyShield") * m / 100.0,
+                    format!("{}% of Energy Shield", num(m)),
+                )
             } else if self
                 .c
                 .flag(db, None, &["StunThresholdBasedOnManaInsteadOfLife"])?
             {
-                o(self, "Mana") * self.c.base(db, None, &["StunThresholdManaPercent"])? / 100.0
+                let m = self.c.base(db, None, &["StunThresholdManaPercent"])?;
+                (o(self, "Mana") * m / 100.0, format!("{}% of Mana", num(m)))
             } else if self.c.flag(db, None, &["ChaosInoculation"])? {
-                self.c.base(db, None, &["Life"])?
+                (
+                    self.c.base(db, None, &["Life"])?,
+                    "Life before Chaos Inoculation".into(),
+                )
             } else {
-                o(self, "Life")
+                (o(self, "Life"), "Life".into())
             };
         if self.c.flag(db, None, &["AddESToStunThreshold"])? {
-            base += o(self, "EnergyShield")
-                * self.c.base(db, None, &["ESToStunThresholdPercent"])?
-                / 100.0;
+            let m = self.c.base(db, None, &["ESToStunThresholdPercent"])?;
+            base += o(self, "EnergyShield") * m / 100.0;
+            source = format!("{source} and {}% of Energy Shield", num(m));
         }
-        let threshold = base * (1.0 + self.c.inc(db, None, &["StunThreshold"])? / 100.0);
+        let threshold_mod = 1.0 + self.c.inc(db, None, &["StunThreshold"])? / 100.0;
+        let threshold = base * threshold_mod;
         self.c.set_out(actor, "StunThreshold", threshold);
         let mut not_avoid = if self.c.flag(db, None, &["StunImmune"])? {
             0.0
@@ -1524,9 +2216,28 @@ impl<'a> Perform<'a> {
             not_avoid *= 0.5;
         }
         self.c.set_out(actor, "StunAvoidChance", 100.0 - not_avoid);
+        if let Some(b) = self.bd(actor) {
+            let mut l = vec![sf!("%d ^8(base from %s)", base, &source)];
+            if threshold_mod != 1.0 {
+                l.push(sf!("* %.2f ^8(increased threshold)", threshold_mod));
+                l.push(sf!("= %d", threshold));
+            }
+            b.set_lines("StunThreshold", l);
+            b.set_lines(
+                "StunAvoidChance",
+                vec![
+                    format!("{CUSTOM}NOTE: Having any energy shield when the hit occurs grants 50% chance to avoid stun."),
+                    format!("{CUSTOM}POB only applies this modifier when ES > Total incoming damage."),
+                ],
+            );
+        }
         if 100.0 - not_avoid >= 100.0 {
             self.c.set_out(actor, "StunDuration", 0.0);
             self.c.set_out(actor, "BlockDuration", 0.0);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines("StunDuration", vec!["Cannot be Stunned".into()]);
+                b.set_lines("BlockDuration", vec!["Cannot be Stunned".into()]);
+            }
         } else {
             let dur = 1.0 + self.c.inc(db, None, &["StunDuration"])? / 100.0;
             let base_dur = self.misc_data("StunBaseDuration");
@@ -1543,6 +2254,30 @@ impl<'a> Perform<'a> {
                 "BlockDuration",
                 (base_dur * dur / block_rec * tick).ceil() / tick,
             );
+            if self.has_bd(actor) {
+                let mut stun = vec![sf!("%.2fs ^8(base)", base_dur)];
+                let mut block = stun.clone();
+                if dur != 1.0 {
+                    stun.push(sf!("* %.2f ^8(increased duration)", dur));
+                    block.push(sf!("* %.2f ^8(increased duration)", dur));
+                }
+                if rec != 1.0 {
+                    stun.push(sf!("/ %.2f ^8(increased/reduced recovery)", rec));
+                }
+                if block_rec != 1.0 {
+                    block.push(sf!(
+                        "/ %.2f ^8(increased/reduced block recovery)",
+                        block_rec
+                    ));
+                }
+                stun.push("rounded up to nearest server tick".into());
+                stun.push(sf!("= %.2fs", o(self, "StunDuration")));
+                block.push("rounded up to nearest server tick".into());
+                block.push(sf!("= %.2fs", o(self, "BlockDuration")));
+                let b = self.bd(actor).unwrap();
+                b.set_lines("StunDuration", stun);
+                b.set_lines("BlockDuration", block);
+            }
         }
         let v = m_min(self.c.base(db, None, &["AvoidInterruptStun"])?, 100.0);
         self.c.set_out(actor, "InterruptStunAvoidChance", v);
@@ -1554,13 +2289,37 @@ impl<'a> Perform<'a> {
             eff *= not_melee;
         }
         let base_chance = m_min(self.misc_data("StunBaseMult") * eff / threshold, 100.0);
-        let v = (if base_chance > self.misc_data("MinStunChanceNeeded") {
+        let min_needed = self.misc_data("MinStunChanceNeeded");
+        let v = (if base_chance > min_needed {
             base_chance
         } else {
             0.0
         }) * not_avoid
             / 100.0;
         self.c.set_out(actor, "SelfStunChance", v);
+        if self.has_bd(actor) {
+            let mut l = vec![
+                sf!("%d%% ^8(stun multiplier)", self.misc_data("StunBaseMult")),
+                sf!("* %.1f ^8(effective enemy stun damage)", eff),
+                sf!("/ %d ^8(stun threshold)", threshold),
+            ];
+            if base_chance < min_needed {
+                l.push(sf!("= %.2f%%", base_chance));
+                l.push(sf!(
+                    "Stun Chance has to be more than %d%% to stun.",
+                    min_needed
+                ));
+            } else {
+                if not_avoid != 100.0 {
+                    l.push(sf!(
+                        "* %.2f ^8(1 - chance to avoid stun)",
+                        not_avoid / 100.0
+                    ));
+                }
+                l.push(sf!("= %.2f%%", v));
+            }
+            self.bd(actor).unwrap().set_lines("SelfStunChance", l);
+        }
         Ok(())
     }
 
@@ -1592,14 +2351,78 @@ impl<'a> Perform<'a> {
         let below_half = self.c.base(db, None, &["LifeLossBelowHalfPrevented"])?;
         let ph = (1.0 - prevented / 100.0) * below_half;
         set(self, "preventedLifeLossBelowHalf", ph);
+        let mut portion = 1.0;
         if !low_life {
-            let portion = m_min(o(self, "Life") * 0.5 / recoverable, 1.0);
+            portion = m_min(o(self, "Life") * 0.5 / recoverable, 1.0);
             set(self, "preventedLifeLossTotal", prevented + ph * portion);
         } else {
             set(self, "preventedLifeLossTotal", prevented + ph);
         }
         let hit_pool = calc_life_hit_pool(recoverable, o(self, "Life"), prevented, below_half);
         set(self, "LifeHitPool", hit_pool);
+        if self.has_bd(actor) {
+            let mut l = vec!["Total life protected:".to_string()];
+            if prevented != 0.0 {
+                l.push(sf!(
+                    "%.2f ^8(portion taken over 4 seconds instead)",
+                    prevented / 100.0
+                ));
+            }
+            let plus = if prevented != 0.0 { "+ " } else { "" };
+            if ph != 0.0 {
+                if portion != 1.0 {
+                    if prevented != 0.0 {
+                        l.push(String::new());
+                    }
+                    l.push(sf!(
+                        "%s%.2f ^8(initial portion taken by petrified blood)",
+                        plus,
+                        below_half / 100.0
+                    ));
+                    if prevented != 0.0 {
+                        l.push(sf!(
+                            "* %.2f ^8(portion not already taken over time)",
+                            1.0 - prevented / 100.0
+                        ));
+                    }
+                    l.push(sf!("* %.2f ^8(portion of life on low life)", portion));
+                    l.push(sf!(
+                        "= %.2f ^8(final portion taken by petrified blood)",
+                        ph * portion / 100.0
+                    ));
+                    l.push(String::new());
+                } else {
+                    let what = if prevented != 0.0 {
+                        "initial portion"
+                    } else {
+                        "portion"
+                    };
+                    l.push(sf!(
+                        "%s%.2f ^8(%s taken by petrified blood)",
+                        plus,
+                        below_half / 100.0,
+                        what
+                    ));
+                    if prevented != 0.0 {
+                        l.push(sf!(
+                            "* %.2f ^8(portion not already taken over time)",
+                            1.0 - prevented / 100.0
+                        ));
+                        l.push(sf!(
+                            "= %.2f ^8(final portion taken by petrified blood)",
+                            ph / 100.0
+                        ));
+                    }
+                }
+            }
+            l.push(sf!(
+                "%.2f ^8(portion taken from life)",
+                1.0 - o(self, "preventedLifeLossTotal") / 100.0
+            ));
+            self.bd(actor)
+                .unwrap()
+                .set_lines("preventedLifeLossTotal", l);
+        }
 
         // Energy shield bypass
         let mut any_bypass = false;
@@ -1645,7 +2468,8 @@ impl<'a> Perform<'a> {
         );
         set(self, "sharedMindOverMatter", shared_mom);
         let es_protects = self.c.flag(db, None, &["EnergyShieldProtectsMana"])?;
-        let mom_pool = |p: &Self, life_pool: f64, mom: f64, bypass: f64| -> f64 {
+        // The pool, the mana usable, the mana used and the energy shield
+        let mom_pool = |p: &Self, life_pool: f64, mom: f64, bypass: f64| -> [f64; 4] {
             let mana = m_max(p.o_or(actor, "ManaUnreserved", 0.0), 0.0);
             let max_mom = if mom < 1.0 {
                 life_pool / (1.0 - mom) - life_pool
@@ -1663,15 +2487,41 @@ impl<'a> Perform<'a> {
                 0.0
             };
             let used = m_min(max_mom - max_es, max_mana).floor();
-            life_pool + used + max_es
+            [life_pool + used + max_es, max_mana, used, max_es]
+        };
+        let mom_lines = |[pool, max_mana, mana, es]: [f64; 4], mom: f64| {
+            let protected = (mana + es) / mom - (mana + es);
+            let shadowed = if mana == max_mana {
+                String::new()
+            } else {
+                sf!(" (%d mana shadowed by energy shield)", max_mana - mana)
+            };
+            let mut l = vec![
+                "Effective life from Mind over Matter:".to_string(),
+                sf!("%d life (%d life is protected)", recoverable, protected),
+                sf!("%d mana%s", mana, &shadowed),
+            ];
+            if es_protects {
+                l.push(sf!("%d energy shield", es));
+            }
+            let es_part = if es_protects {
+                sf!("+ %d ", es)
+            } else {
+                String::new()
+            };
+            l.push(sf!("%d + %d %s= %d", recoverable, mana, &es_part, pool));
+            l
         };
         if shared_mom > 0.0 {
             let mom = shared_mom / 100.0;
             let bypass = minimum / 100.0;
-            let v = mom_pool(self, recoverable, mom, bypass);
-            set(self, "sharedManaEffectiveLife", v);
-            let v = mom_pool(self, hit_pool, mom, bypass);
+            let r = mom_pool(self, recoverable, mom, bypass);
+            set(self, "sharedManaEffectiveLife", r[0]);
+            let v = mom_pool(self, hit_pool, mom, bypass)[0];
             set(self, "sharedMoMHitPool", v);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines("sharedMindOverMatter", mom_lines(r, mom));
+            }
         } else {
             set(self, "sharedManaEffectiveLife", recoverable);
             set(self, "sharedMoMHitPool", hit_pool);
@@ -1692,10 +2542,13 @@ impl<'a> Perform<'a> {
                     .set_out_val(actor, "OnlySharedMindOverMatter", OutVal::Bool(false));
                 let mom = (v + shared_mom) / 100.0;
                 let bypass = bypass_t / 100.0;
-                let x = mom_pool(self, recoverable, mom, bypass);
-                set(self, &format!("{t}ManaEffectiveLife"), x);
-                let x = mom_pool(self, hit_pool, mom, bypass);
+                let r = mom_pool(self, recoverable, mom, bypass);
+                set(self, &format!("{t}ManaEffectiveLife"), r[0]);
+                let x = mom_pool(self, hit_pool, mom, bypass)[0];
                 set(self, &format!("{t}MoMHitPool"), x);
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines(format!("{t}MindOverMatter"), mom_lines(r, mom));
+                }
             } else {
                 let x = o(self, "sharedManaEffectiveLife");
                 set(self, &format!("{t}ManaEffectiveLife"), x);
@@ -1713,6 +2566,9 @@ impl<'a> Perform<'a> {
                 .set_out_val(actor, "OnlySharedGuard", OutVal::Bool(true));
             let v = self.c.val(db, "GuardAbsorbLimit", None)?;
             set(self, "sharedGuardAbsorb", v);
+            if let Some(b) = self.bd(actor) {
+                b.set_lines("sharedGuardAbsorb", protected_lines("guard", v, rate));
+            }
         }
         for t in DMG_TYPES {
             let r = m_min(
@@ -1727,6 +2583,9 @@ impl<'a> Perform<'a> {
                     .set_out_val(actor, "OnlySharedGuard", OutVal::Bool(false));
                 let v = self.c.val(db, &format!("{t}GuardAbsorbLimit"), None)?;
                 set(self, &format!("{t}GuardAbsorb"), v);
+                if let Some(b) = self.bd(actor) {
+                    b.set_lines(format!("{t}GuardAbsorb"), protected_lines("guard", v, r));
+                }
             }
         }
 
@@ -1772,10 +2631,13 @@ impl<'a> Perform<'a> {
         );
 
         // Frost shield and allies
-        let v = self.c.base(db, None, &["FrostGlobeHealth"])?;
-        set(self, "FrostShieldLife", v);
+        let life = self.c.base(db, None, &["FrostGlobeHealth"])?;
+        set(self, "FrostShieldLife", life);
         let v = self.c.base(db, None, &["FrostGlobeDamageMitigation"])?;
         set(self, "FrostShieldDamageMitigation", v);
+        if let Some(b) = self.bd(actor) {
+            b.set_lines("FrostShieldLife", protected_lines("frost shield", life, v));
+        }
         for a in &ALLY_POOLS {
             let Some(redirect) = a.redirect else { continue };
             let mut m = self.c.base(db, None, &[redirect])?;
@@ -1798,6 +2660,7 @@ impl<'a> Perform<'a> {
                 set(self, a.life, v);
             }
         }
+        let mut shared_override = false;
         for a in &ALLY_POOLS {
             if self
                 .c
@@ -1811,6 +2674,7 @@ impl<'a> Perform<'a> {
                     && let Some(v) = specific
                 {
                     set(self, "TotalMinionLife", v);
+                    shared_override = true;
                 } else if self.o_or(actor, "TotalMinionLife", 0.0) == 0.0 {
                     match self.c.out(actor, a.life) {
                         Some(v) => set(self, "TotalMinionLife", v),
@@ -1832,6 +2696,37 @@ impl<'a> Perform<'a> {
             set(self, "VaalRejuvenationTotemAllyDamageMitigation", v);
             set(self, "TotemAllyDamageMitigation", 0.0);
             self.c.clear_out(actor, "TotalTotemLife");
+        }
+        if self.has_bd(actor) {
+            for a in &ALLY_POOLS {
+                let list = if actor == crate::calc::PLAYER {
+                    self.ally_life_list.iter().find(|(k, _)| *k == a.life)
+                } else {
+                    None
+                };
+                let mut over = self.c.override_num(db, None, &[a.life])?;
+                if over.is_none() && a.life == "TotalMinionLife" && shared_override {
+                    over = self.c.out(actor, "TotalMinionLife");
+                }
+                let Some(life) = self.c.out(actor, a.life) else {
+                    continue;
+                };
+                let l = match (over, list) {
+                    (Some(_), _) => vec![sf!("%d ^8(from config)", life)],
+                    (None, Some((_, entries))) => entries
+                        .iter()
+                        .map(|e| {
+                            let count = match e.count {
+                                Some(c) if c > 1.0 => format!("{}x ", num(c)),
+                                _ => String::new(),
+                            };
+                            sf!("%d ^8(%s%s)", e.life, &count, &e.name)
+                        })
+                        .collect(),
+                    (None, None) => continue,
+                };
+                self.bd(actor).unwrap().set_lines(a.life, l);
+            }
         }
         let soul_link = self.c.base(db, None, &["TakenFromParentESBeforeYou"])?;
         set(self, "SoulLinkMitigation", soul_link);
@@ -1880,6 +2775,25 @@ impl<'a> Perform<'a> {
             }
             set(self, &format!("{t}TotalPool"), total);
             set(self, &format!("{t}TotalHitPool"), total_hit);
+            if self.has_bd(actor) {
+                let mom = o(self, &format!("{t}ManaEffectiveLife"));
+                let mut l = vec![sf!("Life: %d", recoverable)];
+                if mom != recoverable {
+                    let text = if bypass < 100.0 && es_protects {
+                        "Mana and non-bypassed Energy Shield"
+                    } else {
+                        "Mana"
+                    };
+                    l.push(sf!("%s through MoM: %d", text, mom - recoverable));
+                }
+                if !es_protects && bypass < 100.0 {
+                    l.push(sf!("Non-bypassed Energy Shield: %d", total - mom));
+                }
+                l.push(sf!("TotalPool: %d", total));
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines(format!("{t}TotalPool"), l);
+            }
         }
         let _ = Base;
         Ok(())
@@ -2016,10 +2930,142 @@ impl<'a> Perform<'a> {
             n
         };
         self.c.set_out(actor, "NumberOfMitigatedDamagingHits", m);
-        let total = m / (1.0 - o(self, "ConfiguredNotHitChance") / 100.0);
+        let article = match category {
+            "Average" | "Untyped" => "n ",
+            _ => " ",
+        };
+        if self.has_bd(actor) {
+            let mut l = vec![sf!("%.2f ^8(chance for block to fail)", 1.0 - block)];
+            if self
+                .c
+                .out_val(actor, "ShowBlockEffect")
+                .is_some_and(OutVal::truthy)
+            {
+                l.push(sf!(
+                    "x %.2f ^8(block effect)",
+                    o(self, "BlockEffect") / 100.0
+                ));
+            }
+            if suppress_effect != 1.0 {
+                l.push(sf!("x %.3f ^8(suppression effect)", suppress_effect));
+            }
+            if avg_avoid > 0.0 {
+                l.push(sf!(
+                    "x %.2f ^8(chance for avoidance to fail)",
+                    1.0 - avg_avoid / 100.0
+                ));
+            }
+            l.push(sf!(
+                "= %.1f%% ^8(of damage taken from a%s%s hit)",
+                chance,
+                article,
+                category
+            ));
+            self.bd(actor)
+                .unwrap()
+                .set_lines("ConfiguredDamageChance", l);
+        }
+        let not_hit = o(self, "ConfiguredNotHitChance");
+        let total = m / (1.0 - not_hit / 100.0);
         self.c.set_out(actor, "TotalNumberOfHits", total);
-        let v = total * o(self, "totalEnemyDamageIn");
+        if self.has_bd(actor) {
+            let mut l = Vec::new();
+            let fail = |l: &mut Vec<String>, f: &str, v: f64| l.push(sf!(f, 1.0 - v / 100.0));
+            let avoid_proj = !specific && o(self, "AvoidProjectilesChance") > 0.0;
+            match category {
+                "Melee" | "Projectile" => {
+                    let ev = o(self, &format!("{category}EvadeChance"));
+                    if ev > 0.0 {
+                        fail(&mut l, "%.2f ^8(chance for evasion to fail)", ev);
+                    }
+                    if o(self, "AttackDodgeChance") > 0.0 {
+                        let v = o(self, "AttackDodgeChance");
+                        fail(&mut l, "x %.2f ^8(chance for dodge to fail)", v);
+                    }
+                    if category == "Projectile" && avoid_proj {
+                        let v = o(self, "AvoidProjectilesChance");
+                        fail(&mut l, "x %.2f ^8(chance for avoidance to fail)", v);
+                    }
+                }
+                "Spell" | "SpellProjectile" => {
+                    if o(self, "SpellDodgeChance") > 0.0 {
+                        let v = o(self, "SpellDodgeChance");
+                        fail(&mut l, "%.2f ^8(chance for dodge to fail)", v);
+                    }
+                    if category == "SpellProjectile" && avoid_proj {
+                        let v = o(self, "AvoidProjectilesChance");
+                        fail(&mut l, "x %.2f ^8(chance for avoidance to fail)", v);
+                    }
+                }
+                "Average" => {
+                    let (me, pe) = (
+                        o(self, "MeleeEvadeChance"),
+                        o(self, "ProjectileEvadeChance"),
+                    );
+                    if me > 0.0 || pe > 0.0 {
+                        fail(
+                            &mut l,
+                            "%.2f ^8(chance for evasion to fail, only applies to the attack portion)",
+                            (me + pe) / 2.0,
+                        );
+                    }
+                    let (ad, sd) = (o(self, "AttackDodgeChance"), o(self, "SpellDodgeChance"));
+                    if ad > 0.0 || sd > 0.0 {
+                        fail(
+                            &mut l,
+                            "x%.2f ^8(chance for dodge to fail)",
+                            (ad + sd) / 2.0,
+                        );
+                    }
+                    if avoid_proj {
+                        let v = o(self, "AvoidProjectilesChance") / 2.0;
+                        fail(&mut l, "x %.2f ^8(chance for avoidance to fail)", v);
+                    }
+                }
+                _ => {}
+            }
+            let all = o(self, "AvoidAllDamageFromHitsChance");
+            if all > 0.0 {
+                fail(
+                    &mut l,
+                    "x %.2f ^8(chance for damage avoidance to fail)",
+                    all,
+                );
+            }
+            if worst > 1.0 {
+                l.push(sf!("unlucky worst of %d", worst));
+            }
+            l.push(sf!(
+                "= %d%% ^8(chance to be hit by a%s%s hit)",
+                100.0 - not_hit,
+                article,
+                category
+            ));
+            let hits = vec![
+                sf!("%.2f ^8(Number of mitigated hits)", m),
+                sf!("/ %.2f ^8(Chance to even be hit)", 1.0 - not_hit / 100.0),
+                sf!(
+                    "= %.2f ^8(total average number of hits you can take)",
+                    total
+                ),
+            ];
+            let b = self.bd(actor).unwrap();
+            b.set_lines("ConfiguredNotHitChance", l);
+            b.set_lines("TotalNumberOfHits", hits);
+        }
+        let damage_in = o(self, "totalEnemyDamageIn");
+        let v = total * damage_in;
         self.c.set_out(actor, "TotalEHP", v);
+        if let Some(b) = self.bd(actor) {
+            b.set_lines(
+                "TotalEHP",
+                vec![
+                    sf!("%.2f ^8(total average number of hits you can take)", total),
+                    sf!("x %d ^8(total incoming damage)", damage_in),
+                    sf!("= %d ^8(total damage you can take)", v),
+                ],
+            );
+        }
         let speed = self
             .input
             .config
@@ -2031,6 +3077,19 @@ impl<'a> Perform<'a> {
         skill_time = skill_time / 1000.0 / enemy_speed;
         self.c.set_out(actor, "enemySkillTime", skill_time);
         self.c.set_out(actor, "EHPSurvivalTime", total * skill_time);
+        if let Some(b) = self.bd(actor) {
+            b.set_lines(
+                "EHPSurvivalTime",
+                vec![
+                    sf!("%.2f ^8(total average number of hits you can take)", total),
+                    sf!("x %.2f ^8enemy attack/cast time", skill_time),
+                    sf!(
+                        "= %.2f seconds ^8(total time it would take to die)",
+                        total * skill_time
+                    ),
+                ],
+            );
+        }
         Ok(())
     }
 
@@ -2114,6 +3173,97 @@ impl<'a> Perform<'a> {
                     + pseudo / (survival + pdur)
                     + ex.map_or(0.0, |(_, a, d)| a / (survival + d));
                 self.c.set_out(actor, &format!("{r}RecoupRecoveryAvg"), avg);
+                if self.has_bd(actor) {
+                    let mut l = Vec::new();
+                    let mut n = 0;
+                    let plus = |n: i32| if n > 0 { "+" } else { "" };
+                    if oo(self, &format!("{r}Recoup")) > 0.0 {
+                        l.push(sf!("%d ^8(total damage taken during ehp calcs)", total));
+                        l.push(sf!(
+                            "* %.2f ^8(percent of damage recouped)",
+                            o(self, &format!("{r}Recoup")) / 100.0
+                        ));
+                        n += 1;
+                    }
+                    let ele = oo(self, &format!("Elemental{r}Recoup"));
+                    if ele > 0.0 && total_ele > 0.0 {
+                        if n > 0 {
+                            l.push(String::new());
+                        }
+                        l.push(sf!(
+                            "%s%d ^8(total elemental damage taken during ehp calcs)",
+                            plus(n),
+                            total
+                        ));
+                        l.push(sf!("* %.2f ^8(percent of damage recouped)", ele / 100.0));
+                        n += 1;
+                    }
+                    for t in DMG_TYPES {
+                        let x = oo(self, &format!("{t}{r}Recoup"));
+                        if x > 0.0 && o(self, &format!("{t}RecoupableDamageTaken")) > 0.0 {
+                            if n > 0 {
+                                l.push(String::new());
+                            }
+                            l.push(sf!(
+                                "%s%d ^8(total %s damage taken during ehp calcs)",
+                                plus(n),
+                                total,
+                                t
+                            ));
+                            l.push(sf!("* %.2f ^8(percent of damage recouped)", x / 100.0));
+                            n += 1;
+                        }
+                    }
+                    l.push(sf!("= %d ^8(total damage recoup amount)", rec));
+                    let mut a = l.clone();
+                    l.push(sf!("/ %.2f ^8(over %d seconds)", time, time));
+                    if pseudo > 0.0 {
+                        l.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            pseudo
+                        ));
+                        l.push(sf!("/ %.2f ^8(over %d seconds)", pdur, pdur));
+                    }
+                    if let Some((_, amount, dur)) = ex {
+                        l.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            amount
+                        ));
+                        l.push(sf!("/ %.2f ^8(over %d seconds)", dur, dur));
+                    }
+                    l.push(sf!("= %.2f per second ^8", max));
+                    a.push(sf!(
+                        "/ %.2f ^8(total time of the recoup (survival time + %d seconds))",
+                        survival + time,
+                        time
+                    ));
+                    if pseudo > 0.0 {
+                        a.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            pseudo
+                        ));
+                        a.push(sf!(
+                            "/ %.2f ^8(total time of the recoup (survival time + %d seconds)",
+                            survival + pdur,
+                            pdur
+                        ));
+                    }
+                    if let Some((_, amount, dur)) = ex {
+                        a.push(sf!(
+                            "+ %.2f ^8(total damage mitigated pseudo recoup amount)",
+                            amount
+                        ));
+                        a.push(sf!(
+                            "/ %.2f ^8(total time of the recoup (survival time + %d seconds)",
+                            survival + dur,
+                            dur
+                        ));
+                    }
+                    a.push(sf!("= %.2f per second ^8", avg));
+                    let b = self.bd(actor).unwrap();
+                    b.set_lines(format!("{r}RecoupRecoveryMax"), l);
+                    b.set_lines(format!("{r}RecoupRecoveryAvg"), a);
+                }
             }
         }
         let prevented_total = o(self, "preventedLifeLossTotal");
@@ -2122,14 +3272,43 @@ impl<'a> Perform<'a> {
             && self.c.out(actor, "LifeBelowHalfLossLostOverTime").is_some()
         {
             let lost = self.c.base(db, None, &["LifeLossBelowHalfLost"])? / 100.0;
-            let x =
-                o(self, "LifeLossLostOverTime") + o(self, "LifeBelowHalfLossLostOverTime") * lost;
-            self.c.set_out(actor, "LifeLossLostMax", x / 4.0);
-            self.c.set_out(
-                actor,
-                "LifeLossLostAvg",
-                x / (o(self, "EHPSurvivalTime") + 4.0),
+            let (over, below) = (
+                o(self, "LifeLossLostOverTime"),
+                o(self, "LifeBelowHalfLossLostOverTime"),
             );
+            let x = over + below * lost;
+            let survival = o(self, "EHPSurvivalTime");
+            self.c.set_out(actor, "LifeLossLostMax", x / 4.0);
+            self.c
+                .set_out(actor, "LifeLossLostAvg", x / (survival + 4.0));
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                if over != 0.0 {
+                    l.push(sf!("( %d ^8(total damage prevented by Progenesis)", over));
+                }
+                if below != 0.0 {
+                    let open = if over != 0.0 { "+" } else { "(" };
+                    l.push(sf!(
+                        "%s %d ^8(total damage prevented by petrified blood)",
+                        open,
+                        below
+                    ));
+                    l.push(sf!(
+                        "* %.2f ^8(percent of damage taken from petrified blood)",
+                        lost
+                    ));
+                }
+                let mut a = l.clone();
+                l.push(sf!(") / %.2f ^8(over 4 seconds)", 4.0));
+                l.push(sf!("= %.2f per second", x / 4.0));
+                a.push(sf!(
+                    ") / %.2f ^8(total time of the degen (survival time + 4 seconds))",
+                    survival + 4.0
+                ));
+                a.push(sf!("= %.2f per second", x / (survival + 4.0)));
+                b.set_lines("LifeLossLostMax", l);
+                b.set_lines("LifeLossLostAvg", a);
+            }
         }
         if oo(self, "LifeRecoupRecoveryAvg") > 0.0 || prevented_total > 0.0 {
             let v = oo(self, "LifeRecoupRecoveryMax") - oo(self, "LifeLossLostMax");
@@ -2141,6 +3320,28 @@ impl<'a> Perform<'a> {
             if oo(self, "LifeRecoupRecoveryAvg") > 0.0 && prevented_total > 0.0 {
                 self.c
                     .set_out_val(actor, "showNetRecoup", OutVal::Bool(true));
+                if self.has_bd(actor) {
+                    let net = |p: &Self, k: &str| {
+                        vec![
+                            sf!(
+                                "%.2f ^8(total life recouped per second)",
+                                o(p, &format!("LifeRecoupRecovery{k}"))
+                            ),
+                            sf!(
+                                "- %.2f ^8(total life taken over time per second)",
+                                o(p, &format!("LifeLossLost{k}"))
+                            ),
+                            sf!(
+                                "= %.2f per second",
+                                o(p, &format!("netLifeRecoupAndLossLostOverTime{k}"))
+                            ),
+                        ]
+                    };
+                    let (max, avg) = (net(self, "Max"), net(self, "Avg"));
+                    let b = self.bd(actor).unwrap();
+                    b.set_lines("netLifeRecoupAndLossLostOverTimeMax", max);
+                    b.set_lines("netLifeRecoupAndLossLostOverTimeAvg", avg);
+                }
             }
         }
         Ok(())
@@ -2164,8 +3365,73 @@ impl<'a> Perform<'a> {
         let pe = 1.0 - pne;
         let portion_ne = (total / t / ne2).powf(ne1) * t * ne2 * pne;
         let portion_e = (total / t / e2).powf(e1) * t * e2 * pe;
-        self.c
-            .set_out(actor, "PvPTotalTakenHit", (portion_ne + portion_e) * mult);
+        let v = (portion_ne + portion_e) * mult;
+        self.c.set_out(actor, "PvPTotalTakenHit", v);
+        if let Some(b) = self.bd(actor) {
+            let both = pne > 0.0 && pe > 0.0;
+            let mut l = vec![
+                sf!(
+                    "Pvp Formula is (D/(T*M))^E*T*%s, where D is the damage, T is the time taken,",
+                    if both { "M*P" } else { "M" }
+                ),
+                sf!(
+                    " M is the multiplier%s",
+                    if both {
+                        ", E is the exponent and P is the percentage of that type (ele or non ele)"
+                    } else {
+                        " and E is the exponent"
+                    }
+                ),
+            ];
+            let line = "(%.1f / (%.2f * %.1f)) ^ %.2f * %.2f * %.1f * %.2f = %.1f";
+            let single = "(%.1f / (%.2f * %.1f)) ^ %.2f * %.2f * %.1f = %.1f";
+            if both {
+                l.push(sf!(
+                    "(M= %.1f for ele and %.1f for non-ele)(E= %.2f for ele and %.2f for non-ele)",
+                    e2,
+                    ne2,
+                    e1,
+                    ne1
+                ));
+                l.push(sf!(line, total, t, ne2, ne1, t, ne2, pne, portion_ne));
+                l.push(sf!(line, total, t, e2, e1, t, e2, pe, portion_e));
+                l.push(sf!(
+                    "(portionNonElemental + portionElemental)%s",
+                    if mult != 1.0 {
+                        " * PvP multiplier"
+                    } else {
+                        " "
+                    }
+                ));
+                if mult != 1.0 {
+                    l.push(sf!("(%.1f + %.1f) * %g", portion_ne, portion_e, mult));
+                } else {
+                    l.push(sf!("%.1f + %.1f", portion_ne, portion_e));
+                }
+            } else if pe <= 0.0 {
+                l.push(sf!("(M= %.1f for non-ele)(E= %.2f for non-ele)", ne2, ne1));
+                l.push(sf!(single, total, t, ne2, ne1, t, ne2, portion_ne));
+                if mult != 1.0 {
+                    l.push(sf!(
+                        "%.1f * %g ^8(portionNonElemental * PvP multiplier)",
+                        portion_ne,
+                        mult
+                    ));
+                }
+            } else if pne <= 0.0 {
+                l.push(sf!("(M= %.1f for ele)(E= %.2f for ele)", e2, e1));
+                l.push(sf!(single, total, t, e2, e1, t, e2, portion_e));
+                if mult != 1.0 {
+                    l.push(sf!(
+                        "%.1f * %g ^8(portionElemental * PvP multiplier)",
+                        portion_e,
+                        mult
+                    ));
+                }
+            }
+            l.push(sf!("= %.1f", v));
+            b.set_lines("PvPTotalTakenHit", l);
+        }
         Ok(())
     }
 
@@ -2349,6 +3615,12 @@ impl<'a> Perform<'a> {
             };
             self.c
                 .set_out(actor, &format!("{t}MaximumHitTaken"), final_max);
+            if self.has_bd(actor) {
+                let b = self.max_hit_breakdown(actor, t, st, final_max, enemy_mult, smoothing)?;
+                self.bd(actor)
+                    .unwrap()
+                    .set(format!("{t}MaximumHitTaken"), b);
+            }
         }
         let mut minimum = f64::INFINITY;
         let mut second = f64::INFINITY;
@@ -2382,11 +3654,23 @@ impl<'a> Perform<'a> {
             if base > 0.0 {
                 for &(c, pct) in ds {
                     if pct > 0.0 {
-                        let total = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                        let mult = o(self, &format!("{c}TakenDotMult"));
+                        let total = base * (pct / 100.0) * mult;
                         let k = format!("{c}BuildDegen");
                         let v = self.o_or(actor, &k, 0.0) + total;
                         self.c.set_out(actor, &k, v);
                         total_build += total;
+                        if let Some(b) = self.bd(actor) {
+                            degen_rows(
+                                b,
+                                "TotalBuildDegen",
+                                &k,
+                                None,
+                                t,
+                                c,
+                                [base, pct, mult, total],
+                            );
+                        }
                     }
                 }
             }
@@ -2421,12 +3705,14 @@ impl<'a> Perform<'a> {
         } else {
             self.c.set_out(actor, "TotalBuildDegen", total_build);
             let (mut tl, mut tm, mut te) = (0.0, 0.0, 0.0);
+            let mut rows = Vec::new();
             for t in DMG_TYPES {
                 if let Some(d) = self.c.out(actor, &format!("{t}BuildDegen")) {
                     let (l, m, e) = split(self, t, d);
                     tl += l;
                     tm += m;
                     te += e;
+                    rows.push((t, [l, m, e]));
                 }
             }
             let nl = o(self, "LifeRegenRecovery") - tl;
@@ -2436,6 +3722,29 @@ impl<'a> Perform<'a> {
             self.c.set_out(actor, "NetManaRegen", nm);
             self.c.set_out(actor, "NetEnergyShieldRegen", ne);
             self.c.set_out(actor, "TotalNetRegen", nl + nm + ne);
+            if self.has_bd(actor) {
+                let mut tables = net_regen_tables(&rows);
+                for (k, (pool, what)) in POOLS3.iter().enumerate() {
+                    let regen = o(self, &format!("{pool}RegenRecovery"));
+                    let l = &mut tables[k].lines;
+                    l.push(sf!("%.1f ^8(total %s regen)", regen, *what));
+                    l.push(sf!("- %.1f ^8(total %s degen)", [tl, tm, te][k], *what));
+                    l.push(sf!("= %.1f", [nl, nm, ne][k]));
+                }
+                let b = self.bd(actor).unwrap();
+                for ((pool, _), t) in POOLS3.iter().zip(tables) {
+                    b.set(format!("Net{pool}Regen"), t);
+                }
+                b.set_lines(
+                    "TotalNetRegen",
+                    vec![
+                        sf!("Net Life Regen: %.1f", nl),
+                        sf!("+ Net Mana Regen: %.1f", nm),
+                        sf!("+ Net Energy Shield Regen: %.1f", ne),
+                        sf!("= Total Net Regen: %.1f", nl + nm + ne),
+                    ],
+                );
+            }
         }
         let crit_ailment = 1.0
             + self.o_or(actor, "EnemyCritChance", 0.0) / 100.0
@@ -2489,8 +3798,9 @@ impl<'a> Perform<'a> {
             };
             if category == "DamageOverTime" {
                 for t in DMG_TYPES {
-                    let base = self
-                        .input_num(&format!("enemy{t}Damage"))
+                    let given = self.input_num(&format!("enemy{t}Damage"));
+                    let source = if given.is_some() { "Config" } else { "Default" };
+                    let base = given
                         .or_else(|| {
                             Some(
                                 self.placeholder_num(&format!("enemy{t}Damage"))
@@ -2501,11 +3811,16 @@ impl<'a> Perform<'a> {
                     if base > 0.0 {
                         for (c, pct) in dot_of(t) {
                             if pct > 0.0 {
-                                let x = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                                let mult = o(self, &format!("{c}TakenDotMult"));
+                                let x = base * (pct / 100.0) * mult;
                                 let k = format!("{c}EnemyDegen");
                                 let v = self.o_or(actor, &k, 0.0) + x;
                                 self.c.set_out(actor, &k, v);
                                 total += x;
+                                if let Some(b) = self.bd(actor) {
+                                    let row = [base, pct, mult, x];
+                                    degen_rows(b, "TotalDegen", &k, Some(source), t, c, row);
+                                }
                             }
                         }
                     }
@@ -2537,11 +3852,16 @@ impl<'a> Perform<'a> {
                     if base > 0.0 {
                         for (c, pct) in dot_of(dt) {
                             if pct > 0.0 {
-                                let x = base * (pct / 100.0) * o(self, &format!("{c}TakenDotMult"));
+                                let mult = o(self, &format!("{c}TakenDotMult"));
+                                let x = base * (pct / 100.0) * mult;
                                 let k = format!("{c}EnemyDegen");
                                 let v = self.o_or(actor, &k, 0.0) + x;
                                 self.c.set_out(actor, &k, v);
                                 total += x;
+                                if let Some(b) = self.bd(actor) {
+                                    let row = [base, pct, mult, x];
+                                    degen_rows(b, "TotalDegen", &k, Some(source), dt, c, row);
+                                }
                             }
                         }
                     }
@@ -2552,6 +3872,7 @@ impl<'a> Perform<'a> {
             } else {
                 self.c.set_out(actor, "TotalDegen", total);
                 let (mut tl, mut tm, mut te) = (0.0, 0.0, 0.0);
+                let mut rows = Vec::new();
                 for t in DMG_TYPES {
                     let d = self.o_or(actor, &format!("{t}BuildDegen"), 0.0)
                         + self.o_or(actor, &format!("{t}EnemyDegen"), 0.0);
@@ -2560,6 +3881,7 @@ impl<'a> Perform<'a> {
                         tl += l;
                         tm += m;
                         te += e;
+                        rows.push((t, [l, m, e]));
                     }
                 }
                 let nl = o(self, "LifeRegenRecovery")
@@ -2578,6 +3900,60 @@ impl<'a> Perform<'a> {
                     .set_out(actor, "ComprehensiveNetEnergyShieldRegen", ne);
                 self.c
                     .set_out(actor, "ComprehensiveTotalNetRegen", nl + nm + ne);
+                if self.has_bd(actor) {
+                    let oo = |p: &Self, k: &str| p.o_or(actor, k, 0.0);
+                    let mut tables = net_regen_tables(&rows);
+                    let [life, mana, es] = &mut tables;
+                    let l = &mut life.lines;
+                    l.push(sf!(
+                        "%.1f ^8(total life regen)",
+                        o(self, "LifeRegenRecovery")
+                    ));
+                    if oo(self, "LifeRecoupRecoveryAvg") != 0.0 {
+                        l.push(sf!(
+                            "+ %.1f ^8(average life recoup)",
+                            oo(self, "LifeRecoupRecoveryAvg")
+                        ));
+                    }
+                    l.push(sf!("- %.1f ^8(total life degen)", tl));
+                    if oo(self, "LifeLossLostAvg") != 0.0 {
+                        l.push(sf!(
+                            "- %.1f ^8(average life lost over time)",
+                            oo(self, "LifeLossLostAvg")
+                        ));
+                    }
+                    l.push(sf!("= %.1f", nl));
+                    for (t, what, pool, degen, net) in [
+                        (mana, "mana", "Mana", tm, nm),
+                        (es, "energy shield", "EnergyShield", te, ne),
+                    ] {
+                        let l = &mut t.lines;
+                        l.push(sf!(
+                            "%.1f ^8(total %s regen)",
+                            o(self, &format!("{pool}RegenRecovery")),
+                            what
+                        ));
+                        let recoup = oo(self, &format!("{pool}RecoupRecoveryAvg"));
+                        if recoup != 0.0 {
+                            l.push(sf!("+ %.1f ^8(average %s recoup)", recoup, what));
+                        }
+                        l.push(sf!("- %.1f ^8(total %s degen)", degen, what));
+                        l.push(sf!("= %.1f", net));
+                    }
+                    let b = self.bd(actor).unwrap();
+                    for ((pool, _), t) in POOLS3.iter().zip(tables) {
+                        b.set(format!("ComprehensiveNet{pool}Regen"), t);
+                    }
+                    b.set_lines(
+                        "ComprehensiveTotalNetRegen",
+                        vec![
+                            sf!("Net Life Regen: %.1f", nl),
+                            sf!("+ Net Mana Regen: %.1f", nm),
+                            sf!("+ Net Energy Shield Regen: %.1f", ne),
+                            sf!("= Total Net Regen: %.1f", nl + nm + ne),
+                        ],
+                    );
+                }
             }
         }
         Ok(())

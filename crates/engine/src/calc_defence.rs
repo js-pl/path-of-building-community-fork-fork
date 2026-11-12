@@ -9,10 +9,13 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::OutVal;
+use crate::breakdown::{Breakdown, Chain, Slot, f, f2, multi_chain};
 use crate::calc::{ENEMY, PLAYER, floor, m_max, m_min, number, round};
 use crate::calc_perform::{Perform, converted_tags, field_num, new_mod, src};
 use crate::config::Val;
 use crate::mods::{Cfg, ModType, ModValue, Tag};
+use crate::pat::num;
+use crate::sf;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -284,6 +287,17 @@ impl<'a> Perform<'a> {
                 format!("MissingTotem{elem}Resist"),
                 m_max(0.0, totem_max - totem_fin),
             );
+            if let Some(b) = self.bd(actor) {
+                let lines = |max: f64, total: f64| {
+                    vec![
+                        format!("Min: {}%", num(min)),
+                        format!("Max: {}%", num(max)),
+                        format!("Total: {}%", num(total)),
+                    ]
+                };
+                b.set_lines(format!("{elem}Resist"), lines(max, total));
+                b.set_lines(format!("Totem{elem}Resist"), lines(totem_max, totem_total));
+            }
         }
         Ok(())
     }
@@ -498,6 +512,27 @@ impl<'a> Perform<'a> {
             );
             self.c.set_out(actor, "SpellProjectileBlockChance", v);
         }
+        if self.has_bd(actor) {
+            let o = |k: &str| self.o(actor, k);
+            let block = vec![
+                format!("Base: {}%", num(base_block)),
+                format!("Max: {}%", num(o("BlockChanceMax"))),
+                format!(
+                    "Total: {}%",
+                    num(o("BlockChance") + o("BlockChanceOverCap"))
+                ),
+            ];
+            let spell = vec![
+                format!("Max: {}%", num(o("SpellBlockChanceMax"))),
+                format!(
+                    "Total: {}%",
+                    num(o("SpellBlockChance") + o("SpellBlockChanceOverCap"))
+                ),
+            ];
+            let b = self.bd(actor).unwrap();
+            b.set_lines("BlockChance", block);
+            b.set_lines("SpellBlockChance", spell);
+        }
         if self.c.flag(db, None, &["CannotBlockAttacks"])? {
             self.c.set_out(actor, "BlockChance", 0.0);
             self.c.set_out(actor, "ProjectileBlockChance", 0.0);
@@ -710,6 +745,24 @@ impl<'a> Perform<'a> {
             "SpellDodgeChanceOverCap",
             m_max(0.0, spell_dodge - spell_dodge_max),
         );
+        if self.has_bd(actor) {
+            let total = |p: &Self, k: &str| {
+                format!("Total: {}%", num(o(p, k) + o(p, &format!("{k}OverCap"))))
+            };
+            let attack = vec![
+                format!("Base: {}%", num(attack_dodge)),
+                format!("Max: {}%", num(attack_max)),
+                total(self, "AttackDodgeChance"),
+            ];
+            let spell = vec![
+                format!("Base: {}%", num(spell_dodge)),
+                format!("Max: {}%", num(spell_dodge_max)),
+                total(self, "SpellDodgeChance"),
+            ];
+            let b = self.bd(actor).unwrap();
+            b.set_lines("AttackDodgeChance", attack);
+            b.set_lines("SpellDodgeChance", spell);
+        }
 
         // Recovery modifiers
         let mut life_rate = 1.0;
@@ -744,18 +797,45 @@ impl<'a> Perform<'a> {
         {
             return Err("not ported: leech from party members".into());
         }
-        let v = life * o(self, "MaxLifeLeechRatePercent") / 100.0;
+        let pct = o(self, "MaxLifeLeechRatePercent");
+        let v = life * pct / 100.0;
         self.c.set_out(actor, "MaxLifeLeechRate", v);
+        let leech = |p: &mut Self, k: &str, pool: f64, what: &str, pct: f64, v: f64| {
+            if let Some(b) = p.bd(actor) {
+                let lines = vec![
+                    sf!("%d ^8(maximum %s)", pool, what),
+                    sf!(
+                        "x %d%% ^8(percentage of %s to maximum leech rate)",
+                        pct,
+                        what
+                    ),
+                    sf!("= %.1f", v),
+                ];
+                b.set_lines(k, lines);
+            }
+        };
+        leech(self, "MaxLifeLeechRate", life, "life", pct, v);
         let es = o(self, "EnergyShield");
         let v = es * self.c.val(db, "MaxEnergyShieldLeechInstance", None)? / 100.0;
         self.c.set_out(actor, "MaxEnergyShieldLeechInstance", v);
-        let v = es * self.c.val(db, "MaxEnergyShieldLeechRate", None)? / 100.0;
+        let pct = self.c.val(db, "MaxEnergyShieldLeechRate", None)?;
+        let v = es * pct / 100.0;
         self.c.set_out(actor, "MaxEnergyShieldLeechRate", v);
+        leech(
+            self,
+            "MaxEnergyShieldLeechRate",
+            es,
+            "energy shield",
+            pct,
+            v,
+        );
         let mana = o(self, "Mana");
         let v = mana * self.c.val(db, "MaxManaLeechInstance", None)? / 100.0;
         self.c.set_out(actor, "MaxManaLeechInstance", v);
-        let v = mana * self.c.val(db, "MaxManaLeechRate", None)? / 100.0;
+        let pct = self.c.val(db, "MaxManaLeechRate", None)?;
+        let v = mana * pct / 100.0;
         self.c.set_out(actor, "MaxManaLeechRate", v);
+        leech(self, "MaxManaLeechRate", mana, "mana", pct, v);
 
         self.regeneration(actor)?;
 
@@ -784,27 +864,86 @@ impl<'a> Perform<'a> {
                 .c
                 .override_num(db, None, &["EnergyShieldRecharge"])?
                 .unwrap_or(misc(self, "EnergyShieldRechargeBase"));
-            if to_life == Some(true) {
-                let recharge = o(self, "Life") * base * (1.0 + inc / 100.0) * more;
-                let v = round(recharge * o(self, "LifeRecoveryRateMod"), 0.0);
-                self.c.set_out(actor, "LifeRecharge", v);
+            let pool = if to_life == Some(true) {
+                "Life"
             } else {
-                let recharge = o(self, "EnergyShield") * base * (1.0 + inc / 100.0) * more;
-                let v = round(recharge * o(self, "EnergyShieldRecoveryRateMod"), 0.0);
-                self.c.set_out(actor, "EnergyShieldRecharge", v);
+                "EnergyShield"
+            };
+            let recharge = o(self, pool) * base * (1.0 + inc / 100.0) * more;
+            let rate_mod = o(self, &format!("{pool}RecoveryRateMod"));
+            let v = round(recharge * rate_mod, 0.0);
+            self.c.set_out(actor, &format!("{pool}Recharge"), v);
+            if self.has_bd(actor) {
+                let mut l = Vec::new();
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("Recharge rate:"),
+                        base: Some(f2(
+                            "%.1f ^8(%d%% per second)",
+                            o(self, pool) * base,
+                            base * 100.0,
+                        )),
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                            f("%.2f ^8(more/less)", more),
+                        ],
+                        total: Some(sf!("= %.1f ^8per second", recharge)),
+                        ..Chain::default()
+                    },
+                );
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some("Effective Recharge rate:"),
+                        base: Some(f("%.1f", recharge)),
+                        factors: vec![f("%.2f ^8(recovery rate modifier)", rate_mod)],
+                        total: Some(sf!("= %.1f ^8per second", v)),
+                        ..Chain::default()
+                    },
+                );
+                self.bd(actor)
+                    .unwrap()
+                    .set_lines(format!("{pool}Recharge"), l);
             }
-            let v = misc(self, "EnergyShieldRechargeDelay")
-                / (1.0 + self.c.inc(db, None, &["EnergyShieldRechargeFaster"])? / 100.0);
+            let base_delay = misc(self, "EnergyShieldRechargeDelay");
+            let faster = 1.0 + self.c.inc(db, None, &["EnergyShieldRechargeFaster"])? / 100.0;
+            let v = base_delay / faster;
             self.c.set_out(actor, "EnergyShieldRechargeDelay", v);
+            if let Some(b) = self.bd(actor)
+                && v != base_delay
+            {
+                b.set_lines(
+                    "EnergyShieldRechargeDelay",
+                    vec![
+                        sf!("%.2fs ^8(base)", base_delay),
+                        sf!("/ %.2f ^8(faster start)", faster),
+                        sf!("= %.2fs", v),
+                    ],
+                );
+            }
         } else {
             self.c.set_out(actor, "EnergyShieldRecharge", 0.0);
         }
 
         self.recoup(actor)?;
 
-        let v = misc(self, "WardRechargeDelay")
-            / (1.0 + self.c.inc(db, None, &["WardRechargeFaster"])? / 100.0);
+        let base_delay = misc(self, "WardRechargeDelay");
+        let faster = 1.0 + self.c.inc(db, None, &["WardRechargeFaster"])? / 100.0;
+        let v = base_delay / faster;
         self.c.set_out(actor, "WardRechargeDelay", v);
+        if let Some(b) = self.bd(actor)
+            && v != base_delay
+        {
+            b.set_lines(
+                "WardRechargeDelay",
+                vec![
+                    sf!("%.2fs ^8(base)", base_delay),
+                    sf!("/ %.2f ^8(faster start)", faster),
+                    sf!("= %.2fs", v),
+                ],
+            );
+        }
 
         // Damage reduction
         let dr_max = self
@@ -866,6 +1005,23 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "MovementSpeedMod", ms);
         let v = ms * o(self, "ActionSpeedMod");
         self.c.set_out(actor, "EffectiveMovementSpeedMod", v);
+        if self.has_bd(actor) {
+            let mut l = Vec::new();
+            multi_chain(
+                &mut l,
+                Chain {
+                    factors: vec![
+                        f("%.2f ^8(movement speed modifier)", ms),
+                        f("%.2f ^8(action speed modifier)", o(self, "ActionSpeedMod")),
+                    ],
+                    total: Some(sf!("= %.2f ^8(effective movement speed modifier)", v)),
+                    ..Chain::default()
+                },
+            );
+            self.bd(actor)
+                .unwrap()
+                .set_lines("EffectiveMovementSpeedMod", l);
+        }
         if self.c.flag(edb, None, &["Blind"])? {
             let v = self
                 .c
@@ -1090,6 +1246,12 @@ impl<'a> Perform<'a> {
         self.c.set_out(actor, "LightRadiusMod", v);
         let v = m_max(self.c.inc(db, None, &["LightRadius"])?, 0.0);
         self.c.set_out(actor, "LightRadiusInc", v);
+        if self.has_bd(actor) {
+            let inc = self.c.inc(db, None, &["LightRadius"])?;
+            let more = self.c.more(db, None, &["LightRadius"])?;
+            let l = crate::breakdown::mod_(inc, more);
+            self.bd(actor).unwrap().set_opt("LightRadiusMod", l);
+        }
         let v = m_max(
             self.c.more(db, None, &["CurseEffectOnSelf"])?
                 * (100.0 + self.c.inc(db, None, &["CurseEffectOnSelf"])?),
@@ -1205,6 +1367,54 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
+    /// A row of a primary defence's breakdown for an item's slot, without
+    /// a name
+    fn slot_row(
+        &self,
+        actor: usize,
+        source: &str,
+        base: f64,
+        total: Option<f64>,
+        inc: f64,
+        more: f64,
+    ) -> Slot {
+        let item = self.c.actors.actors[actor].item_list.get(source).copied();
+        crate::breakdown::slot(source, None, item, base, total, inc, more)
+    }
+
+    fn push_slot(&mut self, actor: usize, key: &str, row: Slot) -> Result<()> {
+        if let Some(b) = self.bd(actor) {
+            b.existing(key)?
+                .slots
+                .get_or_insert_with(Vec::new)
+                .push(row);
+        }
+        Ok(())
+    }
+
+    /// `breakdown.slot(source, sourceName, cfg, base, total, ...)`
+    #[allow(clippy::too_many_arguments)]
+    fn bd_slot(
+        &mut self,
+        actor: usize,
+        source: &str,
+        source_name: Option<&str>,
+        cfg: Option<&Cfg>,
+        base: f64,
+        total: Option<f64>,
+        names: &[&str],
+    ) -> Result<()> {
+        if !self.has_bd(actor) {
+            return Ok(());
+        }
+        let db = self.c.db(actor);
+        let inc = self.c.inc(db, cfg, names)?;
+        let more = self.c.more(db, cfg, names)?;
+        let mut row = self.slot_row(actor, source, base, total, inc, more);
+        row.source_name = source_name.map(String::from);
+        self.push_slot(actor, names[0], row)
+    }
+
     /// Energy shield, armour, evasion and ward, and the evade chances
     fn primary_defences(&mut self, actor: usize) -> Result<()> {
         let db = self.c.db(actor);
@@ -1215,6 +1425,18 @@ impl<'a> Perform<'a> {
         let (mut ward, mut es, mut armour, mut evasion) = (0.0, 0.0, 0.0, 0.0);
         let (mut gear_ward, mut gear_es, mut gear_armour, mut gear_evasion) = (0.0, 0.0, 0.0, 0.0);
         let es_to_ward = self.c.flag(db, None, &["EnergyShieldToWard"])?;
+        let bd = self.has_bd(actor);
+        if let Some(b) = self.bd(actor) {
+            for k in ["Ward", "EnergyShield", "Armour", "Evasion"] {
+                b.set(
+                    k,
+                    Breakdown {
+                        slots: Some(Vec::new()),
+                        ..Breakdown::default()
+                    },
+                );
+            }
+        }
         for slot in [
             "Helmet",
             "Gloves",
@@ -1276,21 +1498,42 @@ impl<'a> Perform<'a> {
                     let inc = self.c.inc(db, sc, &["Ward", "Defences", "EnergyShield"])?;
                     let more = self.c.more(db, sc, &["Ward", "Defences"])?;
                     ward += ward_base * (1.0 + inc / 100.0) * more;
+                    if bd {
+                        let row = self.slot_row(actor, slot, ward_base, None, inc, more);
+                        self.push_slot(actor, "Ward", row)?;
+                    }
                 } else {
                     ward += ward_base * self.c.calc_mod(db, sc, &["Ward", "Defences"])?;
+                    self.bd_slot(
+                        actor,
+                        slot,
+                        None,
+                        sc,
+                        ward_base,
+                        None,
+                        &["Ward", "Defences"],
+                    )?;
                 }
                 gear_ward += ward_base;
             }
             if es_base > 0.0 {
                 if es_to_ward {
-                    es += es_base * self.c.more(db, sc, &["EnergyShield", "Defences"])?;
+                    let more = self.c.more(db, sc, &["EnergyShield", "Defences"])?;
+                    es += es_base * more;
                     gear_es += es_base;
+                    if bd {
+                        let mut row = self.slot_row(actor, slot, es_base, None, 0.0, more);
+                        row.total = sf!("%.2f", es_base * more);
+                        self.push_slot(actor, "EnergyShield", row)?;
+                    }
                 } else if !self.c.flag(db, None, &["ConvertArmourESToLife"])? {
                     es += es_base
                         * self
                             .c
                             .calc_mod(db, sc, &["EnergyShield", "Defences", &es_armour])?;
                     gear_es += es_base;
+                    let names = ["EnergyShield", "Defences", &es_armour];
+                    self.bd_slot(actor, slot, None, sc, es_base, None, &names)?;
                 }
             }
             if armour_base > 0.0 {
@@ -1301,9 +1544,13 @@ impl<'a> Perform<'a> {
                         &["Armour", "ArmourAndEvasion", "Defences", &es_armour],
                     )?;
                 gear_armour += armour_base;
+                let names = ["Armour", "ArmourAndEvasion", "Defences", &es_armour];
+                self.bd_slot(actor, slot, None, sc, armour_base, None, &names)?;
             }
             if evasion_base > 0.0 {
                 gear_evasion += evasion_base;
+                let names = ["Evasion", "ArmourAndEvasion", "Defences"];
+                self.bd_slot(actor, slot, None, sc, evasion_base, None, &names)?;
                 if iron_reflexes {
                     armour += evasion_base
                         * self.c.calc_mod(
@@ -1327,8 +1574,14 @@ impl<'a> Perform<'a> {
                     .inc(db, None, &["Ward", "Defences", "EnergyShield"])?;
                 let more = self.c.more(db, None, &["Ward", "Defences"])?;
                 ward += ward_base * (1.0 + inc / 100.0) * more;
+                if bd {
+                    let row = self.slot_row(actor, "Global", ward_base, None, inc, more);
+                    self.push_slot(actor, "Ward", row)?;
+                }
             } else {
                 ward += ward_base * self.c.calc_mod(db, None, &["Ward", "Defences"])?;
+                let names = ["Ward", "Defences"];
+                self.bd_slot(actor, "Global", None, None, ward_base, None, &names)?;
             }
         }
         let es_base = self.c.base(db, None, &["EnergyShield"])?;
@@ -1338,6 +1591,12 @@ impl<'a> Perform<'a> {
             } else {
                 es += es_base * self.c.calc_mod(db, None, &["EnergyShield", "Defences"])?;
             }
+            if bd {
+                let inc = self.c.inc(db, None, &["Defences", "EnergyShield"])?;
+                let more = self.c.more(db, None, &["EnergyShield", "Defences"])?;
+                let row = self.slot_row(actor, "Global", es_base, None, inc, more);
+                self.push_slot(actor, "EnergyShield", row)?;
+            }
         }
         let armour_base = self.c.base(db, None, &["Armour", "ArmourAndEvasion"])?;
         if armour_base > 0.0 {
@@ -1345,6 +1604,8 @@ impl<'a> Perform<'a> {
                 * self
                     .c
                     .calc_mod(db, None, &["Armour", "ArmourAndEvasion", "Defences"])?;
+            let names = ["Armour", "ArmourAndEvasion", "Defences"];
+            self.bd_slot(actor, "Global", None, None, armour_base, None, &names)?;
         }
         let evasion_base = self.c.base(db, None, &["Evasion", "ArmourAndEvasion"])?;
         if evasion_base > 0.0 {
@@ -1355,22 +1616,31 @@ impl<'a> Perform<'a> {
                         None,
                         &["Armour", "Evasion", "ArmourAndEvasion", "Defences"],
                     )?;
+                let names = ["Armour", "Evasion", "ArmourAndEvasion", "Defences"];
+                let conv = Some("Evasion to Armour");
+                self.bd_slot(actor, "Conversion", conv, None, evasion_base, None, &names)?;
             } else {
                 evasion += evasion_base
                     * self
                         .c
                         .calc_mod(db, None, &["Evasion", "ArmourAndEvasion", "Defences"])?;
+                let names = ["Evasion", "ArmourAndEvasion", "Defences"];
+                self.bd_slot(actor, "Global", None, None, evasion_base, None, &names)?;
             }
         }
         let conv = self.c.base(db, None, &["ManaConvertToArmour"])?;
         if conv > 0.0 {
             let base = 2.0 * self.c.base(db, None, &["Mana"])? * conv / 100.0;
-            armour += base
+            let total = base
                 * self.c.calc_mod(
                     db,
                     None,
                     &["Mana", "Armour", "ArmourAndEvasion", "Defences"],
                 )?;
+            armour += total;
+            let names = ["Armour", "ArmourAndEvasion", "Defences", "Mana"];
+            let conv = Some("Mana to Armour");
+            self.bd_slot(actor, "Conversion", conv, None, base, Some(total), &names)?;
         }
         let conv = self.c.base(db, None, &["ManaGainAsEnergyShield"])?;
         if conv > 0.0 {
@@ -1379,12 +1649,15 @@ impl<'a> Perform<'a> {
                 * self
                     .c
                     .calc_mod(db, None, &["Mana", "EnergyShield", "Defences"])?;
+            let names = ["EnergyShield", "Defences", "Mana"];
+            let conv = Some("Mana to Energy Shield");
+            self.bd_slot(actor, "Conversion", conv, None, base, None, &names)?;
         }
         let ci = self.c.flag(db, None, &["ChaosInoculation"])?;
         let conv = self.c.base(db, None, &["LifeGainAsArmour"])?;
         if conv > 0.0 {
             let base = self.c.base(db, None, &["Life"])? * conv / 100.0;
-            armour += if ci {
+            let total = if ci {
                 1.0
             } else {
                 base * self.c.calc_mod(
@@ -1393,6 +1666,10 @@ impl<'a> Perform<'a> {
                     &["Life", "Armour", "ArmourAndEvasion", "Defences"],
                 )?
             };
+            armour += total;
+            let names = ["Armour", "ArmourAndEvasion", "Defences", "Life"];
+            let conv = Some("Life to Armour");
+            self.bd_slot(actor, "Conversion", conv, None, base, Some(total), &names)?;
         }
         let conv = self.c.base(
             db,
@@ -1401,25 +1678,33 @@ impl<'a> Perform<'a> {
         )?;
         if conv > 0.0 {
             let base = self.c.base(db, None, &["Life"])? * conv / 100.0;
-            es += if ci {
+            let total = if ci {
                 1.0
             } else {
                 base * self
                     .c
                     .calc_mod(db, None, &["Life", "EnergyShield", "Defences"])?
             };
+            es += total;
+            let names = ["EnergyShield", "Defences", "Life"];
+            let conv = Some("Life to Energy Shield");
+            self.bd_slot(actor, "Conversion", conv, None, base, Some(total), &names)?;
         }
         let conv = self.c.base(db, None, &["EvasionGainAsArmour"])?;
         if conv > 0.0 {
             let base = (self.c.base(db, None, &["Evasion", "ArmourAndEvasion"])? + gear_evasion)
                 * conv
                 / 100.0;
-            armour += base
+            let total = base
                 * self.c.calc_mod(
                     db,
                     None,
                     &["Evasion", "Armour", "ArmourAndEvasion", "Defences"],
                 )?;
+            armour += total;
+            let names = ["Armour", "ArmourAndEvasion", "Defences", "Evasion"];
+            let conv = Some("Evasion to Armour");
+            self.bd_slot(actor, "Conversion", conv, None, base, Some(total), &names)?;
         }
         let es_out = self
             .c
@@ -1557,6 +1842,46 @@ impl<'a> Perform<'a> {
                 self.c
                     .set_out_val(actor, "noSplitEvade", OutVal::Bool(true));
             }
+            if self.has_bd(actor) {
+                let level = sf!(
+                    "Enemy level: %d ^8(%s the Configuration tab)",
+                    self.env.enemy_level,
+                    if self.config_val("enemyLevel").is_some() {
+                        "overridden from"
+                    } else {
+                        "can be overridden in"
+                    }
+                );
+                let accuracy = sf!("Average enemy accuracy: %d", acc);
+                let evade = o(self, "EvadeChance");
+                let b = self.bd(actor).unwrap();
+                b.set_lines(
+                    "EvadeChance",
+                    vec![
+                        level.clone(),
+                        accuracy.clone(),
+                        sf!("Approximate evade chance: %d%%", evade),
+                    ],
+                );
+                b.set_lines(
+                    "MeleeEvadeChance",
+                    vec![
+                        level.clone(),
+                        accuracy.clone(),
+                        sf!("Effective Evasion: %d", melee),
+                        sf!("Approximate melee evade chance: %d%%", m),
+                    ],
+                );
+                b.set_lines(
+                    "ProjectileEvadeChance",
+                    vec![
+                        level,
+                        accuracy,
+                        sf!("Effective Evasion: %d", proj),
+                        sf!("Approximate projectile evade chance: %d%%", p),
+                    ],
+                );
+            }
         }
         Ok(())
     }
@@ -1571,6 +1896,7 @@ impl<'a> Perform<'a> {
             let mut inc = self.c.inc(db, None, &[&format!("{r}Regen")])?;
             let more = self.c.more(db, None, &[&format!("{r}Regen")])?;
             let mut regen_rate = 0.0;
+            let mut base_regen = 0.0;
             let rate_mod = self
                 .c
                 .out(actor, &format!("{r}RecoveryRateMod"))
@@ -1640,6 +1966,7 @@ impl<'a> Perform<'a> {
                 }
                 let base = self.c.base(db, None, &[&format!("{r}Regen")])?
                     + pool * self.c.base(db, None, &[&format!("{r}RegenPercent")])? / 100.0;
+                base_regen = base;
                 let regen = base * (1.0 + inc / 100.0) * more;
                 if regen != 0.0 {
                     for to in &resources[i + 1..] {
@@ -1698,7 +2025,84 @@ impl<'a> Perform<'a> {
                 0.0
             };
             self.c.set_out(actor, &format!("{r}RegenPercent"), pct);
+            if let Some(b) = self.bd(actor) {
+                let mut l = Vec::new();
+                let label = format!("{name} Regeneration:");
+                multi_chain(
+                    &mut l,
+                    Chain {
+                        label: Some(&label),
+                        base: Some(f("%.1f ^8(base)", base_regen)),
+                        factors: vec![
+                            f("%.2f ^8(increased/reduced)", 1.0 + inc / 100.0),
+                            f("%.2f ^8(more/less)", more),
+                            f("%.2f ^8(recovery rate modifier)", rate_mod),
+                        ],
+                        total: Some(sf!("= %.1f ^8per second", regen_rate)),
+                        ..Chain::default()
+                    },
+                );
+                if unaffected {
+                    l.push(format!("Unaffected by {name} Regen"));
+                }
+                if degen_rate != 0.0 {
+                    l.push(sf!("- %.1f ^8(degen)", degen_rate));
+                    let v = if unaffected { 0.0 } else { regen_rate } - degen_rate;
+                    l.push(sf!("= %.1f ^8per second", v));
+                }
+                if recovery != 0.0 {
+                    l.push(sf!("+ %.1f ^8(recovery)", recovery));
+                    l.push(sf!("= %.1f ^8per second", rr));
+                }
+                b.set_lines(format!("{r}RegenRecovery"), l);
+            }
         }
+        Ok(())
+    }
+
+    /// The breakdown of a recoup output
+    /// The breakdown of a recoup output; `typed` for a damage type's, whose
+    /// total line shows whatever the rate
+    #[allow(clippy::too_many_arguments)]
+    fn bd_recoup(
+        &mut self,
+        actor: usize,
+        t: &str,
+        k: &str,
+        base: f64,
+        inc: f64,
+        more: f64,
+        typed: bool,
+    ) -> Result<()> {
+        if !self.has_bd(actor) {
+            return Ok(());
+        }
+        let db = self.c.db(actor);
+        let rate = self.o(actor, &format!("{t}RecoveryRateMod"));
+        let v = self.o(actor, k);
+        let secs = if self.c.flag(db, None, &[&format!("3Second{t}Recoup")])?
+            || self.c.flag(db, None, &["3SecondRecoup"])?
+        {
+            3.0
+        } else {
+            4.0
+        };
+        let mut l = vec![sf!("%d%% ^8(base)", base)];
+        if inc != 1.0 {
+            l.push(sf!("x %.2f (increased/reduced)", inc));
+        }
+        if more != 1.0 {
+            l.push(sf!("x %.2f (more/less)", more));
+        }
+        if rate != 1.0 {
+            l.push(sf!("* %.2f ^8(recovery rate modifier)", rate));
+        }
+        l.push(if rate != 1.0 || typed {
+            sf!("= %.1f%% over %d seconds", v, secs)
+        } else {
+            sf!("%.1f%% over %d seconds", v, secs)
+        });
+        self.bd(actor).unwrap().set_lines(k, l);
         Ok(())
     }
 
@@ -1754,6 +2158,15 @@ impl<'a> Perform<'a> {
                 self.c.set_out(actor, &format!("{t}Recoup"), v);
                 let any = o(self, "anyRecoup") + v;
                 self.c.set_out(actor, "anyRecoup", any);
+                self.bd_recoup(
+                    actor,
+                    t,
+                    &format!("{t}Recoup"),
+                    base,
+                    recoup_inc,
+                    recoup_more,
+                    false,
+                )?;
             }
         }
         if self.c.flag(db, None, &["UsePowerCharges"])?
@@ -1797,6 +2210,15 @@ impl<'a> Perform<'a> {
                     self.c.set_out(actor, &format!("{d}{t}Recoup"), v);
                     let any = o(self, "anyRecoup") + v;
                     self.c.set_out(actor, "anyRecoup", any);
+                    self.bd_recoup(
+                        actor,
+                        t,
+                        &format!("{d}{t}Recoup"),
+                        recoup,
+                        recoup_inc,
+                        recoup_more,
+                        true,
+                    )?;
                 }
                 for t2 in types {
                     if let Some(source) = added_to(self, t, t2)? {
@@ -1839,6 +2261,25 @@ impl<'a> Perform<'a> {
                         .set_out(actor, &format!("PhysicalDamageMitigated{r}PseudoRecoup"), v);
                     let any = o(self, "anyRecoup") + v;
                     self.c.set_out(actor, "anyRecoup", any);
+                    if self.has_bd(actor) {
+                        let rate = o(self, &format!("{r}RecoveryRateMod"));
+                        let mut l = Vec::new();
+                        if rate != 1.0 || inc != 0.0 || more != 1.0 {
+                            l.push(sf!("%d%% ^8(base)", pseudo));
+                            if inc != 0.0 || more != 1.0 {
+                                l.push(sf!(
+                                    "* %.2f ^8(regeneration rate modifier)",
+                                    (1.0 + inc / 100.0) * more
+                                ));
+                            }
+                            if rate != 1.0 {
+                                l.push(sf!("* %.2f ^8(recovery rate modifier)", rate));
+                            }
+                        }
+                        l.push(sf!("= %.1f%% over %d seconds", v, dur));
+                        let k = format!("PhysicalDamageMitigated{r}PseudoRecoup");
+                        self.bd(actor).unwrap().set_lines(k, l);
+                    }
                 }
             }
         }

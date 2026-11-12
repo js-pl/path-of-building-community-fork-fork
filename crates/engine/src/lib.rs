@@ -4,6 +4,7 @@
 //! see docs/design.md.
 
 pub mod actor;
+pub mod breakdown;
 pub mod build;
 pub mod calc;
 pub mod calc_cache;
