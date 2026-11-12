@@ -240,8 +240,13 @@ impl Converter<'_> {
         } else {
             self.value(&raw)?
         };
+        // Upstream visits tags with `ipairs`
         let mut tags = Vec::new();
-        for tag in array(v) {
+        loop {
+            let tag = t.get_int(tags.len() as i64 + 1);
+            if tag.is_nil() {
+                break;
+            }
             tags.push(self.tag(&tag)?);
         }
         let mut unreached_tags = Vec::new();

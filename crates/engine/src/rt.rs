@@ -477,7 +477,16 @@ pub fn bnot(v: &Value) -> Value {
 /// `{ ... }` from keyed fields and positional items. A positional nil leaves
 /// a hole, as in Lua.
 pub fn tbl(keyed: Vec<(Value, Value)>, items: Vec<Value>) -> Value {
-    let t = TableRef::new();
+    // Sized as LuaJIT's `TNEW` sizes a constructor, so `#t` is LuaJIT's
+    let asize = if items.is_empty() {
+        0
+    } else {
+        (items.len() as u32 + 1).max(3)
+    };
+    let t = TableRef::from_table(lua::Table::with_sizes(
+        asize,
+        lua::ljtab::hbits(keyed.len() as u32),
+    ));
     {
         let mut tm = t.borrow_mut();
         for (k, v) in keyed {

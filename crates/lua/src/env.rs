@@ -903,18 +903,21 @@ fn install_table(env: &Env) {
             (
                 "remove",
                 func("remove", |a| {
+                    // LuaJIT's lib_table.lua
                     let t = check_table(a, 0, "remove")?;
                     let n = t.borrow().border() as i64;
-                    let pos = opt_num(a, 1, "remove", n as f64)? as i64;
-                    if n == 0 {
+                    let pos = match a.get(1) {
+                        None | Some(Value::Nil) if n != 0 => n,
+                        None | Some(Value::Nil) => return Ok(vec![]),
+                        _ => check_num(a, 1, "remove")? as i64,
+                    };
+                    if pos < 1 || pos > n {
                         return Ok(vec![]);
                     }
                     let v = t.borrow().get_int(pos);
-                    let mut i = pos;
-                    while i < n {
-                        let next = t.borrow().get_int(i + 1);
-                        t.borrow_mut().set(num(i as f64), next);
-                        i += 1;
+                    for i in pos + 1..=n {
+                        let next = t.borrow().get_int(i);
+                        t.borrow_mut().set(num((i - 1) as f64), next);
                     }
                     t.borrow_mut().set(num(n as f64), Value::Nil);
                     ok1(v)

@@ -141,11 +141,13 @@ fn init_env_pass(
     };
     calc_setup::allocation_mods(spec, &mut player_db);
     // The tree before the items
-    let alloc: Vec<usize> = spec.alloc_nodes.iter().map(|(_, &i)| i).collect();
+    // `env.allocNodes`, a copy of the spec's
+    let alloc_nodes = crate::spec::copy_table(&spec.alloc_nodes);
+    let alloc: Vec<usize> = alloc_nodes.iter().map(|(_, &i)| i).collect();
     let (mut initial_node_mods, _) = calc_setup::build_mod_list_for_node_list(
         spec,
         &alloc,
-        &spec.alloc_nodes,
+        &alloc_nodes,
         &mut [],
         &[],
         true,

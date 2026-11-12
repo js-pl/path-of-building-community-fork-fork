@@ -2,7 +2,7 @@
 //! indexing with metatables, calls, arithmetic with string coercion,
 //! comparison, concatenation. Errors are returned, as Lua raises them.
 
-use crate::value::{Function, LResult, LuaError, LuaStr, TableRef, Value};
+use crate::value::{Function, Key, LResult, LuaError, LuaStr, TableRef, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -347,6 +347,15 @@ pub fn next(t: &TableRef, k: &Value) -> LResult<Option<(Value, Value)>> {
         .map_err(|_| LuaError::msg("invalid key to 'next'"))
 }
 
+/// A step of `for k, v in pairs(t)`, which LuaJIT runs by position
+/// (`BC_ITERN`) rather than by key.
+#[inline]
+pub fn pairs_step(t: &TableRef, pos: &mut usize) -> Option<(Value, Value)> {
+    let (p, k, v) = t.borrow().entry_at(*pos)?;
+    *pos = p + 1;
+    Some((k, v))
+}
+
 /// The table `pairs(v)` iterates.
 pub fn pairs_table(v: &Value) -> LResult<TableRef> {
     match v {
@@ -369,19 +378,36 @@ pub fn ipairs_table(v: &Value) -> LResult<TableRef> {
     }
 }
 
-/// A field of a table constructor: nil values are skipped, nil keys rejected.
+/// A field of a table constructor stored after its template
+/// ([`crate::ast::constructor_plan`]); nil keys are rejected.
 #[inline]
 pub fn tset(t: &mut crate::value::Table, k: Value, v: Value) -> LResult<()> {
-    if v.is_nil() {
-        return Ok(());
-    }
     match &k {
         Value::Nil => err("table index is nil"),
         Value::Number(n) if n.is_nan() => err("table index is NaN"),
+        // The template holds the slot of a string key
+        Value::Str(_) if v.is_nil() => {
+            t.unreserve();
+            Ok(())
+        }
         _ => {
             t.set(k, v);
             Ok(())
         }
+    }
+}
+
+/// A field of a table constructor's template: constant key and value.
+#[inline]
+pub fn tset_t(t: &mut crate::value::Table, k: Value, v: Value) {
+    t.set_template(Key::from_value(&k).expect("constant key"), v);
+}
+
+/// A constructor's template growing its array part for keys up to `n`.
+#[inline]
+pub fn treasize(t: &mut crate::value::Table, n: u32) {
+    if t.asize() <= n as usize {
+        t.reasize(n);
     }
 }
 
