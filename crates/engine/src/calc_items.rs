@@ -80,7 +80,7 @@ pub struct ItemsSetup {
     /// `env.player.itemList`: the item in each slot, by id
     pub item_list: BTreeMap<String, f64>,
     /// Multipliers set on `env.modDB`
-    pub player_multipliers: HashMap<Sym, f64>,
+    pub player_multipliers: crate::mods::SymMap<f64>,
     /// Mods added to `env.modDB`
     pub player_mods: Vec<Mod>,
     /// `env.radiusJewelList`
@@ -570,7 +570,7 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
         item_db: Store::db(),
         class_restrictions: HashMap::new(),
         item_list: BTreeMap::new(),
-        player_multipliers: HashMap::new(),
+        player_multipliers: Default::default(),
         player_mods: Vec::new(),
         radius_jewels: Vec::new(),
         extra_radius_nodes: LjMap::default(),

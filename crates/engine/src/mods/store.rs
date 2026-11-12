@@ -8,7 +8,7 @@
 use super::sym::Sym;
 use super::tag::*;
 use super::types::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, String>;
@@ -19,7 +19,7 @@ pub type StoreId = usize;
 /// The mods of a store: by name (a ModDB) or in one list (a ModList).
 #[derive(Clone, Debug)]
 pub enum Mods {
-    Db(HashMap<Sym, Vec<Mod>>),
+    Db(crate::mods::SymMap<Vec<Mod>>),
     List(Vec<Mod>),
 }
 
@@ -28,17 +28,17 @@ pub struct Store {
     pub mods: Mods,
     /// Queries continue into the parent
     pub parent: Option<StoreId>,
-    pub conditions: HashMap<Sym, bool>,
-    pub multipliers: HashMap<Sym, f64>,
+    pub conditions: crate::mods::SymMap<bool>,
+    pub multipliers: crate::mods::SymMap<f64>,
 }
 
 impl Store {
     pub fn db() -> Store {
         Store {
-            mods: Mods::Db(HashMap::new()),
+            mods: Mods::Db(Default::default()),
             parent: None,
-            conditions: HashMap::new(),
-            multipliers: HashMap::new(),
+            conditions: Default::default(),
+            multipliers: Default::default(),
         }
     }
 
@@ -92,7 +92,7 @@ pub struct Cfg {
     pub skill_dist: Option<f64>,
     pub slot_name: Option<Sym>,
     pub actor: Option<Sym>,
-    pub skill_stats: Option<HashMap<Sym, f64>>,
+    pub skill_stats: Option<crate::mods::SymMap<f64>>,
     pub socket_color: Option<Rc<str>>,
     pub socket_num: Option<f64>,
     pub strength_gems: Option<f64>,
@@ -293,7 +293,7 @@ impl<'a> Query<'a> {
     ) -> Result<f64> {
         let db = self.is_db(id);
         // A ModDB shares one globalLimits across the names, a ModList none
-        let mut limits = db.then(HashMap::new);
+        let mut limits = db.then(crate::mods::SymMap::default);
         let mut result = 0.0;
         self.each(id, names, |m| {
             let Some(m) = m else {
@@ -332,7 +332,7 @@ impl<'a> Query<'a> {
         names: &[Sym],
     ) -> Result<f64> {
         let db = self.is_db(id);
-        let mut limits = db.then(HashMap::new);
+        let mut limits = db.then(crate::mods::SymMap::default);
         let mut result = 1.0;
         let mut precision: Option<f64> = None;
         let mut mod_result = 1.0;
@@ -466,7 +466,7 @@ impl<'a> Query<'a> {
         let mut out = Vec::new();
         let mut cur = Some(id);
         while let Some(s) = cur {
-            let mut limits = self.is_db(s).then(HashMap::new);
+            let mut limits = self.is_db(s).then(crate::mods::SymMap::default);
             self.each(s, names, |m| {
                 let Some(m) = m else {
                     return Ok(true);
@@ -656,7 +656,7 @@ impl<'a> Query<'a> {
         id: StoreId,
         m: &Mod,
         cfg: Option<&Cfg>,
-        limits: Option<&mut HashMap<Sym, f64>>,
+        limits: Option<&mut crate::mods::SymMap<f64>>,
     ) -> Result<Option<ModValue>> {
         let mut value = m.value.clone();
         for tag in &m.tags {

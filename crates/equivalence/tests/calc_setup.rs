@@ -1125,7 +1125,7 @@ fn items_setup_matches_upstream() {
             iron_mass: out.iron_mass_mods.is_some(),
             enemy_db: &enemy_base,
         };
-        let mut enemy_multipliers = HashMap::new();
+        let mut enemy_multipliers = engine::mods::SymMap::default();
         let mut mgroups = tgroups.clone();
         if let Err(e) = engine::calc_skill_mods::build_skill_mod_lists(
             &mut setup.active_skills,

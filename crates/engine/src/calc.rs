@@ -20,6 +20,16 @@ pub fn syms(names: &[&str]) -> Vec<Sym> {
     names.iter().map(|n| Sym::new(n)).collect()
 }
 
+/// `f` on the names as symbols, without allocating for a few names
+pub fn with_syms<R>(names: &[&str], f: impl FnOnce(&[Sym]) -> R) -> R {
+    match names {
+        [a] => f(&[Sym::new(a)]),
+        [a, b] => f(&[Sym::new(a), Sym::new(b)]),
+        [a, b, c] => f(&[Sym::new(a), Sym::new(b), Sym::new(c)]),
+        _ => f(&syms(names)),
+    }
+}
+
 /// A value as a number, as upstream's arithmetic takes it
 pub fn number(v: &ModValue) -> Result<f64> {
     match v {
@@ -96,7 +106,7 @@ impl<'a> Calc<'a> {
     }
 
     pub fn sum(&self, id: StoreId, typ: ModType, cfg: Option<&Cfg>, names: &[&str]) -> Result<f64> {
-        self.query().sum(id, typ, cfg, &syms(names))
+        with_syms(names, |n| self.query().sum(id, typ, cfg, n))
     }
 
     pub fn base(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<f64> {
@@ -108,11 +118,11 @@ impl<'a> Calc<'a> {
     }
 
     pub fn more(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<f64> {
-        self.query().more(id, cfg, &syms(names))
+        with_syms(names, |n| self.query().more(id, cfg, n))
     }
 
     pub fn flag(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<bool> {
-        self.query().flag(id, cfg, &syms(names))
+        with_syms(names, |n| self.query().flag(id, cfg, n))
     }
 
     pub fn override_value(
@@ -121,7 +131,7 @@ impl<'a> Calc<'a> {
         cfg: Option<&Cfg>,
         names: &[&str],
     ) -> Result<Option<ModValue>> {
-        self.query().override_value(id, cfg, &syms(names))
+        with_syms(names, |n| self.query().override_value(id, cfg, n))
     }
 
     /// `Override` used as a number
@@ -137,15 +147,15 @@ impl<'a> Calc<'a> {
     }
 
     pub fn max(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<Option<f64>> {
-        self.query().extreme(id, cfg, &syms(names), true)
+        with_syms(names, |n| self.query().extreme(id, cfg, n, true))
     }
 
     pub fn min(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<Option<f64>> {
-        self.query().extreme(id, cfg, &syms(names), false)
+        with_syms(names, |n| self.query().extreme(id, cfg, n, false))
     }
 
     pub fn list(&self, id: StoreId, cfg: Option<&Cfg>, names: &[&str]) -> Result<Vec<ModValue>> {
-        self.query().list(id, cfg, &syms(names))
+        with_syms(names, |n| self.query().list(id, cfg, n))
     }
 
     /// `Tabulate`: each value with its mod
@@ -171,7 +181,7 @@ impl<'a> Calc<'a> {
         cfg: Option<&Cfg>,
         names: &[&str],
     ) -> Result<bool> {
-        self.query().has_mod(id, typ, cfg, &syms(names))
+        with_syms(names, |n| self.query().has_mod(id, typ, cfg, n))
     }
 
     /// `GetCondition(var, cfg)`
