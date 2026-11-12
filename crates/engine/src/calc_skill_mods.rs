@@ -85,6 +85,10 @@ pub struct SkillMods {
     pub info_trigger: Option<String>,
     pub info_message: Option<String>,
     pub info_message2: Option<String>,
+    /// The offence's other cfgs (`bleedCfg`, `dotFireCfg`, ...) by name
+    /// without `Cfg`, kept in calculations with breakdowns for the Calcs
+    /// tab
+    pub named_cfgs: Vec<(String, Cfg)>,
 }
 
 /// What building the mod lists needs

@@ -14,9 +14,9 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 [files]
 "Classes/BuildListControl.lua" = { status = "todo" }
 "Classes/ButtonControl.lua" = { status = "todo" }
-"Classes/CalcBreakdownControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/CalcSectionControl.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx crates/engine/src/build.rs crates/engine/src/calcs.rs crates/engine/src/power.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/CalcBreakdownControl.lua" = { status = "partial", port = "crates/session/src/typed/calcs.rs web/src/ui/CalcsTab.tsx", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/CalcSectionControl.lua" = { status = "partial", port = "crates/session/src/typed/calcs.rs web/src/ui/CalcsTab.tsx", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/CalcsTab.lua" = { status = "partial", port = "web/src/ui/CalcsTab.tsx crates/session/src/typed/calcs.rs crates/engine/src/build.rs crates/engine/src/calcs.rs crates/engine/src/power.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/CheckBoxControl.lua" = { status = "partial", port = "web/src/ui/Control.tsx", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/CompareBuySimilar.lua" = { status = "todo" }
 "Classes/CompareCalcsHelpers.lua" = { status = "todo" }
@@ -306,11 +306,11 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/CalcBase.lua" = { status = "skip", reason = "the empty table the calc modules share; no logic" }
 "Modules/CalcBreakdown.lua" = { status = "ported", port = "crates/engine/src/breakdown.rs crates/engine/src/calc_offence_hit.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcDefence.lua" = { status = "partial", port = "crates/engine/src/calc_defence.rs crates/engine/src/calc_ehp.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/CalcFormat.lua" = { status = "todo" }
+"Modules/CalcFormat.lua" = { status = "ported", port = "crates/session/src/typed/calcs.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcMirages.lua" = { status = "partial", port = "crates/engine/src/calc_mirage.rs crates/engine/src/calc_offence.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcOffence.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs crates/engine/src/calc_offence_hit.rs crates/engine/src/calc_offence_ailments.rs crates/engine/src/calc_offence_dot.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcPerform.lua" = { status = "partial", port = "crates/engine/src/calc.rs crates/engine/src/calc_perform.rs crates/engine/src/calc_minion.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/CalcSections.lua" = { status = "todo" }
+"Modules/CalcSections.lua" = { status = "ported", port = "crates/session/build.rs crates/session/src/typed/calcs.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcSetup.lua" = { status = "partial", port = "crates/engine/src/calc_setup.rs crates/engine/src/calc_env.rs crates/engine/src/calc_override.rs crates/engine/src/calc_items.rs crates/engine/src/calc_tree.rs crates/engine/src/calc_skills.rs crates/engine/src/jewel.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcTools.lua" = { status = "partial", port = "crates/engine/src/skills.rs crates/engine/src/skill_data.rs crates/engine/src/calc_skills.rs crates/engine/src/calc_skill_mods.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcTriggers.lua" = { status = "partial", port = "crates/engine/src/calc_triggers.rs crates/engine/src/calc_offence.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }

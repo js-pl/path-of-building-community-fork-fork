@@ -93,7 +93,8 @@ web/ (TypeScript, Preact)               crates/
   are addressed by name and changed through their handlers. The engine does
   no I/O. `session.lua` is being replaced command by command: a
   `Dispatcher` answers the commands ported to the typed engine with it
-  and the rest with the translation, with the same JSON.
+  and the rest with the translation, with the same JSON. Upstream's UI
+  data (`CalcSections.lua`) is evaluated at build time like game data.
 - **Data delivery.** `pob bundle` writes the data files the engine reads when
   starting and loading a build on the current tree into one compressed bundle
   (`core.bin`), and every tree version as separate files. The site serves them

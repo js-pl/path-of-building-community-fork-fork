@@ -112,11 +112,24 @@ What remains for the full migration, in order:
    others); the browser's background worker, which only loads builds and
    runs node power, no longer needs the translation.
 
+   The Calcs tab is typed (`session::typed::calcs`): `calcs` (the
+   sections of `CalcSections.lua`, evaluated by the session's build
+   script, `CheckFlag`, `formatCalcStr`), `breakdown`
+   (`CalcBreakdownControl:SetBreakdownData`) and `controls` for the
+   tab's and the sidebar's controls, on the `CALCS` calculation made when
+   first asked for; `build_output` keeps that calculation's stores and
+   actors (`engine::calcs::CalcsView`) and the offence its other cfgs
+   (`bleedCfg`, `dotFireCfg`, ...). Equal to the translation for all 61
+   corpus builds, every cell's breakdown (14611; typed 1.3 s in total,
+   translated 128 s with its loads). Upstream's tree keeps the source
+   `modLib.mergeKeystones` last gave a keystone's mods, also across
+   builds: a session that loaded another build with an item granting
+   the keystone shows that item as the source of the tree's keystone
+   mods; the test compares such builds again on a fresh translated
+   session. Not followed either: the slots of energy shield converted
+   to ward, whose `inc` upstream leaves nil (typed: `false`).
+
    Still on the translation, before it can be dropped:
-   - Calcs tab: `calcs` (`CalcSections.lua` as data, `formatCalcStr`,
-     `CheckFlag`) and `breakdown` (`CalcBreakdownControl`); both need
-     the `CALCS` calculation's stores kept after `build_output` for
-     `{mod:}` cells and mod lists.
    - Edits on the typed model with a recalculation: `clickNode`,
      `selectMastery`, `resetTree` (`PassiveSpec:AllocNode`,
      `DeallocNode`, cluster jewel rebuilds), `setMainSocketGroup`,
@@ -129,7 +142,7 @@ What remains for the full migration, in order:
    - Read-only views: `tree`, `treeState`, `treeSpecs`, `nodePath`,
      `masteryOptions`, `powerStats`, `skills`, `copySocketGroup`,
      `gemList`, `items`, `itemDb`, `config`, `party`, `notes`,
-     `controls`.
+     `controls` of other tabs.
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
      `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
      `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).

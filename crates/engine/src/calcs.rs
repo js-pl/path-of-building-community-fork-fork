@@ -25,7 +25,7 @@ use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
 use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, StoreId, Sym, TagKind};
 use crate::skills::SocketGroup;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::rc::Rc;
 
 /// An actor's output
@@ -66,6 +66,134 @@ pub struct BuildOutput {
     pub minion_breakdown: Option<Breakdowns>,
     /// What the sidebar reads besides the outputs (`MAIN` only)
     pub sidebar: Option<crate::sidebar::Sidebar>,
+    /// What the Calcs tab reads of its calculation besides the outputs
+    /// (`CALCS` only)
+    pub view: Option<Box<CalcsView>>,
+}
+
+/// The main skill of an actor of [`CalcsView`]
+#[derive(Clone, Debug)]
+pub struct ViewSkill {
+    pub flags: BTreeSet<String>,
+    /// `skillModList`, unless the skill is a copy from another calculation
+    pub list: Option<StoreId>,
+    /// `skillCfg`, `weapon1Cfg`, `weapon2Cfg` and the offence's other cfgs,
+    /// by name without `Cfg`
+    pub cfgs: Vec<(String, Cfg)>,
+}
+
+impl ViewSkill {
+    fn of(m: &crate::calc_skill_mods::SkillMods, list: Option<StoreId>) -> ViewSkill {
+        let mut cfgs = vec![("skill".to_string(), m.skill_cfg.clone())];
+        for (n, c) in m.weapon_cfgs.iter().enumerate() {
+            if let Some(c) = c {
+                cfgs.push((format!("weapon{}", n + 1), c.clone()));
+            }
+        }
+        cfgs.extend(m.named_cfgs.iter().cloned());
+        ViewSkill {
+            flags: m.skill_flags.clone(),
+            list,
+            cfgs,
+        }
+    }
+
+    /// `mainSkill[name .. "Cfg"]`
+    pub fn cfg(&self, name: &str) -> Option<&Cfg> {
+        self.cfgs.iter().find(|(n, _)| n == name).map(|(_, c)| c)
+    }
+}
+
+/// An actor of [`CalcsView`]: its place and main skill
+#[derive(Clone, Debug)]
+pub struct ViewActor {
+    pub actor: usize,
+    pub skill: ViewSkill,
+}
+
+/// The Calcs tab's calculation after it (`calcsTab.calcsEnv`): its stores
+/// and actors, for the cells' mod queries and the breakdowns' mod lists
+#[derive(Clone, Debug)]
+pub struct CalcsView {
+    pub stores: crate::mods::Stores,
+    pub actors: Vec<crate::actor::Actor>,
+    pub store_actor: std::collections::HashMap<StoreId, usize>,
+    pub player: ViewActor,
+    /// `env.minion`
+    pub minion: Option<ViewActor>,
+    /// The socket groups' active skills, as the sidebar's
+    pub skills: crate::sidebar::Sidebar,
+}
+
+/// [`CalcsView`] with the build its queries read
+pub struct CalcsRef<'a> {
+    pub view: &'a CalcsView,
+    pub env: &'a crate::actor::EnvActors<'a>,
+}
+
+impl CalcsRef<'_> {
+    pub fn query(&self) -> crate::mods::Query<'_> {
+        crate::mods::Query {
+            stores: &self.view.stores,
+            actors: self.env,
+        }
+    }
+
+    pub fn actor(&self, i: usize) -> &crate::actor::Actor {
+        &self.env.actors[i]
+    }
+}
+
+impl CalcsView {
+    fn take(p: &mut Perform) -> Result<CalcsView> {
+        let main = p.main();
+        let player = ViewActor {
+            actor: PLAYER,
+            skill: match &p.main_copy {
+                Some(m) => ViewSkill::of(m, None),
+                None => ViewSkill::of(p.mods(main), Some(p.lists[main].list)),
+            },
+        };
+        let minion = p.env_minion.map(|m| {
+            let k = p.minions[m].main_skill;
+            ViewActor {
+                actor: p.minions[m].actor,
+                skill: ViewSkill::of(p.mods(k), Some(p.lists[k].list)),
+            }
+        });
+        let skills = crate::sidebar::collect(p)?;
+        Ok(CalcsView {
+            stores: std::mem::take(&mut p.c.stores),
+            actors: std::mem::take(&mut p.c.actors.actors),
+            store_actor: std::mem::take(&mut p.c.actors.store_actor),
+            player,
+            minion,
+            skills,
+        })
+    }
+
+    /// Runs `f` on the view with the build its queries read
+    pub fn with<R>(
+        &mut self,
+        tab: &crate::items_tab::ItemsTab,
+        data: &CalcData,
+        f: impl FnOnce(&CalcsRef) -> R,
+    ) -> R {
+        let env = crate::actor::EnvActors {
+            actors: std::mem::take(&mut self.actors),
+            store_actor: std::mem::take(&mut self.store_actor),
+            tab,
+            item_data: data.items,
+            skill_data: data.skills,
+        };
+        let r = f(&CalcsRef {
+            view: self,
+            env: &env,
+        });
+        self.actors = env.actors;
+        self.store_actor = env.store_actor;
+        r
+    }
 }
 
 fn num(out: &Output, k: &str) -> Option<f64> {
@@ -543,22 +671,36 @@ pub fn build_output(
         }
         CalcMode::Calculator => {}
     }
-    let minion = p
-        .minion_actor()
-        .map(|a| p.c.actors.actors[a].output.clone());
-    let minion_breakdown = p
-        .minion_actor()
-        .and_then(|a| p.c.actors.actors[a].breakdown.take())
+    let minion_actor = p.minion_actor();
+    let mut view = match mode {
+        CalcMode::Calcs => Some(Box::new(CalcsView::take(&mut p)?)),
+        _ => None,
+    };
+    let keep = view.is_some();
+    let actors = match &mut view {
+        Some(v) => &mut v.actors,
+        None => &mut p.c.actors.actors,
+    };
+    let minion = minion_actor.map(|a| actors[a].output.clone());
+    let minion_breakdown = minion_actor
+        .and_then(|a| actors[a].breakdown.take())
         .map(|b| *b);
-    let player = &mut p.c.actors.actors[PLAYER];
+    let player = &mut actors[PLAYER];
+    let breakdown = player.breakdown.take().map(|b| *b);
+    let player = if keep {
+        player.output.clone()
+    } else {
+        std::mem::take(&mut player.output)
+    };
     Ok(BuildOutput {
-        player: std::mem::take(&mut player.output),
+        player,
         minion,
         full_dps,
         multipliers_used,
-        breakdown: player.breakdown.take().map(|b| *b),
+        breakdown,
         minion_breakdown,
         sidebar,
+        view,
     })
 }
 
