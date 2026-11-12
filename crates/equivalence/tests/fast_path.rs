@@ -3,14 +3,15 @@
 //! (`engine::calc_env::reuse_setup`) give exactly what setting each up
 //! afresh gives: the sidebar's and Calcs tab's outputs, the calculator's
 //! with overrides and Full DPS, and node power by Full DPS, for a sample
-//! of corpus builds.
+//! of corpus builds. Node power on threads equals node power on one,
+//! calculated as needed.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run, and runs each of them.
 
 use engine::calc_env::set_reuse_setup;
 use engine::calc_override::Override;
 use engine::calculator::{CalcOutput, MiscCalculator};
-use engine::power::{PowerOptions, node_power, power_stats};
+use engine::power::{PowerOptions, cluster_nodes, node_power, node_power_with, power_stats};
 use equivalence::corpus_builds;
 use equivalence::outputs::typed_outputs;
 use equivalence::typed_build::TypedData;
@@ -91,6 +92,63 @@ fn reused_setup_equals_fresh_setup() {
             (Err(f), Err(s)) if f == s => {}
             (f, s) => failures.push(format!("{id}: fast {:?}, simple {:?}", f.err(), s.err())),
         }
+    }
+    eprintln!("{compared} builds compared");
+    assert!(compared > 0);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Node power with its calculations made ahead on 1 and 4 threads gives
+/// what calculating each when needed gives, in the same order
+#[test]
+fn parallel_node_power_equals_sequential() {
+    let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
+    let mut data = TypedData::load();
+    let (mut compared, mut failures) = (0, Vec::new());
+    for (i, (id, xml)) in corpus_builds().into_iter().enumerate() {
+        if !(if filter.is_empty() {
+            i % 8 == 3
+        } else {
+            id.contains(&filter)
+        }) {
+            continue;
+        }
+        let root = engine::xml::parse(&xml).unwrap();
+        data.load_tree(&root);
+        let run = |threads: Option<usize>| -> Result<Vec<String>, String> {
+            let mut build = data.load_build(&root)?;
+            let calc_data = data.calc_data();
+            engine::calcs::build_outputs(&mut build, &calc_data)?;
+            let calc = MiscCalculator::new(&build, &calc_data)?;
+            let tree = calc.build().spec.tree;
+            let mut out = Vec::new();
+            for stat in [None, power_stats().into_iter().find(|s| s.label == "Life")] {
+                let p = node_power_with(
+                    &calc,
+                    &PowerOptions {
+                        stat,
+                        max_depth: Some(2.0),
+                        cluster_nodes: cluster_nodes(tree).into_iter().take(3).collect(),
+                    },
+                    threads,
+                )?;
+                out.push(format!("{:?} {:?} {:?}", p.nodes, p.cluster, p.max));
+            }
+            Ok(out)
+        };
+        let sequential = run(None);
+        for threads in [1, 4] {
+            match (&sequential, run(Some(threads))) {
+                (Ok(s), Ok(p)) if *s == p => {}
+                (Err(s), Err(p)) if *s == p => {}
+                (s, p) => failures.push(format!(
+                    "{id}, {threads} threads: {:?} / {:?}",
+                    s.as_ref().err(),
+                    p.err()
+                )),
+            }
+        }
+        compared += 1;
     }
     eprintln!("{compared} builds compared");
     assert!(compared > 0);

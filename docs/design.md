@@ -442,8 +442,9 @@ each optimisation's numbers are in `docs/progress.md`.
 
    What calculations share (game data, the mod parser, trees, a build's
    shared parts, mods' shared pieces) is `Arc` and `Send + Sync`, checked
-   at compile time, so calculations can run on threads natively; the
-   browser stays on one thread per worker.
+   at compile time, so calculations can run on threads natively (node
+   power's candidates on a `rayon` pool); the browser stays on one
+   thread per worker.
 
    Upstream mutates shared data in a few places, and the typed engine does
    not copy that by accident: `modLib.mergeKeystones` sets the source of a

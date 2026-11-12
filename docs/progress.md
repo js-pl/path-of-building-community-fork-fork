@@ -77,10 +77,13 @@ What remains for the full migration, in order:
    the session API.
 2. A variants test per trigger support and per helmet focus, and of
    the Calcs tab's other minion and stage selections.
-3. The fast path of node power: candidates as a job list run on a base
-   environment built once (`node_power` keeps its API); parallelism
-   needs the engine's `Rc` data shared or rebuilt per worker. Then item,
-   gem and anoint comparisons on the calculator.
+3. The fast path of node power: candidates run on a base environment
+   built once. Natively the candidates' calculations already run on a
+   `rayon` pool (`power::node_power_with`: a recording pass lists them,
+   the pool calculates them, the sequential pass combines them, so
+   results do not depend on the thread count; `tests/fast_path.rs`
+   compares 1 and 4 threads with the sequential path). Then item, gem and
+   anoint comparisons on the calculator, and Full DPS skills on threads.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),
@@ -343,6 +346,14 @@ threads. `Arc` costs nothing measurable on one thread: six alternating
 `--typed-only` runs each, best (mean) ms, `Rc` against `Arc`: perform
 10.6 (11.7) / 9.7 (11.2), build_outputs 70.0 (74.3) / 63.6 (75.9),
 recalc 91.8 (95.7) / 82.8 (97.3), node power 1549 (1581) / 1368 (1564).
+
+Node power on threads (`bench --typed-only --threads N`, two runs each,
+ms, on the shared 4-core machine with another job loading it by about
+2.5): without the pool 1388 / 1611, 1 thread 1638 / 1590, 2 threads
+1006 / 841, 4 threads 863 / 682. Full node power (`--power-depth 0`,
+load about 3.3): without the pool 17948 / 17538, 1 thread 18276, 2
+threads 9895, 4 threads 9716 / 9505 (the other job takes the other
+cores). The browser stays on one thread.
 
 The mod parser (`cargo run --release -p equivalence --example
 parser_bench`): its typed data is made in about 2 s at build time and
