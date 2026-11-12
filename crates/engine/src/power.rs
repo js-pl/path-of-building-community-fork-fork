@@ -325,7 +325,7 @@ enum Mode<'s> {
 /// `CalcsTab:PowerBuilder()` on a calculator of the build
 pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowers> {
     let spec = &calc.build().spec;
-    check_tree_jewels(calc)?;
+    check_tree_jewels(calc.build())?;
     let base = calc.base();
     let granted = calc.granted_passives();
     let mode = match &opts.stat {
@@ -587,8 +587,7 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
 
 /// Jewels that change the tree's paths (Intuitive Leap and the like) are
 /// not ported in the spec
-fn check_tree_jewels(calc: &MiscCalculator) -> Result<()> {
-    let b = calc.build();
+pub fn check_tree_jewels(b: &crate::build::Build) -> Result<()> {
     for (&socket, &id) in &b.spec.jewels {
         if !b.spec.alloc_nodes.contains(socket) {
             continue;
