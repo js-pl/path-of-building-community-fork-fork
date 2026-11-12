@@ -1,14 +1,15 @@
 //! Lua values as upstream's data and modifiers use them.
 //!
-//! Strings are byte strings, like Lua's. Tables keep insertion order, so
-//! anything that iterates them is deterministic; upstream code that depends on
-//! `pairs()` order has to be handled where it is ported.
+//! Strings are byte strings, like Lua's. Tables iterate deterministically:
+//! number and boolean keys in LuaJIT's order, other keys in insertion order.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+
+use crate::ljtab::{LjTable, NKey, Objs, Slot};
 
 /// Immutable Lua string. Its hash is computed once and kept in front of the
 /// bytes, so table lookups do not hash the string again.
@@ -549,18 +550,59 @@ impl From<i64> for Key {
     }
 }
 
-/// Lua table with an array part (`t[1..n]`) and an insertion-ordered hash part.
+impl Slot for Value {
+    #[inline]
+    fn is_nil(&self) -> bool {
+        matches!(self, Value::Nil)
+    }
+}
+
+/// The layout key of a number or boolean key.
+#[inline]
+fn nkey(k: &Key) -> Option<NKey> {
+    match k {
+        Key::Int(i) => Some(NKey::int(*i)),
+        Key::Float(b) => Some(NKey::Num(*b)),
+        Key::Bool(b) => Some(NKey::Bool(*b)),
+        _ => None,
+    }
+}
+
+#[inline]
+fn nkey_value(k: NKey) -> Value {
+    match k {
+        NKey::Num(b) => Value::Number(f64::from_bits(b)),
+        NKey::Bool(b) => Value::Bool(b),
+    }
+}
+
+/// Lua table. Numbers and booleans live in LuaJIT's layout
+/// ([`crate::ljtab`]), so `pairs` visits them in LuaJIT's order. Other keys,
+/// whose order in LuaJIT depends on a random seed or on addresses, follow
+/// them in the order they were first set.
 #[derive(Default, Clone)]
 pub struct Table {
-    array: Vec<Value>,
-    /// Hash part in insertion order; removed entries leave a None
-    entries: Vec<Option<(Key, Value)>>,
-    /// Slot of every key ever set in the hash part; a removed key keeps its
-    /// slot, so `next` can continue from it, as in Lua
-    index: HashMap<Key, usize, std::hash::BuildHasherDefault<FxHasher>>,
-    /// Number of live entries in the hash part
-    live: usize,
+    lj: LjTable<Value>,
+    /// Keys of other types; a removed key keeps its entry with a nil value,
+    /// so `next` can continue from it and setting it again puts it back
+    entries: Vec<Entry>,
+    index: HashMap<Key, u32, std::hash::BuildHasherDefault<FxHasher>>,
+    /// Entries with a value
+    live: u32,
+    /// Entries without a value that still hold a slot of LuaJIT's hash part,
+    /// plus `reserved`
+    dead: u32,
+    /// Slots a constructor's template holds for string keys stored later
+    reserved: u32,
     pub meta: Option<TableRef>,
+}
+
+#[derive(Clone)]
+struct Entry {
+    key: Key,
+    val: Value,
+    /// Resize generation in which a dead entry last held a slot
+    epoch: u32,
 }
 
 /// The fast, non-cryptographic hasher rustc uses.
@@ -602,6 +644,23 @@ impl Table {
         Self::default()
     }
 
+    /// `lj_tab_new`: a table with `asize` array slots (keys `0..asize`) and
+    /// `2^hbits` hash slots, as table constructors make them.
+    pub fn with_sizes(asize: u32, hbits: u32) -> Self {
+        Table {
+            lj: LjTable::with_sizes(asize, hbits),
+            ..Default::default()
+        }
+    }
+
+    #[inline]
+    fn objs(&self) -> Objs {
+        Objs {
+            live: self.live,
+            slots: self.live + self.dead,
+        }
+    }
+
     pub fn get(&self, key: &Value) -> Value {
         match Key::from_value(key) {
             Some(k) => self.get_key(&k),
@@ -609,19 +668,14 @@ impl Table {
         }
     }
 
+    #[inline]
     pub fn get_key(&self, key: &Key) -> Value {
-        if let Key::Int(i) = key
-            && *i >= 1
-            && (*i as usize) <= self.array.len()
-        {
-            return self.array[*i as usize - 1].clone();
-        }
-        match self.index.get(key) {
-            Some(&i) => self.entries[i]
-                .as_ref()
-                .map(|(_, v)| v.clone())
-                .unwrap_or_default(),
-            None => Value::Nil,
+        match nkey(key) {
+            Some(k) => self.lj.get(k).cloned().unwrap_or_default(),
+            None => match self.index.get(key) {
+                Some(&i) => self.entries[i as usize].val.clone(),
+                None => Value::Nil,
+            },
         }
     }
 
@@ -629,8 +683,9 @@ impl Table {
         self.get_key(&Key::from(key))
     }
 
+    #[inline]
     pub fn get_int(&self, i: i64) -> Value {
-        self.get_key(&Key::Int(i))
+        self.lj.get(NKey::int(i)).cloned().unwrap_or_default()
     }
 
     /// `t[key] = value`. Panics on a nil or NaN key, which Lua rejects too.
@@ -639,50 +694,113 @@ impl Table {
         self.set_key(k, value);
     }
 
+    /// `t[key] = value`. As in LuaJIT, setting a missing key to nil gives it
+    /// a slot too.
     pub fn set_key(&mut self, key: Key, value: Value) {
-        if let Key::Int(i) = key
-            && i >= 1
-        {
-            let i = i as usize;
-            if i <= self.array.len() {
-                self.array[i - 1] = value;
-                if i == self.array.len() {
-                    // Keep the array part free of trailing nils
-                    while matches!(self.array.last(), Some(Value::Nil)) {
-                        self.array.pop();
-                    }
+        match nkey(&key) {
+            Some(k) => self.set_n(k, value),
+            None => self.set_obj(key, value, true),
+        }
+    }
+
+    #[inline]
+    fn set_n(&mut self, k: NKey, value: Value) {
+        let (objs, epoch) = (self.objs(), self.lj.epoch);
+        *self.lj.slot(k, objs) = value;
+        if self.lj.epoch != epoch {
+            self.resized();
+        }
+    }
+
+    /// Dead keys go with a resize.
+    #[cold]
+    fn resized(&mut self) {
+        self.dead = 0;
+        self.reserved = 0;
+    }
+
+    /// A new slot for a key outside LuaJIT's layout, one a template
+    /// reserved if `reserved`.
+    fn new_obj_slot(&mut self, reserved: bool) {
+        if reserved && self.reserved > 0 {
+            self.reserved -= 1;
+            self.dead -= 1;
+        } else if self.lj.obj_newkey(self.objs()) {
+            self.resized();
+        }
+    }
+
+    /// A template slot for a string key (see [`crate::ast::Step::Reserve`]).
+    pub fn reserve(&mut self) {
+        if self.lj.obj_newkey(self.objs()) {
+            self.resized();
+        }
+        self.dead += 1;
+        self.reserved += 1;
+    }
+
+    /// A reserved string key stored as nil: its slot stays dead.
+    pub fn unreserve(&mut self) {
+        self.reserved = self.reserved.saturating_sub(1);
+    }
+
+    /// `t[key] = value` in a constructor's template, which does not take
+    /// the slots the template reserved.
+    pub fn set_template(&mut self, key: Key, value: Value) {
+        match nkey(&key) {
+            Some(k) => self.set_n(k, value),
+            None => self.set_obj(key, value, false),
+        }
+    }
+
+    fn set_obj(&mut self, key: Key, value: Value, reserved: bool) {
+        let i = match self.index.get(&key) {
+            Some(&i) => i as usize,
+            None => {
+                self.new_obj_slot(reserved);
+                if value.is_nil() {
+                    // A dead slot; no entry, so stores of nil stay cheap
+                    self.dead += 1;
+                    return;
                 }
+                self.live += 1;
+                self.index.insert(key.clone(), self.entries.len() as u32);
+                self.entries.push(Entry {
+                    key,
+                    val: value,
+                    epoch: self.lj.epoch,
+                });
                 return;
             }
-            if i == self.array.len() + 1 && !value.is_nil() {
-                self.remove_hash(&Key::Int(i as i64));
-                self.array.push(value);
-                // Pull following integer keys out of the hash part
-                loop {
-                    let next = Key::Int(self.array.len() as i64 + 1);
-                    match self.remove_hash(&next) {
-                        Some(v) => self.array.push(v),
-                        None => break,
-                    }
-                }
-                return;
+        };
+        let epoch = self.lj.epoch;
+        let e = &mut self.entries[i];
+        match (e.val.is_nil(), value.is_nil()) {
+            (false, false) => e.val = value,
+            (false, true) => {
+                e.val = value;
+                e.epoch = epoch;
+                self.live -= 1;
+                self.dead += 1;
             }
-        }
-        if value.is_nil() {
-            self.remove_hash(&key);
-            return;
-        }
-        match self.index.get(&key) {
-            Some(&i) => {
-                if self.entries[i].is_none() {
+            (true, _) if e.epoch == epoch => {
+                if !value.is_nil() {
+                    e.val = value;
+                    self.dead -= 1;
                     self.live += 1;
                 }
-                self.entries[i] = Some((key, value))
             }
-            None => {
-                self.index.insert(key.clone(), self.entries.len());
-                self.entries.push(Some((key, value)));
-                self.live += 1;
+            (true, nil) => {
+                // Its slot went with a resize: a new key to LuaJIT
+                self.new_obj_slot(reserved);
+                let e = &mut self.entries[i];
+                e.epoch = self.lj.epoch;
+                e.val = value;
+                if nil {
+                    self.dead += 1;
+                } else {
+                    self.live += 1;
+                }
             }
         }
     }
@@ -691,115 +809,126 @@ impl Table {
         self.set_key(Key::from(key), value.into());
     }
 
-    fn remove_hash(&mut self, key: &Key) -> Option<Value> {
-        let i = *self.index.get(key)?;
-        let (_, v) = self.entries[i].take()?;
-        self.live -= 1;
-        Some(v)
+    /// Number of array part slots (keys `0..asize`).
+    pub fn asize(&self) -> usize {
+        self.lj.asize()
     }
 
-    /// `#t`: a border of the table. The array part never ends in nil, so its
-    /// length is one.
+    /// `lj_tab_reasize`: an array part for keys up to `n`.
+    pub fn reasize(&mut self, n: u32) {
+        self.lj.reasize(n, self.live);
+        self.resized();
+    }
+
+    /// Stores `values` at keys `start..` as a constructor's multiple
+    /// results do (`BC_TSETM`).
+    pub fn set_multi(&mut self, start: u32, values: Vec<Value>) {
+        let need = start as usize + values.len();
+        if values.is_empty() {
+            return;
+        }
+        if need > self.asize() {
+            self.reasize(need as u32);
+        }
+        for (i, v) in values.into_iter().enumerate() {
+            self.set_n(NKey::int(start as i64 + i as i64), v);
+        }
+    }
+
+    /// `#t`, the border LuaJIT's interpreter finds.
+    #[inline]
     pub fn border(&self) -> usize {
-        self.array.len()
+        self.lj.border()
     }
 
-    /// `#t`: the length of the array part.
+    /// `#t`
     pub fn len(&self) -> usize {
-        self.array.len()
+        self.border()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.array.is_empty() && self.live == 0
+        self.live == 0 && self.lj.iter().next().is_none()
     }
 
     /// Number of non-nil entries.
     pub fn len_pairs(&self) -> usize {
-        self.array.iter().filter(|v| !v.is_nil()).count() + self.live
+        self.lj.iter().count() + self.live as usize
     }
 
     /// `t[#t + 1] = value`
     pub fn push(&mut self, value: Value) {
-        let n = self.array.len() as i64 + 1;
-        self.set_key(Key::Int(n), value);
+        let n = self.border() as i64 + 1;
+        self.set_n(NKey::int(n), value);
     }
 
-    /// `table.insert(t, pos, value)`
-    pub fn insert(&mut self, pos: usize, value: Value) {
-        assert!(
-            pos >= 1 && pos <= self.array.len() + 1,
-            "table.insert position out of bounds"
-        );
-        self.array.insert(pos - 1, value);
-    }
-
-    /// `table.remove(t, pos)`
-    pub fn remove(&mut self, pos: usize) -> Value {
-        if pos >= 1 && pos <= self.array.len() {
-            self.array.remove(pos - 1)
-        } else {
-            Value::Nil
+    /// `t[1..=#t]`
+    pub fn array(&self) -> Vec<Value> {
+        let n = self.border();
+        let arr = self.lj.array_part();
+        if n < arr.len() {
+            return arr[1..=n].to_vec();
         }
+        (1..=n as i64).map(|i| self.get_int(i)).collect()
     }
 
-    /// The array part, `t[1..#t]`.
-    pub fn array(&self) -> &[Value] {
-        &self.array
+    /// The first entry at or after iteration position `pos`, with its
+    /// position. Positions are what LuaJIT's `pairs` loops step through.
+    #[inline]
+    pub fn entry_at(&self, pos: usize) -> Option<(usize, Value, Value)> {
+        if let Some((p, k, v)) = self.lj.entry_at(pos) {
+            return Some((p, nkey_value(k), v.clone()));
+        }
+        let base = self.lj.positions();
+        let from = pos.saturating_sub(base);
+        self.entries
+            .get(from..)?
+            .iter()
+            .enumerate()
+            .find(|(_, e)| !e.val.is_nil())
+            .map(|(i, e)| (base + from + i, e.key.to_value(), e.val.clone()))
     }
 
-    /// `next(t, key)`: the entry after `key` (the first for nil), array part
-    /// first, then the hash part in insertion order. Err for a key that is
-    /// not in the table.
+    /// `next(t, key)`: the entry after `key` (the first for nil). Err for a
+    /// key that is not in the table.
     pub fn next(&self, key: &Value) -> Result<Option<(Value, Value)>, InvalidKey> {
-        // Position to start scanning: array index, or hash slot + array len
-        let mut pos = match key {
+        let pos = match key {
             Value::Nil => 0,
             k => {
                 let k = Key::from_value(k).ok_or(InvalidKey)?;
-                match k {
-                    Key::Int(i) if i >= 1 && (i as usize) <= self.array.len() => i as usize,
-                    k => match self.index.get(&k) {
-                        Some(&slot) => self.array.len() + slot + 1,
-                        // An array index past the end: the array part shrank
-                        // after the key was set to nil, continue with the hash part
-                        None if matches!(k, Key::Int(i) if i >= 1) => self.array.len(),
-                        None => return Err(InvalidKey),
-                    },
+                match nkey(&k) {
+                    Some(nk) => self.lj.position_after(nk).ok_or(InvalidKey)?,
+                    None => {
+                        let i = *self.index.get(&k).ok_or(InvalidKey)?;
+                        self.lj.positions() + i as usize + 1
+                    }
                 }
             }
         };
-        while pos < self.array.len() {
-            if !self.array[pos].is_nil() {
-                return Ok(Some((
-                    Value::Number((pos + 1) as f64),
-                    self.array[pos].clone(),
-                )));
-            }
-            pos += 1;
-        }
-        let mut h = pos - self.array.len();
-        while h < self.entries.len() {
-            if let Some((k, v)) = &self.entries[h] {
-                return Ok(Some((k.to_value(), v.clone())));
-            }
-            h += 1;
-        }
-        Ok(None)
+        Ok(self.entry_at(pos).map(|(_, k, v)| (k, v)))
     }
 
-    /// Array part first, then the hash part in insertion order.
-    /// Entries of the hash part, without cloning
-    pub fn raw_entries(&self) -> impl Iterator<Item = &(Key, Value)> + '_ {
-        self.entries.iter().flatten()
+    /// Calls `f` with every key that is an object and every value, for the
+    /// cycle collector.
+    pub fn for_each_ref(&self, mut f: impl FnMut(Option<&Key>, &Value)) {
+        for v in self.lj.values() {
+            f(None, v);
+        }
+        for e in &self.entries {
+            f(Some(&e.key), &e.val);
+        }
     }
 
+    /// Entries in `pairs` order.
     pub fn iter(&self) -> impl Iterator<Item = (Key, Value)> + '_ {
-        self.array
+        self.lj
             .iter()
-            .enumerate()
-            .filter(|(_, v)| !v.is_nil())
-            .map(|(i, v)| (Key::Int(i as i64 + 1), v.clone()))
-            .chain(self.entries.iter().flatten().cloned())
+            .map(|(k, v)| (Key::from_value(&nkey_value(k)).unwrap(), v.clone()))
+            .chain(
+                self.entries
+                    .iter()
+                    .filter(|e| !e.val.is_nil())
+                    .map(|e| (e.key.clone(), e.val.clone())),
+            )
     }
 }
 
@@ -872,7 +1001,7 @@ impl TableRef {
 
     /// Snapshot of the array part.
     pub fn array(&self) -> Vec<Value> {
-        self.borrow().array().to_vec()
+        self.borrow().array()
     }
 
     /// Deep copy, like upstream's `copyTable`.
@@ -936,6 +1065,30 @@ mod tests {
         assert_eq!(keys, vec![Key::Int(1), Key::Int(2), Key::from("x")]);
         t.set(Value::Number(2.0), Value::Nil);
         assert_eq!(t.len(), 1);
+    }
+
+    #[test]
+    fn mixed_keys() {
+        let mut t = Table::new();
+        t.set_str("b", 1.0);
+        for k in [70000.0, 2.0, 1.0, 0.5] {
+            t.set(Value::Number(k), Value::Bool(true));
+        }
+        t.set_str("a", 1.0);
+        let keys: Vec<_> = t.iter().map(|(k, _)| k).collect();
+        // Array part, hash part in LuaJIT's order, then strings as set
+        assert_eq!(keys[..2], [Key::Int(1), Key::Int(2)]);
+        assert_eq!(keys[4..], [Key::from("b"), Key::from("a")]);
+        // A missing key set to nil gets a slot, so next can continue from it
+        t.set(Value::Number(5.0), Value::Nil);
+        assert!(t.next(&Value::Number(5.0)).is_ok());
+        let mut pos = 0;
+        let mut n = 0;
+        while let Some((p, _, _)) = t.entry_at(pos) {
+            pos = p + 1;
+            n += 1;
+        }
+        assert_eq!(n, t.len_pairs());
     }
 
     #[test]

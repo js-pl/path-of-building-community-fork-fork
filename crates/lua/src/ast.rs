@@ -187,22 +187,97 @@ pub enum Constant {
     Str,
 }
 
-/// The order in which a table constructor's fields are stored, as LuaJIT
-/// does it: fields with a constant key and value go into a template table
-/// the constructor copies, the others are stored afterwards in source order.
-/// This only matters for duplicate keys: `{ a = f(), a = 1 }` keeps `f()`.
-pub fn constructor_order(fields: &[Field]) -> Vec<usize> {
-    let template = |f: &Field| match f {
-        Field::Keyed(k, v) => {
-            !matches!(constant(k), None | Some(Constant::Nil)) && constant(v).is_some()
+/// Whether an expression can give several values.
+pub fn is_multi(e: &Expr) -> bool {
+    matches!(e, Expr::Call { .. } | Expr::Method { .. } | Expr::Vararg)
+}
+
+/// How LuaJIT's parser builds a table constructor (`expr_table`): fields
+/// with a constant key and value go into a template table the constructor
+/// copies, the others are stored afterwards in source order. The plan
+/// reproduces the template's layout, so number keys are placed as LuaJIT
+/// places them, and the values duplicate keys end up with:
+/// `{ a = f(), a = 1 }` keeps `f()`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstructorPlan {
+    /// Array and hash sizes of the table made before any field is stored
+    pub asize: u32,
+    pub hbits: u32,
+    pub steps: Vec<Step>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Step {
+    /// Store field `i` in the template
+    Template(usize),
+    /// Store field `i` after the template
+    Field(usize),
+    /// A template slot for a string key whose value is stored later or nil
+    Reserve,
+    /// Grow the array part for keys up to `n` (`lj_tab_reasize`)
+    Reasize(u32),
+}
+
+pub fn constructor_plan(fields: &[Field]) -> ConstructorPlan {
+    let (mut narr, mut nhash, mut needarr) = (1u32, 0u32, false);
+    let mut template: Option<(u32, u32)> = None;
+    let mut steps = Vec::new();
+    for (i, f) in fields.iter().enumerate() {
+        let step = match f {
+            Field::Keyed(k, v) => {
+                let (k, v) = (constant(k), constant(v));
+                if k == Some(Constant::Number(0.0)) {
+                    needarr = true;
+                } else {
+                    nhash += 1;
+                }
+                match (k, v) {
+                    (None | Some(Constant::Nil), _) => None,
+                    (Some(Constant::Str), None | Some(Constant::Nil)) => Some(Step::Reserve),
+                    (Some(_), Some(_)) => Some(Step::Template(i)),
+                    (Some(_), None) => None,
+                }
+            }
+            Field::Item(v) => {
+                narr += 1;
+                needarr = true;
+                constant(v).map(|_| Step::Template(i))
+            }
+        };
+        if let Some(step) = step {
+            template.get_or_insert((if needarr { narr } else { 0 }, crate::ljtab::hbits(nhash)));
+            steps.push(step);
         }
-        Field::Item(v) => constant(v).is_some(),
+    }
+    let (asize, hbits) = match template {
+        Some(sizes) => {
+            if needarr {
+                steps.push(Step::Reasize(narr - 1));
+            }
+            sizes
+        }
+        None if needarr => (narr.clamp(3, 0x7ff), crate::ljtab::hbits(nhash)),
+        None => (0, crate::ljtab::hbits(nhash)),
     };
-    let mut order: Vec<usize> = (0..fields.len())
-        .filter(|&i| template(&fields[i]))
-        .collect();
-    order.extend((0..fields.len()).filter(|&i| !template(&fields[i])));
-    order
+    let templated: Vec<bool> = {
+        let mut t = vec![false; fields.len()];
+        for s in &steps {
+            if let Step::Template(i) = s {
+                t[*i] = true;
+            }
+        }
+        t
+    };
+    steps.extend(
+        (0..fields.len())
+            .filter(|&i| !templated[i])
+            .map(Step::Field),
+    );
+    ConstructorPlan {
+        asize,
+        hbits,
+        steps,
+    }
 }
 
 /// The function of a data file written as `return function(params) ... end`

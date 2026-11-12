@@ -244,6 +244,7 @@ impl<'t> PassiveSpec<'t> {
         let base = self.nodes.len();
         for (k, p) in b.pending.iter().enumerate() {
             self.index.insert(p.node.id, base + k);
+            self.order.insert(p.node.id, base + k);
         }
         for p in std::mem::take(&mut b.pending) {
             let linked = p

@@ -166,10 +166,7 @@ fn specs_match_upstream() {
                 .iter()
                 .map(|n| *n as u32)
                 .collect();
-            let effects: Vec<(u32, f64)> = numbers(a.get("masteryEffects").map_or("", |s| s))
-                .chunks(2)
-                .map(|p| (p[0] as u32, p[1]))
-                .collect();
+            let effects = engine::spec::mastery_effects(a.get("masteryEffects").map_or("", |s| s));
             let num = |k: &str| a.get(k).and_then(|v| v.parse::<i64>().ok()).unwrap_or(0);
             let mut spec = PassiveSpec::new(tree, &parser).unwrap();
             spec.import_from_node_list(

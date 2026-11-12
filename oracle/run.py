@@ -3,7 +3,7 @@
 
   run.py generate                regenerate corpus/generated/ from corpus/generate.lua
   run.py dump [--out DIR]        write oracle outputs (default: tests/oracle),
-                                 including modparser.jsonl
+                                 including modparser.jsonl and tables.jsonl
   run.py check                   dump twice and compare with tests/oracle
   run.py coverage [--out DIR]    dump with luacov and write a coverage report
   run.py data-json [--out DIR]   write upstream's data tables as JSON, to debug
@@ -120,6 +120,7 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
         # Runs next to the build dumps; it parses the corpus builds' lines too
         (out / "modparser.jsonl").unlink(missing_ok=True)
         (out / "data.jsonl").unlink(missing_ok=True)
+        (out / "tables.jsonl").unlink(missing_ok=True)
         jobs = max(1, jobs - 2)
 
     def run(indexed):
@@ -131,6 +132,7 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
     if modparser:
         tasks.append((-1, "modparser"))
         tasks.append((-2, "data"))
+        tasks.append((-3, "tables"))
 
     def run_task(task):
         if task[1] == "modparser":
@@ -138,6 +140,8 @@ def dump(out, jobs, lua_opts=(), env_for_shard=None, modparser=False):
                    [str(out / "modparser.jsonl"), str(CORPUS / "synthetic_mod_lines.txt"), *build_args(builds)])
         elif task[1] == "data":
             luajit(ORACLE / "data.lua", [str(out / "data.jsonl")])
+        elif task[1] == "tables":
+            luajit(ORACLE / "tables.lua", [str(out / "tables.jsonl")])
         else:
             run(task)
 

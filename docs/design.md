@@ -141,7 +141,14 @@ program (`src/Modules`, `src/Classes`, `Launch.lua`, the libraries in
 in sync with the submodule and never edited by hand. The generated code runs on
 a dynamic runtime with LuaJIT's semantics (`lua::rt`, `lua::env`: values,
 metatables, the standard library with LuaJIT's `table.sort`, `%.14g` number
-formatting, LuaJIT's table constructor order for duplicate keys). A headless
+formatting, and LuaJIT's table layout (`lua::ljtab`: array and hash parts,
+collision chains, resizes, constructor templates), so `pairs` visits number
+and boolean keys in LuaJIT's order, checked against LuaJIT by
+`oracle/tables.lua`. Strings, tables and functions hash by a random seed or
+by address in LuaJIT, so upstream cannot depend on their order: they follow
+in insertion order, and count towards the sizes without taking a slot of
+the layout). The typed engine keeps upstream's number-keyed tables in the
+same layout (`lua::ljtab::LjMap`). A headless
 host (`crates/upstream/src/host.rs`, a port of `HeadlessWrapper.lua`) runs it
 like the oracle does. Data files are not translated: the importer evaluates
 them at run time, and the functions they contain are translated by `luagen`

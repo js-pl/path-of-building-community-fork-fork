@@ -4,7 +4,7 @@
 //! engine can map each to its Rust port. Anything else fails loudly.
 
 use lua::ast::*;
-use lua::value::{FuncRef, Key, LuaStr, TableRef, Value};
+use lua::value::{FuncRef, Key, LuaStr, Table, TableRef, Value};
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -553,7 +553,6 @@ impl Evaluator<'_> {
     }
 
     fn table(&mut self, fields: &[Field], path: &str) -> Result<TableRef> {
-        let t = TableRef::new();
         // Positions of positional fields, in source order
         let mut positions = vec![0i64; fields.len()];
         let mut count = 0;
@@ -563,35 +562,55 @@ impl Evaluator<'_> {
                 positions[i] = count;
             }
         }
-        for i in lua::ast::constructor_order(fields) {
-            let f = &fields[i];
-            let mut n = positions[i] - 1;
-            match f {
+        let plan = lua::ast::constructor_plan(fields);
+        let mut t = Table::with_sizes(plan.asize, plan.hbits);
+        for step in plan.steps {
+            let (i, template) = match step {
+                Step::Template(i) => (i, true),
+                Step::Field(i) => (i, false),
+                Step::Reserve => {
+                    t.reserve();
+                    continue;
+                }
+                Step::Reasize(n) => {
+                    lua::rt::treasize(&mut t, n);
+                    continue;
+                }
+            };
+            let n = positions[i];
+            let (key, val) = match &fields[i] {
                 Field::Keyed(k, v) => {
                     let key = self.expr1(k, "")?;
                     let sub = format!("{path}[{}]", key_label(&key));
-                    let val = self.expr1(v, &sub)?;
-                    if Key::from_value(&key).is_none() {
-                        return self.err("table index is nil or NaN");
-                    }
-                    t.set(key, val);
+                    (key, self.expr1(v, &sub)?)
                 }
                 Field::Item(e) => {
-                    let sub = format!("{path}[{}]", n + 1);
-                    if i + 1 == fields.len() {
-                        for v in self.expr(e, &sub)? {
-                            n += 1;
-                            t.set(Value::Number(n as f64), v);
+                    let sub = format!("{path}[{n}]");
+                    if i + 1 == fields.len() && !template {
+                        let vals = self.expr(e, &sub)?;
+                        if is_multi(e) {
+                            t.set_multi(n as u32, vals);
+                            continue;
                         }
+                        (
+                            Value::Number(n as f64),
+                            vals.into_iter().next().unwrap_or_default(),
+                        )
                     } else {
-                        n += 1;
-                        let v = self.expr1(e, &sub)?;
-                        t.set(Value::Number(n as f64), v);
+                        (Value::Number(n as f64), self.expr1(e, &sub)?)
                     }
                 }
+            };
+            if Key::from_value(&key).is_none() {
+                return self.err("table index is nil or NaN");
+            }
+            if template {
+                lua::rt::tset_t(&mut t, key, val);
+            } else if lua::rt::tset(&mut t, key, val).is_err() {
+                return self.err("table index is nil or NaN");
             }
         }
-        Ok(t)
+        Ok(TableRef::from_table(t))
     }
 }
 
