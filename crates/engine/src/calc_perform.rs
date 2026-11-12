@@ -273,6 +273,9 @@ pub struct Perform<'a> {
     pub(crate) debuffs: BuffMap,
     /// `env.player.mainSkill.mirage`
     pub mirage: Option<crate::calc_mirage::Mirage>,
+    /// The Saviour's copy that replaces `env.player.mainSkill`, as its
+    /// calculation left it
+    pub main_copy: Option<Box<crate::calc_skill_mods::SkillMods>>,
     /// `env.player.allyLifeList`: the allies in each life pool
     pub(crate) ally_life_list: Vec<(&'static str, Vec<AllyLife>)>,
 }
@@ -621,6 +624,7 @@ pub fn perform<'a>(env: Env, input: PerformInput<'a>) -> Result<Perform<'a>> {
         merged_buffs: (Vec::new(), Vec::new()),
         debuffs: Vec::new(),
         mirage: None,
+        main_copy: None,
         ally_life_list: Vec::new(),
     };
     p.run()?;
@@ -1394,7 +1398,9 @@ impl<'a> Perform<'a> {
                     .insert("triggerTime".into(), ModValue::Number(60.0 * 1000.0));
             }
             if self.skill_name(i) == "Reflection" || self.sd_truthy(i, "triggeredBySaviour") {
-                self.mods_mut(i).info_trigger = Some("Saviour".into());
+                let mods = self.mods_mut(i);
+                mods.info_message = Some("Triggered by a Crit from The Saviour".into());
+                mods.info_trigger = Some("Saviour".into());
             }
         }
 

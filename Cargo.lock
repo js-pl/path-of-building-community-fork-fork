@@ -145,6 +145,7 @@ name = "session"
 version = "0.0.0"
 dependencies = [
  "engine",
+ "gamedata",
  "importer",
  "lua",
  "miniz_oxide",

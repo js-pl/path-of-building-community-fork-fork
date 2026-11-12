@@ -215,7 +215,12 @@ impl<'a> Perform<'a> {
         if self.sd_truthy(main, "triggeredByMirageArcher") {
             let count = self.c.base(list, Some(&cfg), &["MirageArcherMaxCount"])?;
             let ext = self.external_from_here(main, MirageKind::Archer);
-            let output = recalc()?.mirage(ext, &self.input.limited)?;
+            let (output, _) = recalc()?.mirage(ext, &self.input.limited)?;
+            let mods = self.mods_mut(main);
+            if mods.info_message.is_none() {
+                let n = crate::pat::num(count);
+                mods.info_message = Some(format!("{n} Mirage Archers using {name}"));
+            }
             self.mirage = Some(Mirage {
                 name: name.clone(),
                 skill_part_name: self.mods(main).skill_part_name.clone(),
@@ -280,9 +285,15 @@ impl<'a> Perform<'a> {
                     warriors,
                 },
             );
-            let output = recalc()?.mirage(ext, &self.input.limited)?;
-            // The player's output is the warriors'
+            let (output, mut copy) = recalc()?.mirage(ext, &self.input.limited)?;
+            // The player's output and main skill are the warriors'
             self.c.actors.actors[PLAYER].output = output;
+            let n = crate::pat::num(warriors);
+            copy.info_message = Some(format!(
+                "{n} Mirage Warriors using {}",
+                cached.skill.active_effect.granted_effect.name
+            ));
+            self.main_copy = Some(Box::new(copy));
             return Ok(true);
         }
         if name == "Tawhoa's Chosen" {
@@ -308,7 +319,12 @@ impl<'a> Perform<'a> {
                     cast_chance,
                 },
             );
-            let output = recalc()?.mirage(ext, &self.input.limited)?;
+            let (output, _) = recalc()?.mirage(ext, &self.input.limited)?;
+            let mods = self.mods_mut(main);
+            if mods.info_message.is_none() {
+                let n = count.map_or("nil".into(), crate::pat::num);
+                mods.info_message = Some(format!("{n} Sacred Wisps using {name}"));
+            }
             self.mirage = Some(Mirage {
                 name: name.clone(),
                 skill_part_name: self.mods(main).skill_part_name.clone(),

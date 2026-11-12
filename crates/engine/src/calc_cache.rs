@@ -60,12 +60,16 @@ pub trait Recalc {
     /// it skips.
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()>;
     /// A mirage's calculation of its copy of a skill (`calcs.copyActiveSkill`
-    /// and `calcs.perform` of `calculateMirage`): the player's output
+    /// and `calcs.perform` of `calculateMirage`): the player's output and
+    /// what the calculation set on the copy
     fn mirage(
         &self,
         ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<crate::mods::SymMap<OutVal>>;
+    ) -> Result<(
+        crate::mods::SymMap<OutVal>,
+        crate::calc_skill_mods::SkillMods,
+    )>;
 }
 
 /// `cacheSkillUUID(skill, env)` of a skill of the setup
@@ -182,7 +186,10 @@ impl Recalc for Recalculator<'_, '_> {
         &self,
         mut ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<crate::mods::SymMap<OutVal>> {
+    ) -> Result<(
+        crate::mods::SymMap<OutVal>,
+        crate::calc_skill_mods::SkillMods,
+    )> {
         use crate::calc_skill_mods::{ModsInput, Owner};
         let mut build = self.build.clone();
         let mut env = self.init_env(&mut build)?;
@@ -279,7 +286,8 @@ impl Recalc for Recalculator<'_, '_> {
         input.external = Some(ext);
         let mut p = crate::calc_perform::perform(env, input)?;
         p.finish()?;
-        Ok(p.c.actors.actors[crate::calc::PLAYER].output.clone())
+        let copy = p.mods(p.main()).clone();
+        Ok((p.c.actors.actors[crate::calc::PLAYER].output.clone(), copy))
     }
 }
 

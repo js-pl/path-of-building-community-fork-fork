@@ -59,6 +59,7 @@ pub struct Base {
     pub tincture: Option<TinctureBase>,
     pub enchant: Option<String>,
     pub enchant_mod_types: Option<Vec<Vec<String>>>,
+    pub cannot_be_anointed: bool,
 }
 
 /// An affix or other item mod (`data.itemMods.<group>[id]`).
@@ -303,6 +304,7 @@ impl Base {
                 int: opt_number(&get(&req, "int"))?,
             },
             socket_limit: opt_number(&get(v, "socketLimit"))?,
+            cannot_be_anointed: get(v, "cannotBeAnointed").truthy(),
             weapon: opt_map("weapon")?,
             armour: opt_map("armour")?,
             flask: if flask.is_nil() {
@@ -576,6 +578,7 @@ crate::codec_struct!(Base {
     tincture,
     enchant,
     enchant_mod_types,
+    cannot_be_anointed,
 });
 crate::codec_struct!(Affix {
     id,

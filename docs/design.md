@@ -91,7 +91,9 @@ web/ (TypeScript, Preact)               crates/
   upstream's controls and tabs do, so every result is upstream's. Upstream's
   own controls (sidebar skill selection, config options, calcs tab options)
   are addressed by name and changed through their handlers. The engine does
-  no I/O.
+  no I/O. `session.lua` is being replaced command by command: a
+  `Dispatcher` answers the commands ported to the typed engine with it
+  and the rest with the translation, with the same JSON.
 - **Data delivery.** `pob bundle` writes the data files the engine reads when
   starting and loading a build on the current tree into one compressed bundle
   (`core.bin`), and every tree version as separate files. The site serves them

@@ -922,8 +922,10 @@ impl<'a> Perform<'a> {
         let global = |p: &Self| p.has_flag(main, "globalTrigger");
         if source.is_none() && !(global(self) && config.triggered_skill_cond.is_some()) {
             self.sd_clear(main, "triggered");
+            let name = config.trigger_name.clone().unwrap_or_default();
             let mods = self.mods_mut(main);
             mods.info_message2 = Some("DPS reported assuming Self-Cast".into());
+            mods.info_message = Some(format!("No {name} Triggering Skill Found"));
             mods.info_trigger = Some(String::new());
             return Ok(());
         }
@@ -1459,7 +1461,38 @@ impl<'a> Perform<'a> {
             let uuid = self.skill_uuid(s);
             self.sd_set(main, "triggerSourceUUID", uuid.as_str());
         }
-        self.mods_mut(main).info_trigger = config.trigger_name;
+        let name = config.trigger_name.clone().unwrap_or_default();
+        let mut info = match source.filter(|&s| s != main) {
+            Some(s) => {
+                let source_name = self.skill_name(s);
+                let by = if name != source_name {
+                    name.clone()
+                } else {
+                    self.skill_name(main).to_string()
+                };
+                let what = if actor == PLAYER {
+                    "'s Trigger: "
+                } else {
+                    "'s attack Trigger: "
+                };
+                format!("{by}{what}{source_name}")
+            }
+            None => match self.mods(main).triggered_by {
+                Some(t) => self.skill(main).effect_list[t].granted_effect.name.clone(),
+                None => format!("{name} Trigger"),
+            },
+        };
+        if self.sd_truthy(main, "triggeredByBrand") {
+            let n = config
+                .brand
+                .and_then(|(b, _, _)| self.sd_num(b, "attachedBrandCount"))
+                .unwrap_or(f64::NAN);
+            let s = if n == 1.0 { "" } else { "s" };
+            info = format!("{info}:{} attached Brand{s}", n as i64);
+        }
+        let mods = self.mods_mut(main);
+        mods.info_message = Some(info);
+        mods.info_trigger = config.trigger_name;
         Ok(())
     }
 
@@ -1528,6 +1561,7 @@ impl<'a> Perform<'a> {
             self.sd_clear(main, "triggered");
             let mods = self.mods_mut(main);
             mods.info_message2 = Some("DPS reported assuming Self-Cast".into());
+            mods.info_message = Some("No Cast While Channeling Triggering Skill Found".into());
             mods.info_trigger = Some(String::new());
             return Ok(());
         };
@@ -1684,6 +1718,11 @@ impl<'a> Perform<'a> {
         self.sd_set(main, "triggerRate", rate);
         let uuid = self.skill_uuid(source);
         self.sd_set(main, "triggerSourceUUID", uuid.as_str());
+        let info = format!(
+            "Cast While Channeling's Trigger: {}",
+            self.skill_name(source)
+        );
+        self.mods_mut(main).info_message = Some(info);
         Ok(())
     }
 
