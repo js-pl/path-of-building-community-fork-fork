@@ -26,11 +26,11 @@ use std::rc::Rc;
 #[derive(Clone, Debug)]
 pub struct CachedCalc {
     /// `Env.player.output`
-    pub output: HashMap<Sym, OutVal>,
+    pub output: crate::mods::SymMap<OutVal>,
     /// `ActiveSkill`: the main skill with its mods and skill data
     pub skill: ActiveSkill,
     /// `Env.minion.output`
-    pub minion_output: Option<HashMap<Sym, OutVal>>,
+    pub minion_output: Option<crate::mods::SymMap<OutVal>>,
     /// The calculation's player and enemy as they are at its end: the
     /// cached skill's actor, which a mirage's copy keeps
     pub player_store: crate::mods::Store,
@@ -65,7 +65,7 @@ pub trait Recalc {
         &self,
         ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<HashMap<Sym, OutVal>>;
+    ) -> Result<crate::mods::SymMap<OutVal>>;
 }
 
 /// `cacheSkillUUID(skill, env)` of a skill of the setup
@@ -182,7 +182,7 @@ impl Recalc for Recalculator<'_, '_> {
         &self,
         mut ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<HashMap<Sym, OutVal>> {
+    ) -> Result<crate::mods::SymMap<OutVal>> {
         use crate::calc_skill_mods::{ModsInput, Owner};
         let mut build = self.build.clone();
         let mut env = self.init_env(&mut build)?;
@@ -235,7 +235,7 @@ impl Recalc for Recalculator<'_, '_> {
             &mut copy,
             &mut env.groups,
             &mut db,
-            &mut HashMap::new(),
+            &mut Default::default(),
             &input,
             &owner,
         )?;
