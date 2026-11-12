@@ -43,6 +43,7 @@ pub mod mod_parser;
 pub mod mod_store;
 pub mod mods;
 pub mod pat;
+pub mod power;
 pub mod rt;
 pub mod skill_data;
 pub mod skills;
