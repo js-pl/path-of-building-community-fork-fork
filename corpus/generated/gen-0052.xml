@@ -334,8 +334,8 @@ Implicits: 0
 Badge of the Brotherhood
 Turquoise Amulet
 League: Blight
-LevelReq: 20
-Implicits: 0
+LevelReq: 60
+Implicits: 1
 {tags:attribute}{range:0.5}+(16-24) to Dexterity and Intelligence
 Your Maximum Frenzy Charges is equal to your Maximum Power Charges
 {range:0.5}(7-10)% increased Cooldown Recovery Rate of Travel Skills per Frenzy Charge
@@ -358,7 +358,7 @@ Variant: Pre 2.6.0
 Variant: Current
 Selected Variant: 2
 Sockets: G
-LevelReq: 45
+LevelReq: 44
 Implicits: 1
 Has 1 Socket
 {variant:2}25% increased Effect of Buffs granted by Socketed Golem Skills
@@ -452,10 +452,10 @@ Replica Witchfire Brew
 Stibnite Flask
 League: Heist
 Quality: 20
-LevelReq: 27
-Implicits: 0
-{range:0.5}(-10-10)% reduced Charges per use
+LevelReq: 48
+Implicits: 1
 Creates a Smoke Cloud on Use
+{range:0.5}(-10-10)% reduced Charges per use
 Grants Level 21 Vulnerability Curse Aura during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -632,9 +632,9 @@ Petrified during Effect
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="6" clusterHashFormatVersion="2" masteryEffects="{10495,2902},{62853,33315},{17380,33129},{12873,4319},{50071,33959},{7488,57298}" nodes="3863,30205,6233,41689,42686,56648,51220,49308,46289,38129,23507,127,40751,12189,30338,58244,52157,10511,51517,7920,28012,37175,12873,265,38995,62853,13573,61320,63639,2121,14157,21575,542,50071,15549,57746,27276,4105,47321,8001,4011,48477,32227,21835,58968,35894,58198,46408,39743,10495,8938,33783,54338,49978,7488,62831,42623,43988,9877,47362,48778,1891,5875,59009,37663,58603,25058,35283,33903,31619,40644,57044,41989,1600,27962,62490,45838,62069,31703,10763,57457,13885,21170,57248,45272,28754,27415,8012,8640,14209,39443,52095,3656,60737,64501,11334,42804,44683,59252,31371,17380,20546,24050,9355,1767,5823,21301,51212,27659,11784,64509,58069,37671" secondaryAscendClassId="8" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="6" clusterHashFormatVersion="2" masteryEffects="{7488,57298},{10495,2902},{12873,4319},{17380,33129},{50071,33959},{62853,33315}" nodes="127,265,542,1600,1767,1891,2121,3656,3863,4011,4105,5823,5875,6233,7488,7920,8001,8012,8640,8938,9355,9877,10495,10511,10763,11334,11784,12189,12873,13573,13885,14157,14209,15549,17380,20546,21170,21301,21575,21835,23507,24050,25058,27276,27415,27659,27962,28012,28754,30205,30338,31371,31619,31703,32227,33783,33903,35283,35894,37175,37663,37671,38129,38995,39443,39743,40644,40751,41689,41989,42623,42686,42804,43988,44683,45272,45838,46289,46408,47321,47362,48477,48778,49308,49978,50071,51212,51220,51517,52095,52157,54338,56648,57044,57248,57457,57746,58069,58198,58244,58603,58968,59009,59252,60737,61320,62069,62490,62831,62853,63639,64501,64509" secondaryAscendClassId="8" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgYgbw8Xdf0YWaLZpr7dSMgUwJy00ZTxW9MAf58vL512guOEy70pD8k9HvBtbJE3MkkBCZhT9YU1Be-I-JcISTdNVEfDlzy94ZJqjBAJuNkfQQ-rvV1941VL5liMNuNWtUibPyj_IuqD99RCwzodQPVvpn-r1CaVuQK-igdjFvPmgZMf5Oth4onThG97g57E3tSkBQZAbTr0GrMO8nV71yoL4HE2PVKy36Cw2HBSaxcfTCHAN4GaE8t_DkjtQfv1LEanNOd0eotD5FBCXfIkiwbnFr9TNcgMbAsuCPv94tWTJwAGEN8ySYIj9YWEp8OXC1Yo_9_SHUCBaUPk
+				https://www.pathofexile.com/passive-skill-tree/AAAABgYgbwB_AQkGQAbnB2MISQ5IDxcPqxAJFr8W8xhZHUAe8B9BH0whwCLqJIsmlSj_KQ8qCyxGLggvnTJJNQU2PTdNN4E8vUPkUEJSslM1VEdVS1vTXfJh4mqMaxdsC206bWxwUnX9doJ6i3uDe9d944P3hG-J04w2kTeTH5MnlPGYU5oTmz-exJ8votmkBaZ_pr6nNKvUsNizDrTRtUi42bkCvV2-isCcwzrDl8gMyBTJPct_y73UQt1I3tTfoOBx4ZLi1eNW44Tk6-ZY5oHndO1B74jydfQa9W_1hfiX-_X7_QAG39IdQAtWKP8Q3zJJgWlD5ISnw5eCI_WF
 			</URL>
 			<Sockets/>
 			<Overrides/>

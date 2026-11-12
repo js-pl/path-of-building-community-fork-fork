@@ -7,7 +7,7 @@
 //! from their own cached calculation (Blight, Penance Brand, Earthquake),
 //! the overcapped lightning resistance's mana and allies' life pools.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -2379,6 +2379,12 @@ impl<'a> Perform<'a> {
         self.reserved = [(0.0, extra_life), (0.0, 0.0)];
         self.uncancellable = [extra_life, extra_mana];
         for i in 0..self.n_player {
+            if self.sd_truthy(i, "requiresManaReservation")
+                && self.c.out(PLAYER, "Mana") == Some(0.0)
+            {
+                self.set_flag(i, "disable", true);
+                self.mods_mut(i).disable_reason = Some("This skill requires reserving Mana".into());
+            }
             if !((self.has_type(i, "HasReservation")
                 || self.sd_truthy(i, "triggeredByAutoexertion"))
                 && !self.has_type(i, "ReservationBecomesCost")
@@ -2431,7 +2437,7 @@ impl<'a> Perform<'a> {
                 .or(level.field("lifeReservationPercent"))
                 .unwrap_or(0.0);
             if self.c.flag(list, Some(&cfg), &["BloodMagicReserved"])?
-                && self.sd(i, "ManaReservationPercentForced").is_none()
+                && !self.sd_truthy(i, "requiresManaReservation")
             {
                 life_flat += mana_flat;
                 mana_flat = 0.0;
@@ -2525,12 +2531,6 @@ impl<'a> Perform<'a> {
                 {
                     self.uncancellable[pool] += pct;
                 }
-            }
-            if self.sd(i, "ManaReservationPercentForced").is_some()
-                && self.sd_num(i, "ManaReservedBase") == Some(0.0)
-            {
-                self.set_flag(i, "disable", true);
-                self.mods_mut(i).disable_reason = Some("This skill requires reserving Mana".into());
             }
         }
         self.update_reserving_skills();
@@ -3147,7 +3147,11 @@ impl<'a> Perform<'a> {
         let spell = self.mf("Spell");
         if self.env.mode.combat {
             let player_main_base = self.lists[self.main()].base;
-            if self.c.flag(player_main_base, None, &["Cruelty"])? {
+            let main_cfg = self.cfg(self.main());
+            if self
+                .c
+                .flag(player_main_base, Some(&main_cfg), &["Cruelty"])?
+            {
                 let v = self.c.override_num(db, None, &["Cruelty"])?.unwrap_or(40.0);
                 self.c.set_mult(db, "Cruelty", v);
             }
@@ -3189,14 +3193,7 @@ impl<'a> Perform<'a> {
                     max_stacks,
                 );
                 let over = self.c.override_num(db, None, &["FortificationStacks"])?;
-                let stacks = m_min(
-                    over.unwrap_or(if min_stacks > 0.0 {
-                        min_stacks
-                    } else {
-                        max_stacks
-                    }),
-                    max_stacks,
-                );
+                let stacks = m_min(over.unwrap_or(max_stacks), max_stacks);
                 let inc_dur = self.c.inc(skill_list, None, &["FortifyDuration"])?;
                 self.c.set_out(actor, "MaximumFortification", max_stacks);
                 self.c.set_out(actor, "MinimumFortification", min_stacks);

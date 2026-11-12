@@ -357,8 +357,8 @@ Sockets: G-G-G-G
 LevelReq: 62
 Implicits: 0
 {range:0.5}+(30-40) to Dexterity
-{variant:2}{range:0.5}(320-380)% increased Evasion Rating
 {variant:1}{range:0.5}(80-120)% increased Evasion Rating
+{variant:2}{range:0.5}(320-380)% increased Evasion Rating
 {variant:3}{range:0.5}(300-340)% increased Evasion Rating
 30% increased Movement Speed
 Immune to Burning Ground, Shocked Ground and Chilled Ground
@@ -471,33 +471,33 @@ Variant: Trap Throwing Speed (Current)
 Variant: Energy Shield Regen (Current)
 Variant: Lucky Crit Chance while Focused (Current)
 Selected Variant: 4
-LevelReq: 60
+LevelReq: 64
 Implicits: 1
 {tags:resource}{range:0.5}+(25-40) to maximum Life
+{tags:attribute}{variant:5}{crafted}{range:0.5}+(6-17) to Strength and Dexterity
+{tags:attribute}{variant:14}{range:0.5}+(31-35) to Strength and Dexterity
+{tags:attribute}{variant:7}{crafted}{range:0.5}+(6-17) to Strength and Intelligence
+{tags:attribute}{variant:16}{range:0.5}+(31-35) to Strength and Intelligence
+{tags:attribute}{variant:6}{crafted}{range:0.5}+(6-17) to Dexterity and Intelligence
+{tags:attribute}{variant:15}{range:0.5}+(31-35) to Dexterity and Intelligence
 {tags:resistance}{range:0.5}+(30-40)% to Cold Resistance
+{tags:speed}{variant:17}{range:0.5}(14-16)% increased Trap Throwing Speed
 Chill nearby Enemies when you Focus, causing 30% reduced Action Speed
+{tags:resistance}{variant:3}{crafted}{range:0.5}+(8-15)% to Cold and Chaos Resistances
+{tags:resistance}{variant:12}{range:0.5}+(16-20)% to Cold and Chaos Resistances
+{tags:defences}{variant:18}Regenerate 200 Energy Shield per second while a Rare or Unique Enemy is Nearby
+{tags:critical}{variant:19}Your Critical Strike Chance is Lucky while Focused
+{tags:critical}{variant:19}{range:0.5}Focus has (5-8)% increased Cooldown Recovery Rate
+{tags:resistance}{variant:2}{crafted}{range:0.5}+(8-15)% to Fire and Chaos Resistances
+{tags:resistance}{variant:11}{range:0.5}+(16-20)% to Fire and Chaos Resistances
 {variant:1,2,3,4,5,6,7,8,9,10}{range:0.5}Focus has (15-25)% increased Cooldown Recovery Rate
 {variant:11,12,13,14,15,16,17,18,19}{range:0.5}Focus has (30-50)% increased Cooldown Recovery Rate
 {range:0.5}(50-70)% increased Damage with Hits and Ailments against Chilled Enemies
-{tags:life}{variant:1}{crafted}Regenerate 2% of Life per second during any Flask Effect
-{tags:resistance}{variant:2}{crafted}{range:0.5}+(8-15)% to Fire and Chaos Resistances
-{tags:resistance}{variant:3}{crafted}{range:0.5}+(8-15)% to Cold and Chaos Resistances
 {tags:resistance}{variant:4}{crafted}{range:0.5}+(8-15)% to Lightning and Chaos Resistances
-{tags:attribute}{variant:5}{crafted}{range:0.5}+(6-17) to Strength and Dexterity
-{tags:attribute}{variant:6}{crafted}{range:0.5}+(6-17) to Dexterity and Intelligence
-{tags:attribute}{variant:7}{crafted}{range:0.5}+(6-17) to Strength and Intelligence
-{tags:speed}{variant:8}{crafted}{range:0.5}(7-12)% increased Trap Throwing Speed
-{tags:defences}{variant:9}{crafted}Regenerate 120 Energy Shield per second while a Rare or Unique Enemy is Nearby
-{variant:10,19}{crafted}Your Critical Strike Chance is Lucky while Focused
-{tags:resistance}{variant:11}{crafted}{range:0.5}+(16-20)% to Fire and Chaos Resistances
-{tags:resistance}{variant:12}{crafted}{range:0.5}+(16-20)% to Cold and Chaos Resistances
-{tags:resistance}{variant:13}{crafted}{range:0.5}+(16-20)% to Lightning and Chaos Resistances
-{tags:attribute}{variant:14}{crafted}{range:0.5}+(31-35) to Strength and Dexterity
-{tags:attribute}{variant:15}{crafted}{range:0.5}+(31-35) to Dexterity and Intelligence
-{tags:attribute}{variant:16}{crafted}{range:0.5}+(31-35) to Strength and Intelligence
-{tags:speed}{variant:17}{crafted}{range:0.5}(14-16)% increased Trap Throwing Speed
-{tags:defences}{variant:18}{crafted}Regenerate 200 Energy Shield per second while a Rare or Unique Enemy is Nearby
-{variant:19}{crafted}{range:0.5}Focus has (5-8)% increased Cooldown Recovery Rate
+{tags:resistance}{variant:13}{range:0.5}+(16-20)% to Lightning and Chaos Resistances
+{variant:8}{crafted}{range:0.5}(7-12)% increased Trap Throwing Speed
+{variant:9}{crafted}Regenerate 120 Energy Shield per second while a Rare or Unique Enemy is Nearby
+{variant:10}{crafted}Your Critical Strike Chance is Lucky while Focused
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -789,9 +789,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="2" classId="0" clusterHashFormatVersion="2" masteryEffects="{50757,28676},{18240,30520},{29993,21730},{38436,45263},{12382,31822},{24334,46059},{6507,34383},{48007,2902}" nodes="17674,44788,10829,16775,49178,57565,22628,65097,14211,52094,63976,50757,46578,53558,13714,8643,65167,22497,36489,22441,28330,35936,7903,57736,62103,42731,51786,37078,29993,6534,33508,46910,52099,19144,14182,50288,33479,38436,49807,38048,48828,33545,62662,3992,13782,6507,25732,64816,48768,23122,6204,55485,19506,2355,8348,34907,25431,37575,14090,18033,28475,46092,51923,57900,24472,9009,55906,63845,16633,48423,12926,65034,38450,5560,18240,45456,31683,10108,47062,26740,40907,51291,63630,43162,55373,12382,43374,60532,15073,35179,34207,2348,47312,7594,37690,15144,25959,58833,28221,918,35503,24334,36881,30733,28574,45887,6230,4207,24643,2151,20310,45067,48007,19939,60204,16167,39773,62021,60247,12702,11688" secondaryAscendClassId="13" treeVersion="3_29">
+		<Spec ascendClassId="2" classId="0" clusterHashFormatVersion="2" masteryEffects="{6507,34383},{12382,31822},{18240,30520},{24334,46059},{29993,21730},{38436,45263},{48007,2902},{50757,28676}" nodes="918,2151,2348,2355,3992,4207,5560,6204,6230,6507,6534,7594,7903,8348,8643,9009,10108,10829,11688,12382,12702,12926,13714,13782,14090,14182,14211,15073,15144,16167,16633,16775,17674,18033,18240,19144,19506,19939,20310,22441,22497,22628,23122,24334,24472,24643,25431,25732,25959,26740,28221,28330,28475,28574,29993,30733,31683,33479,33508,33545,34207,34907,35179,35503,35936,36489,36881,37078,37575,37690,38048,38436,38450,39773,40907,42731,43162,43374,44788,45067,45456,45887,46092,46578,46910,47062,47312,48007,48423,48768,48828,49178,49807,50288,50757,51291,51786,51923,52094,52099,53558,55373,55485,55906,57565,57736,57900,58833,60204,60247,60532,62021,62103,62662,63630,63845,63976,64816,65034,65097,65167" secondaryAscendClassId="13" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgA2dkUKrvQqTUGHwBrg3Vhk_kk3g8t--ejGRbXy0TY1kiHD_o9X4Y6JV6luqoxgHt_hiPKXpuvKSpDWdSkZhoLktz7Lg0rIN2bEcILHliTCj5SgvryDCfTGD5g11hlrZIT9ML6AWlIYPNi9TDIJMyCciFtjV5LHNwpGcW87tAzK0-IsX5gjMdpi-WVA-b0nMn7-CpYyFbhHQLGQe8O31mh0n8vIW6ia2E0wXqlu7HQ64YlrhZ8JLLjQHaqTOjsoZWduPQOWiq9fDpAReA1vnrM_GFYQb2BDCGdPVrALu4dN4-ssPyebXfJF61cxni2oAAhwBMZFVOJ1KbDPliSGTxlrdzhHQHxOMF6z618OC1a7hw==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgA2dgOWCGcJLAkzD5gQbxW4GDwYVhlrGYYdqh7fIJwhwyMxKk0tqDBeMZ4yfjWSNdY3CjdmN4M64TsoPydA-UGHRQpGcUdASshMMk3jT1ZXqVfhWGRaUl8OX5hgQ2NXZIRlZ2h0bj1uqm87b551KXgNe8OCx4LkgwmFn4hbiWuKr4xgjomQEZDWkseTOpSgliSWMptdn8um66iaqW6u9LALsZCzP7QMtfK3PrfWuNC7h70nvoC-vMAawo_EcMZFyFvKSsrTy37Lg9E22E3Yvdpi4N3hiOIs6yzrV-x08kXyl_TG-WX56P0w_gr-Sf6PAAiGTxlrfE4wXnc4R0Cz618OVOJ1KbDPliQLVruHcATGRQ==
 			</URL>
 			<Sockets>
 				<Socket itemId="19" nodeId="6230"/>

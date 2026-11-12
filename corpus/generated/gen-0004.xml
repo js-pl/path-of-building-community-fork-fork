@@ -222,9 +222,9 @@ Implicits: 1
 {range:0.5}+(20-40)% to Damage over Time Multiplier
 {range:0.5}(20-40)% increased Critical Strike Chance
 Cannot Poison Enemies with at least 12 Poisons on them
-Wither on Hit with this weapon against Enemies with at least 12 Poisons on them
 {range:0.5}Inflict (2-3) additional Poisons on the same Target
 when you inflict Poison with this weapon
+Wither on Hit with this weapon against Enemies with at least 12 Poisons on them
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -285,8 +285,12 @@ LevelReq: 54
 Implicits: 0
 {variant:1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25}+1 to Level of Socketed Gems
 {variant:34}+2 to Level of Socketed Gems
+{variant:27}+2 to Level of Socketed AoE Gems
+{variant:27}{range:0.5}(8-10)% increased Area of Effect
 {variant:28}+2 to Level of Socketed Projectile Gems
+{variant:28}Projectiles Pierce an additional Target
 {variant:29}+2 to Level of Socketed Melee Gems
+{variant:29}+0.2 metres to Melee Strike Range
 {variant:1,2,3,4,5,6,7,8,9,10,11,12,13}Socketed Gems have 40% reduced Reservation Efficiency
 {variant:14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38}Socketed Gems have 25% increased Reservation Efficiency
 Trigger Level 15 Feast of Flesh every 5 seconds
@@ -301,37 +305,23 @@ Trigger Level 15 Feast of Flesh every 5 seconds
 {variant:20}{range:0.5}+(31-35) to Dexterity and Intelligence
 {range:0.5}(180-220)% increased Energy Shield
 {variant:30}{range:0.5}+(55-60) to maximum Life
+{variant:30}Regenerate 5.3 Mana per second
 {variant:31}Regenerate 33.3 Life per second
 {variant:31}{range:0.5}+(55-60) to maximum Mana
-{variant:30}Regenerate 5.3 Mana per second
 {variant:26}{range:0.5}Minions have (8-10)% increased maximum Life
-{variant:28}Projectiles Pierce an additional Target
-{variant:27}{range:0.5}(8-10)% increased Area of Effect
 {variant:26}+1 to maximum number of Raised Zombies
-{variant:26}+1 to maximum number of Spectres
 {variant:26}+1 to maximum number of Skeletons
-{variant:26}+1 to maximum number of Skeletons
-{variant:29}+0.2 metres to Melee Strike Range
 {variant:38}20% increased Damage if you have Consumed a corpse Recently
+{variant:33}{range:0.5}(13-15)% additional Physical Damage Reduction while Focused
+{variant:36}20% increased Attack and Cast Speed if you&apos;ve Consumed a Corpse Recently
 10% chance for Energy Shield Recharge to start when you use a Skill
+{variant:32}{range:0.5}(30-32)% increased Evasion Rating while Focused
 {variant:4}{range:0.5}+(8-15)% to Fire and Chaos Resistances
 {variant:16}{range:0.5}+(16-20)% to Fire and Chaos Resistances
 {variant:23}{range:0.5}Focus has (5-8)% increased Cooldown Recovery Rate
-{variant:18}{range:0.5}+(16-20)% to Lightning and Chaos Resistances
-Eldritch Battery
-{variant:14}{range:0.5}(161-180)% increased Duration of Ailments you inflict while Focused
-{variant:15}{range:0.5}(81-90)% increased Duration of Ailments you inflict while Focused
-{variant:17}{range:0.5}+(16-20)% to Cold and Chaos Resistances
-{variant:22}{range:0.5}(14-16)% increased Mine Laying Speed
-{variant:23}Trigger Socketed Spells when you Focus, with a 0.25 second Cooldown
-{variant:24}{range:0.5}(36-40)% increased Duration of Ailments you inflict while Focused
-{variant:25}{range:0.5}(10-12)% chance to Avoid Elemental Damage from Hits during Soul Gain Prevention
-{variant:27}+2 to Level of Socketed AoE Gems
-{variant:32}{range:0.5}(30-32)% increased Evasion Rating while Focused
-{variant:33}{range:0.5}(13-15)% additional Physical Damage Reduction while Focused
 {variant:35}Corpses you Spawn have 20% increased Maximum Life
-{variant:36}20% increased Attack and Cast Speed if you&apos;ve Consumed a Corpse Recently
 {variant:37}Take no Extra Damage from Critical Strikes if Energy Shield Recharge started Recently
+Eldritch Battery
 {variant:1,2,3}{crafted}{range:0.5}+(7-18)% to Quality
 {variant:5}{crafted}{range:0.5}+(8-15)% to Cold and Chaos Resistances
 {variant:6}{crafted}{range:0.5}+(8-15)% to Lightning and Chaos Resistances
@@ -339,6 +329,14 @@ Eldritch Battery
 {variant:11}{crafted}Trigger Socketed Spells when you Focus
 {variant:12}{crafted}{range:0.5}(81-140)% increased Duration of Ailments you inflict while Focused
 {variant:13}{crafted}{range:0.5}(6-9)% chance to Avoid Elemental Damage from Hits during Soul Gain Prevention
+{variant:14}{range:0.5}(161-180)% increased Duration of Ailments you inflict while Focused
+{variant:15}{range:0.5}(81-90)% increased Duration of Ailments you inflict while Focused
+{variant:17}{range:0.5}+(16-20)% to Cold and Chaos Resistances
+{variant:18}{range:0.5}+(16-20)% to Lightning and Chaos Resistances
+{variant:22}{range:0.5}(14-16)% increased Mine Laying Speed
+{variant:23}Trigger Socketed Spells when you Focus, with a 0.25 second Cooldown
+{variant:24}{range:0.5}(36-40)% increased Duration of Ailments you inflict while Focused
+{variant:25}{range:0.5}(10-12)% chance to Avoid Elemental Damage from Hits during Soul Gain Prevention
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -393,8 +391,6 @@ Eldritch Battery
 			<ModRange id="52" range="0.5"/>
 			<ModRange id="53" range="0.5"/>
 			<ModRange id="54" range="0.5"/>
-			<ModRange id="55" range="0.5"/>
-			<ModRange id="56" range="0.5"/>
 		</Item>
 		<Item id="3">
 			Rarity: UNIQUE
@@ -746,9 +742,9 @@ Implicits: 1
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="1" clusterHashFormatVersion="2" masteryEffects="{33657,46807},{28862,57298},{58540,233},{25934,60246},{5368,44840},{52875,39154},{4139,64381},{64406,59754}" nodes="55649,25934,5197,34130,61868,59861,31928,7162,14606,33657,28862,47175,36543,44606,10542,65456,64077,24720,31033,15868,35436,63422,62363,33287,35663,52875,4139,36047,24383,39768,6718,32480,2454,5152,15438,12795,63048,32482,5368,49652,9511,32738,26523,62108,32739,7440,34400,11700,8426,29034,22285,34601,22627,53118,12247,30160,28311,14056,43833,49645,487,40653,39786,9052,6981,1354,7828,38777,16756,49412,31080,60169,6043,58540,60031,45341,62017,37884,30335,30251,42800,6446,40535,1252,53793,23881,20551,33098,64406,28728,18025,33988,48284,65308,61198,44429,50904,31628,58449,50264,19261,38119,50340,10282,5065" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="1" clusterHashFormatVersion="2" masteryEffects="{4139,64381},{5368,44840},{25934,60246},{28862,57298},{33657,46807},{52875,39154},{58540,233},{64406,59754}" nodes="487,1252,1354,2454,4139,5065,5152,5197,5368,6043,6446,6718,6981,7162,7440,7828,8426,9052,9511,10282,10542,11700,12247,12795,14056,14606,15438,15868,16756,18025,19261,20551,22285,22627,23881,24383,24720,25934,26523,28311,28728,28862,29034,30160,30251,30335,31033,31080,31628,31928,32480,32482,32738,32739,33098,33287,33657,33988,34130,34400,34601,35436,35663,36047,36543,37884,38119,38777,39768,39786,40535,40653,42800,43833,44429,44606,45341,47175,48284,49412,49645,49652,50264,50340,50904,52875,53118,53793,55649,58449,58540,59861,60031,60169,61198,61868,62017,62108,62363,63048,63422,64077,64406,65308,65456" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgEAaNlhZU4UTYVS8azp1Xy4G_o5DoN5cL6Ov64-KS7_sPpNYJB5OT38imz3vvObggeLT86LECuMz18_m1gaPn7gCZYUIDxOMfv2SH7iFPjB9CUnf-Jnm_Kcf-MdEIZgLbQg6nFqVw2HKVhjz34v13XQbpc26Ks5we0B557Nm2ojXBtFBUoelJd5QXTBBHlo6wkXm-Ss6n-xHfJBk_x2f3YrpzAZLp5XBOTSIV1JUEeBSvuWcDhGaYTEvJz_HO8OrY3G2HuM5FHEWEs9lOfEpCgqE8kACOtWZU6214N539Jwvpjyzov7fRArrygU-ADp5KzpavuW
+				https://www.pathofexile.com/passive-skill-tree/AAAABgEAaAHnBOQFSgmWECsTyRQgFE0U-BebGS4aPhtFG_odEB6UIOojXCUnKCopLi20L9cx-zboOQ48Tj38QXRGaUs9UEdXDVhjXUlfP2CQZU5nm26XcDhwvnFqddB2K3Z_eTl5aHuMfLh-4H7if-J_44FKggeDeYTEhVKGYIcpimyLT4zPjr-T_JTnl3mbWJtqnleezacwqzmtja4-sR28nMEEwe3B9MRYxKTG2M6Lz37SIdlh5FHkrOnV6n_rCe8O8azyQfKc85v2SPe--k37lv8c_7AACPt9ECuvKBT461ZlTt_ScL6214N5mPLOiwDp5KzpavuW
 			</URL>
 			<Sockets/>
 			<Overrides/>

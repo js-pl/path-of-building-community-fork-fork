@@ -6,7 +6,7 @@
 //! Breakdowns are not built. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1720,6 +1720,12 @@ impl<'a> Perform<'a> {
                 set(self, "StrikeTargets", v);
             }
         }
+        if self.has_flag(i, "totem") {
+            let limit = self
+                .c
+                .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
+            set(self, "ActiveTotemLimit", limit);
+        }
         if self.has_flag(i, "area")
             || self.sd(i, "radius").is_some_and(ModValue::truthy)
             || (self.has_flag(i, "mine") && self.has_type(i, "Aura"))
@@ -1825,7 +1831,10 @@ impl<'a> Perform<'a> {
             if base_cooldown.is_some() || self.c.base(list, c, &["CooldownRecovery"])? != 0.0 {
                 let cd = match base_cooldown {
                     Some(b) => {
-                        let cd = b / self.c.calc_mod(list, c, &["CooldownRecovery"])?;
+                        let cd = match self.c.override_num(list, c, &["CooldownRecovery"])? {
+                            Some(v) => v,
+                            None => b / self.c.calc_mod(list, c, &["CooldownRecovery"])?,
+                        };
                         (cd * tick).ceil() / tick
                     }
                     None => self.skill_cooldown(list, &cfg, i)?.0,
@@ -1904,10 +1913,7 @@ impl<'a> Perform<'a> {
             let speed = base_speed * self.c.calc_mod(list, c, &["TotemPlacementSpeed"])? * action;
             set(self, "TotemPlacementSpeed", speed);
             set(self, "TotemPlacementTime", 1.0 / speed);
-            let limit = self
-                .c
-                .base(list, c, &["ActiveTotemLimit", "ActiveBallistaLimit"])?;
-            set(self, "ActiveTotemLimit", limit);
+            let limit = self.c.out(actor, "ActiveTotemLimit").unwrap_or(f64::NAN);
             let summoned = self
                 .c
                 .override_num(self.pdb(), None, &["TotemsSummoned"])?
@@ -2436,6 +2442,22 @@ impl<'a> Perform<'a> {
                 );
             }
         }
+        if let Some(pct) = self.sd_num(i, "sacrificeLifePercent") {
+            let life = if self.has_flag(i, "totem") {
+                self.c.out(actor, "TotemLife")
+            } else {
+                self.c.out(actor, "LifeUnreserved")
+            }
+            .unwrap_or(f64::NAN);
+            let as_chaos = self.sd_num(i, "sacrificeLifeAsChaos").unwrap_or(f64::NAN);
+            let add = (life * pct / 100.0 * (as_chaos / 100.0)).floor();
+            for n in ["ChaosMin", "ChaosMax"] {
+                self.c.add(
+                    list,
+                    new_mod(n, Base, add, Some("Sacrifice Support"), 0, 0, vec![]),
+                );
+            }
+        }
         Ok(())
     }
 
@@ -2673,16 +2695,14 @@ impl<'a> Perform<'a> {
             let (level, list, cfg) = (e.level, self.lists[main].list, self.cfg(main));
             let c = Some(&cfg);
             let actor = crate::calc::PLAYER;
-            if level.is_some() {
-                let v = self.c.base(list, c, &["GemLevel"])?
-                    + self.c.base(list, c, &["GemSupportLevel"])?
-                    + self.c.base(list, c, &["GemItemLevel"])?;
+            if let Some(level) = level {
                 self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
-                self.c.set_out(actor, "GemLevel", v);
+                self.c.set_out(actor, "GemLevel", level);
             }
             let v = self.c.base(list, c, &["GemQuality"])?
                 + self.c.base(list, c, &["GemSupportQuality"])?
                 + self.c.base(list, c, &["GemItemQuality"])?
+                + self.c.base(list, c, &["GemGlobalQuality"])?
                 + self.c.base(list, c, &["GemSocketQuality"])?;
             self.c
                 .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));

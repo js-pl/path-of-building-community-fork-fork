@@ -342,10 +342,10 @@ Implicits: 0
 {range:0.5}(0.3-0.5)% of Physical Attack Damage Leeched as Life
 Life Recovery from Regeneration is not applied
 {variant:1}Regenerate 1 Rage per second for every 100 Life Recovery per second from Regeneration
-{variant:2}Regenerate 1 Rage per second for every 300 Life Recovery per second from Regeneration
-{variant:3}Regenerate 1 Rage per second for every 200 Life Recovery per second from Regeneration
 {variant:1}Does not delay Inherent Loss of Rage
+{variant:2}Regenerate 1 Rage per second for every 300 Life Recovery per second from Regeneration
 {variant:2}Does not delay Inherent Loss of Rage
+{variant:3}Regenerate 1 Rage per second for every 200 Life Recovery per second from Regeneration
 {variant:3}Does not delay Inherent Loss of Rage
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
@@ -497,6 +497,7 @@ Implicits: 1
 {variant:1}You have Acceleration Shrine Buff while affected by no Flasks
 {variant:2}You have Brutal Shrine Buff while affected by no Flasks
 {variant:6}You have Greater Freezing Shrine Buff while affected by no Flasks
+{variant:6}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {variant:3}You have Diamond Shrine Buff while affected by no Flasks
 {variant:4}You have Echoing Shrine Buff while affected by no Flasks
 {variant:5}You have Gloom Shrine Buff while affected by no Flasks
@@ -506,12 +507,11 @@ Implicits: 1
 {variant:12}You have Resistance Shrine Buff while affected by no Flasks
 {variant:13}You have Resonating Shrine Buff while affected by no Flasks
 {variant:7}You have Greater Shocking Shrine Buff while affected by no Flasks
+{variant:7}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {variant:8}You have Greater Skeletal Shrine Buff while affected by no Flasks
+{variant:8}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {tags:attribute}{range:0.5}+(23-32) to Intelligence
 {tags:resistance}{range:0.5}+(23-37)% to Chaos Resistance
-{variant:6}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
-{variant:7}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
-{variant:8}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -605,8 +605,8 @@ LevelReq: 27
 Implicits: 1
 Creates Consecrated Ground on Use
 {variant:2}Life Recovery from Flasks also applies to Energy Shield during Effect
-{range:0.5}(25-50)% increased Duration
 {variant:2}Zealot&apos;s Oath during Effect
+{range:0.5}(25-50)% increased Duration
 {variant:1}Zealot&apos;s Oath during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -678,9 +678,9 @@ Radius: Variable
 Implicits: 0
 {variant:1}Only affects Passives in Small Ring
 {variant:5}Only affects Passives in Massive Ring
-{range:0.5}-(20-10)% to all Elemental Resistances
 Passive Skills in Radius can be Allocated without being connected to your tree
 Passage
+{range:0.5}-(20-10)% to all Elemental Resistances
 {variant:2}Only affects Passives in Medium Ring
 {variant:3}Only affects Passives in Large Ring
 {variant:4}Only affects Passives in Very Large Ring
@@ -813,9 +813,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="0" clusterHashFormatVersion="2" masteryEffects="{50757,25487},{18240,51424},{25186,55886},{12382,34242},{24334,18435},{6507,23621},{48007,59064}" nodes="17674,44788,10829,27718,16775,57565,65097,14211,63976,50757,18033,13714,8643,60090,32091,28330,14182,62103,42731,37078,28424,3452,19144,238,1696,33479,44103,49807,38048,48828,33545,62662,17814,13782,6507,10490,18402,48768,22473,6204,55485,19506,45456,48007,17849,25431,37575,5289,24472,16167,46092,51923,7594,41263,25732,57061,63845,48778,26740,12926,20310,38450,15144,18240,60247,6230,29292,47062,45067,57736,51291,36881,43162,55373,12382,8348,34907,11688,35179,3992,2348,5560,7903,37690,35503,25959,58833,28221,48423,24643,24334,22497,30733,25186,45887,46578,12702,9009,2151,56153,31683,15073,19939,60204,13322,39773,62021,23122,918,60532" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="0" clusterHashFormatVersion="2" masteryEffects="{6507,23621},{12382,34242},{18240,51424},{24334,18435},{25186,55886},{48007,59064},{50757,25487}" nodes="238,918,1696,2151,2348,3452,3992,5289,5560,6204,6230,6507,7594,7903,8348,8643,9009,10490,10829,11688,12382,12702,12926,13322,13714,13782,14182,14211,15073,15144,16167,16775,17674,17814,17849,18033,18240,18402,19144,19506,19939,20310,22473,22497,23122,24334,24472,24643,25186,25431,25732,25959,26740,27718,28221,28330,28424,29292,30733,31683,32091,33479,33545,34907,35179,35503,36881,37078,37575,37690,38048,38450,39773,41263,42731,43162,44103,44788,45067,45456,45887,46092,46578,47062,48007,48423,48768,48778,48828,49807,50757,51291,51923,55373,55485,56153,57061,57565,57736,58833,60090,60204,60247,60532,62021,62103,62662,63845,63976,65097" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgAAbUUKrvQqTWxGQYfg3f5JN4P56MZFRnE1kiHD6rp9W26qN2byl6brkNZvCA18SsgA7gaggsesR8KPlKC-vIMJ9MZFljXWGWso-kfivoBXyRg82L1MMrGQu4dFuWNXkscUqV-YPye0DMrTHaqhL2SE3uX5Zb6KaHQyfk9WljI7KEdA61cYVnJst9awC-GIyFuQEaia2E0wXiCciFstqIlrD5gJLBW4Ht-TOoqvZWduPb0nYENfDlfheA1iYrM_tfIxniMxCGfbWXvDOuFN4-ssNAqbXfJFWlIDlux0AAdjj8ZFXEUZa-a4u4fI4EdAhcIwXkgDXw7aTmJi
+				https://www.pathofexile.com/passive-skill-tree/AAAABgAAbQDuA5YGoAhnCSwNfA-YFKkVuBg8GFYZax2qHt8gnCHDIzEo-ipNLagwXjGeMn40CjWSNdY3ZjeDOuE7KD8nQYdFCkWWRblGcUdAR-JKyEwyTeNPVlfJV-FaUl8OX5hgQ2JiY1dkhGVnaHRsRm49bqpvCHJseA17w31bgseDCYhbiWuKr5ARkNaSx5M6lKCWMptdoS-m66iarEeu9LALsZCzP7QMtfK31ruHvSe-gL6KvrzCj8ZFyFvK09hN2L3bWd7l4N3hiOq66yzrV-x08kXyl_TG-WX56P5JAAdcRRlrhcIwXsjgR0BIA18O2k5iYua4u4djj8ZF
 			</URL>
 			<Sockets>
 				<Socket itemId="19" nodeId="6230"/>

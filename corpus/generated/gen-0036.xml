@@ -372,7 +372,7 @@ Has Alt Variant: true
 Selected Alt Variant: 8
 Has Alt Variant Two: true
 Selected Alt Variant Two: 3
-LevelReq: 20
+LevelReq: 64
 Implicits: 0
 {tags:attribute}{range:0.5}+(10-20) to all Attributes
 {tags:resistance}{range:0.5}+(10-20)% to all Elemental Resistances
@@ -561,9 +561,9 @@ Implicits: 0
 {variant:3}50% increased Duration
 {variant:4}{range:0.5}(30-50)% increased Duration
 Consumes Frenzy Charges on use
+{variant:1,2}Gain Onslaught for 1 second per Frenzy Charge consumed on use
 {variant:3}Gain Onslaught for 2 seconds per Frenzy Charge consumed on use
 {variant:4}Gain Onslaught for 3 seconds per Frenzy Charge consumed on use
-{variant:1,2}Gain Onslaught for 1 second per Frenzy Charge consumed on use
 {variant:1,2,3}{range:0.5}(10-30)% increased Movement Speed during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -711,9 +711,9 @@ Increases and Reductions to other Damage Types in Radius are Transformed to appl
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="2" clusterHashFormatVersion="2" masteryEffects="{9458,59906},{53615,28638},{38568,12100},{41016,10815}" nodes="32117,23471,38348,41819,41016,21758,48614,52213,65033,53615,50338,57259,36287,14292,62712,64265,37619,23438,6913,63618,62744,54354,9458,34660,50734,65502,41866,29104,3469,52904,19401,19228,57240,33989,22845,65210,45035,23407,42964,59220,9373,33196,2715,12412,9355,60942,41137,6799,20807,7085,52714,31315,56090,9206,2094,29870,50459,51440,49978,8938,63843,48099,11239,65224,50690,24133,5616,39718,38568,6042,61306,17790,56814,60735,54307,17788,39861,41250,3187,1201,39821,45491,45202,63194,59370,16079,60180,30826,43457,49639,25178,56149,63795,38344,51235,6538,720,59606,1427,6654,27283,54142,9469,465,37504,1461,46694,38662,24496,17608,42133,30894,15842,31508,11800,41536,10017,64709" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="2" clusterHashFormatVersion="2" masteryEffects="{9458,59906},{38568,12100},{41016,10815},{53615,28638}" nodes="465,720,1201,1427,1461,2094,2715,3187,3469,5616,6042,6538,6654,6799,6913,7085,8938,9206,9355,9373,9458,9469,10017,11239,11800,12412,14292,15842,16079,17608,17788,17790,19228,19401,20807,21758,22845,23407,23438,23471,24133,24496,25178,27283,29104,29870,30826,30894,31315,31508,32117,33196,33989,34660,36287,37504,37619,38344,38348,38568,38662,39718,39821,39861,41016,41137,41250,41536,41819,41866,42133,42964,43457,45035,45202,45491,46694,48099,48614,49639,49978,50338,50459,50690,50734,51235,51440,52213,52714,52904,53615,54142,54307,54354,56090,56149,56814,57240,57259,59220,59370,59606,60180,60735,60942,61306,62712,62744,63194,63618,63795,63843,64265,64709,65033,65210,65224,65502" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgIAdX11W6-VzKNboDhU_r3my_X-CdFvxKLfq42_N9T0-PsJkvNbjhsB-IL1GNRSJPKHZMYu_96jinGwDY3OqEvJSxzfmITFWT3-uq_rW2-n1OdUJJ2BrAqbMHwki-4OoLEaj1FHG63N6npT2xoj9ggudK7I8MM6Iur5Y7vjK-f-yMYCXkUV8JsmlqgXmu96RX7d7u0_1CNFfJu1oSIMcwSxm42xs7CS9trn6j7P6xR4aqnBwediWttV-TOVyMgjGYoC0OjWBZMZ_mqT034k_QHRkoAFtbZmlwZfsETIpJV4rj3iexQuGKJAJyH8xQAEKj-gOG_e0W_qAiTyL0SWqA==
+				https://www.pathofexile.com/passive-skill-tree/AAAABgIAdQHRAtAEsQWTBbUILgqbDHMNjRXwF5oZihn-Go8bARutIuoj9iSLJJ0k8iT9JyEr5y4YMHw31D3iPs9EyEV8RX5LHEvJUUdU_lk9W29bjluvXkVfsGJaapNxsHSueGp4rnpTexR9dYGshMWHZI2_koCS85XIlcyWqJcGmyabjZu1oDigsaEiokCjW6OKpJWn1KnBr-uwkrGztma7473mwefDOsSixgLGLsgjyPDL9c3qzqjRb9N-1CPUUtsa21Xd7t-Y36vnVOfq6NbrFO0_7g7vevT49Rj22viC-TP5Y_sJ_MX-Cf66_sj_3gAE6gIk8i9ElqgqP6A4b97Rbw==
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="33989"/>

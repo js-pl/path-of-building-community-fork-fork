@@ -3,7 +3,7 @@
 //! evasion, suppression, dodge, recovery, regeneration, recoup, damage
 //! reduction and avoidance.
 //!
-//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
+//! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -348,13 +348,27 @@ impl<'a> Perform<'a> {
             let added = self.c.base(db, None, &["ResistanceAddedToMinions"])?;
             if added > 0.0 {
                 let mdb = self.c.db(m);
-                for elem in ["Fire", "Cold", "Lightning", "Chaos"] {
-                    let k = format!("{elem}Resist");
-                    let v = (o(self, &k) * added / 100.0).floor();
-                    self.c.add(
-                        mdb,
-                        crate::mods::Mod::new(&k, crate::mods::ModType::Base, v, Some("Player")),
-                    );
+                let rows = self.c.tabulate(
+                    db,
+                    Some(crate::mods::ModType::Base),
+                    None,
+                    &["ResistanceAddedToMinions"],
+                )?;
+                for (value, m) in rows {
+                    let value = crate::calc::number(&value)?;
+                    for elem in ["Fire", "Cold", "Lightning", "Chaos"] {
+                        let k = format!("{elem}Resist");
+                        let v = (o(self, &k) * value / 100.0).floor();
+                        self.c.add(
+                            mdb,
+                            crate::mods::Mod::new(
+                                &k,
+                                crate::mods::ModType::Base,
+                                v,
+                                m.source.as_deref(),
+                            ),
+                        );
+                    }
                 }
             }
         }

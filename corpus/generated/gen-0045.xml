@@ -40,11 +40,11 @@
 		<PlayerStat stat="Int" value="124"/>
 		<PlayerStat stat="ReqInt" value="173"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4425.1645625626"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3373"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="5964"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="4395"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2212"/>
+		<PlayerStat stat="TotalEHP" value="4395.9943410336"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3351"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="5925"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="4366"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2197"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="2687"/>
 		<PlayerStat stat="Life" value="2351"/>
 		<PlayerStat stat="Spec:LifeInc" value="52"/>
@@ -59,10 +59,10 @@
 		<PlayerStat stat="ManaUnreservedPercent" value="99.42996742671"/>
 		<PlayerStat stat="ManaRegenRecovery" value="45.1"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="572"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="572"/>
+		<PlayerStat stat="EnergyShield" value="550"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="550"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
-		<PlayerStat stat="EnergyShieldRegenRecovery" value="14.9"/>
+		<PlayerStat stat="EnergyShieldRegenRecovery" value="14.3"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="417"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
@@ -370,7 +370,7 @@ Variant: Cold
 Variant: Lightning
 Selected Variant: 1
 LevelReq: 28
-Implicits: 0
+Implicits: 1
 {tags:resistance}{range:0.5}+(8-10)% to all Elemental Resistances
 {tags:resistance}{range:0.5}+(20-25)% to all Elemental Resistances
 {tags:resistance}{range:0.5}+(1-3)% to all maximum Resistances
@@ -429,10 +429,11 @@ Variant: Pre 3.11.0
 Variant: Current
 Selected Variant: 2
 LevelReq: 38
-Implicits: 1
-{tags:defences}{range:0.5}+(15-25) to maximum Energy Shield
-{tags:defences}{variant:2}{range:0.5}+(30-40) to maximum Energy Shield
+Implicits: 2
+{tags:caster,speed}{variant:2}{range:0.5}(7-10)% increased Cast Speed
+{tags:defences}{variant:1}{range:0.5}+(15-25) to maximum Energy Shield
 {tags:defences}{variant:1}{range:0.5}+(10-20) to maximum Energy Shield
+{tags:defences}{variant:2}{range:0.5}+(30-40) to maximum Energy Shield
 {tags:resistance}{variant:1}{range:0.5}+(20-30)% to Fire Resistance
 {tags:resistance}{variant:2}{range:0.5}+(30-40)% to Fire Resistance
 {tags:resistance}-40% to Cold Resistance
@@ -444,16 +445,17 @@ Stun Threshold is based on Energy Shield instead of Life
 			<ModRange id="5" range="0.5"/>
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
+			<ModRange id="8" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: UNIQUE
 Unholy Accomplice
 Cloth Belt
-LevelReq: 16
-Implicits: 0
+LevelReq: 50
+Implicits: 1
+{range:0.5}(15-25)% increased Stun and Block Recovery
 {tags:caster}{range:0.5}(30-50)% increased Spell Damage
 {tags:resource}{range:0.5}+(50-77) to maximum Life
-{range:0.5}(15-25)% increased Stun and Block Recovery
 {tags:resistance}{range:0.5}+(23-37)% to Lightning and Chaos Resistances
 {tags:caster}{range:0.5}Pact Skills have (30-50)% increased Cast Speed
 {tags:caster}{range:0.5}Pact Skills have (30-50)% increased Cooldown Recovery Rate
@@ -479,8 +481,8 @@ LevelReq: 27
 Implicits: 1
 Creates Consecrated Ground on Use
 {variant:2}Life Recovery from Flasks also applies to Energy Shield during Effect
-{range:0.5}(25-50)% increased Duration
 {variant:2}Zealot&apos;s Oath during Effect
+{range:0.5}(25-50)% increased Duration
 {variant:1}Zealot&apos;s Oath during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -684,9 +686,9 @@ With at least 40 Intelligence in Radius, Cold Snap&apos;s Cooldown can be bypass
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="1" classId="4" clusterHashFormatVersion="2" masteryEffects="{39338,27095},{63710,59281},{65395,55886},{26154,12916},{51974,4710},{48859,64642},{62588,21468},{19750,49522}" nodes="27422,60887,64226,42911,19750,14813,5612,57257,43413,21435,43303,54127,12236,38180,61393,47030,62817,42293,1325,25324,32059,39725,50986,16306,62588,19782,20954,30842,30691,25456,17201,51974,33795,29185,6741,59718,48438,58541,58803,35568,4565,45696,26294,49167,50515,23066,25355,61262,26154,18025,31471,14056,34666,50360,17833,56920,29933,63649,47389,50845,17818,11568,8410,48807,56001,3009,45227,53292,40841,18103,43412,46730,36222,36972,30155,6580,13273,34009,1340,49343,54776,16245,11651,49538,48859,8904,13498,58214,24865,24083,50306,28498,65395,24641,42086,56370,51856,60002,24377,28265,25933,49806,19711,4833,34031,22423,51976,62694,49109,476,39211,48513,18302,23199,11859,63710,39338,50679,56803,17566,40867,17383" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="1" classId="4" clusterHashFormatVersion="2" masteryEffects="{19750,49522},{26154,12916},{39338,27095},{48859,64642},{51974,4710},{62588,21468},{63710,59281},{65395,55886}" nodes="476,1325,1340,3009,4565,4833,5612,6580,6741,8410,8904,11568,11651,11859,12236,13273,13498,14056,14813,16245,16306,17201,17383,17566,17818,17833,18025,18103,18302,19711,19750,19782,20954,21435,22423,23066,23199,24083,24377,24641,24865,25324,25355,25456,25933,26154,26294,27422,28265,28498,29185,29933,30155,30691,30842,31471,32059,33795,34009,34031,34666,35568,36222,36972,38180,39211,39338,39725,40841,40867,42086,42293,42911,43303,43412,43413,45227,45696,46730,47030,47389,48438,48513,48807,48859,49109,49167,49343,49538,49806,50306,50360,50515,50679,50845,50986,51856,51974,51976,53292,54127,54776,56001,56370,56803,56920,57257,58214,58541,58803,59718,60002,60887,61262,61393,62588,62694,62817,63649,63710,64226,65395" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgQBeGse7df64qefTSY53RXs36mplVO7qSfTby_MlSTv0be29WGlNQUtYux9O5stP7L0fE1GUdp4enfjY3BDMcsGcgEaVelGvTbkreWzivAR1bKAZrbAD8VTWhpjC-9OZipGaXrvNuiHasS4RaneWHTt-KG5HcadRZotMCDavqfawQvBsKvQLJ-JRreplLaKjX6QbHXLGbQz2YTZBTzAv9X4P3Utg8GCvtsiyDS642ZhIV4TxIJvUv9zYEGkZtwyypDqYl85bmllTcKOTP8S4YTvV5fLCPTmv9UB3JkrvYFHflqfLlP43pmqxffd40Sen6ND5wAIwXJNJlPc9HwSZssGMnRmKvyCvtvaTv9z55H43mnXmao=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgQBeAHcBS0FPAvBEdUS4RXsGbQaVSDaIsgtMC2DLlMvzDPZNLo26DndP3U_skMxQ-dEnkWaRalGaUa3R35M_00mTUZR2lO7V5daGlqfXhNfOWBBYSFi7GMLY3BlTWYqZrZrHm5pb1JyAXTtdct343h6eu99O4TZhO-HaorwjX6QbJUkmSuZqpstn4mfo6RmpTWnn6knqZSplbCrsoC2ire2uR29Nr2Bvqe-27_VwA_Av8GCwo7EgsS4xVPF98adypDLBssI0CzTb9X42sHcMt3j3ljfqeNm5K3ls-lG6mLt1-9O79H0fPTm9WH4ofje-uL_cwAIwXJNJjJ0Zipp15mq_IK-2xJmywZT3PR855H43tpO_3M=
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="54127"/>

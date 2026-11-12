@@ -3,7 +3,7 @@
 	<Build ascendClassName="Chieftain" bandit="None" characterLevelAutoMode="false" className="Marauder" level="89" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="AverageHit" value="0"/>
 		<PlayerStat stat="AverageBurstDamage" value="0"/>
-		<PlayerStat stat="Speed" value="3.3333333333333"/>
+		<PlayerStat stat="Speed" value="0.2"/>
 		<PlayerStat stat="MineLayingTime" value="0.3"/>
 		<PlayerStat stat="MineThrowCount" value="1"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
@@ -401,7 +401,7 @@ Variant: Pre 3.16.0
 Variant: Current
 Selected Variant: 1
 Sockets: G
-LevelReq: 45
+LevelReq: 44
 Implicits: 1
 Has 1 Socket
 {tags:attack,caster,speed}{variant:2,3}Socketed Golem Skills have 20% increased Attack and Cast Speed
@@ -413,7 +413,7 @@ Has 1 Socket
 {tags:physical_damage,attack}{range:0.5}Adds (5-10) to (11-15) Physical Damage to Attacks
 {tags:attack,speed}{range:0.5}(5-10)% increased Attack Speed
 {tags:speed}{variant:1}{range:0.5}(1-2)% increased Movement Speed
-{tags:speed}{variant:2}{range:0.5}(3-5)% increased Movement Speed
+{tags:speed}{variant:2,3}{range:0.5}(3-5)% increased Movement Speed
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -453,6 +453,7 @@ Implicits: 1
 {variant:1}You have Acceleration Shrine Buff while affected by no Flasks
 {variant:2}You have Brutal Shrine Buff while affected by no Flasks
 {variant:6}You have Greater Freezing Shrine Buff while affected by no Flasks
+{variant:6}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {variant:3}You have Diamond Shrine Buff while affected by no Flasks
 {variant:4}You have Echoing Shrine Buff while affected by no Flasks
 {variant:5}You have Gloom Shrine Buff while affected by no Flasks
@@ -462,12 +463,11 @@ Implicits: 1
 {variant:12}You have Resistance Shrine Buff while affected by no Flasks
 {variant:13}You have Resonating Shrine Buff while affected by no Flasks
 {variant:7}You have Greater Shocking Shrine Buff while affected by no Flasks
+{variant:7}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {variant:8}You have Greater Skeletal Shrine Buff while affected by no Flasks
+{variant:8}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 {tags:attribute}{range:0.5}+(23-32) to Intelligence
 {tags:resistance}{range:0.5}+(23-37)% to Chaos Resistance
-{variant:6}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
-{variant:7}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
-{variant:8}{range:0.5}(15-20)% increased Effect of Shrine Buffs on you
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -493,7 +493,7 @@ Implicits: 1
 Wine of the Prophet
 Gold Flask
 Quality: 20
-LevelReq: 27
+LevelReq: 33
 Implicits: 0
 +60 to Maximum Charges
 {range:0.5}(20-100)% increased Charges per use
@@ -521,9 +521,9 @@ Implicits: 0
 {variant:3}50% increased Duration
 {variant:4}{range:0.5}(30-50)% increased Duration
 Consumes Frenzy Charges on use
+{variant:1,2}Gain Onslaught for 1 second per Frenzy Charge consumed on use
 {variant:3}Gain Onslaught for 2 seconds per Frenzy Charge consumed on use
 {variant:4}Gain Onslaught for 3 seconds per Frenzy Charge consumed on use
-{variant:1,2}Gain Onslaught for 1 second per Frenzy Charge consumed on use
 {variant:1,2,3}{range:0.5}(10-30)% increased Movement Speed during Effect
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -712,9 +712,9 @@ Implicits: 0
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="3" classId="1" clusterHashFormatVersion="2" masteryEffects="{8460,14032},{48267,36313},{59013,17821},{4139,38454}" nodes="46636,55649,32245,61868,59861,15086,23185,14606,30335,48267,47175,36543,31667,44606,10542,55913,61355,37884,40535,38777,64077,9971,2219,10238,55002,14996,31033,15868,54396,1550,46910,25168,54267,2550,40645,3167,35663,15405,4139,36047,24383,39768,6718,32480,50197,61198,55772,50422,2913,6981,35192,32482,58449,33631,20551,6359,26523,30380,15163,32739,5233,29353,56359,8426,5643,63723,33740,22627,45646,8460,50692,23881,5152,43833,26023,59928,53118,7335,59013,21650,10221,7828,25796,31604,49412,31080,49445,46585,24704,50570,20966,53793,30547,44624,15438,38906,6446,33988,12247,64181,50225,5430,40653,12795,6028,24155,44941,60169,65308,9511,44429,50904,31628,2454,50264,19261,50862,27166,10282,11431" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="3" classId="1" clusterHashFormatVersion="2" masteryEffects="{4139,38454},{8460,14032},{48267,36313},{59013,17821}" nodes="1550,2219,2454,2550,2913,3167,4139,5152,5233,5430,5643,6028,6359,6446,6718,6981,7335,7828,8426,8460,9511,9971,10221,10238,10282,10542,11431,12247,12795,14606,14996,15086,15163,15405,15438,15868,19261,20551,20966,21650,22627,23185,23881,24155,24383,24704,25168,25796,26023,26523,27166,29353,30335,30380,30547,31033,31080,31604,31628,31667,32245,32480,32482,32739,33631,33740,33988,35192,35663,36047,36543,37884,38777,38906,39768,40535,40645,40653,43833,44429,44606,44624,44941,45646,46585,46636,46910,47175,48267,49412,49445,50197,50225,50264,50422,50570,50692,50862,50904,53118,53793,54267,54396,55002,55649,55772,55913,56359,58449,59013,59861,59928,60169,61198,61355,61868,63723,64077,64181,65308" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgEDdrYs2WF99fGs6dU67lqROQ52f7yLjr97s64-KS7aae-rk_yeV5d5-k0m8wirJ_7W2jqUeTk9_NR8Bg63PmJQ0_sJ9p7FDF-LTzwtECuMz18_m1gaPn7gxBXvDtncxPYLYRtFiXh-4uRRg19QRxjXZ5t2rDs7f-MUcXKp3Ccg6hYL-OuDzFhjsk4hDMYEXUkUIKs5ZafqGM9-HKfmhVSSJ-0elGTEe3TBBHlowSW1-cWKUebSIXdTrlA8Tpf6GS6ExC_X-rXEMRU2ns0x-xeMXluvjesJ_xwlJ62Nxth7jAmWxFhLPcauah4oKiynAASN2byLljYQKzbQIQxFneaF
+				https://www.pathofexile.com/passive-skill-tree/AAAABgEDdgYOCKsJlgn2C2EMXxArFCAUcRU2FgsXjBjXGS4aPhtFHKcelCDqIQwlJybzJ-0n_igqKS4spy_XMfs5DjqUOu47OzwtPE49_Es9UEdR5lSSWGNakV1JXltfP2JQZMRlp2ebah5yqXZ_dqx3U3k5eWh7dHuMe7N99X7gfuJ_44Nfg8yExIl4i0-Mz46_k_yXeZf6m1ieV57Fns2rOa2Nrj6uUK-Nsk61-bYstz68i8EEwSXEFcQxxFjE9sWKxgTGrsbYz37SIdP71HzW2tlh2dzaadwn5FHmhenV6hjrCe8O76vxrPjr-k36tf8cAASWNhArNtAhDI3ZvItFneaF
 			</URL>
 			<Sockets>
 				<Socket itemId="15" nodeId="33631"/>

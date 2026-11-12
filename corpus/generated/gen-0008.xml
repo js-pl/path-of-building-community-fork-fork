@@ -38,7 +38,7 @@
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
 		<PlayerStat stat="TotalEHP" value="4880.4406854532"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2674"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2684"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="7572"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="1968"/>
 		<PlayerStat stat="ColdMaximumHitTaken" value="2335"/>
@@ -68,7 +68,7 @@
 		<PlayerStat stat="Spec:EvasionInc" value="181"/>
 		<PlayerStat stat="MeleeEvadeChance" value="60"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="60"/>
-		<PlayerStat stat="Armour" value="939"/>
+		<PlayerStat stat="Armour" value="999"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
 		<PlayerStat stat="PhysicalDamageReduction" value="8"/>
 		<PlayerStat stat="EffectiveBlockChance" value="40"/>
@@ -303,13 +303,13 @@ Implicits: 0
 			Rarity: UNIQUE
 The Celestial Brace
 Goliath Gauntlets
-Armour: 480
+Armour: 540
 ArmourBasePercentile: 1
 Quality: 20
 Sockets: R-R-R-R
 LevelReq: 53
 Implicits: 0
-{range:0.5}(80-120)% increased Armour
+{range:0.5}(100-150)% increased Armour
 1% increased Attack Speed per Fortification
 {range:0.5}+(1-10) to maximum Fortification
 Melee Hits from Strike Skills Fortify
@@ -525,7 +525,7 @@ All Damage from Critical Strikes can apply Lightning Ailments during effect
 Wine of the Prophet
 Gold Flask
 Quality: 20
-LevelReq: 27
+LevelReq: 33
 Implicits: 0
 +60 to Maximum Charges
 {range:0.5}(20-100)% increased Charges per use
@@ -1315,9 +1315,9 @@ Corrupted
 		</SkillSet>
 	</Skills>
 	<Tree activeSpec="1">
-		<Spec ascendClassId="0" classId="2" clusterHashFormatVersion="2" masteryEffects="{38568,12100},{10141,19002},{43495,57298},{41016,20464},{27371,37190}" nodes="3634,57819,41819,41016,65033,11850,50338,57259,41536,62712,64265,94,52157,45593,9877,63453,45272,52904,19401,36287,57240,33989,31508,65210,27371,6538,42964,52714,43495,27276,2715,25260,46277,1201,18670,59009,38568,58968,4011,8640,51786,60180,43457,29870,50459,30894,49978,49900,22845,48099,11239,17788,50690,24133,5616,2094,45838,25178,7085,39718,56814,15842,62094,720,64235,8938,3187,1461,39821,10141,60803,63194,59370,59606,39861,444,12801,49639,5823,25058,63795,6913,46694,41250,45035,37619,1427,6654,6542,54142,27283,65224,37504,9373,465,38662,24496,17608,42133,41380,9355,6042,38344,56149,10017,23407" secondaryAscendClassId="nil" treeVersion="3_29">
+		<Spec ascendClassId="0" classId="2" clusterHashFormatVersion="2" masteryEffects="{10141,19002},{27371,37190},{38568,12100},{41016,20464},{43495,57298}" nodes="94,444,465,720,1201,1427,1461,2094,2715,3187,3634,4011,5616,5823,6042,6538,6542,6654,6913,7085,8640,8938,9355,9373,9877,10017,10141,11239,11850,12801,15842,17608,17788,18670,19401,22845,23407,24133,24496,25058,25178,25260,27276,27283,27371,29870,30894,31508,33989,36287,37504,37619,38344,38568,38662,39718,39821,39861,41016,41250,41380,41536,41819,42133,42964,43457,43495,45035,45272,45593,45838,46277,46694,48099,49639,49900,49978,50338,50459,50690,51786,52157,52714,52904,54142,56149,56814,57240,57259,57819,58968,59009,59370,59606,60180,60803,62094,62712,63194,63453,63795,64235,64265,65033,65210,65224" secondaryAscendClassId="nil" treeVersion="3_29">
 			<URL>
-				https://www.pathofexile.com/passive-skill-tree/AAAABgIAaQ4y4dujW6A4_gkuSsSi36uiQPT4-wkAXsu9shkmlffdsNjOqEvJjb_fmITFexT-umrrGYqn1M3qqedqjAqbYqy0xQSxSO7mgZao5lgPqyHAykrrFKnBdK54rsM6wuxZPbvjK-dFfMYCXkUV8Agusw5iWhutmybd7j3i8o4C0PrrIuoMcwW1m40nne2D9trn6ujWm7UBvDIBwecWv2Hi-TMbAbZmoSKv65LzBZMZ_hmO035qk_7IkoAknQHRlwZfsETIpJWhpCSLF5qVyNtVJyFbbwAFT_CgOJFGauvf0qnnL0SWqEo6J50=
+				https://www.pathofexile.com/passive-skill-tree/AAAABgIAaQBeAbwB0QLQBLEFkwW1CC4KmwxzDjIPqxXwFr8XmhmKGY4Z_hsBG60hwCLqJIsknSaVJyEnnSvnLkoyAT3iRMhFfEjuS8lZPVtvXkVfsGHiYlpirGqMapNq63SueK57FITFjb-SgJLzlciWqJcGmyabjZu1oDihIqGkokCjW6SVp9Spwannr-uw2LIZsw60xbZmu-PB58LswzrEosYCykrLvc3qzqjTfttV3e7fmN-r4dvmWOaB5-ro1usU7YPyjvT49tr33fkz-uv7Cf4J_rr-yAAFSjonnZFGausvRJaoT_CgON_Sqec=
 			</URL>
 			<Sockets>
 				<Socket itemId="16" nodeId="33989"/>

@@ -3,8 +3,6 @@
 {"extra":" Life per second for each Stage Banner Skills Reserve no Mana ","line":" Life per second for each Stage Banner Skills Reserve no Mana","mods":false}
 {"extra":" Life per second for each Stage Banner Skills Reserve no Mana When you create a Banner, it gains 40% of the Stages of your placed Banner ","line":" Life per second for each Stage Banner Skills Reserve no Mana When you create a Banner, it gains 40% of the Stages of your placed Banner","mods":false}
 {"extra":" Life per second for each Stage Banner Skills Reserve no Mana When you create a Banner, it gains 40% of the Stages of your placed Banner You and nearby Allies have 12% increased Movement Speed ","line":" Life per second for each Stage Banner Skills Reserve no Mana When you create a Banner, it gains 40% of the Stages of your placed Banner You and nearby Allies have 12% increased Movement Speed","mods":false}
-{"extra":" Wolf Alpha Talisman ","line":" Wolf Alpha Talisman","mods":false}
-{"extra":" Wolf Alpha Talisman League: Talisman Standard ","line":" Wolf Alpha Talisman League: Talisman Standard","mods":false}
 {"extra":false,"line":" modifier magnitudes are doubled","mods":{}}
 {"extra":"\"A man's soul rules from a cavern of bone, learns and\u000d ","line":"\"A man's soul rules from a cavern of bone, learns and\u000d","mods":false}
 {"extra":"\"I don't know how I know, \u000d ","line":"\"I don't know how I know, \u000d","mods":false}
@@ -8376,7 +8374,7 @@
 {"extra":false,"line":"+10 to level of all elemental skill gems if the stars are aligned","mods":[{"1":{"type":"Condition","var":"StarsAreAligned"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["elemental","grants_active_skill"],"value":10}}]}
 {"extra":false,"line":"+10 to level of all elemental support gems if the stars are aligned","mods":[{"1":{"type":"Condition","var":"StarsAreAligned"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["elemental","support"],"value":10}}]}
 {"extra":false,"line":"+10 to level of all fire skill gems if 10 fire items are equipped","mods":[{"1":{"threshold":10,"type":"MultiplierThreshold","var":"FireItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keyword":"fire","value":10}}]}
-{"extra":false,"line":"+10 to level of all fire skill gems if at least 10 fire fire items are equipped","mods":[{"1":{"threshold":10,"type":"MultiplierThreshold","var":"FireFireItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keyword":"fire","value":10}}]}
+{"extra":false,"line":"+10 to level of all fire skill gems if at least 10 fire fire items are equipped","mods":[{"1":{"threshold":10,"type":"MultiplierThreshold","var":"FireFireItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["fire","grants_active_skill"],"value":10}}]}
 {"extra":false,"line":"+10 to level of socketed active skill gems per 10 player levels","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"2":{"div":10,"type":"Multiplier","var":"Level"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyword":"grants_active_skill","value":10}}]}
 {"extra":false,"line":"+10 to level of socketed gems","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyword":"all","value":10}}]}
 {"extra":false,"line":"+10 to level of socketed gems while there is a single gem socketed in this item","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"2":{"equals":true,"threshold":1,"type":"MultiplierThreshold","var":"SocketedGemsIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyword":"all","value":10}}]}
@@ -8724,6 +8722,7 @@
 {"extra":false,"line":"+13% to Physical Damage over Time Multiplier","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDotMultiplier","type":"BASE","value":13}]}
 {"extra":false,"line":"+13% to all Elemental Resistances","mods":[{"flags":0,"keywordFlags":0,"name":"ElementalResist","type":"BASE","value":13}]}
 {"extra":false,"line":"+130 to Ward","mods":[{"flags":0,"keywordFlags":0,"name":"Ward","type":"BASE","value":130}]}
+{"extra":false,"line":"+130 to maximum Energy Shield","mods":[{"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":130}]}
 {"extra":false,"line":"+130 to maximum Mana","mods":[{"flags":0,"keywordFlags":0,"name":"Mana","type":"BASE","value":130}]}
 {"extra":false,"line":"+131 to Armour","mods":[{"flags":0,"keywordFlags":0,"name":"Armour","type":"BASE","value":131}]}
 {"extra":false,"line":"+131 to Evasion Rating","mods":[{"flags":0,"keywordFlags":0,"name":"Evasion","type":"BASE","value":131}]}
@@ -9094,14 +9093,14 @@
 {"extra":false,"line":"+2 to Level of Socketed Warcry Gems","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyword":"warcry","value":2}}]}
 {"extra":false,"line":"+2 to Level of all Aura Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["aura","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Chaos Spell Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["chaos","spell","skill"],"value":2}}]}
-{"extra":false,"line":"+2 to Level of all Cold Skill Gems if at least 4 Foulborn Unique Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"FoulbornUniqueItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keyword":"cold","value":2}}]}
+{"extra":false,"line":"+2 to Level of all Cold Skill Gems if at least 4 Foulborn Unique Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"FoulbornUniqueItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["cold","grants_active_skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Cold Spell Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["cold","spell","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Curse Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["curse","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Elemental Skill Gems if the stars are aligned","mods":[{"1":{"type":"Condition","var":"StarsAreAligned"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["elemental","grants_active_skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Elemental Support Gems if the stars are aligned","mods":[{"1":{"type":"Condition","var":"StarsAreAligned"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["elemental","support"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Fire Spell Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["fire","spell","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Herald Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["herald","skill"],"value":2}}]}
-{"extra":false,"line":"+2 to Level of all Lightning Skill Gems if at least 4 Foulborn Unique Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"FoulbornUniqueItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keyword":"lightning","value":2}}]}
+{"extra":false,"line":"+2 to Level of all Lightning Skill Gems if at least 4 Foulborn Unique Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"FoulbornUniqueItem"},"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["lightning","grants_active_skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Lightning Spell Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["lightning","spell","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Link Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["link","skill"],"value":2}}]}
 {"extra":false,"line":"+2 to Level of all Melee Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"GemProperty","type":"LIST","value":{"key":"level","keyOfScaledMod":"value","keywordList":["melee","skill"],"value":2}}]}
@@ -9215,7 +9214,6 @@
 {"extra":false,"line":"+20% Chance to Block Attack Damage from Cursed Enemies","mods":[{"1":{"actor":"enemy","type":"ActorCondition","var":"Cursed"},"flags":0,"keywordFlags":0,"name":"BlockChance","type":"BASE","value":20}]}
 {"extra":false,"line":"+20% Chance to Block Attack Damage if you have Blocked Spell Damage Recently","mods":[{"1":{"type":"Condition","var":"BlockedSpellRecently"},"flags":0,"keywordFlags":0,"name":"BlockChance","type":"BASE","value":20}]}
 {"extra":false,"line":"+20% Chance to Block Attack Damage while Dual Wielding","mods":[{"1":{"type":"Condition","var":"DualWielding"},"flags":0,"keywordFlags":0,"name":"BlockChance","type":"BASE","value":20}]}
-{"extra":false,"line":"+20% Chance to Block Attack Damage while wielding a Staff","mods":[{"1":{"type":"Condition","var":"UsingStaff"},"flags":0,"keywordFlags":0,"name":"BlockChance","type":"BASE","value":20}]}
 {"extra":false,"line":"+20% Chance to Block Spell Damage","mods":[{"flags":0,"keywordFlags":0,"name":"SpellBlockChance","type":"BASE","value":20}]}
 {"extra":false,"line":"+20% Chance to Block Spell Damage during Effect","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"SpellBlockChance","type":"BASE","value":20}]}
 {"extra":false,"line":"+20% Chance to Block Spell Damage while Cursed","mods":[{"1":{"type":"Condition","var":"Cursed"},"flags":0,"keywordFlags":0,"name":"SpellBlockChance","type":"BASE","value":20}]}
@@ -9333,7 +9331,6 @@
 {"extra":false,"line":"+22% Chance to Block Attack Damage","mods":[{"flags":0,"keywordFlags":0,"name":"BlockChance","type":"BASE","value":22}]}
 {"extra":false,"line":"+22% Chance to Block Spell Damage","mods":[{"flags":0,"keywordFlags":0,"name":"SpellBlockChance","type":"BASE","value":22}]}
 {"extra":false,"line":"+22% to Chaos Damage over Time Multiplier","mods":[{"flags":0,"keywordFlags":0,"name":"ChaosDotMultiplier","type":"BASE","value":22}]}
-{"extra":false,"line":"+22% to Chaos Resistance","mods":[{"flags":0,"keywordFlags":0,"name":"ChaosResist","type":"BASE","value":22}]}
 {"extra":false,"line":"+22% to Cold Damage over Time Multiplier","mods":[{"flags":0,"keywordFlags":0,"name":"ColdDotMultiplier","type":"BASE","value":22}]}
 {"extra":false,"line":"+22% to Cold Resistance","mods":[{"flags":0,"keywordFlags":0,"name":"ColdResist","type":"BASE","value":22}]}
 {"extra":false,"line":"+22% to Critical Strike Multiplier for Attack Damage","mods":[{"flags":1,"keywordFlags":0,"name":"CritMultiplier","type":"BASE","value":22}]}
@@ -11352,6 +11349,7 @@
 {"extra":false,"line":"-14 Physical Damage taken from Attack Hits","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDamageTakenFromAttacks","type":"BASE","value":-14}]}
 {"extra":false,"line":"-15 Chaos Damage taken","mods":[{"flags":0,"keywordFlags":0,"name":"ChaosDamageTaken","type":"BASE","value":-15}]}
 {"extra":false,"line":"-15 Fire, Cold and Lightning Damage taken from Spell Hits per Bark","mods":[{"1":{"type":"Multiplier","var":"BarkskinStacks"},"flags":0,"keywordFlags":0,"name":"FireDamageTakenFromSpells","type":"BASE","value":-15},{"1":{"type":"Multiplier","var":"BarkskinStacks"},"flags":0,"keywordFlags":0,"name":"ColdDamageTakenFromSpells","type":"BASE","value":-15},{"1":{"type":"Multiplier","var":"BarkskinStacks"},"flags":0,"keywordFlags":0,"name":"LightningDamageTakenFromSpells","type":"BASE","value":-15}]}
+{"extra":false,"line":"-15 to Intelligence","mods":[{"flags":0,"keywordFlags":0,"name":"Int","type":"BASE","value":-15}]}
 {"extra":false,"line":"-15% additional Physical Damage Reduction","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDamageReduction","type":"BASE","value":-15}]}
 {"extra":false,"line":"-15% chance to Suppress Spell Damage if you've Suppressed Spell Damage Recently","mods":[{"1":{"type":"Condition","var":"SuppressedRecently"},"flags":0,"keywordFlags":0,"name":"SpellSuppressionChance","type":"BASE","value":-15}]}
 {"extra":false,"line":"-15% to Chaos Resistance","mods":[{"flags":0,"keywordFlags":0,"name":"ChaosResist","type":"BASE","value":-15}]}
@@ -11507,7 +11505,6 @@
 {"extra":false,"line":"-60 Cold Damage taken from Hits","mods":[{"flags":0,"keywordFlags":0,"name":"ColdDamageTakenWhenHit","type":"BASE","value":-60}]}
 {"extra":false,"line":"-60 Fire Damage taken from Hits","mods":[{"flags":0,"keywordFlags":0,"name":"FireDamageTakenWhenHit","type":"BASE","value":-60}]}
 {"extra":"  from Hits ","line":"-60 Lightning Damage taken from Hits","mods":[{"flags":0,"keywordFlags":0,"name":"LightningDamageTaken","type":"BASE","value":-60}]}
-{"extra":false,"line":"-60 Physical Damage taken from Attack Hits","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDamageTakenFromAttacks","type":"BASE","value":-60}]}
 {"extra":false,"line":"-60% of Toxic Rain Physical Damage Converted to Chaos Damage","mods":[{"1":{"includeTransfigured":true,"skillName":"Toxic Rain","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"SkillPhysicalDamageConvertToChaos","type":"BASE","value":-60}]}
 {"extra":false,"line":"-60% to Critical Strike Multiplier for Spell Damage","mods":[{"flags":2,"keywordFlags":0,"name":"CritMultiplier","type":"BASE","value":-60}]}
 {"extra":false,"line":"-60% to Lightning Resistance","mods":[{"flags":0,"keywordFlags":0,"name":"LightningResist","type":"BASE","value":-60}]}
@@ -12354,7 +12351,7 @@
 {"extra":" for  Recharge to start when you Link to a target ","line":"10% chance for Energy Shield Recharge to start when you Link to a target","mods":[{"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":10}]}
 {"extra":" for  Recharge to start when you Link to a target  have 20% increased Buff Effect if you have Linked to a target Recently ","line":"10% chance for Energy Shield Recharge to start when you Link to a target Link Skills have 20% increased Buff Effect if you have Linked to a target Recently","mods":[{"1":{"skillType":107,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":10}]}
 {"extra":" for  Recharge to start when you use a Skill ","line":"10% chance for Energy Shield Recharge to start when you use a Skill","mods":[{"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":10}]}
-{"extra":" for  Recharge to start when you use a Skill +15% to Fire and Chaos Resistances ","line":"10% chance for Energy Shield Recharge to start when you use a Skill +15% to Fire and Chaos Resistances","mods":[{"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":10}]}
+{"extra":" for  Recharge to start when you use a Skill 32% increased Evasion Rating  ","line":"10% chance for Energy Shield Recharge to start when you use a Skill 32% increased Evasion Rating while Focused","mods":[{"1":{"type":"Condition","var":"Focused"},"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"BASE","value":10}]}
 {"extra":false,"line":"10% chance for blade vortex and blade blast to impale enemies on hit","mods":[{"1":{"includeTransfigured":true,"skillNameList":["Blade Vortex","Blade Blast"],"type":"SkillName"},"flags":0,"keywordFlags":0,"name":"ImpaleChance","type":"BASE","value":10}]}
 {"extra":false,"line":"10% chance for bleeding inflicted with cobra lash or venom gyre to deal 10% more damage","mods":[{"1":{"skillNameList":["Cobra Lash","Venom Gyre"],"type":"SkillName"},"flags":0,"keywordFlags":4194304,"name":"Damage","type":"MORE","value":1}]}
 {"extra":false,"line":"10% chance for bleeding inflicted with this weapon to deal 10% more damage","mods":[{"1":{"type":"Condition","var":"{Hand}Attack"},"2":{"skillType":1,"type":"SkillType"},"flags":0,"keywordFlags":4194304,"name":"Damage","type":"MORE","value":1}]}
@@ -14078,8 +14075,8 @@
 {"extra":false,"line":"100% chance to Avoid Elemental Ailments while on Consecrated Ground","mods":[{"1":{"type":"Condition","var":"OnConsecratedGround"},"flags":0,"keywordFlags":0,"name":"AvoidElementalAilments","type":"BASE","value":100}]}
 {"extra":false,"line":"100% chance to Avoid being Chilled","mods":[{"flags":0,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100}]}
 {"extra":false,"line":"100% chance to Avoid being Chilled during Onslaught","mods":[{"1":{"type":"Condition","var":"Onslaught"},"flags":0,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100}]}
-{"extra":"  or Frozen  ","line":"100% chance to Avoid being Chilled or Frozen if you have used a Fire Skill Recently","mods":[{"1":{"type":"Condition","var":"UsedFireSkillRecently"},"flags":0,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100}]}
-{"extra":"  or Frozen while Casting a  ","line":"100% chance to Avoid being Chilled or Frozen while Casting a Spell","mods":[{"flags":2,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100}]}
+{"extra":false,"line":"100% chance to Avoid being Chilled or Frozen if you have used a Fire Skill Recently","mods":[{"1":{"type":"Condition","var":"UsedFireSkillRecently"},"flags":0,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100},{"1":{"type":"Condition","var":"UsedFireSkillRecently"},"flags":0,"keywordFlags":0,"name":"AvoidFreeze","type":"BASE","value":100}]}
+{"extra":"  while Casting a  ","line":"100% chance to Avoid being Chilled or Frozen while Casting a Spell","mods":[{"flags":2,"keywordFlags":0,"name":"AvoidChill","type":"BASE","value":100},{"flags":2,"keywordFlags":0,"name":"AvoidFreeze","type":"BASE","value":100}]}
 {"extra":false,"line":"100% chance to Avoid being Frozen","mods":[{"flags":0,"keywordFlags":0,"name":"AvoidFreeze","type":"BASE","value":100}]}
 {"extra":false,"line":"100% chance to Avoid being Ignited","mods":[{"flags":0,"keywordFlags":0,"name":"AvoidIgnite","type":"BASE","value":100}]}
 {"extra":false,"line":"100% chance to Avoid being Ignited while on Low Life","mods":[{"1":{"type":"Condition","var":"LowLife"},"flags":0,"keywordFlags":0,"name":"AvoidIgnite","type":"BASE","value":100}]}
@@ -15246,7 +15243,6 @@
 {"extra":false,"line":"14% increased Projectile Damage","mods":[{"flags":1024,"keywordFlags":0,"name":"Damage","type":"INC","value":14}]}
 {"extra":false,"line":"14% increased Projectile Speed","mods":[{"flags":0,"keywordFlags":0,"name":"ProjectileSpeed","type":"INC","value":14}]}
 {"extra":false,"line":"14% increased Punishment Curse Effect","mods":[{"1":{"includeTransfigured":true,"skillName":"Punishment","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"CurseEffect","type":"INC","value":14}]}
-{"extra":false,"line":"14% increased Quantity of Items found","mods":[{"flags":0,"keywordFlags":0,"name":"LootQuantity","type":"INC","value":14}]}
 {"extra":false,"line":"14% increased Shock Duration on Enemies","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyShockDuration","type":"INC","value":14}]}
 {"extra":false,"line":"14% increased Skill Effect Duration","mods":[{"flags":0,"keywordFlags":0,"name":"Duration","type":"INC","value":14}]}
 {"extra":false,"line":"14% increased Spell Damage","mods":[{"flags":2,"keywordFlags":0,"name":"Damage","type":"INC","value":14}]}
@@ -15427,7 +15423,6 @@
 {"extra":"a Frenzy Charge and a Power Charge  50% increased Recovery Rate of Life, Mana and Energy Shield  15% chance to gain 50% of Non-Chaos Damage with Hits as Extra Chaos Damage Cannot be Stunned if you haven't been Hit Recently Regenerate 15 Mana per second if you've used a Movement Skill Recently ","line":"15% chance to gain a Frenzy Charge and a Power Charge on Kill 50% increased Recovery Rate of Life, Mana and Energy Shield if you've Killed an Enemy affected by your Damage Over Time Recently 15% chance to gain 50% of Non-Chaos Damage with Hits as Extra Chaos Damage Cannot be Stunned if you haven't been Hit Recently Regenerate 15 Mana per second if you've used a Movement Skill Recently","mods":false}
 {"extra":"a Frenzy Charge on Hit  ","line":"15% chance to gain a Frenzy Charge on Hit if 4 Redeemer Items are Equipped","mods":false}
 {"extra":"a Frenzy Charge on Hit  +3% to maximum Cold Resistance  ","line":"15% chance to gain a Frenzy Charge on Hit if 4 Redeemer Items are Equipped +3% to maximum Cold Resistance if 4 Redeemer Items are Equipped","mods":false}
-{"extra":"a Frenzy Charge on Hit  15% chance to gain a Power Charge on Hit  ","line":"15% chance to gain a Frenzy Charge on Hit if 4 Redeemer Items are Equipped 15% chance to gain a Power Charge on Hit if 4 Crusader Items are Equipped","mods":false}
 {"extra":"a Frenzy Charge on Hit  ","line":"15% chance to gain a Frenzy Charge on Hit while Blinded","mods":false}
 {"extra":"a Frenzy Charge  ","line":"15% chance to gain a Frenzy Charge on Kill","mods":false}
 {"extra":"a Frenzy Charge  +1 to Maximum Frenzy Charges ","line":"15% chance to gain a Frenzy Charge on Kill +1 to Maximum Frenzy Charges","mods":false}
@@ -16937,6 +16932,7 @@
 {"extra":" to Extinguish Enemies  ","line":"20% chance to Extinguish Enemies on Hit","mods":{}}
 {"extra":false,"line":"20% chance to Freeze","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyFreezeChance","type":"BASE","value":20}]}
 {"extra":"  Enemies for 1 second when they Hit you ","line":"20% chance to Freeze Enemies for 1 second when they Hit you","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyFreezeChance","type":"BASE","value":20}]}
+{"extra":"  Enemies for 1 second when they Hit you +2 to Level of all Herald Skill Gems ","line":"20% chance to Freeze Enemies for 1 second when they Hit you +2 to Level of all Herald Skill Gems","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyFreezeChance","type":"BASE","value":20}]}
 {"extra":false,"line":"20% chance to Freeze, Shock and Ignite during any Flask Effect","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyFreezeChance","type":"BASE","value":20},{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyShockChance","type":"BASE","value":20},{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyIgniteChance","type":"BASE","value":20}]}
 {"extra":false,"line":"20% chance to Freeze, Shock and Ignite while using a Flask","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyFreezeChance","type":"BASE","value":20},{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyShockChance","type":"BASE","value":20},{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"EnemyIgniteChance","type":"BASE","value":20}]}
 {"extra":" to Hinder Enemies  ","line":"20% chance to Hinder Enemies on Hit with Spells","mods":{}}
@@ -17519,7 +17515,7 @@
 {"extra":false,"line":"20% less Damage taken if you haven't been Hit Recently","mods":[{"1":{"neg":true,"type":"Condition","var":"BeenHitRecently"},"flags":0,"keywordFlags":0,"name":"DamageTaken","type":"MORE","value":-20}]}
 {"extra":false,"line":"20% less Damage taken while there are at least two Rare or Unique Enemies nearby","mods":[{"1":{"threshold":2,"type":"MultiplierThreshold","var":"NearbyRareOrUniqueEnemies"},"flags":0,"keywordFlags":0,"name":"DamageTaken","type":"MORE","value":-20}]}
 {"extra":"  of Curses from Socketed Hex Skills ","line":"20% less Effect of Curses from Socketed Hex Skills","mods":[{"flags":0,"keywordFlags":0,"name":"LocalEffect","type":"MORE","value":-20}]}
-{"extra":"  of Curses from Socketed Hex Skills +40 to Intelligence ","line":"20% less Effect of Curses from Socketed Hex Skills +40 to Intelligence","mods":[{"flags":0,"keywordFlags":0,"name":"LocalEffect","type":"MORE","value":-20}]}
+{"extra":"  of Curses from Socketed Hex Skills Grants Level 20 Summon Doedre's Effigy Skill ","line":"20% less Effect of Curses from Socketed Hex Skills Grants Level 20 Summon Doedre's Effigy Skill","mods":[{"flags":0,"keywordFlags":0,"name":"LocalEffect","type":"MORE","value":-20}]}
 {"extra":false,"line":"20% less Effect of your Curses","mods":[{"flags":0,"keywordFlags":0,"name":"CurseEffect","type":"MORE","value":-20}]}
 {"extra":false,"line":"20% less Global Damage","mods":[{"1":{"type":"Global"},"flags":0,"keywordFlags":0,"name":"Damage","type":"MORE","value":-20}]}
 {"extra":false,"line":"20% less Minimum Physical Attack Damage","mods":[{"1":{"skillType":1,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"MinPhysicalDamage","type":"MORE","value":-20}]}
@@ -17892,7 +17888,6 @@
 {"extra":false,"line":"220% increased Armour and Evasion","mods":[{"flags":0,"keywordFlags":0,"name":"ArmourAndEvasion","type":"INC","value":220}]}
 {"extra":false,"line":"220% increased Energy Shield","mods":[{"flags":0,"keywordFlags":0,"name":"EnergyShield","type":"INC","value":220}]}
 {"extra":false,"line":"220% increased Evasion Rating","mods":[{"flags":0,"keywordFlags":0,"name":"Evasion","type":"INC","value":220}]}
-{"extra":false,"line":"220% increased Evasion Rating and Armour","mods":[{"flags":0,"keywordFlags":0,"name":"ArmourAndEvasion","type":"INC","value":220}]}
 {"extra":false,"line":"220% increased Evasion and Energy Shield","mods":[{"flags":0,"keywordFlags":0,"name":"EvasionAndEnergyShield","type":"INC","value":220}]}
 {"extra":false,"line":"220% increased Physical Damage","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDamage","type":"INC","value":220}]}
 {"extra":false,"line":"225% increased Armour","mods":[{"flags":0,"keywordFlags":0,"name":"Armour","type":"INC","value":225}]}
@@ -18480,7 +18475,6 @@
 {"extra":false,"line":"25% increased Attack Speed if you haven't gained a Frenzy Charge Recently","mods":[{"1":{"neg":true,"type":"Condition","var":"GainedFrenzyChargeRecently"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
 {"extra":false,"line":"25% increased Attack Speed if you've Killed Recently","mods":[{"1":{"type":"Condition","var":"KilledRecently"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
 {"extra":false,"line":"25% increased Attack Speed if you've been Hit Recently","mods":[{"1":{"type":"Condition","var":"BeenHitRecently"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
-{"extra":false,"line":"25% increased Attack Speed if you've changed Stance Recently","mods":[{"1":{"type":"Condition","var":"ChangedStanceRecently"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
 {"extra":false,"line":"25% increased Attack Speed if you've taken a Savage Hit Recently","mods":[{"1":{"type":"Condition","var":"BeenSavageHitRecently"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
 {"extra":false,"line":"25% increased Attack Speed when on Low Life","mods":[{"1":{"type":"Condition","var":"LowLife"},"flags":1,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
 {"extra":"  if you've taken a Savage ","line":"25% increased Attack and Cast Speed if you've taken a Savage","mods":[{"flags":0,"keywordFlags":0,"name":"Speed","type":"INC","value":25}]}
@@ -20133,6 +20127,7 @@
 {"extra":false,"line":"31% increased Stun Threshold","mods":[{"flags":0,"keywordFlags":0,"name":"StunThreshold","type":"INC","value":31}]}
 {"extra":false,"line":"31% increased effect of Offerings","mods":[{"1":{"skillNameList":["Bone Offering","Flesh Offering","Spirit Offering","Blood Offering"],"type":"SkillName"},"flags":0,"keywordFlags":0,"name":"BuffEffect","type":"INC","value":31}]}
 {"extra":false,"line":"31% of Damage taken Recouped as Life","mods":[{"flags":0,"keywordFlags":0,"name":"LifeRecoup","type":"BASE","value":31}]}
+{"extra":false,"line":"310% increased Evasion Rating","mods":[{"flags":0,"keywordFlags":0,"name":"Evasion","type":"INC","value":310}]}
 {"extra":false,"line":"310% increased Physical Damage","mods":[{"flags":0,"keywordFlags":0,"name":"PhysicalDamage","type":"INC","value":310}]}
 {"extra":false,"line":"32 to 59 Added Cold Damage with Bow Attacks","mods":[{"flags":131076,"keywordFlags":0,"name":"ColdMin","type":"BASE","value":32},{"flags":131076,"keywordFlags":0,"name":"ColdMax","type":"BASE","value":59}]}
 {"extra":false,"line":"32% chance to Avoid Elemental Ailments","mods":[{"flags":0,"keywordFlags":0,"name":"AvoidElementalAilments","type":"BASE","value":32}]}
@@ -20703,7 +20698,6 @@
 {"extra":false,"line":"39% reduced Freeze Duration on you during Effect","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"SelfFreezeDuration","type":"INC","value":-39}]}
 {"extra":false,"line":"4 Mana gained when you Block","mods":[{"flags":0,"keywordFlags":0,"name":"ManaOnBlock","type":"BASE","value":4}]}
 {"extra":" Warlord Items are Equipped ","line":"4 Warlord Items are Equipped","mods":{}}
-{"extra":" Warlord Items are Equipped +3% to   ","line":"4 Warlord Items are Equipped +3% to maximum Chance to Block Attack Damage if 4 Elder Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"ElderItem"},"flags":0,"keywordFlags":0,"name":"BlockChanceMax","type":"BASE","value":4}]}
 {"extra":" Warlord Items are Equipped +3% to   ","line":"4 Warlord Items are Equipped +3% to maximum Fire Resistance if 4 Warlord Items are Equipped","mods":[{"1":{"threshold":4,"type":"MultiplierThreshold","var":"WarlordItem"},"flags":0,"keywordFlags":0,"name":"FireResistMax","type":"BASE","value":4}]}
 {"extra":" seconds  ","line":"4 seconds while wielding an Axe","mods":{}}
 {"extra":" to (5-6) Added   ","line":"4 to (5-6) Added Physical Damage with Axe Attacks","mods":[{"flags":65540,"keywordFlags":0,"name":"PhysicalDamage","type":"BASE","value":4}]}
@@ -20780,14 +20774,15 @@
 {"extra":false,"line":"4% chance to deal Triple Damage","mods":[{"flags":0,"keywordFlags":0,"name":"TripleDamageChance","type":"BASE","value":4}]}
 {"extra":false,"line":"4% chance to gain Onslaught for 4 seconds on Kill","mods":[{"1":{"type":"Condition","var":"KilledRecently"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":false,"line":"4% chance to gain Phasing for 4 seconds on Kill","mods":[{"1":{"type":"Condition","var":"KilledRecently"},"flags":0,"keywordFlags":0,"name":"Condition:Phasing","type":"FLAG","value":true}]}
-{"extra":"a Endurance Charge  ","line":"4% chance to gain a Endurance Charge on Kill","mods":false}
 {"extra":"a Frenzy Charge ","line":"4% chance to gain a Frenzy Charge on Critical Strike","mods":false}
 {"extra":"a Frenzy Charge on Hit ","line":"4% chance to gain a Frenzy Charge on Hit","mods":false}
 {"extra":"a Frenzy Charge  ","line":"4% chance to gain a Frenzy Charge on Kill","mods":false}
-{"extra":"a Frenzy Charge  4% chance to gain a Power Charge  ","line":"4% chance to gain a Frenzy Charge on Kill 4% chance to gain a Power Charge on Kill","mods":false}
+{"extra":"a Frenzy Charge  +1 to Minimum Power Charges ","line":"4% chance to gain a Frenzy Charge on Kill +1 to Minimum Power Charges","mods":false}
 {"extra":"a Frenzy Charge when you Hit a Rare or Unique Enemy ","line":"4% chance to gain a Frenzy Charge when you Hit a Rare or Unique Enemy","mods":false}
 {"extra":"a Power Charge  ","line":"4% chance to gain a Power Charge on Kill","mods":false}
 {"extra":"a Power Charge  Regenerate 15 Life per second  ","line":"4% chance to gain a Power Charge on Kill Regenerate 15 Life per second for each Uncorrupted Item Equipped","mods":false}
+{"extra":"an Endurance Charge  ","line":"4% chance to gain an Endurance Charge on Kill","mods":false}
+{"extra":"an Endurance Charge  +1 to Minimum Frenzy Charges ","line":"4% chance to gain an Endurance Charge on Kill +1 to Minimum Frenzy Charges","mods":false}
 {"extra":"an additional Vaal Soul  ","line":"4% chance to gain an additional Vaal Soul on Kill","mods":false}
 {"extra":false,"line":"4% increased Action Speed","mods":[{"flags":0,"keywordFlags":0,"name":"ActionSpeed","type":"INC","value":4}]}
 {"extra":false,"line":"4% increased Area Damage per 10 Devotion","mods":[{"1":{"actor":"parent","div":10,"stat":"Devotion","type":"PerStat"},"flags":512,"keywordFlags":0,"name":"Damage","type":"INC","value":4}]}
@@ -23319,7 +23314,7 @@
 {"extra":false,"line":"60% increased Global Critical Strike Chance while wielding a Staff","mods":[{"1":{"type":"Global"},"2":{"type":"Condition","var":"UsingStaff"},"flags":0,"keywordFlags":0,"name":"CritChance","type":"INC","value":60}]}
 {"extra":false,"line":"60% increased Global Damage","mods":[{"1":{"type":"Global"},"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":60}]}
 {"extra":false,"line":"60% increased Intelligence Requirement","mods":[{"flags":0,"keywordFlags":0,"name":"IntRequirement","type":"INC","value":60}]}
-{"extra":" Item Rarity  ","line":"60% increased Item Rarity per White Socket","mods":{}}
+{"extra":false,"line":"60% increased Item Rarity per White Socket","mods":[{"1":{"type":"Multiplier","var":"WhiteSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"LootRarity","type":"INC","value":60}]}
 {"extra":false,"line":"60% increased Lacerate Critical Strike Chance","mods":[{"1":{"includeTransfigured":true,"skillName":"Lacerate","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"CritChance","type":"INC","value":60}]}
 {"extra":false,"line":"60% increased Life Recovery from Flasks while affected by Vitality","mods":[{"1":{"type":"Condition","var":"AffectedByVitality"},"flags":0,"keywordFlags":0,"name":"FlaskLifeRecovery","type":"INC","value":60}]}
 {"extra":false,"line":"60% increased Lightning Damage while affected by Herald of Thunder","mods":[{"1":{"type":"Condition","var":"AffectedByHeraldofThunder"},"flags":0,"keywordFlags":0,"name":"LightningDamage","type":"INC","value":60}]}
@@ -27627,6 +27622,7 @@
 {"extra":false,"line":"Adds 6 to 84 Lightning Damage against Shocked Enemies","mods":[{"1":{"actor":"enemy","type":"ActorCondition","var":"Shocked"},"flags":0,"keywordFlags":0,"name":"LightningMin","type":"BASE","value":6},{"1":{"actor":"enemy","type":"ActorCondition","var":"Shocked"},"flags":0,"keywordFlags":0,"name":"LightningMax","type":"BASE","value":84}]}
 {"extra":false,"line":"Adds 6 to 87 Lightning Damage to Spells","mods":[{"flags":0,"keywordFlags":131072,"name":"LightningMin","type":"BASE","value":6},{"flags":0,"keywordFlags":131072,"name":"LightningMax","type":"BASE","value":87}]}
 {"extra":false,"line":"Adds 6 to 9 Cold Damage to Attacks","mods":[{"flags":0,"keywordFlags":65536,"name":"ColdMin","type":"BASE","value":6},{"flags":0,"keywordFlags":65536,"name":"ColdMax","type":"BASE","value":9}]}
+{"extra":false,"line":"Adds 6 to 9 Cold Damage to Spells and Attacks","mods":[{"flags":0,"keywordFlags":196608,"name":"ColdMin","type":"BASE","value":6},{"flags":0,"keywordFlags":196608,"name":"ColdMax","type":"BASE","value":9}]}
 {"extra":false,"line":"Adds 6 to 9 Fire Damage to Spells","mods":[{"flags":0,"keywordFlags":131072,"name":"FireMin","type":"BASE","value":6},{"flags":0,"keywordFlags":131072,"name":"FireMax","type":"BASE","value":9}]}
 {"extra":false,"line":"Adds 6 to 90 Lightning Damage to Spells","mods":[{"flags":0,"keywordFlags":131072,"name":"LightningMin","type":"BASE","value":6},{"flags":0,"keywordFlags":131072,"name":"LightningMax","type":"BASE","value":90}]}
 {"extra":false,"line":"Adds 6 to 94 Lightning Damage","mods":[{"flags":0,"keywordFlags":0,"name":"LightningMin","type":"BASE","value":6},{"flags":0,"keywordFlags":0,"name":"LightningMax","type":"BASE","value":94}]}
@@ -29216,6 +29212,7 @@
 {"extra":"Auras you Cast grant 5% increased Attack and Cast Speed to you and Allies You and Allies affected by your Auras have +20% to all Elemental Resistances ","line":"Auras you Cast grant 5% increased Attack and Cast Speed to you and Allies You and Allies affected by your Auras have +20% to all Elemental Resistances","mods":false}
 {"extra":false,"line":"Avatar of Fire","mods":[{"flags":0,"keywordFlags":0,"name":"Keystone","type":"LIST","value":"Avatar of Fire"},{"flags":0,"keywordFlags":0,"name":"Condition:HaveAvatarOfFire","type":"FLAG","value":true}]}
 {"extra":"Avoid Projectiles that have Chained ","line":"Avoid Projectiles that have Chained","mods":false}
+{"extra":"Avoid Projectiles that have Chained Damage cannot be Reflected ","line":"Avoid Projectiles that have Chained Damage cannot be Reflected","mods":false}
 {"extra":false,"line":"Axe Attacks deal 10% increased Damage with Hits and Ailments","mods":[{"flags":65536,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"Axe Attacks deal 12% increased Damage with Ailments","mods":[{"flags":67584,"keywordFlags":0,"name":"Damage","type":"INC","value":12}]}
 {"extra":false,"line":"Axe Attacks deal 12% increased Damage with Hits and Ailments","mods":[{"flags":65536,"keywordFlags":786432,"name":"Damage","type":"INC","value":12}]}
@@ -30059,6 +30056,7 @@
 {"extra":"Chill Enemy for 5 seconds when Hit, reducing their Action Speed by 30% ","line":"Chill Enemy for 5 seconds when Hit, reducing their Action Speed by 30%","mods":false}
 {"extra":"Chill Nearby Enemies when you Block ","line":"Chill Nearby Enemies when you Block","mods":false}
 {"extra":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed ","line":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed","mods":false}
+{"extra":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed +15% to Cold and Chaos Resistances ","line":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed +15% to Cold and Chaos Resistances","mods":false}
 {"extra":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed Focus has 25% increased Cooldown Recovery Rate ","line":"Chill nearby Enemies when you Focus, causing 30% reduced Action Speed Focus has 25% increased Cooldown Recovery Rate","mods":false}
 {"extra":"Chills from Ice Nova Hits always reduce Action Speed by at least 6% ","line":"Chills from Ice Nova Hits always reduce Action Speed by at least 6%","mods":false}
 {"extra":"Chills from Ice Nova Hits always reduce Action Speed by at least 8% ","line":"Chills from Ice Nova Hits always reduce Action Speed by at least 8%","mods":false}
@@ -30488,7 +30486,6 @@
 {"extra":false,"line":"Consecrated Path has 24% increased Area of Effect","mods":[{"1":{"includeTransfigured":true,"skillName":"Consecrated Path","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"AreaOfEffect","type":"INC","value":24}]}
 {"extra":"Consumes Frenzy Charges on use ","line":"Consumes Frenzy Charges on use","mods":false}
 {"extra":"Consumes Frenzy Charges on use Gain Onslaught for 1 second per Frenzy Charge consumed on use ","line":"Consumes Frenzy Charges on use Gain Onslaught for 1 second per Frenzy Charge consumed on use","mods":false}
-{"extra":"Consumes Frenzy Charges on use Gain Onslaught for 2 seconds per Frenzy Charge consumed on use ","line":"Consumes Frenzy Charges on use Gain Onslaught for 2 seconds per Frenzy Charge consumed on use","mods":false}
 {"extra":"Consumes Maximum Charges to use ","line":"Consumes Maximum Charges to use","mods":false}
 {"extra":"Consumes Maximum Charges to use Gain Vaal Souls equal to Charges Consumed when used ","line":"Consumes Maximum Charges to use Gain Vaal Souls equal to Charges Consumed when used","mods":false}
 {"extra":"Consumes Socketed Uncorrupted Support Gems when they reach Maximum Level ","line":"Consumes Socketed Uncorrupted Support Gems when they reach Maximum Level","mods":false}
@@ -30643,8 +30640,7 @@
 {"extra":false,"line":"Critical Strikes do not deal extra Damage","mods":[{"flags":0,"keywordFlags":0,"name":"NoCritMultiplier","type":"FLAG","value":true}]}
 {"extra":false,"line":"Critical Strikes do not inherently Freeze","mods":[{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysFreeze","type":"FLAG","value":true}]}
 {"extra":false,"line":"Critical Strikes do not inherently Ignite","mods":[{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysIgnite","type":"FLAG","value":true}]}
-{"extra":"Critical Strikes do not inherently inflict non-Damaging Ailments ","line":"Critical Strikes do not inherently inflict non-Damaging Ailments","mods":false}
-{"extra":"Critical Strikes do not inherently inflict non-Damaging Ailments Inflict non-Damaging Ailments as though dealing 200% more Damage ","line":"Critical Strikes do not inherently inflict non-Damaging Ailments Inflict non-Damaging Ailments as though dealing 200% more Damage","mods":false}
+{"extra":false,"line":"Critical Strikes do not inherently inflict non-Damaging Ailments","mods":[{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysChill","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysFreeze","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysShock","type":"FLAG","value":true}]}
 {"extra":"Critical Strikes have (10-20)% chance to Blind Enemies while you have Cat's Stealth ","line":"Critical Strikes have (10-20)% chance to Blind Enemies while you have Cat's Stealth","mods":false}
 {"extra":"Critical Strikes have 15% chance to Blind Enemies while you have Cat's Stealth ","line":"Critical Strikes have 15% chance to Blind Enemies while you have Cat's Stealth","mods":false}
 {"extra":"Critical Strikes have 20% chance to Blind Enemies while you have Cat's Stealth ","line":"Critical Strikes have 20% chance to Blind Enemies while you have Cat's Stealth","mods":false}
@@ -31213,7 +31209,6 @@
 {"extra":"Divine Ire's beam has 15% increased width ","line":"Divine Ire's beam has 15% increased width","mods":false}
 {"extra":false,"line":"Divine Shield","mods":[{"flags":0,"keywordFlags":0,"name":"Keystone","type":"LIST","value":"Divine Shield"},{"flags":0,"keywordFlags":0,"name":"Condition:HaveDivineShield","type":"FLAG","value":true}]}
 {"extra":"Does not delay Inherent Loss of Rage ","line":"Does not delay Inherent Loss of Rage","mods":false}
-{"extra":"Does not delay Inherent Loss of Rage Does not delay Inherent Loss of Rage ","line":"Does not delay Inherent Loss of Rage Does not delay Inherent Loss of Rage","mods":false}
 {"extra":"Does not delay Inherent Loss of Rage Regenerate 1 Rage per second for every 200 Life Recovery per second from Regeneration ","line":"Does not delay Inherent Loss of Rage Regenerate 1 Rage per second for every 200 Life Recovery per second from Regeneration","mods":false}
 {"extra":"Does not delay Inherent Loss of Rage Regenerate 1 Rage per second for every 300 Life Recovery per second from Regeneration ","line":"Does not delay Inherent Loss of Rage Regenerate 1 Rage per second for every 300 Life Recovery per second from Regeneration","mods":false}
 {"extra":"Does not delay Inherent Loss of   Rage ","line":"Does not delay Inherent Loss of Rage Skills Cost +3 Rage","mods":[{"flags":0,"keywordFlags":0,"name":"RageCostNoMult","type":"BASE","value":3}]}
@@ -31343,8 +31338,7 @@
 {"extra":"Elemental Resistance values as inverted Limited to 1 Runegraft of the Gauche ","line":"Elemental Resistance values as inverted Limited to 1 Runegraft of the Gauche","mods":false}
 {"extra":false,"line":"Elemental Resistances are Zero","mods":[{"flags":0,"keywordFlags":0,"name":"FireResist","type":"OVERRIDE","value":0},{"flags":0,"keywordFlags":0,"name":"ColdResist","type":"OVERRIDE","value":0},{"flags":0,"keywordFlags":0,"name":"LightningResist","type":"OVERRIDE","value":0}]}
 {"extra":false,"line":"Elemental Resistances are capped by your highest Maximum Elemental Resistance instead","mods":[{"flags":0,"keywordFlags":0,"name":"ElementalResistMaxIsHighestResistMax","type":"FLAG","value":true}]}
-{"extra":"Elemental Resistances cannot be Penetrated ","line":"Elemental Resistances cannot be Penetrated","mods":false}
-{"extra":"Elemental Resistances cannot be Penetrated Unaffected by Burning Ground ","line":"Elemental Resistances cannot be Penetrated Unaffected by Burning Ground","mods":false}
+{"extra":false,"line":"Elemental Resistances cannot be Penetrated","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyCannotPenFireResistance","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"EnemyCannotPenColdResistance","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"EnemyCannotPenLightningResistance","type":"FLAG","value":true}]}
 {"extra":"Elemental Status Ailments are removed when you reach Low Life ","line":"Elemental Status Ailments are removed when you reach Low Life","mods":false}
 {"extra":"Elemental Status Ailments are removed when you reach Low Life Your Hits permanently Intimidate Enemies that are on Full Life ","line":"Elemental Status Ailments are removed when you reach Low Life Your Hits permanently Intimidate Enemies that are on Full Life","mods":false}
 {"extra":"Elemental Status Effects caused by your Skills spread to other nearby Enemies ","line":"Elemental Status Effects caused by your Skills spread to other nearby Enemies","mods":false}
@@ -31410,6 +31404,7 @@
 {"extra":"or Arcanist Brand Explode on Death dealing a quarter of their maximum Life as Chaos damage ","line":"Enemies Branded by Wintertide Brand or Arcanist Brand Explode on Death dealing a quarter of their maximum Life as Chaos damage","mods":false}
 {"extra":"Enemies Cannot Leech Life From You ","line":"Enemies Cannot Leech Life From You","mods":false}
 {"extra":"Enemies Cannot Leech Life From you ","line":"Enemies Cannot Leech Life From you","mods":false}
+{"extra":"Enemies Cannot Leech Life From you Avoid Projectiles that have Chained ","line":"Enemies Cannot Leech Life From you Avoid Projectiles that have Chained","mods":false}
 {"extra":"Enemies Cannot Leech Mana From you ","line":"Enemies Cannot Leech Mana From you","mods":false}
 {"extra":"Enemies Cannot Leech Mana From you 10% of Damage taken Recouped as Mana ","line":"Enemies Cannot Leech Mana From you 10% of Damage taken Recouped as Mana","mods":false}
 {"extra":false,"line":"Enemies Chilled by your Hits are Shocked","mods":[{"1":{"actor":"enemy","type":"ActorCondition","var":"ChilledByYourHits"},"flags":0,"keywordFlags":0,"name":"ShockBase","type":"BASE","value":15},{"flags":0,"keywordFlags":0,"name":"EnemyModifier","type":"LIST","value":{"mod":{"1":{"type":"Condition","var":"ChilledByYourHits"},"flags":0,"keywordFlags":0,"name":"Condition:Shocked","type":"FLAG","value":true}}}]}
@@ -31693,6 +31688,7 @@
 {"extra":"Enemy Hits inflict Temporal Chains on you When you lose Temporal Chains you gain maximum Rage ","line":"Enemy Hits inflict Temporal Chains on you When you lose Temporal Chains you gain maximum Rage","mods":false}
 {"extra":"Enemy Projectiles Pierce you ","line":"Enemy Projectiles Pierce you","mods":false}
 {"extra":"Enemy for 4 seconds, dealing 8% of the Killed Enemy's Life as Fire Damage per second ","line":"Enemy for 4 seconds, dealing 8% of the Killed Enemy's Life as Fire Damage per second","mods":false}
+{"extra":"Enemy for 4 seconds, dealing 8% of the Killed Enemy's Life as Fire Damage per second -10% to all Elemental Resistances ","line":"Enemy for 4 seconds, dealing 8% of the Killed Enemy's Life as Fire Damage per second -10% to all Elemental Resistances","mods":false}
 {"extra":"Enemy hits on you roll low Damage ","line":"Enemy hits on you roll low Damage","mods":false}
 {"extra":"Enemy with a Melee Weapon, no more than once every second ","line":"Enemy with a Melee Weapon, no more than once every second","mods":false}
 {"extra":"Enemy you've Killed Recently ","line":"Enemy you've Killed Recently","mods":false}
@@ -33023,7 +33019,6 @@
 {"extra":"Maximum Life instead of Maximum Energy Shield from Equipped Armour Items at 50% of the value ","line":"Gain Maximum Life instead of Maximum Energy Shield from Equipped Armour Items at 50% of the value","mods":false}
 {"extra":" after Spending a total of 200  ","line":"Gain Onslaught after Spending a total of 200 Mana","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":" for 1 second  consumed on use ","line":"Gain Onslaught for 1 second per Frenzy Charge consumed on use","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
-{"extra":" for 1 second  consumed on use 30% increased   ","line":"Gain Onslaught for 1 second per Frenzy Charge consumed on use 30% increased Movement Speed during Effect","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"2":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":" for 1 second  consumed on use Gain   perCharge consumed on use ","line":"Gain Onslaught for 1 second per Frenzy Charge consumed on use Gain Onslaught for 2 seconds per Frenzy Charge consumed on use","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"2":{"includeTransfigured":true,"skillName":"Frenzy","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":false,"line":"Gain Onslaught for 10 seconds on Kill","mods":[{"1":{"type":"Condition","var":"KilledRecently"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":false,"line":"Gain Onslaught for 10 seconds when you Cast Socketed Golem Skill","mods":[{"1":{"type":"Condition","var":"SummonedGolemInPast10Sec"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
@@ -33034,7 +33029,6 @@
 {"extra":false,"line":"Gain Onslaught for 3 seconds on Kill","mods":[{"1":{"type":"Condition","var":"KilledRecently"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":"   consumed on use ","line":"Gain Onslaught for 3 seconds per Frenzy Charge consumed on use","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":"   consumed on use 30% increased  during Effect ","line":"Gain Onslaught for 3 seconds per Frenzy Charge consumed on use 30% increased Movement Speed during Effect","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
-{"extra":"   consumed on use Gain  for 1 second perCharge consumed on use ","line":"Gain Onslaught for 3 seconds per Frenzy Charge consumed on use Gain Onslaught for 1 second per Frenzy Charge consumed on use","mods":[{"1":{"type":"Multiplier","var":"FrenzyCharge"},"2":{"includeTransfigured":true,"skillName":"Frenzy","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":"  when Hit ","line":"Gain Onslaught for 3 seconds when Hit","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
 {"extra":false,"line":"Gain Onslaught for 4 seconds on Hit while at maximum Frenzy Charges","mods":[{"1":{"stat":"FrenzyCharges","thresholdStat":"FrenzyChargesMax","type":"StatThreshold"},"2":{"type":"Condition","var":"HitRecently"},"flags":0,"keywordFlags":0,"name":"Onslaught","type":"FLAG","value":true}]}
 {"extra":false,"line":"Gain Onslaught for 4 seconds when you Warcry","mods":[{"1":{"type":"Condition","var":"UsedWarcryRecently"},"flags":0,"keywordFlags":0,"name":"Condition:Onslaught","type":"FLAG","value":true}]}
@@ -34226,8 +34220,7 @@
 {"extra":false,"line":"Hits deal 20% increased Damage against Enemies that are on Low Life","mods":[{"1":{"actor":"enemy","type":"ActorCondition","var":"LowLife"},"flags":0,"keywordFlags":262144,"name":"Damage","type":"INC","value":20}]}
 {"extra":false,"line":"Hits deal 30% increased Damage against Enemies that are on Low Life","mods":[{"1":{"actor":"enemy","type":"ActorCondition","var":"LowLife"},"flags":0,"keywordFlags":262144,"name":"Damage","type":"INC","value":30}]}
 {"extra":false,"line":"Hits from Socketed Vaal Skills ignore Enemy Monster Resistances","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"2":{"skillType":38,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"ExtraSkillMod","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"IgnoreElementalResistances","type":"FLAG","value":true}}},{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"2":{"skillType":38,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"ExtraSkillMod","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"IgnoreChaosResistance","type":"FLAG","value":true}}}]}
-{"extra":"Hits from Socketed Vaal Skills ignore Enemy Physical Damage Reduction ","line":"Hits from Socketed Vaal Skills ignore Enemy Physical Damage Reduction","mods":false}
-{"extra":"Hits from Socketed Vaal Skills ignore Enemy Physical Damage Reduction Hits from Socketed Vaal Skills ignore Enemy Monster Resistances ","line":"Hits from Socketed Vaal Skills ignore Enemy Physical Damage Reduction Hits from Socketed Vaal Skills ignore Enemy Monster Resistances","mods":false}
+{"extra":false,"line":"Hits from Socketed Vaal Skills ignore Enemy Physical Damage Reduction","mods":[{"1":{"slotName":"{SlotName}","type":"SocketedIn"},"2":{"skillType":38,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"ExtraSkillMod","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"IgnoreEnemyPhysicalDamageReduction","type":"FLAG","value":true}}}]}
 {"extra":"Hits have (10-15)% chance to ignore Enemy Physical Damage Reduction ","line":"Hits have (10-15)% chance to ignore Enemy Physical Damage Reduction","mods":false}
 {"extra":"Hits have (140-200)% increased Critical Strike Chance  ","line":"Hits have (140-200)% increased Critical Strike Chance against you","mods":false}
 {"extra":"Hits have (20-25)% chance to treat Enemy Monster Elemental Resistance values as inverted ","line":"Hits have (20-25)% chance to treat Enemy Monster Elemental Resistance values as inverted","mods":false}
@@ -34301,7 +34294,7 @@
 {"extra":false,"line":"Hits ignore Enemy Monster Chaos Resistance if all Equipped Items are Shaper Items","mods":[{"1":{"threshold":0,"type":"MultiplierThreshold","upper":true,"var":"NonShaperItem"},"flags":0,"keywordFlags":0,"name":"IgnoreChaosResistance","type":"FLAG","value":true}]}
 {"extra":false,"line":"Hits ignore Enemy Monster Fire Resistance while you are Ignited","mods":[{"1":{"type":"Condition","var":"Ignited"},"flags":0,"keywordFlags":0,"name":"IgnoreFireResistance","type":"FLAG","value":true}]}
 {"extra":false,"line":"Hits ignore Enemy Monster Physical Damage Reduction if you've Blocked in the past 20 seconds","mods":[{"1":{"type":"Condition","var":"BlockedRecently"},"flags":0,"keywordFlags":0,"name":"IgnoreEnemyPhysicalDamageReduction","type":"FLAG","value":true}]}
-{"extra":"Hits ignore Enemy Physical Damage Reduction ","line":"Hits ignore Enemy Physical Damage Reduction","mods":false}
+{"extra":false,"line":"Hits ignore Enemy Physical Damage Reduction","mods":[{"flags":0,"keywordFlags":0,"name":"IgnoreEnemyPhysicalDamageReduction","type":"FLAG","value":true}]}
 {"extra":"Hits ignore Enemy Physical Damage Reduction if you've Blocked in the past 20 seconds ","line":"Hits ignore Enemy Physical Damage Reduction if you've Blocked in the past 20 seconds","mods":false}
 {"extra":false,"line":"Hits that Stun Enemies have Culling Strike","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:maceMasteryStunCullSpecced","type":"FLAG","value":true}]}
 {"extra":"Hits that deal Elemental Damage remove Exposure to those Elements and inflict Exposure to other Elements ","line":"Hits that deal Elemental Damage remove Exposure to those Elements and inflict Exposure to other Elements","mods":false}
@@ -34495,6 +34488,7 @@
 {"extra":false,"line":"Ignites you inflict deal Damage 9% faster","mods":[{"flags":0,"keywordFlags":0,"name":"IgniteBurnFaster","type":"INC","value":9}]}
 {"extra":"Ignites you inflict deal no Damage ","line":"Ignites you inflict deal no Damage","mods":false}
 {"extra":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres ","line":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres","mods":false}
+{"extra":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres Enemies Ignited by you during Effect have Malediction ","line":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres Enemies Ignited by you during Effect have Malediction","mods":false}
 {"extra":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect ","line":"Ignites you inflict during Effect spread to other Enemies within 1.5 metres Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect","mods":false}
 {"extra":"Ignites you inflict spread to other Enemies within 1.2 metres ","line":"Ignites you inflict spread to other Enemies within 1.2 metres","mods":false}
 {"extra":"Ignites you inflict spread to other Enemies within 1.2 metres Ignites you inflict spread to other Enemies within 1.5 metres ","line":"Ignites you inflict spread to other Enemies within 1.2 metres Ignites you inflict spread to other Enemies within 1.5 metres","mods":false}
@@ -34649,7 +34643,7 @@
 {"extra":"Increases and Reductions to your Evasion Rating also apply to your Spell Damage at 50% of their value ","line":"Increases and Reductions to your Evasion Rating also apply to your Spell Damage at 50% of their value","mods":false}
 {"extra":"Increases and reductions to Maximum Life also apply to Maximum Rage at 20% Value ","line":"Increases and reductions to Maximum Life also apply to Maximum Rage at 20% Value","mods":false}
 {"extra":false,"line":"Increases and reductions to Maximum Mana also apply to Shock Effect at 30% of their value","mods":[{"flags":0,"keywordFlags":0,"name":"ManaAppliesToShockEffect","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"ImprovedManaAppliesToShockEffect","type":"MAX","value":30}]}
-{"extra":"Increases to Cast Speed from Arcane Surge also applies to Movement Speed ","line":"Increases to Cast Speed from Arcane Surge also applies to Movement Speed","mods":false}
+{"extra":false,"line":"Increases to Cast Speed from Arcane Surge also applies to Movement Speed","mods":[{"flags":0,"keywordFlags":0,"name":"ArcaneSurgeCastSpeedToMovementSpeed","type":"FLAG","value":true}]}
 {"extra":false,"line":"Infernal Blow Debuff deals an additional 3% of Damage per Charge","mods":[{"1":{"includeTransfigured":true,"skillName":"Infernal Blow","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"DebuffEffect","type":"BASE","value":3}]}
 {"extra":false,"line":"Infernal Blow Debuff deals an additional 5% of Damage per Charge","mods":[{"1":{"includeTransfigured":true,"skillName":"Infernal Blow","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"DebuffEffect","type":"BASE","value":5}]}
 {"extra":"(15-17)% increased Area of Effect ","line":"Infernal Cry has (15-17)% increased Area of Effect","mods":false}
@@ -34915,6 +34909,7 @@
 {"extra":" to count as consuming Steel Shards without Consuming them ","line":"Lancing Steel has 20% chance to count as consuming Steel Shards without Consuming them","mods":{}}
 {"extra":" to count as consuming Steel Shards without Consuming them ","line":"Lancing Steel has 30% chance to count as consuming Steel Shards without Consuming them","mods":{}}
 {"extra":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect ","line":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect","mods":false}
+{"extra":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect 15% of Damage Taken from Hits is Leeched as Life during Effect ","line":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect 15% of Damage Taken from Hits is Leeched as Life during Effect","mods":false}
 {"extra":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect Enemies Ignited by you during Effect take 8% increased Damage ","line":"Leech 1.5% of Expected Ignite Damage as Life when you Ignite an Enemy during Effect Enemies Ignited by you during Effect take 8% increased Damage","mods":false}
 {"extra":false,"line":"Leech Energy Shield instead of Life","mods":[{"flags":0,"keywordFlags":0,"name":"GhostReaver","type":"FLAG","value":true}]}
 {"extra":false,"line":"Left Ring Slot: Your Chilling Skitterbot's Aura applies Socketed Hex Curse instead","mods":[{"1":{"num":1,"type":"SlotNumber"},"flags":0,"keywordFlags":0,"name":"SkitterbotsCannotChill","type":"FLAG","value":true}]}
@@ -34956,7 +34951,7 @@
 {"extra":"LevelReq: 45 ","line":"LevelReq: 45","mods":false}
 {"extra":"LevelReq: 45 Implicits: 3 ","line":"LevelReq: 45 Implicits: 3","mods":false}
 {"extra":"LevelReq: 64 ","line":"LevelReq: 64","mods":false}
-{"extra":"LevelReq: 64 Implicits: 2 ","line":"LevelReq: 64 Implicits: 2","mods":false}
+{"extra":"LevelReq: 64 Implicits: 3 ","line":"LevelReq: 64 Implicits: 3","mods":false}
 {"extra":"LevelReq: 70 ","line":"LevelReq: 70","mods":false}
 {"extra":"LevelReq: 70 Implicits: 2 ","line":"LevelReq: 70 Implicits: 2","mods":false}
 {"extra":false,"line":"Life Flask Effects are not removed when Unreserved Life is Filled","mods":[{"flags":0,"keywordFlags":0,"name":"LifeFlaskEffectNotRemoved","type":"FLAG","value":true}]}
@@ -35220,7 +35215,6 @@
 {"extra":false,"line":"Lose 5.2 Mana per Second","mods":[{"flags":0,"keywordFlags":0,"name":"ManaDegen","type":"BASE","value":5.2000000000000002}]}
 {"extra":false,"line":"Lose 5.3 Mana per second","mods":[{"flags":0,"keywordFlags":0,"name":"ManaDegen","type":"BASE","value":5.2999999999999998}]}
 {"extra":false,"line":"Lose 500 Life per second","mods":[{"flags":0,"keywordFlags":0,"name":"LifeDegen","type":"BASE","value":500}]}
-{"extra":false,"line":"Lose 500.00 Life per second","mods":[{"flags":0,"keywordFlags":0,"name":"LifeDegen","type":"BASE","value":500}]}
 {"extra":false,"line":"Lose 56.1 Life per second","mods":[{"flags":0,"keywordFlags":0,"name":"LifeDegen","type":"BASE","value":56.100000000000001}]}
 {"extra":false,"line":"Lose 6 Mana per second","mods":[{"flags":0,"keywordFlags":0,"name":"ManaDegen","type":"BASE","value":6}]}
 {"extra":false,"line":"Lose 6.3 Mana per Second","mods":[{"flags":0,"keywordFlags":0,"name":"ManaDegen","type":"BASE","value":6.2999999999999998}]}
@@ -35479,7 +35473,6 @@
 {"extra":"Melee Hits Fortify Limited to 1 Attribute Notable Tattoo ","line":"Melee Hits Fortify Limited to 1 Attribute Notable Tattoo","mods":false}
 {"extra":"Melee Hits Fortify Regenerate 0.2% of Life per second per Fortification ","line":"Melee Hits Fortify Regenerate 0.2% of Life per second per Fortification","mods":false}
 {"extra":"Melee Hits Fortify if 6 Warlord Items are Equipped ","line":"Melee Hits Fortify if 6 Warlord Items are Equipped","mods":false}
-{"extra":"Melee Hits Fortify if 6 Warlord Items are Equipped +1 to Level of all Chaos Skill Gems if 6 Hunter Items are Equipped ","line":"Melee Hits Fortify if 6 Warlord Items are Equipped +1 to Level of all Chaos Skill Gems if 6 Hunter Items are Equipped","mods":false}
 {"extra":"Melee Hits Fortify if 6 Warlord Items are Equipped +1 to Level of all Fire Skill Gems if 6 Warlord Items are Equipped ","line":"Melee Hits Fortify if 6 Warlord Items are Equipped +1 to Level of all Fire Skill Gems if 6 Warlord Items are Equipped","mods":false}
 {"extra":"Melee Hits count as Rampage Kills ","line":"Melee Hits count as Rampage Kills","mods":false}
 {"extra":"Melee Hits count as Rampage Kills Rampage ","line":"Melee Hits count as Rampage Kills Rampage","mods":false}
@@ -36022,7 +36015,6 @@
 {"extra":false,"line":"Minions deal 30 to 45 additional Fire Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"FireMin","type":"BASE","value":30}}},{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"FireMax","type":"BASE","value":45}}}]}
 {"extra":false,"line":"Minions deal 30 to 58 additional Chaos Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ChaosMin","type":"BASE","value":30}}},{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ChaosMax","type":"BASE","value":58}}}]}
 {"extra":false,"line":"Minions deal 30 to 58 additional Cold Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMin","type":"BASE","value":30}}},{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMax","type":"BASE","value":58}}}]}
-{"extra":false,"line":"Minions deal 30 to 63 additional Cold Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMin","type":"BASE","value":30}}},{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMax","type":"BASE","value":63}}}]}
 {"extra":false,"line":"Minions deal 30% increased Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":30}}}]}
 {"extra":false,"line":"Minions deal 30% increased Damage if you've used a Minion Skill Recently","mods":[{"1":{"type":"Condition","var":"UsedMinionSkillRecently"},"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":30}}}]}
 {"extra":false,"line":"Minions deal 30% reduced Damage","mods":[{"flags":0,"keywordFlags":0,"name":"MinionModifier","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":-30}}}]}
@@ -37032,8 +37024,7 @@
 {"extra":false,"line":"Nearby Allies have 20% increased Attack, Cast and Movement Speed","mods":[{"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Speed","type":"INC","value":20},"onlyAllies":true}},{"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"MovementSpeed","type":"INC","value":20},"onlyAllies":true}}]}
 {"extra":false,"line":"Nearby Allies have 3% increased Cast Speed per 100 Intelligence you have","mods":[{"1":{"div":100,"stat":"Int","type":"PerStat"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":16,"keywordFlags":0,"name":"Speed","type":"INC","value":3},"onlyAllies":true}}]}
 {"extra":false,"line":"Nearby Allies have 30% increased Area of Effect","mods":[{"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"AreaOfEffect","type":"INC","value":30},"onlyAllies":true}}]}
-{"extra":" Item Rarity ","line":"Nearby Allies have 30% increased Item Rarity","mods":{}}
-{"extra":" Item Rarity Nearby Allies have Culling Strike ","line":"Nearby Allies have 30% increased Item Rarity Nearby Allies have Culling Strike","mods":{}}
+{"extra":false,"line":"Nearby Allies have 30% increased Item Rarity","mods":[{"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LootRarity","type":"INC","value":30},"onlyAllies":true}}]}
 {"extra":false,"line":"Nearby Allies have 4% increased Cast Speed per 100 Intelligence you have","mods":[{"1":{"div":100,"stat":"Int","type":"PerStat"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":16,"keywordFlags":0,"name":"Speed","type":"INC","value":4},"onlyAllies":true}}]}
 {"extra":false,"line":"Nearby Allies have 5% increased Defences per 100 Strength you have","mods":[{"1":{"div":100,"stat":"Str","type":"PerStat"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Defences","type":"INC","value":5},"onlyAllies":true}}]}
 {"extra":false,"line":"Nearby Allies have 6% increased Defences per 100 Strength you have","mods":[{"1":{"div":100,"stat":"Str","type":"PerStat"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"Defences","type":"INC","value":6},"onlyAllies":true}}]}
@@ -37171,6 +37162,8 @@
 {"extra":"Non-Aura Curses you inflict are not removed from Dying Enemies Enemies near corpses affected by your Curses are Blinded\nEnemies Killed near corpses affected by your Curses explode, dealing\n5% of their Life as Physical Damage ","line":"Non-Aura Curses you inflict are not removed from Dying Enemies Enemies near corpses affected by your Curses are Blinded\nEnemies Killed near corpses affected by your Curses explode, dealing\n5% of their Life as Physical Damage","mods":false}
 {"extra":"Non-Aura Hexes expire upon reaching 200% of base Effect ","line":"Non-Aura Hexes expire upon reaching 200% of base Effect","mods":false}
 {"extra":false,"line":"Non-Aura Hexes expire upon reaching 200% of base Effect Non-Aura Hexes gain 20% increased Effect per second","mods":[{"1":{"actor":"enemy","limit":200,"limitTotal":true,"type":"Multiplier","var":"CurseDurationExpired"},"2":{"neg":true,"skillType":39,"type":"SkillType"},"3":{"skillType":97,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"CurseEffect","type":"INC","value":20}]}
+{"extra":"Non-Aura Hexes expire upon reaching 220% of base Effect ","line":"Non-Aura Hexes expire upon reaching 220% of base Effect","mods":false}
+{"extra":false,"line":"Non-Aura Hexes expire upon reaching 220% of base Effect Non-Aura Hexes gain 20% increased Effect per second","mods":[{"1":{"actor":"enemy","limit":220,"limitTotal":true,"type":"Multiplier","var":"CurseDurationExpired"},"2":{"neg":true,"skillType":39,"type":"SkillType"},"3":{"skillType":97,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"CurseEffect","type":"INC","value":20}]}
 {"extra":"Non-Aura Hexes gain 20% increased Effect per second ","line":"Non-Aura Hexes gain 20% increased Effect per second","mods":false}
 {"extra":false,"line":"Non-Aura Skills Cost no Mana or Life while Focused","mods":[{"1":{"type":"Condition","var":"Focused"},"2":{"neg":true,"skillType":39,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"ManaCost","type":"MORE","value":-100},{"1":{"type":"Condition","var":"Focused"},"2":{"neg":true,"skillType":39,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"LifeCost","type":"MORE","value":-100}]}
 {"extra":false,"line":"Non-Aura Vaal Skills require 20% reduced Souls Per Use","mods":[{"1":{"neg":true,"skillType":39,"type":"SkillType"},"flags":0,"keywordFlags":512,"name":"SoulCost","type":"INC","value":-20}]}
@@ -37326,7 +37319,7 @@
 {"extra":false,"line":"Pact Skills have 50% increased Cooldown Recovery Rate","mods":[{"1":{"skillType":135,"type":"SkillType"},"flags":0,"keywordFlags":0,"name":"CooldownRecovery","type":"INC","value":50}]}
 {"extra":false,"line":"Pain Attunement","mods":[{"flags":0,"keywordFlags":0,"name":"Keystone","type":"LIST","value":"Pain Attunement"},{"flags":0,"keywordFlags":0,"name":"Condition:HavePainAttunement","type":"FLAG","value":true}]}
 {"extra":"Passage ","line":"Passage","mods":false}
-{"extra":"Passage Only affects Passives in Medium Ring ","line":"Passage Only affects Passives in Medium Ring","mods":false}
+{"extra":"Passage -10% to all Elemental Resistances ","line":"Passage -10% to all Elemental Resistances","mods":false}
 {"extra":false,"line":"Passive Skills in Radius also grant +2 to all Attributes","mods":[{"flags":0,"keywordFlags":0,"name":"JewelFunc","type":"LIST","value":{"func":{"$func":true},"type":"Other"}}]}
 {"extra":false,"line":"Passive Skills in Radius also grant +4% to Chaos Resistance","mods":[{"flags":0,"keywordFlags":0,"name":"JewelFunc","type":"LIST","value":{"func":{"$func":true},"type":"Other"}}]}
 {"extra":false,"line":"Passive Skills in Radius also grant +5 to maximum Life","mods":[{"flags":0,"keywordFlags":0,"name":"JewelFunc","type":"LIST","value":{"func":{"$func":true},"type":"Other"}}]}
@@ -37737,7 +37730,7 @@
 {"extra":false,"line":"Projectiles deal 20% increased Damage for each time they have Chained","mods":[{"1":{"stat":"Chain","type":"PerStat"},"flags":1024,"keywordFlags":0,"name":"Damage","type":"INC","value":20}]}
 {"extra":"   for ","line":"Projectiles deal 20% increased Damage with Hits and Ailments for","mods":[{"flags":1024,"keywordFlags":786432,"name":"Damage","type":"INC","value":20}]}
 {"extra":false,"line":"Projectiles deal 20% increased Damage with Hits and Ailments for each Enemy Pierced","mods":[{"1":{"stat":"PiercedCount","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":20}]}
-{"extra":"   , up to a maximum of 100% ","line":"Projectiles deal 20% increased Damage with Hits and Ailments for each remaining Chain, up to a maximum of 100%","mods":[{"1":{"stat":"ChainRemaining","type":"PerStat"},"flags":1024,"keywordFlags":786432,"name":"Damage","type":"INC","value":20}]}
+{"extra":false,"line":"Projectiles deal 20% increased Damage with Hits and Ailments for each remaining Chain, up to a maximum of 100%","mods":[{"1":{"globalLimit":100,"globalLimitKey":"FollowThrough","stat":"ChainRemaining","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":20}]}
 {"extra":false,"line":"Projectiles deal 20% increased Damage with Hits and Ailments for each time they have Chained","mods":[{"1":{"stat":"Chain","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":20}]}
 {"extra":"   to targets at the start ","line":"Projectiles deal 20% increased Damage with Hits to targets at the start","mods":[{"flags":1024,"keywordFlags":262144,"name":"Damage","type":"INC","value":20}]}
 {"extra":false,"line":"Projectiles deal 20% increased Damage with Hits to targets at the start of their movement, reducing to 0% as they travel farther","mods":[{"1":{"ramp":[[35,1],[70,0]],"type":"DistanceRamp"},"flags":1028,"keywordFlags":0,"name":"Damage","type":"INC","value":20}]}
@@ -43142,7 +43135,7 @@
 {"extra":false,"line":"Unaffected by Shock while Channelling","mods":[{"1":{"type":"Condition","var":"Channelling"},"flags":0,"keywordFlags":0,"name":"SelfShockEffect","type":"MORE","value":-100}]}
 {"extra":false,"line":"Unaffected by Shock while Leeching Energy Shield","mods":[{"1":{"type":"Condition","var":"LeechingEnergyShield"},"flags":0,"keywordFlags":0,"name":"SelfShockEffect","type":"MORE","value":-100}]}
 {"extra":"Unaffected by Shocked Ground ","line":"Unaffected by Shocked Ground","mods":false}
-{"extra":"Unaffected by Shocked Ground Monsters cannot steal or remove your Power, Frenzy or Endurance charges on Hit ","line":"Unaffected by Shocked Ground Monsters cannot steal or remove your Power, Frenzy or Endurance charges on Hit","mods":false}
+{"extra":"Unaffected by Shocked Ground Monsters cannot Block your Attacks ","line":"Unaffected by Shocked Ground Monsters cannot Block your Attacks","mods":false}
 {"extra":"Unaffected by Shocked Ground while affected by Purity of Lightning ","line":"Unaffected by Shocked Ground while affected by Purity of Lightning","mods":false}
 {"extra":"Unaffected by Shocked Ground while affected by Purity of Lightning 1.5% of Damage leeched as Life while affected by Vitality ","line":"Unaffected by Shocked Ground while affected by Purity of Lightning 1.5% of Damage leeched as Life while affected by Vitality","mods":false}
 {"extra":"Unaffected by Shocked Ground while affected by Purity of Lightning 2% of Damage leeched as Life while affected by Vitality ","line":"Unaffected by Shocked Ground while affected by Purity of Lightning 2% of Damage leeched as Life while affected by Vitality","mods":false}
@@ -43672,7 +43665,7 @@
 {"extra":false,"line":"When Hit, 10% of Damage is taken from Mana before Life","mods":[{"flags":0,"keywordFlags":0,"name":"DamageTakenFromManaBeforeLife","type":"BASE","value":10}]}
 {"extra":false,"line":"When Hit, 30% of Damage is taken from Mana before Life","mods":[{"flags":0,"keywordFlags":0,"name":"DamageTakenFromManaBeforeLife","type":"BASE","value":30}]}
 {"extra":"a random Movement Speed modifier from 20% reduced to 50% increased, until Hit again ","line":"When Hit, gain a random Movement Speed modifier from 20% reduced to 50% increased, until Hit again","mods":false}
-{"extra":"a random Movement Speed modifier from 40% reduced to 100% increased, until Hit again ","line":"When Hit, gain a random Movement Speed modifier from 40% reduced to 100% increased, until Hit again","mods":false}
+{"extra":false,"line":"When Hit, gain a random Movement Speed modifier from 40% reduced to 100% increased, until Hit again","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:HaveGamblesprint","type":"FLAG","value":true}]}
 {"extra":"lose a Ghost Shroud and Recover Energy Shield equal to 4% of your Evasion Rating ","line":"When Hit, lose a Ghost Shroud and Recover Energy Shield equal to 4% of your Evasion Rating","mods":false}
 {"extra":"lose a Ghost Shroud and Recover Energy Shield equal to 4% of your Evasion Rating 10% increased Movement Speed while you have Energy Shield ","line":"When Hit, lose a Ghost Shroud and Recover Energy Shield equal to 4% of your Evasion Rating 10% increased Movement Speed while you have Energy Shield","mods":false}
 {"extra":"lose a Ghost Shroud and Recover Energy Shield equal to 5% of your Evasion Rating ","line":"When Hit, lose a Ghost Shroud and Recover Energy Shield equal to 5% of your Evasion Rating","mods":false}
@@ -46559,7 +46552,7 @@
 {"extra":" to (8-12) added   ","line":"You and Nearby Allies have 1 to (8-12) added Lightning Damage per Blue Socket","mods":[{"1":{"type":"Multiplier","var":"BlueSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LightningDamage","type":"BASE","value":1}}}]}
 {"extra":false,"line":"You and Nearby Allies have 1 to 10 added Lightning Damage per Blue Socket","mods":[{"1":{"type":"Multiplier","var":"BlueSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LightningMin","type":"BASE","value":1}}},{"1":{"type":"Multiplier","var":"BlueSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LightningMax","type":"BASE","value":10}}}]}
 {"extra":false,"line":"You and Nearby Allies have 16 to 144 added Lightning Damage per Blue Socket","mods":[{"1":{"type":"Multiplier","var":"BlueSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LightningMin","type":"BASE","value":16}}},{"1":{"type":"Multiplier","var":"BlueSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LightningMax","type":"BASE","value":144}}}]}
-{"extra":" Item Rarity ","line":"You and Nearby Allies have 30% increased Item Rarity","mods":{}}
+{"extra":false,"line":"You and Nearby Allies have 30% increased Item Rarity","mods":[{"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"LootRarity","type":"INC","value":30}}}]}
 {"extra":false,"line":"You and Nearby Allies have 47 to 61 added Chaos Damage per White Socket","mods":[{"1":{"type":"Multiplier","var":"WhiteSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ChaosMin","type":"BASE","value":47}}},{"1":{"type":"Multiplier","var":"WhiteSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ChaosMax","type":"BASE","value":61}}}]}
 {"extra":false,"line":"You and Nearby Allies have 56 to 88 added Cold Damage per Green Socket","mods":[{"1":{"type":"Multiplier","var":"GreenSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMin","type":"BASE","value":56}}},{"1":{"type":"Multiplier","var":"GreenSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"ColdMax","type":"BASE","value":88}}}]}
 {"extra":false,"line":"You and Nearby Allies have 64 to 96 added Fire Damage per Red Socket","mods":[{"1":{"type":"Multiplier","var":"RedSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"FireMin","type":"BASE","value":64}}},{"1":{"type":"Multiplier","var":"RedSocketIn{SlotName}"},"flags":0,"keywordFlags":0,"name":"ExtraAura","type":"LIST","value":{"mod":{"flags":0,"keywordFlags":0,"name":"FireMax","type":"BASE","value":96}}}]}
@@ -47548,7 +47541,6 @@
 {"extra":false,"line":"critical strike chance is increased by uncapped lightning resistance","mods":[{"flags":0,"keywordFlags":0,"name":"CritChanceIncreasedByUncappedLightningRes","type":"FLAG","value":true}]}
 {"extra":false,"line":"critical strikes deal 10% increased damage","mods":[{"1":{"type":"Condition","var":"CriticalStrike"},"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"critical strikes do not alwaysinherently freeze","mods":[{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysFreeze","type":"FLAG","value":true}]}
-{"extra":false,"line":"critical strikes do not inflict non-damaging ailments","mods":[{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysChill","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysFreeze","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"CritsDontAlwaysShock","type":"FLAG","value":true}]}
 {"extra":false,"line":"critical strikes with daggers have a 10% chance to poison the enemy","mods":[{"1":{"type":"Condition","var":"CriticalStrike"},"flags":524288,"keywordFlags":0,"name":"PoisonChance","type":"BASE","value":10}]}
 {"extra":false,"line":"culling strike during flask effect","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"2":{"effectType":"Global","type":"GlobalEffect","unscalable":true},"flags":0,"keywordFlags":0,"name":"CullPercent","type":"MAX","value":10}]}
 {"extra":false,"line":"culling strike with melee weapons","mods":[{"1":{"effectType":"Global","type":"GlobalEffect","unscalable":true},"flags":67108864,"keywordFlags":0,"name":"CullPercent","type":"MAX","value":10}]}
@@ -47600,7 +47592,6 @@
 {"extra":false,"line":"each mine applies 10% increased damage taken to enemies near it, up to 10%","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyModifier","type":"LIST","value":{"mod":{"1":{"limit":1,"type":"Multiplier","var":"ActiveMineCount"},"flags":0,"keywordFlags":0,"name":"DamageTaken","type":"INC","value":10}}}]}
 {"extra":false,"line":"each mine applies 10% reduced damage dealt to enemies near it, up to 10%","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyModifier","type":"LIST","value":{"mod":{"1":{"limit":1,"type":"Multiplier","var":"ActiveMineCount"},"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":-10}}}]}
 {"extra":false,"line":"each rage also grants 10% increased damage","mods":[{"1":{"type":"Multiplier","var":"RageEffect"},"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":10}]}
-{"extra":"each remaining Chain, up to a maximum of 100% ","line":"each remaining Chain, up to a maximum of 100%","mods":false}
 {"extra":false,"line":"each totem applies 10% increased damage taken to enemies near it","mods":[{"flags":0,"keywordFlags":0,"name":"EnemyModifier","type":"LIST","value":{"mod":{"1":{"type":"Multiplier","var":"TotemsSummoned"},"flags":0,"keywordFlags":0,"name":"DamageTaken","type":"INC","value":10}}}]}
 {"extra":"each type of Elemental Ailment on Enemy ","line":"each type of Elemental Ailment on Enemy","mods":false}
 {"extra":false,"line":"earthquake deals 10% increased damage per 10 seconds duration","mods":[{"flags":0,"keywordFlags":0,"name":"EarthquakeDurationIncDamage","type":"INC","value":10}]}
@@ -47914,7 +47905,6 @@
 {"extra":false,"line":"immunety to shock during flask effect","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"ShockImmune","type":"FLAG","value":true}]}
 {"extra":false,"line":"incinerate has +10 to maximum stages","mods":[{"1":{"skillName":"Incinerate","type":"SkillName"},"flags":0,"keywordFlags":0,"name":"Multiplier:IncinerateMaxStages","type":"BASE","value":10}]}
 {"extra":false,"line":"incinerate starts with 10 additional stages","mods":[{"1":{"effectType":"Buff","type":"GlobalEffect","unscalable":true},"flags":0,"keywordFlags":0,"name":"Multiplier:IncinerateMinimumStage","type":"BASE","value":10}]}
-{"extra":false,"line":"increase to cast speed from arcane surge also applies to movement speed","mods":[{"flags":0,"keywordFlags":0,"name":"ArcaneSurgeCastSpeedToMovementSpeed","type":"FLAG","value":true}]}
 {"extra":false,"line":"increases and reductions to armour also apply to energy shield recharge rate at 10% of their value","mods":[{"flags":0,"keywordFlags":0,"name":"ArmourAppliesToEnergyShieldRecharge","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"ImprovedArmourAppliesToEnergyShieldRecharge","type":"MAX","value":10}]}
 {"extra":false,"line":"increases and reductions to cast speed apply to attack speed at 10% of their value","mods":[{"flags":0,"keywordFlags":0,"name":"CastSpeedAppliesToAttacks","type":"FLAG","value":true},{"flags":0,"keywordFlags":0,"name":"ImprovedCastSpeedAppliesToAttacks","type":"MAX","value":10}]}
 {"extra":false,"line":"increases and reductions to effect of flasks applied to you also applies to effect of arcane surge on you at 10% of their value","mods":[{"flags":0,"keywordFlags":0,"name":"FlaskEffectToArcaneSurgeEffect","type":"BASE","value":10}]}
@@ -48148,6 +48138,8 @@
 {"extra":false,"line":"projectiles deal 10% increased damage for each remaining chain","mods":[{"1":{"stat":"ChainRemaining","type":"PerStat"},"flags":1024,"keywordFlags":0,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"projectiles deal 10% increased damage with hits and ailments for each enemy pierced","mods":[{"1":{"stat":"PiercedCount","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"projectiles deal 10% increased damage with hits and ailments for each remaining chain","mods":[{"1":{"stat":"ChainRemaining","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
+{"extra":false,"line":"projectiles deal 10% increased damage with hits and ailments for each remaining chain, up to 10%","mods":[{"1":{"globalLimit":10,"globalLimitKey":"FollowThrough","stat":"ChainRemaining","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
+{"extra":false,"line":"projectiles deal 10% increased damage with hits and ailments for each remaining chain, up to a maximum of 10%","mods":[{"1":{"globalLimit":10,"globalLimitKey":"FollowThrough","stat":"ChainRemaining","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"projectiles deal 10% increased damage with hits and ailments for each time they have chained","mods":[{"1":{"stat":"Chain","type":"PerStat"},"2":{"skillType":3,"type":"SkillType"},"flags":0,"keywordFlags":786432,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"projectiles deal 10% increased damage with hits to targets at the start of their movement, reducing to 10% as they travel farther","mods":[{"1":{"ramp":[[35,1],[70,0]],"type":"DistanceRamp"},"flags":1028,"keywordFlags":0,"name":"Damage","type":"INC","value":10}]}
 {"extra":false,"line":"projectiles from attacks can fork 10 additional times","mods":[{"1":{"skillType":41,"type":"SkillType"},"flags":1024,"keywordFlags":0,"name":"ForkTwice","type":"FLAG","value":true},{"1":{"skillType":41,"type":"SkillType"},"flags":1024,"keywordFlags":0,"name":"ForkCountMax","type":"BASE","value":10}]}
@@ -48219,7 +48211,6 @@
 {"extra":false,"line":"remembrancing 10 songworthy deeds by the line of fire","mods":[{"flags":0,"keywordFlags":0,"name":"JewelData","type":"LIST","value":{"key":"conqueredBy","value":{"id":10}}}]}
 {"extra":"removed by Filling Unreserved Life ","line":"removed by Filling Unreserved Life","mods":false}
 {"extra":"removed by Filling Unreserved Life 10% chance to gain Onslaught for 4 Seconds when Leech is ","line":"removed by Filling Unreserved Life 10% chance to gain Onslaught for 4 Seconds when Leech is","mods":false}
-{"extra":"removed by Filling Unreserved Life removed by Filling Unreserved Life ","line":"removed by Filling Unreserved Life removed by Filling Unreserved Life","mods":false}
 {"extra":false,"line":"removes 10 of your fire damage","mods":[{"1":{"type":"Condition","var":"{Hand}Attack"},"flags":0,"keywordFlags":0,"name":"FireDamage","type":"BASE","value":-10}]}
 {"extra":false,"line":"replenishes energy shield by 10% of armour when you block","mods":[{"1":{"percent":10,"stat":"Armour","type":"PercentStat"},"flags":0,"keywordFlags":0,"name":"EnergyShieldOnBlock","type":"BASE","value":1}]}
 {"extra":false,"line":"reserves 10% of life","mods":[{"flags":0,"keywordFlags":0,"name":"ExtraLifeReserved","type":"BASE","value":10}]}
@@ -48537,7 +48528,6 @@
 {"extra":false,"line":"when an enemy hit deals elemental damage to you, their resistance to those elements becomes zero for 10 seconds","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:HaveTrickstersSmile","type":"FLAG","value":true}]}
 {"extra":false,"line":"when hit during effect, 10% of life loss from damage taken occurs over 4 seconds instead","mods":[{"1":{"type":"Condition","var":"UsingFlask"},"flags":0,"keywordFlags":0,"name":"LifeLossPrevented","type":"BASE","value":10}]}
 {"extra":false,"line":"when hit, 10% increased damage","mods":[{"flags":0,"keywordFlags":0,"name":"Damage","type":"INC","value":10}]}
-{"extra":false,"line":"when hit, gain a random movement speed modifier from 40% reduced to 100% increased until hit again","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:HaveGamblesprint","type":"FLAG","value":true}]}
 {"extra":false,"line":"when you attack, take 10% of life as fire damage for each warcry exerting the attack","mods":[{"flags":0,"keywordFlags":0,"name":"EchoesOfCreationSelfDamage","type":"LIST","value":{"damageType":"fire","dmgMult":10}}]}
 {"extra":false,"line":"when you cast a spell, sacrifice all mana to gain added maximum lightning damage equal to 10% of sacrificed mana for 4 seconds","mods":[{"flags":0,"keywordFlags":0,"name":"Condition:HaveManaStorm","type":"FLAG","value":true},{"1":{"percent":10,"stat":"ManaUnreserved","type":"PercentStat"},"2":{"type":"Condition","var":"SacrificeManaForLightning"},"flags":0,"keywordFlags":0,"name":"LightningMax","type":"BASE","value":1}]}
 {"extra":"when you inflict Poison with this weapon ","line":"when you inflict Poison with this weapon","mods":false}
