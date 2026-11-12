@@ -272,6 +272,14 @@ impl Ctx {
         if !skill_id.truthy() {
             return vec![];
         }
+        let applies = arg(&args, 3);
+        let support_value = |id: Value| {
+            let mut fields = vec![(s("skillId"), id), (s("level"), level.clone())];
+            if !applies.is_nil() {
+                fields.push((s("appliesToGrantedSkills"), applies.clone()));
+            }
+            tbl(fields, vec![])
+        };
         let data = self.value("data");
         let socketed = || {
             tbl(
@@ -286,13 +294,7 @@ impl Ctx {
         );
         if gem_id.truthy() {
             let gem = index(&field(&data, "gems"), &gem_id);
-            let v = tbl(
-                vec![
-                    (s("skillId"), field(&gem, "grantedEffectId")),
-                    (s("level"), level.clone()),
-                ],
-                vec![],
-            );
+            let v = support_value(field(&gem, "grantedEffectId"));
             let mods = tbl(
                 vec![],
                 vec![first(self.mod_(vec![
@@ -304,25 +306,24 @@ impl Ctx {
             );
             let secondary = field(&gem, "secondaryGrantedEffect");
             if secondary.truthy() {
-                let v = tbl(
-                    vec![
-                        (s("skillId"), field(&gem, "secondaryGrantedEffectId")),
-                        (s("level"), level.clone()),
-                    ],
-                    vec![],
-                );
+                let id = field(&gem, "secondaryGrantedEffectId");
                 if field(&secondary, "support").truthy() {
+                    let v = support_value(id);
                     t_insert(
                         &mods,
                         first(self.mod_(vec![s("ExtraSupport"), s("LIST"), v, socketed()])),
                     );
                 } else {
+                    let v = tbl(
+                        vec![(s("skillId"), id), (s("level"), level.clone())],
+                        vec![],
+                    );
                     t_insert(&mods, first(self.mod_(vec![s("ExtraSkill"), s("LIST"), v])));
                 }
             }
             vec![mods]
         } else {
-            let v = tbl(vec![(s("skillId"), skill_id), (s("level"), level)], vec![]);
+            let v = support_value(skill_id);
             vec![tbl(
                 vec![],
                 vec![first(self.mod_(vec![
@@ -502,6 +503,7 @@ impl ModParser {
         values.insert("data", Value::Table(data.data.clone()));
         values.insert("damageTypeList", t("damageTypeList"));
         values.insert("conquerorList", t("conquerorList"));
+        values.insert("dmgTypes", t("dmgTypes"));
         let gem_id_lookup = t("gemIdLookup");
         values.insert("gemIdLookup", gem_id_lookup.clone());
         let ctx = Ctx { data, values };

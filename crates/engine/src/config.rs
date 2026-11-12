@@ -3,7 +3,7 @@
 //! and `ConfigTabClass:BuildModList`, which turns the options set into
 //! mods for the player and the enemy.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::mod_parser::ModParser;
 use crate::mods::convert::{Converter, array, get, number};
@@ -529,6 +529,38 @@ pub static OPTIONS: std::sync::LazyLock<Vec<ConfigOption>> = std::sync::LazyLock
         opt("arcaneCloakUsedRecentlyCheck", Kind::Check, |_, o| {
             o.mods.push(flag("Condition:ArcaneCloakUsedRecently"));
         }),
+        opt(
+            "aspectOfLunarisLunarProtection",
+            Kind::CountAllowZero,
+            |val, o| {
+                o.mods.push(cfg(
+                    "Multiplier:LunarProtection",
+                    ModType::Base,
+                    val.value(),
+                ));
+            },
+        ),
+        opt(
+            "aspectOfLunarisLunarResistance",
+            Kind::CountAllowZero,
+            |val, o| {
+                o.mods.push(cfg(
+                    "Multiplier:LunarResistance",
+                    ModType::Base,
+                    val.value(),
+                ));
+            },
+        ),
+        opt(
+            "aspectOfSolarisSunscaldStacks",
+            Kind::CountAllowZero,
+            |val, o| {
+                o.mods.push(
+                    cfg("Multiplier:SunscaldStack", ModType::Base, val.value())
+                        .tag(Tag::condition("Effective")),
+                );
+            },
+        ),
         opt("aspectOfTheAvianAviansMight", Kind::Check, |_, o| {
             o.mods.push(flag("Condition:AviansMightActive"));
         }),
@@ -3506,6 +3538,26 @@ pub static OPTIONS: std::sync::LazyLock<Vec<ConfigOption>> = std::sync::LazyLock
         opt("buffLesserResistanceShrine", Kind::Check, |_, o| {
             o.mods
                 .push(flag("Condition:LesserResistanceShrine").tag(Tag::condition("Combat")));
+        }),
+        opt("buffBloodShrineOfRats", Kind::Check, |_, o| {
+            o.mods
+                .push(flag("Condition:BloodShrineOfRats").tag(Tag::condition("Combat")));
+        }),
+        opt("buffBloodShrineOfLocusts", Kind::Check, |_, o| {
+            o.mods
+                .push(flag("Condition:BloodShrineOfLocusts").tag(Tag::condition("Combat")));
+        }),
+        opt("buffBloodShrineOfToads", Kind::Check, |_, o| {
+            o.mods
+                .push(flag("Condition:BloodShrineOfToads").tag(Tag::condition("Combat")));
+        }),
+        opt("buffBloodShrineOfCrows", Kind::Check, |_, o| {
+            o.mods
+                .push(flag("Condition:BloodShrineOfCrows").tag(Tag::condition("Combat")));
+        }),
+        opt("buffBloodShrineOfBats", Kind::Check, |_, o| {
+            o.mods
+                .push(flag("Condition:BloodShrineOfBats").tag(Tag::condition("Combat")));
         }),
         opt("skillForkCount", Kind::Count, |val, o| {
             o.mods.push(

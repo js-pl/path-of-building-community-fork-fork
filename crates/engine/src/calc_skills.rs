@@ -10,7 +10,7 @@
 //! that makes it. Not ported yet: whether supports are superseded, and
 //! the gems' requirements.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::actor::{Actor, EnvActors};
 use crate::calc_items::ItemSkill;
@@ -60,7 +60,7 @@ pub fn granted_skills(
             out.push(GrantedSkill {
                 skill_id: text(&skill.skill_id),
                 level: skill.level.as_ref().and_then(ModValue::as_number),
-                no_supports: true,
+                no_supports: false,
                 source: skill.source.clone(),
                 triggered: false,
                 trigger_chance: None,
@@ -237,6 +237,9 @@ pub struct SkillEffect {
     pub gem_cfg: Option<Cfg>,
     /// `gemPropertyInfo`: the gem properties that applied, value and mod
     pub gem_property_info: Vec<(ModValue, Mod)>,
+    /// An extra support that also supports granted skills
+    /// (`appliesToGrantedSkills`)
+    pub applies_to_granted: bool,
 }
 
 impl SkillEffect {
@@ -258,6 +261,7 @@ impl SkillEffect {
             src: None,
             gem_cfg: None,
             gem_property_info: Vec::new(),
+            applies_to_granted: false,
         }
     }
 }
@@ -351,29 +355,53 @@ pub fn type_expression_matches(
     stack.into_iter().any(|v| v)
 }
 
-/// `calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill)`
+/// What a support's weapon check reads of the actor's weapons
+#[derive(Clone, Debug, Default)]
+pub struct ActorWeapons {
+    /// A weapon counts as every one handed weapon (`countsAsAll1H`)
+    pub all_one_hand: bool,
+    /// The weapons' types (`weaponData1.type`, `weaponData2.type`)
+    pub types: Vec<String>,
+}
+
+impl ActorWeapons {
+    pub fn new<'a>(weapons: impl IntoIterator<Item = &'a Fields>) -> ActorWeapons {
+        let mut w = ActorWeapons::default();
+        for d in weapons {
+            w.all_one_hand |= d.get("countsAsAll1H").is_some_and(ModValue::truthy);
+            if let Some(ModValue::Str(t)) = d.get("type") {
+                w.types.push(t.to_string());
+            }
+        }
+        w
+    }
+}
+
+/// `calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill,
+/// nil, appliesToGrantedSkills)`
 pub(crate) fn can_support(
-    support: &GrantedEffect,
+    support: &SkillEffect,
     skill: &ActiveSkill,
     from_item: &HashSet<String>,
     groups: &[SocketGroup],
-    all_one_hand: bool,
+    weapons: &ActorWeapons,
     data: &SkillData,
 ) -> bool {
-    can_support_summoned(support, skill, None, from_item, groups, all_one_hand, data)
+    can_support_summoned(support, skill, None, from_item, groups, weapons, data)
 }
 
 /// The same for a minion's skill: the summoning skill's types count
 /// (`activeSkill.summonSkill`), and triggers support no minion skills
 fn can_support_summoned(
-    support: &GrantedEffect,
+    effect_of_support: &SkillEffect,
     skill: &ActiveSkill,
     summon: Option<&ActiveSkill>,
     from_item: &HashSet<String>,
     groups: &[SocketGroup],
-    all_one_hand: bool,
+    actor: &ActorWeapons,
     data: &SkillData,
 ) -> bool {
+    let support = &*effect_of_support.granted_effect;
     let types = summon.unwrap_or(skill);
     let active = &skill.active_effect;
     let effect = &active.granted_effect;
@@ -388,7 +416,8 @@ fn can_support_summoned(
         .src
         .and_then(|(g, i)| groups.get(g)?.gem_list.get(i))
         .is_some_and(|g| g.from_item);
-    if is_from_item(support)
+    if !effect_of_support.applies_to_granted
+        && is_from_item(support)
         && support.support
         && (is_from_item(effect)
             || effect
@@ -419,10 +448,17 @@ fn can_support_summoned(
             .flatten()
             .map(String::as_str)
             .collect();
+        if effect.weapon_types.is_none()
+            && data
+                .skill_type("SkillGrantedBySupport")
+                .is_some_and(|t| types.skill_types.contains(&t))
+        {
+            lookup.extend(actor.types.iter().map(String::as_str));
+        }
         if lookup.is_empty() {
             return false;
         }
-        if all_one_hand {
+        if actor.all_one_hand {
             lookup.extend([
                 "Claw",
                 "Dagger",
@@ -473,18 +509,17 @@ fn create_active_skill(
     skill.effect_list.push(skill.active_effect.clone());
     // Pass 1: the skill types compatible supports add
     for i in 0..skill.support_list.len() {
-        let support = skill.support_list[i].granted_effect.clone();
-        if support.support && ctx.can_support(&support, &skill) {
-            skill
-                .skill_types
-                .extend(support.add_skill_types.iter().copied());
+        let support = skill.support_list[i].clone();
+        let g = &support.granted_effect;
+        if g.support && ctx.can_support(&support, &skill) {
+            skill.skill_types.extend(g.add_skill_types.iter().copied());
         }
     }
     // Pass 2: the compatible supports
     for i in 0..skill.support_list.len() {
         let support = skill.support_list[i].clone();
         let g = &support.granted_effect;
-        if g.support && ctx.can_support(g, &skill) {
+        if g.support && ctx.can_support(&support, &skill) {
             if let Some(flags) = &g.add_flags {
                 skill.skill_flags.extend(flags.iter().cloned());
             }
@@ -496,13 +531,12 @@ fn create_active_skill(
 
 /// `calcs.createActiveSkill(activeEffect, summonSkill.supportList, minion,
 /// nil, summonSkill)`: a minion's skill, supported by the summoning
-/// skill's supports. `all_one_hand` is whether the minion's weapons count
-/// as every one handed weapon.
+/// skill's supports; `weapons` are the minion's.
 pub fn create_minion_skill(
     active: SkillEffect,
     summon: &ActiveSkill,
     from_item: &HashSet<String>,
-    all_one_hand: bool,
+    weapons: &ActorWeapons,
     data: &SkillData,
 ) -> ActiveSkill {
     let effect = active.granted_effect.clone();
@@ -525,22 +559,22 @@ pub fn create_minion_skill(
         skill.skill_flags.insert("hit".into());
     }
     skill.effect_list.push(skill.active_effect.clone());
-    let can = |g: &GrantedEffect, skill: &ActiveSkill| {
-        can_support_summoned(g, skill, Some(summon), from_item, &[], all_one_hand, data)
+    let can = |e: &SkillEffect, skill: &ActiveSkill| {
+        can_support_summoned(e, skill, Some(summon), from_item, &[], weapons, data)
     };
     // Pass 1: the skill types compatible supports add
     for i in 0..skill.support_list.len() {
-        let support = skill.support_list[i].granted_effect.clone();
-        if support.support && can(&support, &skill) {
+        let support = skill.support_list[i].clone();
+        if support.granted_effect.support && can(&support, &skill) {
             skill
                 .skill_types
-                .extend(support.add_skill_types.iter().copied());
+                .extend(support.granted_effect.add_skill_types.iter().copied());
         }
     }
     // Pass 2: the compatible supports, which add no flags to minion skills
     for i in 0..skill.support_list.len() {
         let support = skill.support_list[i].clone();
-        if support.granted_effect.support && can(&support.granted_effect, &skill) {
+        if support.granted_effect.support && can(&support, &skill) {
             skill.effect_list.push(support);
         }
     }
@@ -554,7 +588,7 @@ pub fn copy_active_skill(
     skill: &ActiveSkill,
     groups: &[SocketGroup],
     from_item: &HashSet<String>,
-    all_one_hand: bool,
+    weapons: &ActorWeapons,
     data: &SkillData,
 ) -> ActiveSkill {
     let e = &skill.active_effect;
@@ -570,7 +604,7 @@ pub fn copy_active_skill(
     let ctx = SupportContext {
         from_item: from_item.clone(),
         groups,
-        all_one_hand,
+        weapons: weapons.clone(),
         data,
     };
     create_active_skill(active, skill.support_list.clone(), skill.group, &ctx)
@@ -580,18 +614,18 @@ pub fn copy_active_skill(
 struct SupportContext<'a> {
     from_item: HashSet<String>,
     groups: &'a [SocketGroup],
-    all_one_hand: bool,
+    weapons: ActorWeapons,
     data: &'a SkillData,
 }
 
 impl SupportContext<'_> {
-    fn can_support(&self, support: &GrantedEffect, skill: &ActiveSkill) -> bool {
+    fn can_support(&self, support: &SkillEffect, skill: &ActiveSkill) -> bool {
         can_support(
             support,
             skill,
             &self.from_item,
             self.groups,
-            self.all_one_hand,
+            &self.weapons,
             self.data,
         )
     }
@@ -795,6 +829,10 @@ fn field_num(v: &ModValue, k: &str) -> Option<f64> {
     }
 }
 
+fn field_truthy(v: &ModValue, k: &str) -> bool {
+    matches!(v, ModValue::Record(r) if r.get(k).is_some_and(ModValue::truthy))
+}
+
 fn field_str(v: &ModValue, k: &str) -> Option<String> {
     match v {
         ModValue::Record(r) => match r.get(k) {
@@ -868,9 +906,7 @@ pub fn create_active_skills(
         .copied()
         .unwrap_or(false);
     let weapon_data = weapon_data(input, mod_db);
-    let all_one_hand = weapon_data
-        .iter()
-        .any(|d| d.get("countsAsAll1H").is_some_and(ModValue::truthy));
+    let weapons = ActorWeapons::new(&weapon_data);
     let mut db = PlayerDb::new(
         std::mem::replace(mod_db, Store::db()),
         input.enemy_db,
@@ -880,7 +916,7 @@ pub fn create_active_skills(
         input.item_data,
         data,
     );
-    let result = active_skills(input, &mut db, weapon_data, all_one_hand, energy_blade);
+    let result = active_skills(input, &mut db, weapon_data, weapons, energy_blade);
     *mod_db = db.finish();
     result
 }
@@ -889,7 +925,7 @@ fn active_skills(
     input: &SkillsInput,
     db: &mut PlayerDb,
     weapon_data: [Fields; 2],
-    all_one_hand: bool,
+    weapons: ActorWeapons,
     energy_blade: bool,
 ) -> Result<Option<SkillsSetup>, String> {
     let groups = input.groups;
@@ -928,7 +964,14 @@ fn active_skills(
         }
     };
     let used = |i: usize| i + 1 == main_index || (groups[i].enabled && slot_enabled[i]);
-    let slot_of = |g: &SocketGroup| g.slot.as_ref().map(|s| s.replace(" Swap", ""));
+    let slot_of = |g: &SocketGroup| match &g.slot {
+        Some(s) => Some(s.replace(" Swap", "")),
+        None => g
+            .source
+            .as_ref()
+            .filter(|s| s.to_lowercase().contains("tree"))
+            .map(|_| "Passive Tree".to_string()),
+    };
     let mut cfgs: Vec<GroupCfg> = groups
         .iter()
         .map(|g| GroupCfg {
@@ -1002,41 +1045,42 @@ fn active_skills(
                 None => slot_groups.push((slot.clone(), vec![gi])),
             }
         }
-        let mut extra =
-            |effect: Option<Rc<GrantedEffect>>, value: Option<&ModValue>, level: Option<f64>| {
-                let mut effect = effect.or_else(|| {
-                    value
-                        .and_then(|v| field_str(v, "skillId"))
-                        .and_then(|id| data.skills.get(&id).cloned())
-                });
-                if let (Some(v), Some(e)) = (value, &effect) {
-                    from_item.insert(e.id.clone());
-                    if !e.support {
-                        let id = format!("Support{}", field_str(v, "skillId").unwrap_or_default());
-                        effect = data.skills.get(&id).cloned();
-                        if let Some(e) = &effect {
-                            from_item.insert(e.id.clone());
-                        }
-                    }
-                }
-                let Some(e) = effect else {
-                    return;
-                };
-                let name = crate::pat::lower(&e.name);
-                let gem = data
-                    .gem_for_base_name(&name)
-                    .or_else(|| data.gem_for_base_name(&format!("{name} support")))
-                    .cloned();
-                let mut s = SkillEffect::new(
-                    e,
-                    level.or_else(|| value.and_then(|v| field_num(v, "level"))),
-                    0.0,
-                );
-                s.gem = gem;
-                supports[gi].push(s);
+        let mut extra = |effect: Option<Rc<GrantedEffect>>,
+                         value: Option<&ModValue>,
+                         level: Option<f64>| {
+            let mut effect = effect.or_else(|| {
+                value
+                    .and_then(|v| field_str(v, "skillId"))
+                    .and_then(|id| data.skills.get(&id).cloned())
+            });
+            if let (Some(v), Some(e)) = (value, &effect)
+                && !e.support
+            {
+                let id = format!("Support{}", field_str(v, "skillId").unwrap_or_default());
+                effect = data.skills.get(&id).cloned();
+            }
+            if let (Some(_), Some(e)) = (value, &effect) {
+                from_item.insert(e.id.clone());
+            }
+            let Some(e) = effect else {
+                return;
             };
-        if group.source.is_none() {
-            for v in db.list(Some(&cfgs[gi].cfg()), "ExtraSupport")? {
+            let name = crate::pat::lower(&e.name);
+            let gem = data
+                .gem_for_base_name(&name)
+                .or_else(|| data.gem_for_base_name(&format!("{name} support")))
+                .cloned();
+            let mut s = SkillEffect::new(
+                e,
+                level.or_else(|| value.and_then(|v| field_num(v, "level"))),
+                0.0,
+            );
+            s.gem = gem;
+            s.applies_to_granted = value.is_some_and(|v| field_truthy(v, "appliesToGrantedSkills"));
+            add_best_support(&s, &mut supports[gi]);
+        };
+        for v in db.list(Some(&cfgs[gi].cfg()), "ExtraSupport")? {
+            if group.source.is_none() || field_truthy(&v, "appliesToGrantedSkills") {
                 extra(None, Some(&v), None);
             }
         }
@@ -1083,7 +1127,7 @@ fn active_skills(
     let ctx = SupportContext {
         from_item,
         groups,
-        all_one_hand,
+        weapons,
         data,
     };
     // The active skills of the groups in use, with their supports

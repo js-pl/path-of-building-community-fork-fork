@@ -587,7 +587,7 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
             };
         let recalc =
             engine::calc_cache::Recalculator::new(&typed_build, &calc_data, CalcMode::Main);
-        let mut input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
+        let mut input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, true)
             .unwrap_or_else(|e| panic!("{id}: {e}"));
         input.recalc = Some(&recalc);
         let p = match engine::calc_perform::perform(typed_env, input) {

@@ -3,7 +3,7 @@
 //! `Classes/ModList.lua`), with the same arithmetic in the same order, so
 //! results are bit for bit upstream's.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use super::sym::Sym;
 use super::tag::*;

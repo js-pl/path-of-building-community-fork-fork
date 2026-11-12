@@ -89,13 +89,8 @@
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.48"/>
-		<PlayerStat stat="FullDPS" value="9000.0248913946"/>
-		<PlayerStat stat="FullDotDPS" value="5721.7832550933"/>
-		<FullDPSSkill skillPart="" source="Vaal Smite" stat="Best Bleed DPS" value="4990.147693801"/>
-		<FullDPSSkill skillPart="Melee Hit" source="" stat="Vaal Smite" value="1965.4632427017"/>
-		<FullDPSSkill skillPart="Melee Hit" source="" stat="Smite of Divine Judgement" value="1159.7824470105"/>
-		<FullDPSSkill skillPart="" source="" stat="Full Poison DPS" value="731.63556129232"/>
-		<FullDPSSkill skillPart="" source="" stat="Full Impale DPS" value="152.99594658917"/>
+		<PlayerStat stat="FullDPS" value="0"/>
+		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
@@ -161,16 +156,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionGainedPowerChargeRecently"/>
-			<Input boolean="true" name="conditionOnShockedGround"/>
-			<Input boolean="true" name="conditionSoulGainPrevention"/>
-			<Input boolean="true" name="conditionThrownTrapOrMineRecently"/>
+			<Input boolean="true" name="conditionHaveVulconus"/>
+			<Input boolean="true" name="conditionHitByFireDamageRecently"/>
+			<Input boolean="true" name="conditionIgnited"/>
+			<Input boolean="true" name="conditionSpawnedCorpseRecently"/>
+			<Input boolean="true" name="conditionTotemsKilledRecently"/>
 			<Input boolean="true" name="enemyConditionHitByLightningDamage"/>
-			<Input name="minionsOverrideEnduranceCharges" number="8"/>
-			<Input name="multiplierBleedsOnEnemy" number="6"/>
-			<Input name="overrideSiphoningCharges" number="3"/>
+			<Input name="multiplierSoulEater" number="8"/>
+			<Input name="overrideChallengerCharges" number="3"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

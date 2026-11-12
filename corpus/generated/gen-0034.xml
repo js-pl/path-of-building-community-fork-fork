@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Berserker" bandit="None" characterLevelAutoMode="false" className="Marauder" level="83" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="1203.80715"/>
-		<PlayerStat stat="AverageBurstDamage" value="1203.80715"/>
+		<PlayerStat stat="AverageHit" value="1404.65154375"/>
+		<PlayerStat stat="AverageBurstDamage" value="1404.65154375"/>
 		<PlayerStat stat="Speed" value="1.6666666666667"/>
 		<PlayerStat stat="TrapThrowingTime" value="0.6"/>
 		<PlayerStat stat="TrapThrowCount" value="1"/>
@@ -10,16 +10,16 @@
 		<PlayerStat stat="CritChance" value="5"/>
 		<PlayerStat stat="CritMultiplier" value="1.5"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="2006.34525"/>
+		<PlayerStat stat="TotalDPS" value="2341.08590625"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="2006.34525"/>
-		<PlayerStat stat="IgniteDPS" value="1495.1267177951"/>
-		<PlayerStat stat="WithIgniteDPS" value="3501.4719677951"/>
-		<PlayerStat stat="WithPoisonDPS" value="2006.34525"/>
-		<PlayerStat stat="TotalDotDPS" value="1495.1267177951"/>
+		<PlayerStat stat="WithBleedDPS" value="2341.08590625"/>
+		<PlayerStat stat="IgniteDPS" value="1744.3221711749"/>
+		<PlayerStat stat="WithIgniteDPS" value="4085.4080774249"/>
+		<PlayerStat stat="WithPoisonDPS" value="2341.08590625"/>
+		<PlayerStat stat="TotalDotDPS" value="1744.3221711749"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="3501.4719677951"/>
+		<PlayerStat stat="CombinedDPS" value="4085.4080774249"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.8"/>
 		<PlayerStat stat="ManaCost" value="21"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -41,12 +41,12 @@
 		<PlayerStat stat="Int" value="87"/>
 		<PlayerStat stat="ReqInt" value="224"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="8000.571768303"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="5555"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2637"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="3415"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="4325"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2250"/>
+		<PlayerStat stat="TotalEHP" value="8875.8824803153"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="6172"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="2930"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3794"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="4806"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2500"/>
 		<PlayerStat stat="Life" value="2632"/>
 		<PlayerStat stat="Spec:LifeInc" value="54"/>
 		<PlayerStat stat="LifeUnreserved" value="2632"/>
@@ -156,19 +156,22 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionBleeding"/>
-			<Input boolean="true" name="conditionEnemyPacified"/>
-			<Input boolean="true" name="conditionEnergyShieldRechargePastTwoSec"/>
-			<Input boolean="true" name="conditionHaveTotem"/>
+			<Input boolean="true" name="Disgorged"/>
+			<Input name="TotemsSummoned" number="6"/>
+			<Input boolean="true" name="buffLesserBrutalShrine"/>
+			<Input name="buffPendulum" string="DAMAGE"/>
+			<Input boolean="true" name="conditionEnemyDebilitated"/>
+			<Input boolean="true" name="conditionEnemyFireResZero"/>
 			<Input name="conditionSapEffect" number="5"/>
+			<Input boolean="true" name="conditionSpawnedCorpseRecently"/>
 			<Input name="enemyIsBoss" string="None"/>
-			<Input name="frostShieldStages" number="8"/>
-			<Input name="multiplierCorpseConsumedRecently" number="3"/>
-			<Input name="multiplierEnduranceChargesLostRecently" number="6"/>
-			<Input name="overrideFortification" number="10"/>
-			<Input name="raiseSpectreKaomFireBeamTotemStage" number="9"/>
+			<Input boolean="true" name="raiseSpectreEnableSummonedUrsaRallyingCry"/>
+			<Input name="toxicRainPodOverlap" number="5"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="38296"/>
 			<Placeholder name="enemyCritChance" number="5"/>

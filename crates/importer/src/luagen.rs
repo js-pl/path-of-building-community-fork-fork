@@ -1641,6 +1641,11 @@ impl Gen<'_> {
 
 /// Function literals outside other functions, with a name for messages.
 fn collect_functions_stat<'a>(s: &'a Stat, out: &mut Vec<(&'a FuncBody, String)>) {
+    // The importer evaluates the body of `(function() ... end)()` in place
+    if let Some(b) = lua::ast::iife_body(s) {
+        b.stats.iter().for_each(|s| collect_functions_stat(s, out));
+        return;
+    }
     match s {
         Stat::Local { values, .. } => values
             .iter()

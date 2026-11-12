@@ -171,16 +171,18 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionBurning"/>
-			<Input boolean="true" name="conditionHitsAlwaysStun"/>
-			<Input boolean="true" name="conditionUsedFireSkillRecently"/>
+			<Input boolean="true" name="buffDiamondShrine"/>
+			<Input boolean="true" name="conditionConsumed12SteelShardsRecently"/>
+			<Input boolean="true" name="conditionEnemyFullLife"/>
+			<Input boolean="true" name="conditionScorched"/>
 			<Input boolean="true" name="divineSentinelChaosResistance"/>
 			<Input boolean="true" name="enemyConditionHitByLightningDamage"/>
-			<Input name="inventionMineTrapPlacedDuration" number="10"/>
-			<Input name="multiplierBeenHitRecently" number="6"/>
-			<Input name="multiplierPvpTvalueOverride" number="9"/>
+			<Input boolean="true" name="iceNovaCastOnFrostbolt"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

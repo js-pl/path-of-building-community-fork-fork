@@ -38,12 +38,12 @@
 		<PlayerStat stat="Int" value="292"/>
 		<PlayerStat stat="ReqInt" value="212"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4895.007152513"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3686"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="3472"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2645"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="6944"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2794"/>
+		<PlayerStat stat="TotalEHP" value="6838.3120163106"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3932"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="5555"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3704"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="12077"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="4264"/>
 		<PlayerStat stat="Life" value="1823"/>
 		<PlayerStat stat="Spec:LifeInc" value="18"/>
 		<PlayerStat stat="LifeUnreserved" value="1823"/>
@@ -76,13 +76,13 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="12"/>
-		<PlayerStat stat="FireResist" value="-2"/>
+		<PlayerStat stat="FireResist" value="28"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="63"/>
-		<PlayerStat stat="ColdResistOverCap" value="0"/>
-		<PlayerStat stat="LightningResist" value="23"/>
+		<PlayerStat stat="ColdResist" value="80"/>
+		<PlayerStat stat="ColdResistOverCap" value="13"/>
+		<PlayerStat stat="LightningResist" value="53"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
-		<PlayerStat stat="ChaosResist" value="13"/>
+		<PlayerStat stat="ChaosResist" value="43"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.37"/>
 		<PlayerStat stat="FullDPS" value="0"/>
@@ -153,18 +153,22 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="BrandsInLastHalf"/>
-			<Input boolean="true" name="EEIgnoreHitDamage"/>
 			<Input boolean="true" name="bloodSacramentReservationEHP"/>
-			<Input boolean="true" name="channellingCycloneCheck"/>
-			<Input boolean="true" name="conditionSummonedTotemRecently"/>
-			<Input boolean="true" name="conditionUsedWarcryRecently"/>
-			<Input name="multiplierAppliedAilmentsRecently" number="6"/>
-			<Input name="multiplierShockedNonShockedEnemyRecently" number="9"/>
-			<Input name="raiseSpectreKaomFireBeamTotemStage" number="6"/>
-			<Input boolean="true" name="vortexCastOnFrostbolt"/>
+			<Input boolean="true" name="buffBloodShrineOfLocusts"/>
+			<Input boolean="true" name="buffNgamahuFlamesAdvance"/>
+			<Input boolean="true" name="conditionCastLast1Seconds"/>
+			<Input boolean="true" name="conditionKilledLast3Seconds"/>
+			<Input boolean="true" name="conditionShatteredEnemyRecently"/>
+			<Input boolean="true" name="conditionTotemsHitRecently"/>
+			<Input name="darkPactSkeletonLife" number="1"/>
+			<Input name="multiplierMineDetonatedRecently" number="10"/>
+			<Input name="multiplierWarcryPower" number="3"/>
+			<Input name="resistancePenalty" number="-30"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -205,6 +209,7 @@ Tornado Wand
 Variant: Pre 2.3.0
 Variant: Pre 2.6.0
 Variant: Pre 3.21.0
+Variant: Pre 3.27.0
 Variant: Current
 Selected Variant: 1
 {variant:4}Imbued Wand

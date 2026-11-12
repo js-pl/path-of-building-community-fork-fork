@@ -273,6 +273,7 @@ pub fn import(src_dir: &Path) -> Result<Raw> {
         ("JewelCluster", "ModJewelCluster"),
         ("JewelCharm", "ModJewelCharm"),
         ("Foulborn", "ModFoulborn"),
+        ("Mercenary", "ModMercenary"),
     ] {
         item_mods.set_str(key, im.load1(&format!("Data/{file}"), vec![])?);
     }

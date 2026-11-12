@@ -3,7 +3,7 @@
 //! evasion, suppression, dodge, recovery, regeneration, recoup, damage
 //! reduction and avoidance.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -1711,8 +1711,36 @@ impl<'a> Perform<'a> {
         let es_instead = self
             .c
             .flag(db, None, &["EnergyShieldRecoupInsteadOfLife"])?;
+        let recoup_inc = 1.0 + self.c.inc(db, None, &["RecoupRecoveryAmount"])? / 100.0;
+        let recoup_more = self.c.more(db, None, &["RecoupRecoveryAmount"])?;
+        let added_to = |p: &Self, t: &str, t2: &str| -> Result<Option<Option<std::rc::Rc<str>>>> {
+            let flag = format!("Add{t}RecoupTo{t2}Recoup");
+            if t == t2 || !p.c.flag(db, None, &[&flag])? {
+                return Ok(None);
+            }
+            Ok(Some(
+                p.c.tabulate(db, Some(ModType::Flag), None, &[&flag])?
+                    .first()
+                    .and_then(|(_, m)| m.source.clone()),
+            ))
+        };
         for t in types {
-            let base = self.c.base(db, None, &[&format!("{t}Recoup")])?;
+            for t2 in types {
+                if let Some(source) = added_to(self, t, t2)? {
+                    let base = self.c.base(db, None, &[&format!("{t}Recoup")])?;
+                    self.c.add(
+                        db,
+                        crate::mods::Mod::new(
+                            &format!("{t2}Recoup"),
+                            Base,
+                            base,
+                            source.as_deref(),
+                        ),
+                    );
+                }
+            }
+        }
+        for t in types {
             if t == "Life" && es_instead {
                 self.c.set_out(actor, "LifeRecoup", 0.0);
                 let life = self.c.base(db, None, &["LifeRecoup"])?;
@@ -1721,22 +1749,11 @@ impl<'a> Perform<'a> {
                     src("EnergyShieldRecoup", Base, life, "Life Recoup Conversion"),
                 );
             } else {
-                let v = base * o(self, &format!("{t}RecoveryRateMod"));
+                let base = self.c.base(db, None, &[&format!("{t}Recoup")])?;
+                let v = base * o(self, &format!("{t}RecoveryRateMod")) * recoup_inc * recoup_more;
                 self.c.set_out(actor, &format!("{t}Recoup"), v);
                 let any = o(self, "anyRecoup") + v;
                 self.c.set_out(actor, "anyRecoup", any);
-            }
-            let flag = format!("Add{t}RecoupToEnergyShieldRecoup");
-            if self.c.flag(db, None, &[&flag])? {
-                let source = self
-                    .c
-                    .tabulate(db, Some(ModType::Flag), None, &[&flag])?
-                    .first()
-                    .and_then(|(_, m)| m.source.clone());
-                self.c.replace_mod(
-                    db,
-                    crate::mods::Mod::new("EnergyShieldRecoup", Base, base, source.as_deref()),
-                );
             }
         }
         if self.c.flag(db, None, &["UsePowerCharges"])?
@@ -1775,27 +1792,24 @@ impl<'a> Perform<'a> {
                         ),
                     );
                 } else {
-                    let v = recoup * o(self, &format!("{t}RecoveryRateMod"));
+                    let v =
+                        recoup * o(self, &format!("{t}RecoveryRateMod")) * recoup_inc * recoup_more;
                     self.c.set_out(actor, &format!("{d}{t}Recoup"), v);
                     let any = o(self, "anyRecoup") + v;
                     self.c.set_out(actor, "anyRecoup", any);
                 }
-                let flag = format!("Add{t}RecoupToEnergyShieldRecoup");
-                if self.c.flag(db, None, &[&flag])? {
-                    let source = self
-                        .c
-                        .tabulate(db, Some(ModType::Flag), None, &[&flag])?
-                        .first()
-                        .and_then(|(_, m)| m.source.clone());
-                    self.c.replace_mod(
-                        db,
-                        crate::mods::Mod::new(
-                            &format!("{d}EnergyShieldRecoup"),
-                            Base,
-                            recoup,
-                            source.as_deref(),
-                        ),
-                    );
+                for t2 in types {
+                    if let Some(source) = added_to(self, t, t2)? {
+                        self.c.replace_mod(
+                            db,
+                            crate::mods::Mod::new(
+                                &format!("{d}{t2}Recoup"),
+                                Base,
+                                recoup,
+                                source.as_deref(),
+                            ),
+                        );
+                    }
                 }
             }
         }

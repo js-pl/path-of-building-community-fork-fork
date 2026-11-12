@@ -37,12 +37,12 @@
 		<PlayerStat stat="Int" value="97"/>
 		<PlayerStat stat="ReqInt" value="155"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="5424.6828083939"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2971"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="8414"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2186"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2595"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1795"/>
+		<PlayerStat stat="TotalEHP" value="4880.4406854532"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2674"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="7572"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="1968"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="2335"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="1615"/>
 		<PlayerStat stat="Life" value="2035"/>
 		<PlayerStat stat="Spec:LifeInc" value="52"/>
 		<PlayerStat stat="LifeUnreserved" value="2035"/>
@@ -152,20 +152,23 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="BrandsAttachedToEnemy" number="8"/>
+			<Input name="MapSuffix1" string="of Toughness"/>
 			<Input boolean="true" name="aspectOfTheAvianAviansMight"/>
-			<Input boolean="true" name="buffVaalArcLuckyHits"/>
-			<Input name="conditionCorruptingCryStages" number="5"/>
-			<Input boolean="true" name="conditionEnemyDebilitated"/>
-			<Input boolean="true" name="conditionEnemyFrozen"/>
-			<Input boolean="true" name="conditionEnemyLowLife"/>
-			<Input boolean="true" name="conditionEnemyPoisoned"/>
-			<Input boolean="true" name="conditionKilledLast3Seconds"/>
-			<Input boolean="true" name="conditionSpawnedCorpseRecently"/>
-			<Input name="multiplierAffectedByWarcryBuffDuration" number="6"/>
-			<Input name="multiplierMapModEffect" number="6"/>
+			<Input boolean="true" name="conditionEnemyFullLife"/>
+			<Input boolean="true" name="conditionEnemyTaunted"/>
+			<Input boolean="true" name="conditionOnProfaneGround"/>
+			<Input boolean="true" name="conditionTotemsNotSummonedInPastTwoSeconds"/>
+			<Input boolean="true" name="freshMeatBuffs"/>
+			<Input name="minesPerThrow" number="6"/>
+			<Input name="multiplierCorpseConsumedRecently" number="9"/>
+			<Input name="multiplierMapModTier" string="MED"/>
+			<Input name="multiplierWarcryUsedRecently" number="10"/>
+			<Input name="overrideBuffElusive" number="2"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

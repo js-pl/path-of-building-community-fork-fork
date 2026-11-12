@@ -38,8 +38,8 @@
 		<PlayerStat stat="Int" value="507"/>
 		<PlayerStat stat="ReqInt" value="159"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="5503.9377778676"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3458"/>
+		<PlayerStat stat="TotalEHP" value="5143.0858085929"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2924"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="15872"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="10204"/>
 		<PlayerStat stat="ColdMaximumHitTaken" value="5494"/>
@@ -50,13 +50,13 @@
 		<PlayerStat stat="LifeUnreserved" value="2302"/>
 		<PlayerStat stat="LifeRecoverable" value="2302"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="60"/>
+		<PlayerStat stat="LifeRegenRecovery" value="214.2"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1771"/>
 		<PlayerStat stat="Spec:ManaInc" value="87"/>
 		<PlayerStat stat="ManaUnreserved" value="1151"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="64.991530208922"/>
-		<PlayerStat stat="ManaRegenRecovery" value="55.1"/>
+		<PlayerStat stat="ManaRegenRecovery" value="127.1"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
 		<PlayerStat stat="EnergyShield" value="355"/>
 		<PlayerStat stat="EnergyShieldRecoveryCap" value="355"/>
@@ -154,17 +154,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MapSuffix2" string="of Drought"/>
-			<Input name="conditionCorruptingCryStages" number="4"/>
+			<Input boolean="true" name="EVBypass"/>
+			<Input name="MapSuffix4" string="of Drought"/>
+			<Input boolean="true" name="buffReplenishingShrine"/>
 			<Input boolean="true" name="conditionEnemyBurning"/>
-			<Input boolean="true" name="conditionEnemyLightningExposure"/>
-			<Input boolean="true" name="divineSentinelSelfCurseEffect"/>
-			<Input boolean="true" name="enemyConditionHitByLightningDamage"/>
-			<Input name="pactMode" string="MAX"/>
-			<Input name="raiseSpectreKaomFireBeamTotemStage" number="2"/>
-			<Input name="trapsPerThrow" number="8"/>
+			<Input boolean="true" name="conditionEnemyColdExposure"/>
+			<Input boolean="true" name="conditionSpawnedCorpseRecently"/>
+			<Input name="playerCursedWithVulnerability" number="10"/>
+			<Input boolean="true" name="raiseSpectreEnableSummonedUrsaRallyingCry"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

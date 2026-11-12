@@ -1,7 +1,7 @@
 //! The skills' own offence functions (`initialFunc`, `preDamageFunc`, ...
 //! of `Data/Skills/*.lua`), ported by hand per granted effect id.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -853,7 +853,9 @@ impl<'a> Perform<'a> {
                         / per)
                         .floor();
                     let n = m_max(0.0, m_min(max_strikes, last + 1.0 - first));
-                    // `output.NormalHitsPerCast` only with breakdowns
+                    if self.input.breakdown {
+                        self.c.set_out(actor, "NormalHitsPerCast", n);
+                    }
                     mult = n;
                 }
                 if mult != 1.0 {

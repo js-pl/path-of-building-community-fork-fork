@@ -151,13 +151,17 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionBeenCritRecently"/>
-			<Input boolean="true" name="conditionBurning"/>
-			<Input boolean="true" name="conditionPoisoned"/>
-			<Input boolean="true" name="conditionPoisonedEnemyRecently"/>
-			<Input boolean="true" name="holyStrikeSkillDamageCountedOnce"/>
+			<Input name="VaalMoltenShellDamageMitigated" number="6"/>
+			<Input boolean="true" name="conditionBeenSavageHitRecently"/>
+			<Input boolean="true" name="conditionEnemyFrozen"/>
+			<Input name="multiplierManaSpentRecently" number="3"/>
+			<Input name="multiplierNearbyEnemies" number="2"/>
+			<Input name="tornadoShotSecondaryHitChance" number="1"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

@@ -4,7 +4,7 @@
 //! bandit and pantheon mods, the configuration's mods, and the passive
 //! nodes' mods with the radius jewels.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::config::{Inputs, Val};
 use crate::jewel::{RadiusData, RadiusFunc, RadiusNode, RadiusType};
@@ -837,6 +837,15 @@ pub fn init_mod_db(d: &SetupData, db: &mut Store, mode: BuffMode) {
             .tag(Tag::condition("LesserResistanceShrine"))
             .tag(Tag::condition("ResistanceShrine").negated()),
     );
+    for shrine in [
+        "BloodShrineOfRats",
+        "BloodShrineOfLocusts",
+        "BloodShrineOfToads",
+        "BloodShrineOfCrows",
+        "BloodShrineOfBats",
+    ] {
+        db.add(Mod::new(shrine, ModType::Flag, true, Some("Base")).tag(Tag::condition(shrine)));
+    }
     db.add(
         Mod::new("AlchemistsGenius", ModType::Flag, true, Some("Base"))
             .tag(Tag::condition("AlchemistsGenius")),
