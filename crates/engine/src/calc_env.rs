@@ -30,9 +30,31 @@ pub struct CalcData<'a> {
     pub jewel_radius: &'a [String],
 }
 
+/// Which calculation this is (`env.mode`)
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CalcMode {
+    /// The sidebar's (`MAIN`)
+    Main,
+    /// The Calcs tab's (`CALCS`), with its own main skill and buff mode
+    Calcs,
+    /// A calculator's (`CALCULATOR`), such as the Full DPS skills'
+    Calculator,
+}
+
+impl CalcMode {
+    /// The calculation's buff mode: the Calcs tab's input, or effective
+    pub fn buff_mode(self, build: &Build) -> BuffMode {
+        match self {
+            CalcMode::Calcs => BuffMode::new(Some(&build.calcs.buff_mode)),
+            _ => BuffMode::new(Some("EFFECTIVE")),
+        }
+    }
+}
+
 /// A calculation's setup (`env` after `calcs.initEnv`)
 #[derive(Debug)]
 pub struct Env {
+    pub calc_mode: CalcMode,
     pub mode: BuffMode,
     pub enemy_level: f64,
     /// `env.modDB` and `env.enemyDB`
@@ -51,11 +73,11 @@ pub struct Env {
 
 /// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
 /// groups with the granted skills and the gems' selections.
-pub fn init_env(build: &mut Build, data: &CalcData, mode: BuffMode) -> Result<Env> {
-    match init_env_pass(build, data, mode, false)? {
+pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Result<Env> {
+    match init_env_pass(build, data, calc_mode, false)? {
         Some(env) => Ok(env),
         // An enabled Energy Blade: everything again, with its condition
-        None => init_env_pass(build, data, mode, true)?
+        None => init_env_pass(build, data, calc_mode, true)?
             .ok_or_else(|| "Energy Blade asked for a second rerun".to_string()),
     }
 }
@@ -66,9 +88,11 @@ pub fn init_env(build: &mut Build, data: &CalcData, mode: BuffMode) -> Result<En
 fn init_env_pass(
     build: &mut Build,
     data: &CalcData,
-    mode: BuffMode,
+    calc_mode: CalcMode,
     energy_blade: bool,
 ) -> Result<Option<Env>> {
+    let calcs = calc_mode == CalcMode::Calcs;
+    let mode = calc_mode.buff_mode(build);
     let spec = &build.spec;
     let tree = spec.tree;
     let class_id = spec.cur_class_id.unwrap_or(0);
@@ -193,7 +217,12 @@ fn init_env_pass(
         skill_data: data.skills,
         item_list: &setup.items.item_list,
         unarmed: &unarmed,
-        main_socket_group: Some(build.info.main_socket_group),
+        main_socket_group: Some(if calcs {
+            build.calcs.skill_number
+        } else {
+            build.info.main_socket_group
+        }),
+        calcs,
         imbued_support_by_slot: &imbued,
         matching_socket_quality_bonus: data
             .setup
@@ -216,6 +245,7 @@ fn init_env_pass(
         item_list: &setup.items.item_list,
         weapon_data: &weapon_data,
         mode,
+        calcs,
         config: &config,
         placeholders: &placeholders,
         spectre_list: &build.info.spectre_list,
@@ -227,6 +257,7 @@ fn init_env_pass(
     let mut enemy_multipliers = HashMap::new();
     calc_skill_mods::build_skill_mod_lists(
         &mut skills.active_skills,
+        skills.main_skill,
         &mut groups,
         &mut player_db,
         &mut enemy_multipliers,
@@ -239,7 +270,11 @@ fn init_env_pass(
     {
         *list = groups.clone();
     }
+    if calcs {
+        build.calcs.skill_number = skills.main_socket_group as f64;
+    }
     Ok(Some(Env {
+        calc_mode,
         mode,
         enemy_level,
         player_db,

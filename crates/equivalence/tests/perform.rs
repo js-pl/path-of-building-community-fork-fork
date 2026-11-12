@@ -9,7 +9,7 @@
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::actor::OutVal;
-use engine::calc_setup::BuffMode;
+use engine::calc_env::CalcMode;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use engine::mods::{Mod, ModValue, Mods, Store};
@@ -577,22 +577,16 @@ fn run_builds(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
                 continue;
             }
         };
-        let typed_env = match engine::calc_env::init_env(
-            &mut typed_build,
-            &calc_data,
-            BuffMode::new(Some("EFFECTIVE")),
-        ) {
-            Ok(e) => e,
-            Err(e) => {
-                failures.push(format!("{id}: init_env: {e}"));
-                continue;
-            }
-        };
-        let recalc = engine::calc_cache::Recalculator::new(
-            &typed_build,
-            &calc_data,
-            BuffMode::new(Some("EFFECTIVE")),
-        );
+        let typed_env =
+            match engine::calc_env::init_env(&mut typed_build, &calc_data, CalcMode::Main) {
+                Ok(e) => e,
+                Err(e) => {
+                    failures.push(format!("{id}: init_env: {e}"));
+                    continue;
+                }
+            };
+        let recalc =
+            engine::calc_cache::Recalculator::new(&typed_build, &calc_data, CalcMode::Main);
         let mut input = engine::calc_perform::PerformInput::new(&typed_build, &calc_data, false)
             .unwrap_or_else(|e| panic!("{id}: {e}"));
         input.recalc = Some(&recalc);

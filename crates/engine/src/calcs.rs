@@ -1,12 +1,14 @@
-//! `Modules/Calcs.lua`: `calcs.buildOutput` of the main calculation
-//! (`mode == "MAIN"`) with `calcs.calcFullDPS`, from a loaded build.
+//! `Modules/Calcs.lua`: `calcs.buildOutput` of the sidebar's calculation
+//! (`mode == "MAIN"`) and the Calcs tab's (`mode == "CALCS"`) with
+//! `calcs.calcFullDPS`, from a loaded build.
 //!
 //! The Full DPS skills are calculated each in a calculation of its own
-//! from the setup, where upstream reuses the first calculation's setup.
+//! from the setup, where upstream reuses the first calculation's setup;
+//! the Calcs tab's calculation reuses the sidebar's Full DPS results.
 //!
-//! Not ported yet: the Calcs tab's calculation (`mode == "CALCS"`), the
-//! conditions, multipliers and mods in use that the Configuration tab
-//! reads (`env.conditionsUsed`, ...), the node and misc calculators.
+//! Not ported yet: breakdowns, the conditions and mods in use that the
+//! Configuration tab reads (`env.conditionsUsed`, ...; of them only
+//! `env.multipliersUsed`), the node and misc calculators.
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
@@ -14,13 +16,13 @@ use crate::actor::OutVal;
 use crate::build::Build;
 use crate::calc::{PLAYER, m_min};
 use crate::calc_cache::{Recalc, Recalculator, skill_uuid};
-use crate::calc_env::{CalcData, init_env};
+use crate::calc_env::{CalcData, CalcMode, init_env};
 use crate::calc_perform::{Perform, PerformInput, Result, perform};
 use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
-use crate::mods::{Cfg, ModType, Sym};
+use crate::mods::{Cfg, Mod, ModType, Mods, Names, Sym, TagKind};
 use crate::skills::SocketGroup;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 /// An actor's output
@@ -46,20 +48,17 @@ pub struct FullDps {
     pub total_dot_dps: f64,
 }
 
-/// What `calcs.buildOutput(build, "MAIN")` leaves: the player's output,
+/// What `calcs.buildOutput(build, mode)` leaves: the player's output,
 /// with the Full DPS results, and the main skill's minion's
 #[derive(Clone, Debug)]
 pub struct BuildOutput {
     pub player: Output,
     pub minion: Option<Output>,
+    /// The Full DPS skills in `calcs.calcFullDPS`'s order
     pub full_dps: FullDps,
+    /// `env.multipliersUsed` of the sidebar's calculation
+    pub multipliers_used: HashSet<Sym>,
 }
-
-const MODE: BuffMode = BuffMode {
-    buffs: true,
-    combat: true,
-    effective: true,
-};
 
 fn num(out: &Output, k: &str) -> Option<f64> {
     out.get(&Sym::new(k)).and_then(OutVal::num)
@@ -125,8 +124,8 @@ impl Best {
 
 /// `calcs.calcFullDPS(build, "CALCULATOR")`
 pub fn calc_full_dps(build: &Build, data: &CalcData) -> Result<FullDps> {
-    let recalc = Recalculator::calculator(build, data, MODE);
-    let mut first = Some(init_env(&mut build.clone(), data, MODE)?);
+    let recalc = Recalculator::new(build, data, CalcMode::Calculator);
+    let mut first = Some(init_env(&mut build.clone(), data, CalcMode::Calculator)?);
     let list: Vec<(usize, f64)> = {
         let env = first.as_ref().unwrap();
         env.skills
@@ -157,7 +156,7 @@ pub fn calc_full_dps(build: &Build, data: &CalcData) -> Result<FullDps> {
         let mut b = build.clone();
         let mut env = match first.take() {
             Some(e) => e,
-            None => init_env(&mut b, data, MODE)?,
+            None => init_env(&mut b, data, CalcMode::Calculator)?,
         };
         env.skills.main_skill = i;
         let mut input = PerformInput::new(&b, data, false)?;
@@ -449,27 +448,81 @@ pub fn lua_sort<T>(t: &mut [T], less: impl Fn(&T, &T) -> bool) {
     }
 }
 
-/// `calcs.buildOutput(build, "MAIN")`. The setup adds the granted skills'
-/// socket groups to the build, as upstream's does. The Full DPS skills are
-/// sorted by their DPS, as the sidebar sorts upstream's in place
-/// (`buildMode:AddDisplayStatList`).
-pub fn build_output(build: &mut Build, data: &CalcData) -> Result<BuildOutput> {
-    let env = init_env(build, data, MODE)?;
+/// `CalcsTab:BuildOutput`: the sidebar's calculation, then the Calcs
+/// tab's, which shares the first's Full DPS results
+pub struct Outputs {
+    pub main: BuildOutput,
+    pub calcs: Result<BuildOutput>,
+}
+
+/// `CalcsTab:BuildOutput`
+pub fn build_outputs(build: &mut Build, data: &CalcData) -> Result<Outputs> {
+    let main = build_output(build, data, CalcMode::Main, None)?;
+    let calcs = build_output(build, data, CalcMode::Calcs, Some(&main));
+    Ok(Outputs { main, calcs })
+}
+
+/// `calcs.buildOutput(build, mode)`. The setup adds the granted skills'
+/// socket groups to the build, as upstream's does. `main` is the sidebar's
+/// calculation, whose Full DPS results the Calcs tab's reuses. The sidebar
+/// sorts its Full DPS skills by their DPS in place
+/// (`buildMode:AddDisplayStatList`); the Calcs tab's keep their order.
+pub fn build_output(
+    build: &mut Build,
+    data: &CalcData,
+    mode: CalcMode,
+    main: Option<&BuildOutput>,
+) -> Result<BuildOutput> {
+    let env = init_env(build, data, mode)?;
+    // `calcFullDPS` sets up from this calculation's setup
+    if env.mode != BuffMode::new(Some("EFFECTIVE")) {
+        return Err("not ported: Full DPS set up in another buff mode".into());
+    }
     let build = &*build;
-    let recalc = Recalculator::new(build, data, MODE);
-    let mut input = PerformInput::new(build, data, false)?;
+    let recalc = Recalculator::new(build, data, mode);
+    let mut input = PerformInput::new(build, data, mode == CalcMode::Calcs)?;
     input.recalc = Some(&recalc);
     let mut p = perform(env, input)?;
     p.finish()?;
-    let mut full_dps = calc_full_dps(build, data)?;
-    lua_sort(&mut full_dps.skills, |a, b| {
-        a.dps * a.count > b.dps * b.count
-    });
-    let skills = full_dps.skills.iter().map(FullDpsSkill::out_val).collect();
+    let full_dps = match main {
+        Some(m) => m.full_dps.clone(),
+        None => calc_full_dps(build, data)?,
+    };
+    let mut skills = full_dps.skills.clone();
+    if mode == CalcMode::Main {
+        lua_sort(&mut skills, |a, b| a.dps * a.count > b.dps * b.count);
+    }
+    let skills = skills.iter().map(FullDpsSkill::out_val).collect();
     p.c.set_out_val(PLAYER, "SkillDPS", OutVal::List(Rc::new(skills)));
     p.c.set_out(PLAYER, "FullDPS", full_dps.combined_dps);
     p.c.set_out(PLAYER, "FullDotDPS", full_dps.total_dot_dps);
-    cost_warnings(&mut p, &recalc)?;
+    let mut multipliers_used = HashSet::new();
+    match mode {
+        CalcMode::Main => {
+            main_extras(&mut p, &recalc)?;
+            multipliers_used = used_multipliers(&p);
+        }
+        CalcMode::Calcs => {
+            let used = main.map_or(&multipliers_used, |m| &m.multipliers_used);
+            calcs_lists(&mut p, used)?;
+        }
+        CalcMode::Calculator => {}
+    }
+    let minion = p
+        .minion_actor()
+        .map(|a| p.c.actors.actors[a].output.clone());
+    Ok(BuildOutput {
+        player: std::mem::take(&mut p.c.actors.actors[PLAYER].output),
+        minion,
+        full_dps,
+        multipliers_used,
+    })
+}
+
+/// What only the sidebar's calculation sets: the cost warnings, extra
+/// points and the tree's increases
+fn main_extras(p: &mut Perform, recalc: &Recalculator) -> Result<()> {
+    cost_warnings(p, recalc)?;
     let pdb = p.c.db(PLAYER);
     let extra = p.c.sum(pdb, ModType::Base, None, &["ExtraPoints"])?;
     p.c.set_out(PLAYER, "ExtraPoints", extra);
@@ -487,15 +540,210 @@ pub fn build_output(build: &mut Build, data: &CalcData) -> Result<BuildOutput> {
         let v = p.c.sum(pdb, ModType::Inc, Some(&tree), names)?;
         p.c.set_out(PLAYER, k, v);
     }
-    let minion = p
-        .minion_actor()
-        .map(|a| p.c.actors.actors[a].output.clone());
-    Ok(BuildOutput {
-        player: std::mem::take(&mut p.c.actors.actors[PLAYER].output),
-        minion,
-        full_dps,
-    })
+    Ok(())
 }
+
+/// The multipliers the player's mods and skills use without an actor
+/// (`env.multipliersUsed`): the player's database and the base mod lists
+/// of the player's skills, without the `Base` descriptors
+fn used_multipliers(p: &Perform) -> HashSet<Sym> {
+    let mut used = HashSet::new();
+    let mut add = |m: &Mod| {
+        if m.source.as_deref() == Some("Base") {
+            return;
+        }
+        for t in &m.tags {
+            let vars = match &t.kind {
+                TagKind::Other { kind, .. } if kind.as_str() == "IgnoreCond" => break,
+                TagKind::Multiplier(x) if x.actor.is_none() => &x.vars,
+                TagKind::MultiplierThreshold(x) if x.actor.is_none() => &x.vars,
+                _ => continue,
+            };
+            used.extend(vars.iter().flat_map(Names::iter));
+        }
+    };
+    let stores =
+        std::iter::once(p.c.db(PLAYER)).chain(p.lists[..p.n_player].iter().map(|l| l.base));
+    for id in stores {
+        match &p.c.store(id).mods {
+            Mods::Db(by_name) => by_name.values().flatten().for_each(&mut add),
+            Mods::List(list) => list.iter().for_each(&mut add),
+        }
+    }
+    used
+}
+
+/// The charges, buffs and curses the Calcs tab lists (`BuffList`,
+/// `CombatList`, `CurseList`), for the player and the main skill's minion.
+/// `used` are the sidebar calculation's multipliers in use.
+fn calcs_lists(p: &mut Perform, used: &HashSet<Sym>) -> Result<()> {
+    let pdb = p.c.db(PLAYER);
+    let out = |p: &Perform, a: usize, k: &str| {
+        p.c.out(a, k)
+            .ok_or_else(|| format!("attempt to compare nil with number ({k})"))
+    };
+    let mut combat = Vec::new();
+    for (k, label) in CHARGES {
+        let shown = match *k {
+            "InspirationCharges" => used.contains(&Sym::new("InspirationCharge")),
+            "BloodCharges" => used.contains(&Sym::new("BloodCharge")),
+            "SpiritCharges" => used.contains(&Sym::new("SpiritCharge")),
+            "SpiritInfusions" => used.contains(&Sym::new("SpiritInfusion")),
+            _ => out(p, PLAYER, k)? > 0.0,
+        };
+        if shown {
+            combat.push(format!("{} {label}", lua_int(out(p, PLAYER, k)?)?));
+        }
+    }
+    let main_base = p.lists[p.main()].base;
+    if p.c.flag(main_base, None, &["Cruelty"])? {
+        combat.push("Cruelty".to_string());
+    }
+    for (flag, label) in COMBAT_FLAGS {
+        if p.c.flag(pdb, None, &[flag])? {
+            combat.push(label.to_string());
+        }
+    }
+    let mut buffs: Vec<&str> = p
+        .merged_buffs
+        .0
+        .iter()
+        .map(|(k, _, _)| k.as_str())
+        .collect();
+    if p.c.flag(pdb, None, &["Elusive"])? {
+        combat.push("Elusive".to_string());
+    }
+    buffs.sort_unstable();
+    let buff_list = buffs.join(", ");
+    let mut curses = Vec::new();
+    let mut names: Vec<&(String, Vec<Mod>, bool)> = p.debuffs.iter().collect();
+    names.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    for (name, list, _) in names {
+        let stack = Sym::new(&format!("Multiplier:{name}Stack"));
+        let count = list
+            .iter()
+            .filter(|m| m.name == stack && m.typ == ModType::Base)
+            .try_fold(0.0, |n, m| m.value.as_number().map(|v| n + v))
+            .ok_or("a debuff's stack count is not a number")?;
+        curses.push(if count > 0.0 {
+            let s = if count > 1.0 { "s" } else { "" };
+            format!("{name} ({} stack{s})", crate::pat::num(count))
+        } else {
+            name.clone()
+        });
+    }
+    curses.extend(p.curse_slots.iter().cloned());
+    let curse_list = curses.join(", ");
+    let set = |p: &mut Perform, a: usize, k: &str, v: &str| {
+        p.c.set_out_val(a, k, OutVal::Str(v.into()));
+    };
+    set(p, PLAYER, "BuffList", &buff_list);
+    set(p, PLAYER, "CombatList", &combat.join(", "));
+    set(p, PLAYER, "CurseList", &curse_list);
+    if let Some(a) = p.minion_actor() {
+        let mdb = p.c.db(a);
+        let mut combat = Vec::new();
+        for (k, label) in CHARGES {
+            if matches!(*k, "PowerCharges" | "FrenzyCharges" | "EnduranceCharges") {
+                let n = out(p, a, k)?;
+                if n > 0.0 {
+                    combat.push(format!("{} {label}", lua_int(n)?));
+                }
+            }
+        }
+        for (flag, label) in MINION_COMBAT_FLAGS {
+            if p.c.flag(mdb, None, &[flag])? {
+                combat.push(label.to_string());
+            }
+        }
+        let mut buffs: Vec<&str> = p
+            .merged_buffs
+            .1
+            .iter()
+            .map(|(k, _, _)| k.as_str())
+            .collect();
+        buffs.sort_unstable();
+        let buff_list = buffs.join(", ");
+        set(p, a, "BuffList", &buff_list);
+        set(p, a, "CombatList", &combat.join(", "));
+        set(p, a, "CurseList", &curse_list);
+    }
+    Ok(())
+}
+
+/// `s_format("%d", n)`
+fn lua_int(n: f64) -> Result<i64> {
+    if n.is_finite() {
+        Ok(n as i64)
+    } else {
+        Err(format!(
+            "bad argument to 'format' (number has no integer representation: {n})"
+        ))
+    }
+}
+
+/// The charges the Calcs tab lists, in its order
+const CHARGES: &[(&str, &str)] = &[
+    ("PowerCharges", "Power Charges"),
+    ("AbsorptionCharges", "Absorption Charges"),
+    ("FrenzyCharges", "Frenzy Charges"),
+    ("AfflictionCharges", "Affliction Charges"),
+    ("EnduranceCharges", "Endurance Charges"),
+    ("BrutalCharges", "Brutal Charges"),
+    ("BrineCharges", "Brine Charges"),
+    ("SiphoningCharges", "Siphoning Charges"),
+    ("ChallengerCharges", "Challenger Charges"),
+    ("BlitzCharges", "Blitz Charges"),
+    ("InspirationCharges", "Inspiration Charges"),
+    ("GhostShrouds", "Ghost Shrouds"),
+    ("CrabBarriers", "Crab Barriers"),
+    ("BloodCharges", "Blood Charges"),
+    ("SpiritCharges", "Spirit Charges"),
+    ("SpiritInfusions", "Spirit Infusions"),
+];
+
+/// The player's flags the Calcs tab lists after Cruelty, in its order
+const COMBAT_FLAGS: &[(&str, &str)] = &[
+    ("Fortify", "Fortify"),
+    ("Onslaught", "Onslaught"),
+    ("UnholyMight", "Unholy Might"),
+    ("ChaoticMight", "Chaotic Might"),
+    ("Tailwind", "Tailwind"),
+    ("Adrenaline", "Adrenaline"),
+    ("AlchemistsGenius", "Alchemist's Genius"),
+    ("HerEmbrace", "Her Embrace"),
+    ("AccelerationShrine", "Acceleration Shrine"),
+    ("BrutalShrine", "Brutal Shrine"),
+    ("DiamondShrine", "Diamond Shrine"),
+    ("DivineShrine", "Divine Shrine"),
+    ("EchoingShrine", "Echoing Shrine"),
+    ("GloomShrine", "Gloom Shrine"),
+    ("GreaterFreezingShrine", "Greater Freezing Shrine"),
+    ("GreaterShockingShrine", "Greater Shocking Shrine"),
+    ("GreaterSkeletalShrine", "Greater Skeletal Shrine"),
+    ("ImpenetrableShrine", "Impenetrable Shrine"),
+    ("MassiveShrine", "Massive Shrine"),
+    ("ReplenishingShrine", "Replenishing Shrine"),
+    ("ResistanceShrine", "Resistance Shrine"),
+    ("ResonatingShrine", "Resonating Shrine"),
+    ("LesserAccelerationShrine", "Lesser Acceleration Shrine"),
+    ("LesserBrutalShrine", "Lesser Brutal Shrine"),
+    ("LesserImpenetrableShrine", "Lesser Impenetrable Shrine"),
+    ("LesserMassiveShrine", "Lesser Massive Shrine"),
+    ("LesserReplenishingShrine", "Lesser Replenishing Shrine"),
+    ("LesserResistanceShrine", "Lesser Resistance Shrine"),
+];
+
+/// The minion's flags the Calcs tab lists, in its order
+const MINION_COMBAT_FLAGS: &[(&str, &str)] = &[
+    ("Fortify", "Fortify"),
+    ("Onslaught", "Onslaught"),
+    ("UnholyMight", "Unholy Might"),
+    ("ChaoticMight", "Chaotic Might"),
+    ("Tailwind", "Tailwind"),
+    ("DiamondShrine", "Diamond Shrine"),
+    ("MassiveShrine", "Massive Shrine"),
+];
 
 /// The skills whose costs the pools cannot pay, each calculated as the
 /// main skill unless cached

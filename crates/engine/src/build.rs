@@ -4,7 +4,8 @@
 //! The calculations' inputs, without the UI.
 //!
 //! Not ported yet: the character level's auto mode, timeless jewel data,
-//! notes, party and import sections.
+//! notes, party and import sections, the Calcs tab's inputs other than the
+//! calculations'.
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
@@ -63,6 +64,41 @@ impl BuildInfo {
     }
 }
 
+/// The Calcs tab's inputs (`calcsTab.input`) the calculations read
+#[derive(Clone, Debug, PartialEq)]
+pub struct CalcsInput {
+    /// `skill_number`: the socket group the tab shows
+    pub skill_number: f64,
+    /// `misc_buffMode`
+    pub buff_mode: String,
+}
+
+impl Default for CalcsInput {
+    fn default() -> Self {
+        CalcsInput {
+            skill_number: 1.0,
+            buff_mode: "EFFECTIVE".into(),
+        }
+    }
+}
+
+impl CalcsInput {
+    /// `CalcsTab:Load`
+    pub fn load(xml: &Element) -> CalcsInput {
+        let mut input = CalcsInput::default();
+        for e in xml.elements().filter(|e| e.elem == "Input") {
+            match (e.attr("name"), e.attr("number"), e.attr("string")) {
+                (Some("skill_number"), Some(n), _) => {
+                    input.skill_number = pat::to_number(n).unwrap_or(1.0)
+                }
+                (Some("misc_buffMode"), None, Some(s)) => input.buff_mode = s.into(),
+                _ => {}
+            }
+        }
+        input
+    }
+}
+
 /// What loading a build reads
 pub struct LoadContext<'a> {
     pub items: ItemContext<'a>,
@@ -89,6 +125,7 @@ pub struct Build<'t> {
     pub spec: PassiveSpec<'t>,
     pub items: ItemsTab,
     pub skills: Option<Skills>,
+    pub calcs: CalcsInput,
 }
 
 /// The version of the active spec's tree, which loading the build needs
@@ -147,6 +184,7 @@ impl<'t> Build<'t> {
             None => ItemsTab::load(&Element::default(), &ctx.items, ctx.socket_ids)?,
         };
         let skills = pob.child("Skills").map(|x| Skills::load(x, ctx.skill_data));
+        let calcs = pob.child("Calcs").map(CalcsInput::load).unwrap_or_default();
         let mut spec = PassiveSpec::new(tree, parser)?;
         if let Some(s) = active_spec(root) {
             spec.load(s)?;
@@ -173,6 +211,7 @@ impl<'t> Build<'t> {
             spec,
             items,
             skills,
+            calcs,
         })
     }
 }

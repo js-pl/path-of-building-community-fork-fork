@@ -14,7 +14,7 @@
 
 use crate::calc::{PLAYER, m_max, m_min, round};
 use crate::calc_cache::CachedCalc;
-use crate::calc_perform::{Perform, Result};
+use crate::calc_perform::{Perform, Result, src};
 use crate::mods::{ModType, ModValue};
 
 /// A skill as the rotation simulation sees it
@@ -415,27 +415,25 @@ impl<'a> Perform<'a> {
             }
             "doom blast" => {
                 let pdb = self.pdb();
-                if self.doom_blast_source() == Some("replacement") {
-                    self.c.add(
-                        pdb,
-                        crate::calc_perform::src(
-                            "UsesCurseOverlaps",
-                            ModType::Flag,
-                            true,
-                            "Config",
-                        ),
-                    );
+                if self
+                    .input
+                    .config
+                    .get("doomBlastSource")
+                    .is_some_and(|v| v.is_str("replacement"))
+                {
+                    self.c
+                        .add(pdb, src("UsesCurseOverlaps", ModType::Flag, true, "Config"));
                 }
                 self.sd_set(main, "ignoresTickRate", true);
-                let names = ["Multiplier:CurseOverlaps"];
+                let overlaps = "Multiplier:CurseOverlaps";
                 let overlaps = if self
                     .c
-                    .tabulate(pdb, Some(ModType::Base), None, &names)?
+                    .tabulate(pdb, Some(ModType::Base), None, &[overlaps])?
                     .is_empty()
                 {
                     None
                 } else {
-                    Some(m_max(self.c.base(pdb, None, &names)?, 1.0))
+                    Some(m_max(self.c.base(pdb, None, &[overlaps])?, 1.0))
                 };
                 TriggerConfig {
                     overlaps,

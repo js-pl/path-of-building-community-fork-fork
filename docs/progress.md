@@ -19,13 +19,15 @@ pick the work up:
 
 State at the handoff:
 
-- `engine::calcs::build_output` is `calcs.buildOutput(build, "MAIN")`
-  with `calcs.calcFullDPS`: all 61 corpus builds equal the oracle's
-  `MAIN` outputs (`tests/build_output.rs`). Energy Blade (gen-0031) reruns
-  the setup with `AffectedByEnergyBlade` and swaps in generated weapons,
-  which the items tab holds under reserved negative ids
-  (`ItemsTab::generated`). Doom Blast's trigger sources are ported (all four
-  `doomBlastSource` modes); the corpus reaches only the default, Vixen's.
+- `engine::calcs::build_outputs` is `CalcsTab:BuildOutput`:
+  `calcs.buildOutput(build, "MAIN")` with `calcs.calcFullDPS`, then
+  `calcs.buildOutput(build, "CALCS")` without breakdowns: all 61 corpus
+  builds equal the oracle's `MAIN` and `CALCS` outputs
+  (`tests/build_output.rs`). Energy Blade (gen-0031) reruns the setup with
+  `AffectedByEnergyBlade` and swaps in generated weapons, which the items
+  tab holds under reserved negative ids (`ItemsTab::generated`). Doom
+  Blast's trigger sources are ported (all four `doomBlastSource` modes);
+  the corpus reaches only the default, Vixen's.
 - `perform.rs` and its variants test skip no build.
 
 What remains for the full migration, in order:
@@ -36,8 +38,13 @@ What remains for the full migration, in order:
    them), overcapped lightning
    resistance's mana, PvP, Cryogenesis' added damage redirection, the
    party tab.
-2. The Calcs tab's mode (`env.mode == "CALCS"`) and breakdowns
-   (`CalcBreakdown.lua`, `CalcSections.lua`).
+2. Breakdowns (`CalcBreakdown.lua`, `breakdown.*` in the calculations,
+   `CalcSections.lua`): `PerformInput::breakdown` marks the Calcs tab's
+   calculation, `Perform::merged_buffs`, `debuffs` and `curse_slots` hold
+   what `SkillBuffs` and `SkillDebuffs` list; the corpus only has the
+   Calcs tab on its first socket group, effective, so a variants test of
+   its inputs (`skill_number`, `misc_buffMode`, the `*Calcs` selections)
+   is due.
 3. Calculation overrides and the power calculators (node power, item
    comparisons).
 4. `Data.lua` into the importer, so no Lua runs at load.
@@ -72,11 +79,12 @@ covers everything from the items on; 61 builds compared).
 | `buildActiveSkillModList`, `mergeSkillInstanceMods`, `buildSkillInstanceStats` | `calc_skill_mods.rs` |
 | `SkillsTab:UpdateSocketGroups` (`matchesSocket`) | `skills.rs` |
 
-`engine::calcs::build_output` gives a build's player and minion outputs
-with the Full DPS table and the cost warnings, compared with the oracle's
-own `MAIN` outputs (`tests/oracle/<id>.json`) in
-`crates/equivalence/tests/build_output.rs`, bitwise and key for key: 61 of
-61 builds equal, the rest skipped (see the handoff).
+`engine::calcs::build_outputs` gives a build's player and minion outputs
+of the sidebar's and the Calcs tab's calculations, with the Full DPS table
+and the cost warnings, compared with the oracle's own `MAIN` and `CALCS`
+outputs (`tests/oracle/<id>.json`) in
+`crates/equivalence/tests/build_output.rs`, bitwise and key for key: all 61
+builds equal in both.
 
 `calcs.perform` runs typed after the setup (`engine::calc_perform::perform`,
 then `defence`, `defence_estimations` and `player_offence`), compared with
@@ -100,7 +108,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
-| `calcs.buildOutput` (`MAIN`), `calcs.calcFullDPS` | `calcs.rs`: `build_output` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does |
+| `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
 
 Every skill with a minion has an actor of its own after the player and the
 enemy (`Perform::minions`); its skills follow the player's in
@@ -136,9 +144,11 @@ a skip:
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis)
-- Breakdowns and the Calcs tab's outputs (`env.mode == "CALCS"`), and
-  what `buildOutput` collects for the Configuration tab
-  (`env.conditionsUsed`, `env.modsUsed`, ...)
+- Breakdowns, and what `buildOutput` collects for the Configuration tab
+  (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
+  ported)
+- The Calcs tab in a buff mode other than effective: `calcFullDPS` then
+  sets up from that mode's databases
 
 ## Next
 
@@ -168,6 +178,8 @@ the tests align these:
   typed one sets each skill up afresh, with equal results on the corpus
 - a weapon pass's cfg sees the pass's output live as `skillStats`: take
   the cfg again (`pcfg`) after setting outputs a later query reads
+- the Calcs tab's `SkillDPS` keeps `calcFullDPS`'s order: only the
+  sidebar's table is sorted
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
