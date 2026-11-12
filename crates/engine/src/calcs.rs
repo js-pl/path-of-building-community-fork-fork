@@ -6,21 +6,23 @@
 //! from the setup, where upstream reuses the first calculation's setup;
 //! the Calcs tab's calculation reuses the sidebar's Full DPS results.
 //!
-//! Not ported yet: breakdowns, the conditions and mods in use that the
+//! Not ported yet: the offence's breakdowns, the conditions and mods in use that the
 //! Configuration tab reads (`env.conditionsUsed`, ...; of them only
 //! `env.multipliersUsed`), the node and misc calculators.
 //!
 //! In sync with upstream `b32759ab0f31a1c8499a0d420cb0f0633d4fe478`.
 
 use crate::actor::OutVal;
+use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
 use crate::build::Build;
 use crate::calc::{PLAYER, m_min};
 use crate::calc_cache::{Recalc, Recalculator, skill_uuid};
 use crate::calc_env::{CalcData, CalcMode, init_env};
+use crate::calc_perform::BuffMap;
 use crate::calc_perform::{Perform, PerformInput, Result, perform};
 use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
-use crate::mods::{Cfg, Mod, ModType, Mods, Names, Sym, TagKind};
+use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, StoreId, Sym, TagKind};
 use crate::skills::SocketGroup;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
@@ -58,6 +60,9 @@ pub struct BuildOutput {
     pub full_dps: FullDps,
     /// `env.multipliersUsed` of the sidebar's calculation
     pub multipliers_used: HashSet<Sym>,
+    /// The Calcs tab's breakdowns of the player and the minion
+    pub breakdown: Option<Breakdowns>,
+    pub minion_breakdown: Option<Breakdowns>,
 }
 
 fn num(out: &Output, k: &str) -> Option<f64> {
@@ -511,11 +516,18 @@ pub fn build_output(
     let minion = p
         .minion_actor()
         .map(|a| p.c.actors.actors[a].output.clone());
+    let minion_breakdown = p
+        .minion_actor()
+        .and_then(|a| p.c.actors.actors[a].breakdown.take())
+        .map(|b| *b);
+    let player = &mut p.c.actors.actors[PLAYER];
     Ok(BuildOutput {
-        player: std::mem::take(&mut p.c.actors.actors[PLAYER].output),
+        player: std::mem::take(&mut player.output),
         minion,
         full_dps,
         multipliers_used,
+        breakdown: player.breakdown.take().map(|b| *b),
+        minion_breakdown,
     })
 }
 
@@ -615,9 +627,23 @@ fn calcs_lists(p: &mut Perform, used: &HashSet<Sym>) -> Result<()> {
     }
     buffs.sort_unstable();
     let buff_list = buffs.join(", ");
+    let skill_buffs = evaluated(p, pdb, &p.merged_buffs.0, &buffs)?;
     let mut curses = Vec::new();
     let mut names: Vec<&(String, Vec<Mod>, bool)> = p.debuffs.iter().collect();
     names.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    let edb = p.c.db(crate::calc::ENEMY);
+    let mut skill_debuffs = Vec::new();
+    for (_, list, _) in &names {
+        mod_entries(p, edb, list, &mut skill_debuffs)?;
+    }
+    for (_, list) in &p.curse_slots {
+        mod_entries(
+            p,
+            edb,
+            list.as_deref().unwrap_or_default(),
+            &mut skill_debuffs,
+        )?;
+    }
     for (name, list, _) in names {
         let stack = Sym::new(&format!("Multiplier:{name}Stack"));
         let count = list
@@ -632,11 +658,19 @@ fn calcs_lists(p: &mut Perform, used: &HashSet<Sym>) -> Result<()> {
             name.clone()
         });
     }
-    curses.extend(p.curse_slots.iter().cloned());
+    curses.extend(p.curse_slots.iter().map(|(n, _)| n.clone()));
     let curse_list = curses.join(", ");
     let set = |p: &mut Perform, a: usize, k: &str, v: &str| {
         p.c.set_out_val(a, k, OutVal::Str(v.into()));
     };
+    let mod_list = |l: Vec<ModEntry>| Breakdown {
+        mod_list: Some(l),
+        ..Breakdown::default()
+    };
+    if let Some(b) = p.bd(PLAYER) {
+        b.set("SkillBuffs", mod_list(skill_buffs));
+        b.set("SkillDebuffs", mod_list(skill_debuffs.clone()));
+    }
     set(p, PLAYER, "BuffList", &buff_list);
     set(p, PLAYER, "CombatList", &combat.join(", "));
     set(p, PLAYER, "CurseList", &curse_list);
@@ -664,11 +698,46 @@ fn calcs_lists(p: &mut Perform, used: &HashSet<Sym>) -> Result<()> {
             .collect();
         buffs.sort_unstable();
         let buff_list = buffs.join(", ");
+        let skill_buffs = evaluated(p, mdb, &p.merged_buffs.1, &buffs)?;
+        if let Some(b) = p.bd(a) {
+            b.set("SkillBuffs", mod_list(skill_buffs));
+            b.set("SkillDebuffs", mod_list(skill_debuffs));
+        }
         set(p, a, "BuffList", &buff_list);
         set(p, a, "CombatList", &combat.join(", "));
         set(p, a, "CurseList", &curse_list);
     }
     Ok(())
+}
+
+/// The mods of a list with a value other than 0 on the database
+/// (`db:EvalMod(mod)`), for the breakdowns
+fn mod_entries(p: &Perform, db: StoreId, list: &[Mod], out: &mut Vec<ModEntry>) -> Result<()> {
+    if !p.has_bd(PLAYER) {
+        return Ok(());
+    }
+    for m in list {
+        if let Some(value) = p.c.query().eval_mod(db, m, None, None)?
+            && value != ModValue::Number(0.0)
+        {
+            out.push(ModEntry {
+                m: m.clone(),
+                value,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// The mods of the named buffs, in the names' order, with their values
+fn evaluated(p: &Perform, db: StoreId, buffs: &BuffMap, names: &[&str]) -> Result<Vec<ModEntry>> {
+    let mut out = Vec::new();
+    for name in names {
+        if let Some((_, list, _)) = buffs.iter().find(|(k, _, _)| k == name) {
+            mod_entries(p, db, list, &mut out)?;
+        }
+    }
+    Ok(out)
 }
 
 /// `s_format("%d", n)`

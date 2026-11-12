@@ -75,6 +75,8 @@ pub struct Actor {
     pub player: Option<usize>,
     pub enemy: Option<usize>,
     pub parent: Option<usize>,
+    /// `actor.breakdown`, in a calculation of the Calcs tab
+    pub breakdown: Option<Box<crate::breakdown::Breakdowns>>,
 }
 
 /// The actors of a calculation and what their queries read

@@ -5,8 +5,9 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
-Last session's branch: `claude/typed-calcs-mode`, merged as one PR. To
-pick the work up:
+Last session's branch: `claude/typed-breakdowns`, the first of two PRs
+(perform, defence and defence estimation breakdowns). To pick the work
+up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule).
 2. Build the tests once: `cargo test --release -p equivalence --test
@@ -14,8 +15,9 @@ pick the work up:
    first time).
 3. Check the state: `cargo test --release -p equivalence --test
    build_output` (the typed engine against the oracle, under a minute),
-   `--test perform` (both tests in parallel, about 14 minutes) and `--test
-   calc_setup` (about 4 minutes).
+   `--test perform` (both tests in parallel, about 14 minutes), `--test
+   calc_setup` (about 4 minutes) and `--test breakdown` (about 3
+   minutes).
 
 State at the handoff:
 
@@ -26,6 +28,14 @@ State at the handoff:
   (`tests/build_output.rs`); skipped is Energy Blade (gen-0031).
 - Skips left in `perform.rs`: Energy Blade (gen-0031) only. The variants
   test has none.
+- Breakdowns (`engine::breakdown`, `Actor::breakdown`, only in the Calcs
+  tab's calculation): the helpers of `CalcBreakdown.lua` but `leech`, and
+  every breakdown of `calcs.perform` before the triggers, `calcs.defence`,
+  `calcs.buildDefenceEstimations` and `calcs.buildOutput`'s `SkillBuffs` and
+  `SkillDebuffs`, for the player and the minion: equal to the translated
+  `calcs.buildOutput(build, "CALCS")` for 60 builds
+  (`tests/breakdown.rs`; it compares the breakdowns present when
+  `calcs.triggers` starts, and those written after the offence).
 
 What remains for the full migration, in order:
 
@@ -36,13 +46,14 @@ What remains for the full migration, in order:
    them), overcapped lightning
    resistance's mana, PvP, Cryogenesis' added damage redirection, the
    party tab.
-2. Breakdowns (`CalcBreakdown.lua`, `breakdown.*` in the calculations,
-   `CalcSections.lua`): `PerformInput::breakdown` marks the Calcs tab's
-   calculation, `Perform::merged_buffs`, `debuffs` and `curse_slots` hold
-   what `SkillBuffs` and `SkillDebuffs` list; the corpus only has the
-   Calcs tab on its first socket group, effective, so a variants test of
-   its inputs (`skill_number`, `misc_buffMode`, the `*Calcs` selections)
-   is due.
+2. Breakdowns of the triggers, mirages and offence (`breakdown.leech`,
+   the weapons' `MainHand.*` and `OffHand.*` breakdowns, `damageTypes`
+   tables, `applyDmgTakenConversion`); then drop the key filter of
+   `tests/breakdown.rs`. The corpus only has the Calcs tab on its first
+   socket group, effective, so a variants test of its inputs
+   (`skill_number`, `misc_buffMode`, the `*Calcs` selections) is due.
+   `CalcSections.lua` (which breakdown each cell shows) belongs to the
+   session API.
 3. Calculation overrides and the power calculators (node power, item
    comparisons).
 4. `Data.lua` into the importer, so no Lua runs at load.
@@ -107,6 +118,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
+| `CalcBreakdown.lua`, the calculations' `breakdown.*` | `breakdown.rs` (types and helpers); the breakdowns where each calculation writes them, into `Actor::breakdown` |
 
 Every skill with a minion has an actor of its own after the player and the
 enemy (`Perform::minions`); its skills follow the player's in
@@ -144,7 +156,8 @@ a skip:
   (`Perform::trigger_config`), breakdowns of triggers
 - Overcapped lightning resistance's
   mana, PvP scaling, added damage redirection (Cryogenesis), Energy Blade
-- Breakdowns, and what `buildOutput` collects for the Configuration tab
+- Breakdowns of the triggers, mirages and offence, and what `buildOutput`
+  collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
 - Doom Blast with a hex as its source (curse expiration, Hexblast,
