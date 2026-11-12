@@ -149,16 +149,19 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="bladestormInBloodstorm"/>
+			<Input boolean="true" name="bladestormInSandstorm"/>
 			<Input boolean="true" name="conditionEnemyBleeding"/>
 			<Input boolean="true" name="conditionEnemyLifeHigherThanPlayer"/>
-			<Input boolean="true" name="conditionEnemyShocked"/>
-			<Input boolean="true" name="conditionNonCritRecently"/>
-			<Input boolean="true" name="conditionSummonedTotemRecently"/>
-			<Input name="multiplierManaSpentRecently" number="4"/>
-			<Input name="raiseSpectreBladeVortexBladeCount" number="6"/>
+			<Input boolean="true" name="conditionEnemyOnBrittleGround"/>
+			<Input boolean="true" name="conditionHitRecentlyWithWeapon"/>
+			<Input boolean="true" name="conditionSummonedGolemInPast8Sec"/>
+			<Input name="multiplierBeenHitRecently" number="4"/>
+			<Input name="raiseSpectreKaomFireBeamTotemStage" number="6"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

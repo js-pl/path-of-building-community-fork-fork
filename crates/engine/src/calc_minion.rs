@@ -6,7 +6,7 @@
 //! the enemy, whose database its skills' mod lists stand on. The minions'
 //! skills follow the player's in [`Perform::lists`].
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::actor::Actor;
 use crate::calc::{ENEMY, PLAYER, round};
@@ -29,10 +29,6 @@ pub struct MinionActor {
     pub skills: Vec<usize>,
     /// `minion.mainSkill`
     pub main_skill: usize,
-}
-
-fn truthy(v: Option<&ModValue>) -> bool {
-    v.is_some_and(ModValue::truthy)
 }
 
 impl<'a> Perform<'a> {
@@ -157,10 +153,7 @@ impl<'a> Perform<'a> {
         let mut owner = self.c.actors.actors[actor].clone();
         owner.store = owner_store;
         db.actors.actors.push(owner);
-        let all_one_hand = minion
-            .weapon_data
-            .iter()
-            .any(|w| truthy(w.get("countsAsAll1H")));
+        let weapons = crate::calc_skills::ActorWeapons::new(&minion.weapon_data);
         let summon_name = self.skill(i).active_effect.granted_effect.name.clone();
         let spectre = self.has_flag(i, "spectre");
         let effectiveness = self.sd_num(i, "minionDamageEffectiveness").unwrap_or(0.0);
@@ -175,7 +168,7 @@ impl<'a> Perform<'a> {
                 item_list: &self.env.setup.items.item_list,
                 weapon_data: &self.env.skills.weapon_data,
                 mode: self.env.mode,
-                calcs: self.input.breakdown,
+                calcs: self.calcs_mode(),
                 config: self.input.config,
                 placeholders: self.input.placeholder,
                 spectre_list: self.input.spectre_list,
@@ -212,7 +205,7 @@ impl<'a> Perform<'a> {
                     effect,
                     self.skill(i),
                     &self.env.skills.from_item,
-                    all_one_hand,
+                    &weapons,
                     skill_data,
                 );
                 crate::calc_skill_mods::build_minion_skill_mod_list(
@@ -269,7 +262,7 @@ impl<'a> Perform<'a> {
         }
         // The selected skill
         let n = self.minions[m].skills.len() as f64;
-        let breakdown = self.input.breakdown;
+        let breakdown = self.calcs_mode();
         let gem = self.skill(i).active_effect.src;
         let chosen = gem
             .and_then(|(g, k)| self.env.groups.get(g)?.gem_list.get(k))

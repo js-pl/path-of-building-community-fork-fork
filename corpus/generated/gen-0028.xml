@@ -19,7 +19,7 @@
 		<PlayerStat stat="ReservationDPS" value="0"/>
 		<PlayerStat stat="CombinedDPS" value="0"/>
 		<PlayerStat stat="Cooldown" value="5.412"/>
-		<PlayerStat stat="AreaOfEffectRadiusMetres" value="7.5"/>
+		<PlayerStat stat="AreaOfEffectRadiusMetres" value="6.9"/>
 		<PlayerStat stat="ManaCost" value="22"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
 		<PlayerStat stat="ManaPerSecondCost" value="4.0650406504065"/>
@@ -40,16 +40,16 @@
 		<PlayerStat stat="Int" value="196"/>
 		<PlayerStat stat="ReqInt" value="159"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="4968.9157441398"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3395"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="9968"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="2560"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="4294"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2649"/>
-		<PlayerStat stat="Life" value="2360"/>
+		<PlayerStat stat="TotalEHP" value="5359.2865696382"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3069"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="8844"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3020"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="6693"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2260"/>
+		<PlayerStat stat="Life" value="2014"/>
 		<PlayerStat stat="Spec:LifeInc" value="34"/>
-		<PlayerStat stat="LifeUnreserved" value="2360"/>
-		<PlayerStat stat="LifeRecoverable" value="2360"/>
+		<PlayerStat stat="LifeUnreserved" value="2014"/>
+		<PlayerStat stat="LifeRecoverable" value="2014"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="0"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
@@ -79,9 +79,9 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="26"/>
-		<PlayerStat stat="FireResist" value="-6"/>
+		<PlayerStat stat="FireResist" value="21"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="38"/>
+		<PlayerStat stat="ColdResist" value="66"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="75"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
@@ -155,11 +155,14 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="buffGreaterSkeletalShrine"/>
-			<Input boolean="true" name="buffLesserMassiveShrine"/>
-			<Input boolean="true" name="conditionPoisoned"/>
+			<Input boolean="true" name="buffBloodShrineOfLocusts"/>
+			<Input boolean="true" name="buffResistanceShrine"/>
+			<Input name="multiplierNearbyEnemies" number="3"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

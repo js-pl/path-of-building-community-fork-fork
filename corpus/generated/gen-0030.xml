@@ -3,26 +3,26 @@
 	<Build ascendClassName="Reliquarian" bandit="None" characterLevelAutoMode="false" className="Scion" level="98" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="AverageDamage" value="2419.8447"/>
 		<PlayerStat stat="AverageBurstDamage" value="2419.8447"/>
-		<PlayerStat stat="Speed" value="0.620928"/>
+		<PlayerStat stat="Speed" value="1.75714"/>
 		<PlayerStat stat="PreEffectiveCritChance" value="5"/>
 		<PlayerStat stat="CritChance" value="5"/>
 		<PlayerStat stat="CritMultiplier" value="1.8"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="1502.5493298816"/>
+		<PlayerStat stat="TotalDPS" value="4252.005916158"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithDotDPS" value="1502.5493298816"/>
-		<PlayerStat stat="BleedDPS" value="644.9036289696"/>
-		<PlayerStat stat="WithBleedDPS" value="2147.4529588512"/>
-		<PlayerStat stat="IgniteDPS" value="5.1871083264"/>
-		<PlayerStat stat="WithIgniteDPS" value="1507.736438208"/>
+		<PlayerStat stat="WithDotDPS" value="4252.005916158"/>
+		<PlayerStat stat="BleedDPS" value="993.24892360995"/>
+		<PlayerStat stat="WithBleedDPS" value="5245.2548397679"/>
+		<PlayerStat stat="IgniteDPS" value="14.678796132"/>
+		<PlayerStat stat="WithIgniteDPS" value="4266.68471229"/>
 		<PlayerStat stat="PoisonDPS" value="889.908075"/>
 		<PlayerStat stat="CausticGroundDPS" value="29937.013866667"/>
 		<PlayerStat stat="PoisonDamage" value="1779.81615"/>
-		<PlayerStat stat="WithPoisonDPS" value="1778.8337504784"/>
-		<PlayerStat stat="TotalDotDPS" value="30863.389024559"/>
+		<PlayerStat stat="WithPoisonDPS" value="5033.8524536107"/>
+		<PlayerStat stat="TotalDotDPS" value="31726.788123861"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="32365.938354441"/>
+		<PlayerStat stat="CombinedDPS" value="35978.794040019"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="1.3"/>
 		<PlayerStat stat="ManaCost" value="0"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -44,19 +44,19 @@
 		<PlayerStat stat="Int" value="130"/>
 		<PlayerStat stat="ReqInt" value="224"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2988.4236800746"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2287"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="2070"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="3140"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="2101"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1498"/>
+		<PlayerStat stat="TotalEHP" value="5407.7939653827"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3448"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="3311"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="5024"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="3362"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2261"/>
 		<PlayerStat stat="MainHandAccuracy" value="780"/>
 		<PlayerStat stat="Life" value="2142"/>
 		<PlayerStat stat="Spec:LifeInc" value="40"/>
 		<PlayerStat stat="LifeUnreserved" value="2142"/>
 		<PlayerStat stat="LifeRecoverable" value="2142"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="10.7"/>
+		<PlayerStat stat="LifeRegenRecovery" value="107.1"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
 		<PlayerStat stat="Mana" value="1188"/>
 		<PlayerStat stat="Spec:ManaInc" value="68"/>
@@ -71,15 +71,15 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="TotalBuildDegen" value="13440"/>
-		<PlayerStat stat="TotalNetRegen" value="-13387.7"/>
-		<PlayerStat stat="NetLifeRegen" value="-8053.3"/>
-		<PlayerStat stat="NetManaRegen" value="-5334.4"/>
+		<PlayerStat stat="TotalBuildDegen" value="8400"/>
+		<PlayerStat stat="TotalNetRegen" value="-8251.3"/>
+		<PlayerStat stat="NetLifeRegen" value="-4932.9"/>
+		<PlayerStat stat="NetManaRegen" value="-3318.4"/>
 		<PlayerStat stat="NetEnergyShieldRegen" value="0"/>
-		<PlayerStat stat="Evasion" value="2490"/>
+		<PlayerStat stat="Evasion" value="5555"/>
 		<PlayerStat stat="Spec:EvasionInc" value="102"/>
-		<PlayerStat stat="MeleeEvadeChance" value="17"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="17"/>
+		<PlayerStat stat="MeleeEvadeChance" value="38"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="38"/>
 		<PlayerStat stat="Armour" value="2055"/>
 		<PlayerStat stat="Spec:ArmourInc" value="24"/>
 		<PlayerStat stat="PhysicalDamageReduction" value="25"/>
@@ -96,16 +96,16 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-37"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="0.66"/>
-		<PlayerStat stat="FullDPS" value="38080.51560757"/>
-		<PlayerStat stat="FullDotDPS" value="36390.971521539"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.84"/>
+		<PlayerStat stat="FullDPS" value="42098.935311027"/>
+		<PlayerStat stat="FullDotDPS" value="37317.760206461"/>
 		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Caustic Ground DPS" value="29937.013866667"/>
 		<FullDPSSkill skillPart="" source="" stat="Full DoT DPS" value="5492.94075"/>
-		<FullDPSSkill skillPart="" source="" stat="Vaal Caustic Arrow" value="1502.5493298816"/>
-		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Bleed DPS" value="644.9036289696"/>
-		<FullDPSSkill skillPart="" source="" stat="Full Poison DPS" value="310.92616757664"/>
-		<FullDPSSkill skillPart="" source="" stat="Caustic Arrow" value="186.99475614924"/>
-		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Ignite DPS" value="5.1871083264"/>
+		<FullDPSSkill skillPart="" source="" stat="Vaal Caustic Arrow" value="4252.005916158"/>
+		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Bleed DPS" value="993.24892360995"/>
+		<FullDPSSkill skillPart="" source="" stat="Full Poison DPS" value="879.87787005195"/>
+		<FullDPSSkill skillPart="" source="" stat="Caustic Arrow" value="529.16918840844"/>
+		<FullDPSSkill skillPart="" source="Vaal Caustic Arrow" stat="Best Ignite DPS" value="14.678796132"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
@@ -173,10 +173,13 @@
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
 			<Input boolean="true" name="conditionEnemyOnSappedGround"/>
-			<Input name="configSpectralTigerCount" number="10"/>
-			<Input boolean="true" name="embraceMadnessActive"/>
+			<Input name="configSpectralWolfCount" number="10"/>
+			<Input boolean="true" name="feedingFrenzyFeedingFrenzyActive"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

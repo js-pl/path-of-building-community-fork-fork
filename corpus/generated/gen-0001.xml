@@ -153,19 +153,23 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="conditionBurning"/>
-			<Input boolean="true" name="conditionKilledTauntedEnemyRecently"/>
-			<Input boolean="true" name="conditionOnFungalGround"/>
-			<Input boolean="true" name="conditionSoulGainPrevention"/>
-			<Input boolean="true" name="conditionUsedMinionSkillRecently"/>
-			<Input name="configSnipeStages" number="9"/>
-			<Input name="multiplierAffectedByWarcryBuffDuration" number="7"/>
-			<Input name="multiplierCastLast8Seconds" number="1"/>
-			<Input name="multiplierEnduranceChargesLostRecently" number="5"/>
+			<Input boolean="true" name="buffPhasing"/>
+			<Input boolean="true" name="conditionEnemyBleeding"/>
+			<Input boolean="true" name="conditionImpaledRecently"/>
+			<Input boolean="true" name="conditionLowMana"/>
+			<Input boolean="true" name="conditionOnChilledGround"/>
+			<Input boolean="true" name="conditionTotemsHitRecently"/>
+			<Input boolean="true" name="conditionUsedFireSkillRecently"/>
+			<Input boolean="true" name="conditionUsedMovementSkillRecently"/>
+			<Input name="configSpectralTigerCount" number="9"/>
+			<Input name="minesPerThrow" number="7"/>
 			<Input name="overrideEmptyGreenSockets" number="1"/>
-			<Input name="voltaxicBurstSpellsQueued" number="9"/>
+			<Input boolean="true" name="vortexCastOnFrostbolt"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

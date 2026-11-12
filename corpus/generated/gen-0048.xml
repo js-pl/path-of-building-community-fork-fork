@@ -35,12 +35,12 @@
 		<PlayerStat stat="Int" value="213"/>
 		<PlayerStat stat="ReqInt" value="173"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="5616.0123594327"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="6484"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="3890"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="6467"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="7353"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="2992"/>
+		<PlayerStat stat="TotalEHP" value="6262.0564753045"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="7205"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="4322"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="7186"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="8170"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="3325"/>
 		<PlayerStat stat="Life" value="2855"/>
 		<PlayerStat stat="Spec:LifeInc" value="35"/>
 		<PlayerStat stat="LifeUnreserved" value="2855"/>
@@ -61,13 +61,13 @@
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="14"/>
+		<PlayerStat stat="Evasion" value="17"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
 		<PlayerStat stat="MeleeEvadeChance" value="0"/>
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
 		<PlayerStat stat="Armour" value="4499"/>
 		<PlayerStat stat="Spec:ArmourInc" value="50"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="33"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="35"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -81,7 +81,7 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-30"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.2"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.116"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -149,19 +149,22 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="balanceOfTerrorSelfCastDespair"/>
-			<Input boolean="true" name="bladestormInSandstorm"/>
-			<Input boolean="true" name="conditionBlinded"/>
-			<Input boolean="true" name="conditionBlockedRecently"/>
-			<Input boolean="true" name="conditionCausedBleedingRecently"/>
-			<Input name="minionPactLife" number="7"/>
-			<Input boolean="true" name="minionsUseFrenzyCharges"/>
-			<Input name="multiplierNearbyCorpse" number="2"/>
-			<Input boolean="true" name="physicalAegisDepleted"/>
-			<Input name="playerCursedWithProjectileWeakness" number="9"/>
-			<Input name="raiseSpidersSpiderCount" number="5"/>
+			<Input name="bloodsoakedBannerStages" number="8"/>
+			<Input name="buffConflux" string="CHILLING"/>
+			<Input boolean="true" name="conditionBlockedSpellRecently"/>
+			<Input boolean="true" name="conditionEnemyMalignantMadness"/>
+			<Input boolean="true" name="conditionEnergyShieldRechargeRecently"/>
+			<Input boolean="true" name="conditionIgnited"/>
+			<Input boolean="true" name="conditionSummonedTotemRecently"/>
+			<Input boolean="true" name="conditionSummonedZombieInPast8Sec"/>
+			<Input name="minionsOverridePowerCharges" number="2"/>
+			<Input name="multiplierPermanentMinion" number="2"/>
+			<Input name="playerCursedWithTemporalChains" number="9"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

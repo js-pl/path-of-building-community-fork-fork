@@ -10,15 +10,12 @@
 		<PlayerStat stat="HitChance" value="67"/>
 		<PlayerStat stat="TotalDPS" value="138.83499928421"/>
 		<PlayerStat stat="TotalDot" value="0"/>
-		<PlayerStat stat="WithBleedDPS" value="138.83499928421"/>
-		<PlayerStat stat="WithIgniteDPS" value="138.83499928421"/>
 		<PlayerStat stat="PoisonDPS" value="2.085825"/>
 		<PlayerStat stat="PoisonDamage" value="5.84031"/>
-		<PlayerStat stat="WithPoisonDPS" value="143.49499603519"/>
-		<PlayerStat stat="TotalDotDPS" value="4.6599967509745"/>
+		<PlayerStat stat="TotalDotDPS" value="2.085825"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedDPS" value="143.49499603519"/>
+		<PlayerStat stat="CombinedAvg" value="64.13031"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="9"/>
 		<PlayerStat stat="ManaCost" value="10"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -53,18 +50,18 @@
 		<PlayerStat stat="LifeRecoverable" value="2072"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
 		<PlayerStat stat="LifeRegenRecovery" value="41.4"/>
-		<PlayerStat stat="LifeLeechGainRate" value="1.8048549906947"/>
+		<PlayerStat stat="LifeLeechGainPerHit" value="1.131"/>
 		<PlayerStat stat="Mana" value="1275"/>
 		<PlayerStat stat="Spec:ManaInc" value="72"/>
 		<PlayerStat stat="ManaUnreserved" value="389"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="30.509803921569"/>
 		<PlayerStat stat="ManaRegenRecovery" value="22.3"/>
-		<PlayerStat stat="ManaLeechGainRate" value="0"/>
+		<PlayerStat stat="ManaLeechGainPerHit" value="0"/>
 		<PlayerStat stat="EnergyShield" value="984"/>
 		<PlayerStat stat="EnergyShieldRecoveryCap" value="492"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
-		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
+		<PlayerStat stat="EnergyShieldLeechGainPerHit" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
 		<PlayerStat stat="Evasion" value="11135"/>
@@ -87,7 +84,7 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-60"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.5012"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.5768"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -155,22 +152,25 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="bloodsoakedBannerStages" number="7"/>
-			<Input boolean="true" name="buffVaalArcLuckyHits"/>
-			<Input boolean="true" name="conditionCanBeCurseImmune"/>
-			<Input boolean="true" name="conditionHitSpellRecently"/>
+			<Input boolean="true" name="bloodSacramentReservationEHP"/>
+			<Input boolean="true" name="conditionBlockedRecently"/>
+			<Input boolean="true" name="conditionCritWithHeraldSkillRecently"/>
+			<Input boolean="true" name="conditionHitRecently"/>
 			<Input boolean="true" name="conditionLowEnergyShield"/>
 			<Input boolean="true" name="conditionMinionsDiedRecently"/>
-			<Input boolean="true" name="conditionTotemsNotSummonedInPastTwoSeconds"/>
-			<Input boolean="true" name="conditionUsedBrandRecently"/>
+			<Input boolean="true" name="conditionTotemsHitSpellRecently"/>
 			<Input name="enemyDamageType" string="DamageOverTime"/>
 			<Input name="enemyLevel" number="6"/>
-			<Input boolean="true" name="harbingerOfTimeSlipstream"/>
-			<Input name="overrideGhostShrouds" number="1"/>
-			<Input name="playerCursedWithAssassinsMark" number="7"/>
+			<Input name="multiplierNonInstantSpellCastRecently" number="2"/>
+			<Input name="multiplierShockedEnemyKilledRecently" number="4"/>
+			<Input name="overrideBuffElusive" number="4"/>
 			<Input name="presetBossSkills" string="Shaper Beam"/>
+			<Input name="warcryMode" string="MAX"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosResist" number="30"/>

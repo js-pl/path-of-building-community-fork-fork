@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PathOfBuilding>
 	<Build ascendClassName="Ascendant" bandit="None" characterLevelAutoMode="false" className="Scion" level="93" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
-		<PlayerStat stat="AverageHit" value="1559.548875"/>
-		<PlayerStat stat="AverageBurstDamage" value="1559.548875"/>
+		<PlayerStat stat="AverageHit" value="1730.3221875"/>
+		<PlayerStat stat="AverageBurstDamage" value="1730.3221875"/>
 		<PlayerStat stat="Speed" value="0.85"/>
 		<PlayerStat stat="TotemPlacementTime" value="0.54054054054054"/>
-		<PlayerStat stat="PreEffectiveCritChance" value="7.5"/>
-		<PlayerStat stat="CritChance" value="7.5"/>
+		<PlayerStat stat="PreEffectiveCritChance" value="18.75"/>
+		<PlayerStat stat="CritChance" value="18.75"/>
 		<PlayerStat stat="CritMultiplier" value="2.05"/>
 		<PlayerStat stat="HitChance" value="100"/>
-		<PlayerStat stat="TotalDPS" value="1325.61654375"/>
+		<PlayerStat stat="TotalDPS" value="1470.773859375"/>
 		<PlayerStat stat="TotalDot" value="2240.8989"/>
 		<PlayerStat stat="TotalDotDPS" value="2240.8989"/>
 		<PlayerStat stat="CullingDPS" value="0"/>
 		<PlayerStat stat="ReservationDPS" value="0"/>
-		<PlayerStat stat="CombinedAvg" value="1559.548875"/>
+		<PlayerStat stat="CombinedAvg" value="1730.3221875"/>
 		<PlayerStat stat="AreaOfEffectRadiusMetres" value="3.9"/>
 		<PlayerStat stat="ManaCost" value="0"/>
 		<PlayerStat stat="ManaPercentCost" value="0"/>
@@ -85,7 +85,7 @@
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.36"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
-		<PlayerStat stat="PowerCharges" value="0"/>
+		<PlayerStat stat="PowerCharges" value="3"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
 		<PlayerStat stat="FrenzyChargesMax" value="3"/>
@@ -151,23 +151,25 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MoltenShellDamageMitigated" number="8"/>
-			<Input name="bloodsoakedBannerStages" number="10"/>
-			<Input name="buffHeartstopper" string="DOT"/>
-			<Input boolean="true" name="conditionBlockedHitFromUniqueEnemyInPast10Sec"/>
-			<Input boolean="true" name="conditionBrittle"/>
-			<Input boolean="true" name="conditionHaveTotem"/>
-			<Input boolean="true" name="conditionMinionsKilledRecently"/>
-			<Input name="configResonanceCount" number="9"/>
+			<Input name="TotemsSummoned" number="8"/>
+			<Input name="VaalMoltenShellDamageMitigated" number="8"/>
+			<Input boolean="true" name="bloodSacramentReservationEHP"/>
+			<Input boolean="true" name="conditionEnemyColdExposure"/>
+			<Input boolean="true" name="conditionKilledAffectedByDoT"/>
+			<Input boolean="true" name="conditionUsedAmethystFlaskRecently"/>
+			<Input name="configUnholyResonanceCount" number="9"/>
 			<Input boolean="true" name="divineSentinelRegenMana"/>
-			<Input boolean="true" name="minionsConditionLeechingEnergyShield"/>
-			<Input name="minionsOverrideFrenzyCharges" number="9"/>
-			<Input name="multiplierManaSpentRecently" number="6"/>
-			<Input name="multiplierWitheredStackCount" number="4"/>
-			<Input name="overrideFrenzyCharges" number="9"/>
-			<Input name="raiseSpectreKaomFireBeamTotemStage" number="4"/>
+			<Input boolean="true" name="enemyInRFOrScorchingRay"/>
+			<Input name="multiplierBeenHitRecently" number="6"/>
+			<Input name="multiplierRampage" number="9"/>
+			<Input name="overrideEnduranceCharges" number="9"/>
+			<Input boolean="true" name="raiseSpectreEnableSummonedUrsaRallyingCry"/>
+			<Input boolean="true" name="usePowerCharges"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

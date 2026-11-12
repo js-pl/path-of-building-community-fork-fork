@@ -154,11 +154,14 @@
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
 			<Input name="bandit" string="Alira"/>
-			<Input boolean="true" name="conditionKilledPoisonedLast2Seconds"/>
+			<Input boolean="true" name="conditionTotemsKilledRecently"/>
 			<Input boolean="true" name="enemyMaxResist"/>
-			<Input name="raiseSpectreKaomFireBeamTotemStage" number="1"/>
+			<Input boolean="true" name="raiseSpectreEnableSummonedUrsaRallyingCry"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

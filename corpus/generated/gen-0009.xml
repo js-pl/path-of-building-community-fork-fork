@@ -35,7 +35,7 @@
 		<PlayerStat stat="Int" value="94"/>
 		<PlayerStat stat="ReqInt" value="123"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="3155.7555154441"/>
+		<PlayerStat stat="TotalEHP" value="2999.1814757316"/>
 		<PlayerStat stat="PhysicalMaximumHitTaken" value="3061"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="1501"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="1738"/>
@@ -67,7 +67,7 @@
 		<PlayerStat stat="ProjectileEvadeChance" value="84"/>
 		<PlayerStat stat="Armour" value="1620"/>
 		<PlayerStat stat="Spec:ArmourInc" value="0"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="13"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="19"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -150,20 +150,23 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="MapSuffix2" string="of Insulation"/>
-			<Input boolean="true" name="buffGreaterFreezingShrine"/>
-			<Input boolean="true" name="conditionCritWithHeraldSkillRecently"/>
-			<Input boolean="true" name="conditionEnemyChilledByYourHits"/>
-			<Input boolean="true" name="conditionEnemyFrozen"/>
-			<Input boolean="true" name="conditionOnCausticGround"/>
-			<Input boolean="true" name="ignoreItemDisablers"/>
+			<Input name="BlockedPast10Sec" number="4"/>
+			<Input boolean="true" name="LostNonVaalBuffRecently"/>
+			<Input boolean="true" name="buffArcaneSurge"/>
+			<Input name="conditionEnemyChilledEffect" number="4"/>
+			<Input boolean="true" name="conditionOnChilledGround"/>
+			<Input boolean="true" name="ignoreJewelLimits"/>
 			<Input boolean="true" name="minionsConditionLowLife"/>
-			<Input name="multiplierSextant" number="4"/>
-			<Input name="multiplierUsedVaalSkillInPast8Seconds" number="8"/>
+			<Input name="multiplierBarnacleStacks" number="8"/>
+			<Input name="multiplierMapModTier" string="MED"/>
+			<Input name="overrideFrenzyCharges" number="8"/>
 			<Input name="pantheonMinorGod" string="Ralakesh"/>
-			<Input name="playerCursedWithProjectileWeakness" number="5"/>
+			<Input name="playerCursedWithProjectileWeakness" number="9"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

@@ -215,3 +215,20 @@ pub fn data_wrapper(b: &Block) -> Option<&FuncBody> {
         _ => None,
     }
 }
+
+/// The body of a statement `(function() ... end)()`, which data files use to
+/// split long chunks
+pub fn iife_body(s: &Stat) -> Option<&Block> {
+    let Stat::Call(Expr::Call { func, args }) = s else {
+        return None;
+    };
+    match &**func {
+        Expr::Paren(f) => match &**f {
+            Expr::Function(fb) if args.is_empty() && fb.params.is_empty() && !fb.vararg => {
+                Some(&fb.body)
+            }
+            _ => None,
+        },
+        _ => None,
+    }
+}

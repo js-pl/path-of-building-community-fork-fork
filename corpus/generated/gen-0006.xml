@@ -42,41 +42,41 @@
 		<PlayerStat stat="Int" value="104"/>
 		<PlayerStat stat="ReqInt" value="224"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="10522.903341133"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="6249"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="11814"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="13267"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="11814"/>
+		<PlayerStat stat="TotalEHP" value="7732.9966600682"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="5034"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="9848"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="11059"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="9848"/>
 		<PlayerStat stat="ChaosMaximumHitTaken" value="1697"/>
 		<PlayerStat stat="Life" value="2930"/>
 		<PlayerStat stat="Spec:LifeInc" value="78"/>
 		<PlayerStat stat="LifeUnreserved" value="2930"/>
 		<PlayerStat stat="LifeRecoverable" value="2930"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="115.7"/>
+		<PlayerStat stat="LifeRegenRecovery" value="213.9"/>
 		<PlayerStat stat="LifeRecharge" value="977"/>
 		<PlayerStat stat="LifeLeechGainRate" value="11.7154909872"/>
 		<PlayerStat stat="Mana" value="940"/>
 		<PlayerStat stat="Spec:ManaInc" value="42"/>
 		<PlayerStat stat="ManaUnreserved" value="-1410"/>
 		<PlayerStat stat="ManaUnreservedPercent" value="-150"/>
-		<PlayerStat stat="ManaRegenRecovery" value="21.4"/>
+		<PlayerStat stat="ManaRegenRecovery" value="54.3"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="2032"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="2032"/>
+		<PlayerStat stat="EnergyShield" value="1206"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="1206"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="36"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
 		<PlayerStat stat="Ward" value="0"/>
 		<PlayerStat stat="Rage" value="0"/>
 		<PlayerStat stat="RageRegenRecovery" value="0"/>
-		<PlayerStat stat="Evasion" value="4361"/>
+		<PlayerStat stat="Evasion" value="2440"/>
 		<PlayerStat stat="Spec:EvasionInc" value="0"/>
-		<PlayerStat stat="MeleeEvadeChance" value="31"/>
-		<PlayerStat stat="ProjectileEvadeChance" value="31"/>
-		<PlayerStat stat="Armour" value="12046"/>
+		<PlayerStat stat="MeleeEvadeChance" value="16"/>
+		<PlayerStat stat="ProjectileEvadeChance" value="16"/>
+		<PlayerStat stat="Armour" value="8534"/>
 		<PlayerStat stat="Spec:ArmourInc" value="143"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="52"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="43"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -97,11 +97,11 @@
 		<FullDPSSkill skillPart="" source="Armageddon Brand" stat="Best Ignite DPS" value="1986.219799344"/>
 		<FullDPSSkill skillPart="Animated Weapon: Default Attack" source="" stat="Animate Weapon of Self Reflection" value="301.2267838125"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
-		<PlayerStat stat="PowerChargesMax" value="3"/>
+		<PlayerStat stat="PowerChargesMax" value="4"/>
 		<PlayerStat stat="FrenzyCharges" value="0"/>
-		<PlayerStat stat="FrenzyChargesMax" value="3"/>
+		<PlayerStat stat="FrenzyChargesMax" value="4"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
-		<PlayerStat stat="EnduranceChargesMax" value="3"/>
+		<PlayerStat stat="EnduranceChargesMax" value="4"/>
 		<TimelessData devotionVariant1="1" devotionVariant2="1" searchList="" searchListFallback=""/>
 	</Build>
 	<Calcs>
@@ -161,14 +161,17 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="aspectOfTheAvianAviansFlight"/>
-			<Input boolean="true" name="buffGreaterShockingShrine"/>
-			<Input boolean="true" name="buffImpenetrableShrine"/>
-			<Input boolean="true" name="conditionLeechingLife"/>
-			<Input name="multiplierSummonedMinion" number="3"/>
-			<Input name="tornadoShotSecondaryHitChance" number="4"/>
+			<Input boolean="true" name="aspectOfTheCatCatsStealth"/>
+			<Input boolean="true" name="buffReplenishingShrine"/>
+			<Input boolean="true" name="buffResonatingShrine"/>
+			<Input boolean="true" name="minionsConditionLeechingEnergyShield"/>
+			<Input name="multiplierPermanentMinion" number="3"/>
+			<Input name="toxicRainPodOverlap" number="4"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

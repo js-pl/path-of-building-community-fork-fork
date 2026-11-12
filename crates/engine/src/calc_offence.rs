@@ -6,7 +6,7 @@
 //! Breakdowns are not built. Skill functions (`preDamageFunc`, ...) are
 //! ported by hand per granted effect, see `calc_skill_funcs.rs`.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -633,18 +633,20 @@ impl<'a> Perform<'a> {
                         ),
                     );
                     if m.source.as_deref() == Some("Strength") {
-                        self.c.replace_mod(
-                            list,
-                            new_mod(
-                                "PhysicalDamage",
-                                Inc,
-                                0.0,
-                                Some("Strength"),
-                                self.mf("Melee"),
-                                0,
-                                vec![],
-                            ),
-                        );
+                        for flags in [self.mf("Melee"), attack | self.mf("Projectile")] {
+                            self.c.replace_mod(
+                                list,
+                                new_mod(
+                                    "PhysicalDamage",
+                                    Inc,
+                                    0.0,
+                                    Some("Strength"),
+                                    flags,
+                                    0,
+                                    vec![],
+                                ),
+                            );
+                        }
                     }
                 }
             }
@@ -2559,7 +2561,7 @@ impl<'a> Perform<'a> {
 
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
-pub(crate) const TRIGGER_CONFIGS: [&str; 81] = [
+pub(crate) const TRIGGER_CONFIGS: [&str; 82] = [
     "law of the wilds",
     "the rippling thoughts",
     "the surging thoughts",
@@ -2638,6 +2640,7 @@ pub(crate) const TRIGGER_CONFIGS: [&str; 81] = [
     "supporttriggerfirespellonhit",
     "ghostly artillery",
     "replica gifts from above",
+    "BloodShrineUniqueTriggeredExplodingToad",
     "bursting toad",
     "TriggeredMoltenStrike",
     "FieryImpactHeistMaceImplicit",

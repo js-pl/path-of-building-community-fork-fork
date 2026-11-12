@@ -321,7 +321,14 @@ impl Evaluator<'_> {
                 Ok(())
             }
             Stat::Call(e) => {
-                self.expr(e, "")?;
+                match lua::ast::iife_body(s) {
+                    Some(b) => {
+                        self.block(b)?;
+                    }
+                    None => {
+                        self.expr(e, "")?;
+                    }
+                }
                 Ok(())
             }
             Stat::Do(b) => {

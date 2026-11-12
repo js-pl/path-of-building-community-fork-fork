@@ -9,7 +9,7 @@
 //!
 //! Not ported yet: Tawhoa's Chosen, mirages of skills with minions.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::actor::{Actor, OutVal};
 use crate::calc::{ENEMY, PLAYER};

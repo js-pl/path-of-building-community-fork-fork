@@ -3,7 +3,7 @@
 	<Build ascendClassName="Guardian" bandit="None" characterLevelAutoMode="false" className="Templar" level="81" mainSocketGroup="1" pantheonMajorGod="None" pantheonMinorGod="None" targetVersion="3_0" viewMode="TREE">
 		<PlayerStat stat="AverageHit" value="0"/>
 		<PlayerStat stat="AverageBurstDamage" value="0"/>
-		<PlayerStat stat="Speed" value="3.14"/>
+		<PlayerStat stat="Speed" value="3.38"/>
 		<PlayerStat stat="CritMultiplier" value="1.77"/>
 		<PlayerStat stat="HitChance" value="100"/>
 		<PlayerStat stat="TotalDPS" value="0"/>
@@ -79,14 +79,14 @@
 		<PlayerStat stat="ChaosResist" value="5"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
 		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.67"/>
-		<PlayerStat stat="FullDPS" value="23121.157234907"/>
+		<PlayerStat stat="FullDPS" value="27895.118881289"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
-		<FullDPSSkill skillPart="Default Attack" source="" stat="Absolution of Inspiring" value="19982.49684963"/>
+		<FullDPSSkill skillPart="Default Attack" source="" stat="Absolution of Inspiring" value="24464.07428725"/>
 		<FullDPSSkill skillPart="Sentinel of Absolution: Default Attack" source="" stat="Absolution of Inspiring" value="1853.1470940171"/>
-		<FullDPSSkill skillPart="" source="" stat="Flicker Strike of Power" value="1285.51329126"/>
+		<FullDPSSkill skillPart="" source="" stat="Flicker Strike of Power" value="1577.8975000219"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
 		<PlayerStat stat="PowerChargesMax" value="3"/>
-		<PlayerStat stat="FrenzyCharges" value="0"/>
+		<PlayerStat stat="FrenzyCharges" value="3"/>
 		<PlayerStat stat="FrenzyChargesMax" value="3"/>
 		<PlayerStat stat="EnduranceCharges" value="0"/>
 		<PlayerStat stat="EnduranceChargesMax" value="3"/>
@@ -149,17 +149,20 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="bannerValour" number="2"/>
-			<Input boolean="true" name="conditionCastMarkRecently"/>
-			<Input boolean="true" name="conditionConsumedCorpseInPast2Sec"/>
+			<Input name="barkskinStacks" number="2"/>
+			<Input boolean="true" name="conditionGainedPowerChargeRecently"/>
 			<Input boolean="true" name="conditionLowMana"/>
-			<Input boolean="true" name="deathmarkDeathmarkActive"/>
-			<Input boolean="true" name="greaterHarbingerOfTimeSlipstream"/>
-			<Input name="multiplierHitsSuppressedRecently" number="7"/>
-			<Input name="multiplierWarcryPower" number="4"/>
+			<Input boolean="true" name="conditionTauntedEnemyRecently"/>
+			<Input boolean="true" name="harbingerOfTimeSlipstream"/>
+			<Input name="multiplierCorpseConsumedRecently" number="3"/>
+			<Input name="prideEffect" string="MAX"/>
+			<Input boolean="true" name="useFrenzyCharges"/>
 			<Input name="warcryMode" string="MAX"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

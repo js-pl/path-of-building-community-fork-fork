@@ -156,14 +156,17 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input name="BlockedPast10Sec" number="5"/>
-			<Input boolean="true" name="buffSacrificialZeal"/>
-			<Input boolean="true" name="conditionEnemyColdExposure"/>
-			<Input boolean="true" name="conditionIgnitedEnemyRecently"/>
+			<Input boolean="true" name="buffPhasing"/>
+			<Input boolean="true" name="conditionEnemyFireExposure"/>
+			<Input boolean="true" name="conditionStunnedEnemyRecently"/>
 			<Input boolean="true" name="divineSentinelPhysAsLightning"/>
-			<Input boolean="true" name="greaterHarbingerOfTimeSlipstream"/>
+			<Input boolean="true" name="harbingerOfTimeSlipstream"/>
+			<Input name="multiplierFragileRegrowth" number="5"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

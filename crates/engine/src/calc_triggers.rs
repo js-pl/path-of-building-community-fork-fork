@@ -7,7 +7,7 @@
 //! activation, Manaforged Arrows, Cast while Channelling's handler, and every
 //! configuration but those in [`Perform::trigger_config`].
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // Lua's `math.min` and `math.max`, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -365,6 +365,29 @@ impl<'a> Perform<'a> {
                 ignore_source_rate: true,
                 ..TriggerConfig::default()
             },
+            "BloodShrineUniqueTriggeredExplodingToad" => {
+                let chance = self
+                    .skill(main)
+                    .active_effect
+                    .src
+                    .and_then(|(g, k)| self.env.groups.get(g)?.gem_list.get(k))
+                    .and_then(|g| g.trigger_chance)
+                    .ok_or(
+                        "attempt to perform arithmetic on field 'triggerChance' (a nil value)",
+                    )?;
+                let pdb = self.pdb();
+                let chance = chance
+                    + self
+                        .c
+                        .base(pdb, None, &["BloodShrineExplodingToadTriggerChance"])?;
+                TriggerConfig {
+                    trigger_chance: Some(m_min(chance, 100.0)),
+                    trigger_skill_cond: Some(|p, s| {
+                        p.has_type(s, "Damage") || p.has_type(s, "Attack")
+                    }),
+                    ..TriggerConfig::default()
+                }
+            }
             "bursting toad" => {
                 let interval = (0..self.n_player)
                     .filter_map(|k| self.sd_num(k, "hextoadTriggerInterval"))
@@ -1036,11 +1059,8 @@ impl<'a> Perform<'a> {
             .mods(main)
             .triggered_by
             .map(|t| self.skill(main).effect_list[t].gem.clone());
-        let all_one_hand = (0..2).any(|n| {
-            self.weapon(PLAYER, n)
-                .and_then(|w| w.get("countsAsAll1H"))
-                .is_some_and(ModValue::truthy)
-        });
+        let weapons =
+            crate::calc_skills::ActorWeapons::new((0..2).filter_map(|n| self.weapon(PLAYER, n)));
         let mut source = None;
         let mut triggered = Vec::new();
         for i in 0..self.n_player {
@@ -1051,11 +1071,11 @@ impl<'a> Perform<'a> {
                     .ok_or("attempt to index a nil value (field 'triggeredBy')")?;
                 let can = gem.as_ref().is_some_and(|g| {
                     crate::calc_skills::can_support(
-                        &g.granted_effect,
+                        &crate::calc_skills::SkillEffect::new(g.granted_effect.clone(), None, 0.0),
                         self.skill(i),
                         &self.env.skills.from_item,
                         &self.env.groups,
-                        all_one_hand,
+                        &weapons,
                         self.input.data.skills,
                     )
                 });

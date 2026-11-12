@@ -39,8 +39,8 @@
 		<PlayerStat stat="Int" value="102"/>
 		<PlayerStat stat="ReqInt" value="189"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="2295.622951436"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="2508"/>
+		<PlayerStat stat="TotalEHP" value="2340.7647371852"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="2787"/>
 		<PlayerStat stat="LightningMaximumHitTaken" value="1802"/>
 		<PlayerStat stat="FireMaximumHitTaken" value="2354"/>
 		<PlayerStat stat="ColdMaximumHitTaken" value="1468"/>
@@ -72,7 +72,7 @@
 		<PlayerStat stat="ProjectileEvadeChance" value="0"/>
 		<PlayerStat stat="Armour" value="688"/>
 		<PlayerStat stat="Spec:ArmourInc" value="104"/>
-		<PlayerStat stat="PhysicalDamageReduction" value="6"/>
+		<PlayerStat stat="PhysicalDamageReduction" value="16"/>
 		<PlayerStat stat="EffectiveBlockChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellBlockChance" value="0"/>
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
@@ -86,7 +86,7 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="11"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.64"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.89"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -154,19 +154,23 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="balanceOfTerrorSelfCastVulnerability"/>
-			<Input boolean="true" name="conditionEnemyFullLife"/>
-			<Input boolean="true" name="conditionEnemyOnBrittleGround"/>
-			<Input boolean="true" name="conditionEnemyOnConsecratedGround"/>
+			<Input boolean="true" name="DetonatedMinesRecently"/>
+			<Input boolean="true" name="buffAdrenaline"/>
+			<Input boolean="true" name="buffWildSavagery"/>
+			<Input name="conditionBrittleEffect" number="10"/>
+			<Input boolean="true" name="conditionEnemyMoving"/>
 			<Input boolean="true" name="conditionFullMana"/>
-			<Input boolean="true" name="conditionUsedAmethystFlaskRecently"/>
-			<Input boolean="true" name="conditionUsingFlask"/>
+			<Input boolean="true" name="conditionMoving"/>
+			<Input boolean="true" name="conditionStunnedWhileCastingRecently"/>
+			<Input boolean="true" name="conditionUsedTopazFlaskRecently"/>
 			<Input boolean="true" name="flameWallAddedDamage"/>
-			<Input name="multiplierDefiance" number="1"/>
-			<Input name="multiplierNonInstantSpellCastRecently" number="5"/>
-			<Input name="stormRainBeamOverlap" number="8"/>
+			<Input name="multiplierSextant" number="5"/>
+			<Input name="stormRainActiveArrows" number="8"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>

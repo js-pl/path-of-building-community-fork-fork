@@ -35,30 +35,30 @@
 		<PlayerStat stat="ReqStr" value="170"/>
 		<PlayerStat stat="Dex" value="158"/>
 		<PlayerStat stat="ReqDex" value="122"/>
-		<PlayerStat stat="Int" value="84"/>
+		<PlayerStat stat="Int" value="104"/>
 		<PlayerStat stat="ReqInt" value="194"/>
 		<PlayerStat stat="Devotion" value="0"/>
-		<PlayerStat stat="TotalEHP" value="3605.1935435229"/>
-		<PlayerStat stat="PhysicalMaximumHitTaken" value="3373"/>
-		<PlayerStat stat="LightningMaximumHitTaken" value="6365"/>
-		<PlayerStat stat="FireMaximumHitTaken" value="6024"/>
-		<PlayerStat stat="ColdMaximumHitTaken" value="5354"/>
-		<PlayerStat stat="ChaosMaximumHitTaken" value="1931"/>
-		<PlayerStat stat="Life" value="2780"/>
+		<PlayerStat stat="TotalEHP" value="2802.6129764623"/>
+		<PlayerStat stat="PhysicalMaximumHitTaken" value="3540"/>
+		<PlayerStat stat="LightningMaximumHitTaken" value="6679"/>
+		<PlayerStat stat="FireMaximumHitTaken" value="3806"/>
+		<PlayerStat stat="ColdMaximumHitTaken" value="3133"/>
+		<PlayerStat stat="ChaosMaximumHitTaken" value="2024"/>
+		<PlayerStat stat="Life" value="2914"/>
 		<PlayerStat stat="Spec:LifeInc" value="35"/>
-		<PlayerStat stat="LifeUnreserved" value="2780"/>
-		<PlayerStat stat="LifeRecoverable" value="2780"/>
+		<PlayerStat stat="LifeUnreserved" value="2914"/>
+		<PlayerStat stat="LifeRecoverable" value="2914"/>
 		<PlayerStat stat="LifeUnreservedPercent" value="100"/>
-		<PlayerStat stat="LifeRegenRecovery" value="177.9"/>
+		<PlayerStat stat="LifeRegenRecovery" value="186.5"/>
 		<PlayerStat stat="LifeLeechGainRate" value="0"/>
-		<PlayerStat stat="Mana" value="994"/>
+		<PlayerStat stat="Mana" value="1009"/>
 		<PlayerStat stat="Spec:ManaInc" value="55"/>
-		<PlayerStat stat="ManaUnreserved" value="397"/>
-		<PlayerStat stat="ManaUnreservedPercent" value="39.939637826962"/>
-		<PlayerStat stat="ManaRegenRecovery" value="26.1"/>
+		<PlayerStat stat="ManaUnreserved" value="403"/>
+		<PlayerStat stat="ManaUnreservedPercent" value="39.94053518335"/>
+		<PlayerStat stat="ManaRegenRecovery" value="26.5"/>
 		<PlayerStat stat="ManaLeechGainRate" value="0"/>
-		<PlayerStat stat="EnergyShield" value="256"/>
-		<PlayerStat stat="EnergyShieldRecoveryCap" value="256"/>
+		<PlayerStat stat="EnergyShield" value="272"/>
+		<PlayerStat stat="EnergyShieldRecoveryCap" value="272"/>
 		<PlayerStat stat="Spec:EnergyShieldInc" value="0"/>
 		<PlayerStat stat="EnergyShieldRegenRecovery" value="0"/>
 		<PlayerStat stat="EnergyShieldLeechGainRate" value="0"/>
@@ -76,9 +76,9 @@
 		<PlayerStat stat="AttackDodgeChance" value="0"/>
 		<PlayerStat stat="SpellDodgeChance" value="0"/>
 		<PlayerStat stat="EffectiveSpellSuppressionChance" value="0"/>
-		<PlayerStat stat="FireResist" value="47"/>
+		<PlayerStat stat="FireResist" value="10"/>
 		<PlayerStat stat="FireResistOverCap" value="0"/>
-		<PlayerStat stat="ColdResist" value="40"/>
+		<PlayerStat stat="ColdResist" value="-10"/>
 		<PlayerStat stat="ColdResistOverCap" value="0"/>
 		<PlayerStat stat="LightningResist" value="50"/>
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
@@ -152,20 +152,24 @@
 	</Calcs>
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
-			<Input boolean="true" name="EEIgnoreHitDamage"/>
-			<Input name="MapPrefix1" string="Freezing"/>
-			<Input boolean="true" name="buffLesserResistanceShrine"/>
+			<Input name="MapPrefix3" string="Freezing"/>
+			<Input boolean="true" name="conditionAttackedRecently"/>
+			<Input boolean="true" name="conditionBlockedHitFromUniqueEnemyInPast10Sec"/>
+			<Input boolean="true" name="conditionBlockedRecently"/>
+			<Input boolean="true" name="conditionEnemyBleeding"/>
 			<Input boolean="true" name="conditionEnemyBrittle"/>
-			<Input boolean="true" name="conditionEnemyHindered"/>
+			<Input boolean="true" name="conditionEnemyFullLife"/>
 			<Input boolean="true" name="conditionEnemyInChillingArea"/>
 			<Input boolean="true" name="conditionEnemyLightningExposure"/>
-			<Input boolean="true" name="conditionEnemyOnBrineGround"/>
-			<Input name="minionsOverrideEnduranceCharges" number="3"/>
-			<Input name="multiplierWarcryUsedRecently" number="9"/>
-			<Input name="overrideBleedStackPotential" number="7"/>
-			<Input name="playerCursedWithFlammability" number="2"/>
+			<Input boolean="true" name="conditionEnemyMaimed"/>
+			<Input boolean="true" name="enemyInRFOrScorchingRay"/>
+			<Input name="multiplierSoulEater" number="3"/>
+			<Input name="playerCursedWithPoachersMark" number="2"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
@@ -352,24 +356,47 @@ Implicits: 1
 			<ModRange id="9" range="0.5"/>
 			<ModRange id="10" range="0.5"/>
 		</Item>
-		<Item id="7" variant="2">
+		<Item id="7">
 			Rarity: UNIQUE
-Pyre
-Sapphire Ring
-Variant: Pre 2.6.0
-Variant: Pre 3.0.0
-Variant: Current
-Selected Variant: 2
-LevelReq: 11
+Putembo&apos;s Valley
+Topaz Ring
+League: Delve
+LevelReq: 49
 Implicits: 1
-{tags:resistance}{range:0.5}+(20-30)% to Cold Resistance
-{tags:resistance}{range:0.5}+(25-35)% to Fire Resistance
-{tags:elemental_damage}{variant:1,2}{range:0.5}(25-35)% increased Burning Damage
-{tags:elemental_damage}{variant:3}{range:0.5}(60-80)% increased Burning Damage
-{tags:elemental_damage}{variant:1}100% of Cold Damage Converted to Fire Damage
-{tags:elemental_damage}{variant:2,3}40% of Cold Damage Converted to Fire Damage
-10% increased Light Radius
-Ignited Enemies Killed by your Hits are destroyed
+{tags:resistance}{range:0.5}+(20-30)% to Lightning Resistance
+{tags:attribute}+20 to Intelligence
+{tags:defences}5% increased maximum Energy Shield
+{tags:resource}5% increased maximum Life
+			<ModRange id="1" range="0.5"/>
+			<ModRange id="2" range="0.5"/>
+			<ModRange id="3" range="0.5"/>
+			<ModRange id="4" range="0.5"/>
+		</Item>
+		<Item id="8" variant="4">
+			Rarity: UNIQUE
+Sibyl&apos;s Lament
+Coral Ring
+Variant: Pre 2.0.0
+Variant: Pre 2.6.0
+Variant: Pre 3.9.0
+Variant: Pre 3.28.0
+Variant: Current
+Selected Variant: 4
+LevelReq: 45
+Implicits: 1
+{tags:resource}{range:0.5}+(20-30) to maximum Life
+{tags:elemental_damage,attack}{range:0.5}Adds (8-15) to (20-28) Fire Damage to Attacks
+{variant:1}{range:0.5}(20-40)% increased Rarity of Items found
+{variant:2,3,4,5}{range:0.5}(10-20)% reduced Rarity of Items found
+{tags:elemental_damage,attack}{range:0.5}(20-30)% increased Elemental Damage with Attack Skills
+{variant:1,2}Left ring slot: you and your Minions prevent +30% of Reflected Elemental Damage
+{variant:3}Left ring slot: you and your Minions prevent +40% of Reflected Elemental Damage
+{variant:4}Left ring slot: you and your Minions prevent +80% of Reflected Elemental Damage
+{variant:5}Left ring slot: you and your Minions prevent +100% of Reflected Elemental Damage
+{variant:1,2}Right ring slot: you and your Minions prevent +30% of Reflected Physical Damage
+{variant:3}Right ring slot: you and your Minions prevent +40% of Reflected Physical Damage
+{variant:4}Right ring slot: you and your Minions prevent +80% of Reflected Physical Damage
+{variant:5}Right ring slot: you and your Minions prevent +100% of Reflected Physical Damage
 			<ModRange id="1" range="0.5"/>
 			<ModRange id="2" range="0.5"/>
 			<ModRange id="3" range="0.5"/>
@@ -378,29 +405,11 @@ Ignited Enemies Killed by your Hits are destroyed
 			<ModRange id="6" range="0.5"/>
 			<ModRange id="7" range="0.5"/>
 			<ModRange id="8" range="0.5"/>
-		</Item>
-		<Item id="8">
-			Rarity: RARE
-Ring
-Manifold Ring
-Crafted: true
-Prefix: None
-Prefix: None
-Prefix: None
-Prefix: None
-Suffix: None
-Suffix: None
-Suffix: None
-LevelReq: 24
-Implicits: 4
-+1 Prefix Modifier allowed
--2 Suffix Modifiers allowed
-Implicit Modifiers Cannot Be Changed
-50% increased Prefix Modifier magnitudes
-			<ModRange id="1" range="0.5"/>
-			<ModRange id="2" range="0.5"/>
-			<ModRange id="3" range="0.5"/>
-			<ModRange id="4" range="0.5"/>
+			<ModRange id="9" range="0.5"/>
+			<ModRange id="10" range="0.5"/>
+			<ModRange id="11" range="0.5"/>
+			<ModRange id="12" range="0.5"/>
+			<ModRange id="13" range="0.5"/>
 		</Item>
 		<Item id="9">
 			Rarity: UNIQUE

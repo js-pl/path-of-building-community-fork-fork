@@ -8,7 +8,7 @@
 //! upstream adds them to `spec.nodes`, each nested subgraph after its
 //! socket.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 use crate::item::Item;
 use crate::item_data::{ClusterJewel, ItemData};
@@ -233,6 +233,7 @@ impl<'t> PassiveSpec<'t> {
                 continue;
             };
             if large
+                && self.alloc_nodes.contains(socket)
                 && field(jewel, "clusterJewelValid").is_some_and(ModValue::truthy)
                 && let Some(&parent) = self.index.get(&socket)
             {
@@ -664,6 +665,7 @@ impl<'t> PassiveSpec<'t> {
                 linked: s.linked,
             });
             if is_socket
+                && (self.alloc_nodes.contains(s.id) || self.alloc_subgraph_nodes.contains(&s.id))
                 && let Some(j) = self.socketed_jewel(tab, s.id)
                 && field(j, "clusterJewelValid").is_some_and(ModValue::truthy)
             {

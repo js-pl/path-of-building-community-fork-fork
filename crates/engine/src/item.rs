@@ -2,7 +2,7 @@
 //! and text building. Parses an item's text into its base, properties and
 //! mod lines, and builds the mods it grants in each slot it can occupy.
 //!
-//! In sync with upstream `7685abcc028e5f0b4fffef3e09d5d0e038162174`.
+//! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
 // `m_max(m_min(x, hi), lo)` as upstream writes it, which `clamp` is not for NaN
 #![allow(clippy::manual_clamp)]
@@ -274,6 +274,8 @@ pub struct Item {
     pub rarity: String,
     pub quality: Option<f64>,
     pub crafted_quality: Option<f64>,
+    /// `corruptImplicitCount`
+    pub corrupt_implicit_count: Option<f64>,
     pub unique_id: Option<String>,
     pub item_level: Option<f64>,
     pub memory_strands: Option<f64>,
@@ -2371,7 +2373,14 @@ impl Item {
                         matched = false;
                     }
                     let mut ml = ml;
-                    if matched && !ml.flags.unscalable {
+                    // Modifiers that grant skills are not affected by modifier magnitude
+                    let grants_skill = ml.mod_list.iter().any(|m| m.name == Sym::new("ExtraSkill"))
+                        || (ml.extra.is_some() && {
+                            let line = ml.line.to_lowercase();
+                            crate::pat::find(&line, "^grants level %d+ ").is_some()
+                                || crate::pat::find(&line, "^grants %D+$").is_some()
+                        });
+                    if matched && !ml.flags.unscalable && !grants_skill {
                         ml.value_scalar = Some(match mm.multiplier {
                             Some(m) => ml.value_scalar.unwrap_or(1.0) * m,
                             None => ml.value_scalar.unwrap_or(1.0) + mm.quality / 100.0,
@@ -2382,9 +2391,11 @@ impl Item {
                         let ranged =
                             apply_range(ctx.data, ctx.parser, &ml.line, &r, Some(vs), Some(1.0))?;
                         let (list, extra) = Item::parse_mod(ctx, &ranged)?;
-                        ml.display_value_scalar = Some(1.0);
-                        ml.mod_list = list.unwrap_or_default();
-                        ml.extra = extra;
+                        if let Some(list) = list {
+                            ml.display_value_scalar = Some(1.0);
+                            ml.mod_list = list;
+                            ml.extra = extra;
+                        }
                     }
                     self.lines_mut(which)[i] = ml;
                 }
@@ -2889,6 +2900,8 @@ impl Item {
             }
             self.crafted_quality = Some(crafted_quality);
         }
+        let corrupt = calc_num(&mut mods, "CorruptImplicitCount", ModType::Base, 0)?;
+        self.corrupt_implicit_count = (corrupt != 0.0).then_some(corrupt);
         if let Some(q) = self.quality {
             mods.push(new_mod(
                 &format!("Multiplier:QualityOn{slot_name}"),
@@ -3229,6 +3242,15 @@ impl Item {
             (ward_base + ward_var * pct(ad, "Ward")) * (1.0 + ward_incs / 100.0) * q,
             None,
         );
+        for (stat, var) in [
+            ("Armour", armour_var),
+            ("Evasion", evasion_var),
+            ("EnergyShield", es_var),
+            ("Ward", ward_var),
+        ] {
+            let base = round(a(&format!("{stat}BaseMin")) + var * pct(ad, stat), None);
+            ad.insert(format!("{stat}Base"), n(base));
+        }
         for (stat, v) in [
             ("Armour", armour_v),
             ("Evasion", evasion_v),

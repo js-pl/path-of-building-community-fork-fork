@@ -326,6 +326,30 @@ impl Parser {
             }
             return Ok(Stat::Assign { targets, values });
         }
+        // LuaJIT's compound assignment, `a op= b`, as `a = a op b`
+        if let Some((op, ..)) = binop(self.peek())
+            && matches!(
+                op,
+                BinOp::Add
+                    | BinOp::Sub
+                    | BinOp::Mul
+                    | BinOp::Div
+                    | BinOp::Mod
+                    | BinOp::Pow
+                    | BinOp::Concat
+            )
+            && *self.peek_at(1) == Tok::Assign
+            && matches!(e, Expr::Name(_) | Expr::Index(..))
+        {
+            self.advance();
+            self.advance();
+            let rhs = self.expr()?;
+            let value = Expr::Binary(op, Box::new(e.clone()), Box::new(rhs));
+            return Ok(Stat::Assign {
+                targets: vec![e],
+                values: vec![value],
+            });
+        }
         match e {
             Expr::Call { .. } | Expr::Method { .. } => Ok(Stat::Call(e)),
             _ => self.err("syntax error: expression is not a statement"),
@@ -600,6 +624,21 @@ repeat local x = 1 until x
         assert_eq!(
             &src[func.span.0..func.span.1],
             b"function m.f:g(x, ...) return x end"
+        );
+    }
+
+    #[test]
+    fn compound_assignment() {
+        let b = parse(b"x += 1 + 2 t.s ..= 'a'").unwrap();
+        let Stat::Assign { targets, values } = &b.stats[0] else {
+            panic!()
+        };
+        assert_eq!(targets[0], Expr::Name("x".into()));
+        assert!(
+            matches!(&values[0], Expr::Binary(BinOp::Add, l, r) if **l == targets[0] && matches!(**r, Expr::Binary(BinOp::Add, _, _)))
+        );
+        assert!(
+            matches!(&b.stats[1], Stat::Assign { values, .. } if matches!(values[0], Expr::Binary(BinOp::Concat, _, _)))
         );
     }
 }

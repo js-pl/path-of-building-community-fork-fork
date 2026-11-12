@@ -49,6 +49,7 @@ pub const MOD_PARSER: Upvalues = Upvalues {
         "damageTypeList",
         "conquerorList",
         "gemIdLookup",
+        "dmgTypes",
     ],
 };
 

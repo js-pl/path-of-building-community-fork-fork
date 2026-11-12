@@ -52,7 +52,7 @@
 		<PlayerStat stat="LightningResistOverCap" value="0"/>
 		<PlayerStat stat="ChaosResist" value="-27"/>
 		<PlayerStat stat="ChaosResistOverCap" value="0"/>
-		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.32"/>
+		<PlayerStat stat="EffectiveMovementSpeedMod" value="1.98"/>
 		<PlayerStat stat="FullDPS" value="0"/>
 		<PlayerStat stat="FullDotDPS" value="0"/>
 		<PlayerStat stat="PowerCharges" value="0"/>
@@ -121,19 +121,22 @@
 	<Config activeConfigSet="1">
 		<ConfigSet id="1">
 			<Input name="BrandsAttachedToEnemy" number="6"/>
-			<Input boolean="true" name="buffFanaticism"/>
-			<Input boolean="true" name="conditionAttackedRecently"/>
-			<Input boolean="true" name="conditionBeenCritRecently"/>
+			<Input name="HoarfrostStacks" number="9"/>
+			<Input boolean="true" name="buffAccelerationShrine"/>
+			<Input boolean="true" name="conditionCastSpellRecently"/>
 			<Input boolean="true" name="conditionEnemyFireResZero"/>
-			<Input boolean="true" name="conditionEnemyLowLife"/>
-			<Input boolean="true" name="conditionUsedSkillRecently"/>
-			<Input name="configSnipeStages" number="3"/>
-			<Input name="multiplierHitsSuppressedRecently" number="10"/>
-			<Input name="multiplierWitheredStackCount" number="7"/>
-			<Input name="overrideEmptyRedSockets" number="10"/>
-			<Input boolean="true" name="useSiphoningCharges"/>
+			<Input boolean="true" name="conditionGainedFrenzyChargeRecently"/>
+			<Input boolean="true" name="conditionGainedPowerChargeRecently"/>
+			<Input boolean="true" name="conditionUsedTravelSkillRecently"/>
+			<Input name="configSpectralTigerCount" number="3"/>
+			<Input name="multiplierAppliedAilmentsRecently" number="9"/>
+			<Input name="multiplierBeenHitRecently" number="4"/>
+			<Input name="overrideEmptyGreenSockets" number="10"/>
 			<Placeholder name="ScorchStacks" number="1"/>
 			<Placeholder name="ShockStacks" number="1"/>
+			<Placeholder name="aspectOfLunarisLunarProtection" number="8"/>
+			<Placeholder name="aspectOfLunarisLunarResistance" number="8"/>
+			<Placeholder name="aspectOfSolarisSunscaldStacks" number="5"/>
 			<Placeholder name="configSpectralTigerCount" number="5"/>
 			<Placeholder name="enemyArmour" number="61989"/>
 			<Placeholder name="enemyChaosDamage" number="896"/>
