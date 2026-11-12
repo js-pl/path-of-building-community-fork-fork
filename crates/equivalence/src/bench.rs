@@ -9,7 +9,7 @@ use engine::calc_env::{CalcMode, init_env};
 use engine::calc_override::Override;
 use engine::calc_perform::{PerformInput, perform};
 use engine::calculator::MiscCalculator;
-use engine::power::{PowerOptions, node_power};
+use engine::power::{PowerOptions, node_power, node_power_with};
 use engine::tree::NodeType;
 use lua::{LuaStr, TableRef, Value, rt};
 use std::rc::Rc;
@@ -29,6 +29,9 @@ pub struct Options {
     pub overrides: usize,
     pub translation: bool,
     pub power: bool,
+    /// Threads of the typed node power; the machine's by default, 0 for
+    /// calculating each candidate when needed
+    pub power_threads: Option<usize>,
 }
 
 impl Default for Options {
@@ -42,6 +45,7 @@ impl Default for Options {
             overrides: 3,
             translation: true,
             power: true,
+            power_threads: None,
         }
     }
 }
@@ -255,7 +259,11 @@ fn typed(data: &TypedData, xml: &str, opts: &Options, row: &mut Row) -> Result<(
         row.typed[7] = Some(time(
             opts.power_reps,
             || (),
-            |_| node_power(&calc, &p).map(drop),
+            |_| match opts.power_threads {
+                None => node_power(&calc, &p).map(drop),
+                Some(0) => node_power_with(&calc, &p, None).map(drop),
+                Some(n) => node_power_with(&calc, &p, Some(n)).map(drop),
+            },
         )?);
     }
     Ok(())

@@ -6,7 +6,10 @@
 //! notables for the power report.
 //!
 //! Candidates with equal mods share one calculation (`node.modKey`), as
-//! upstream's do.
+//! upstream's do. Natively the candidates' calculations run on a thread
+//! pool ahead of the sequential pass that combines them, so results and
+//! their order do not depend on the thread count; the browser stays on
+//! one thread.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -292,26 +295,89 @@ fn spec_mod_key(spec: &PassiveSpec, i: usize) -> String {
     }
 }
 
-/// The calculator's results by candidate, calculated once per `modKey`
+/// The calculator's results by candidate, calculated once per `modKey`.
+/// Recording, it lists the calculations asked for instead, answering
+/// with the base calculation; calculations made ahead are taken by key.
 struct Candidates<'c, 'a, 't> {
     calc: &'c MiscCalculator<'a, 't>,
     full_dps: bool,
     cache: HashMap<String, Arc<CalcOutput>>,
+    ready: HashMap<String, Result<CalcOutput>>,
+    record: Option<(Arc<CalcOutput>, Vec<Job>)>,
 }
 
+/// A calculation asked for, by key
+type Job = (String, Override);
+
 impl Candidates<'_, '_, '_> {
+    fn calculate(&mut self, key: &str, ovr: Override) -> Result<CalcOutput> {
+        match self.ready.remove(key) {
+            Some(out) => out,
+            None => self.calc.calculate(&ovr, self.full_dps),
+        }
+    }
+
     fn get(&mut self, key: String, ovr: impl FnOnce() -> Override) -> Result<Arc<CalcOutput>> {
         if let Some(out) = self.cache.get(&key) {
             return Ok(out.clone());
         }
-        let out = Arc::new(self.calc.calculate(&ovr(), self.full_dps)?);
+        let out = match &mut self.record {
+            Some((base, jobs)) => {
+                jobs.push((key.clone(), ovr()));
+                base.clone()
+            }
+            None => Arc::new(self.calculate(&key, ovr())?),
+        };
         self.cache.insert(key, out.clone());
         Ok(out)
     }
 
-    fn uncached(&self, ovr: &Override) -> Result<CalcOutput> {
-        self.calc.calculate(ovr, self.full_dps)
+    /// A calculation used once, by a key no `modKey` takes
+    fn uncached(&mut self, key: String, ovr: impl FnOnce() -> Override) -> Result<Arc<CalcOutput>> {
+        match &mut self.record {
+            Some((base, jobs)) => {
+                jobs.push((key, ovr()));
+                Ok(base.clone())
+            }
+            None => self.calculate(&key, ovr()).map(Arc::new),
+        }
     }
+}
+
+/// The calculations of `jobs`, by key, on `threads` threads
+#[cfg(not(target_arch = "wasm32"))]
+fn calculate_all(
+    calc: &MiscCalculator,
+    full_dps: bool,
+    jobs: Vec<Job>,
+    threads: usize,
+) -> HashMap<String, Result<CalcOutput>> {
+    use rayon::prelude::*;
+    let reuse = crate::calc_env::reuse_setup();
+    let run = || {
+        jobs.into_par_iter()
+            .map(|(k, ovr)| {
+                crate::calc_env::set_reuse_setup(reuse);
+                (k, calc.calculate(&ovr, full_dps))
+            })
+            .collect()
+    };
+    match rayon::ThreadPoolBuilder::new().num_threads(threads).build() {
+        Ok(pool) => pool.install(run),
+        Err(_) => run(),
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn calculate_all(
+    calc: &MiscCalculator,
+    full_dps: bool,
+    jobs: Vec<Job>,
+    _threads: usize,
+) -> HashMap<String, Result<CalcOutput>> {
+    jobs.into_iter()
+        .map(|(k, ovr)| (k, calc.calculate(&ovr, full_dps)))
+        .collect()
 }
 
 /// How the power is measured
@@ -322,17 +388,24 @@ enum Mode<'s> {
     None,
 }
 
-/// `CalcsTab:PowerBuilder()` on a calculator of the build
+/// `CalcsTab:PowerBuilder()` on a calculator of the build: natively on as
+/// many threads as the machine has, in the browser on one
 pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowers> {
-    let spec = &calc.build().spec;
+    #[cfg(not(target_arch = "wasm32"))]
+    let threads = Some(std::thread::available_parallelism().map_or(1, |n| n.get()));
+    #[cfg(target_arch = "wasm32")]
+    let threads = None;
+    node_power_with(calc, opts, threads)
+}
+
+/// [`node_power`] with the candidates' calculations made ahead on
+/// `threads` threads, or with none (`None`) each made when needed
+pub fn node_power_with(
+    calc: &MiscCalculator,
+    opts: &PowerOptions,
+    threads: Option<usize>,
+) -> Result<NodePowers> {
     check_tree_jewels(calc)?;
-    let base = calc.base();
-    let granted = calc.granted_passives();
-    let mode = match &opts.stat {
-        Some(s) if s.stat.is_some() && !s.ignore_for_nodes => Mode::Stat(s),
-        Some(s) if s.ignore_for_nodes => Mode::None,
-        _ => Mode::Combined,
-    };
     let full_dps = opts
         .stat
         .as_ref()
@@ -341,6 +414,32 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
         calc,
         full_dps,
         cache: HashMap::new(),
+        ready: HashMap::new(),
+        record: None,
+    };
+    if let Some(threads) = threads {
+        cands.record = Some((Arc::new(calc.base().clone()), Vec::new()));
+        // A recording that stops at an error leaves the rest to the replay
+        let _ = power_pass(calc, opts, &mut cands);
+        let (_, jobs) = cands.record.take().expect("recording");
+        cands.cache.clear();
+        cands.ready = calculate_all(calc, full_dps, jobs, threads);
+    }
+    power_pass(calc, opts, &mut cands)
+}
+
+fn power_pass(
+    calc: &MiscCalculator,
+    opts: &PowerOptions,
+    cands: &mut Candidates,
+) -> Result<NodePowers> {
+    let spec = &calc.build().spec;
+    let base = calc.base();
+    let granted = calc.granted_passives();
+    let mode = match &opts.stat {
+        Some(s) if s.stat.is_some() && !s.ignore_for_nodes => Mode::Stat(s),
+        Some(s) if s.ignore_for_nodes => Mode::None,
+        _ => Mode::Combined,
     };
     let mut max = PowerMax::default();
     let mut powers: Vec<NodePower> = vec![NodePower::default(); spec.nodes.len()];
@@ -384,6 +483,7 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
                      distance: f64,
                      on_path: bool,
                      out: &CalcOutput,
+                     path_key: String,
                      path: &dyn Fn() -> Override|
      -> Result<()> {
         match mode {
@@ -394,7 +494,8 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
                     max.single_stat = m_max(max.single_stat, single);
                     power.path_power = Some(single);
                     if distance > 1.0 {
-                        power.path_power = Some(stat.power(&cands.uncached(&path())?, base));
+                        let out = cands.uncached(path_key, path)?;
+                        power.path_power = Some(stat.power(&out, base));
                     }
                 }
             }
@@ -441,12 +542,13 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
                 };
                 let mut power = std::mem::take(&mut powers[i].power);
                 add_power(
-                    &mut cands,
+                    cands,
                     &mut max,
                     &mut power,
                     *distance,
                     on_path(i),
                     &out,
+                    format!("\0path {i}"),
                     &path,
                 )?;
                 powers[i].power = power;
@@ -459,11 +561,11 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
                     if spec.tree_node(i).ascendancy_name.is_none() {
                         p.path_power = Some(single);
                         if n.depends.len() > 1 {
-                            let ovr = Override {
+                            let out = cands.uncached(format!("\0depends {i}"), || Override {
                                 remove_nodes: n.depends.clone(),
                                 ..Override::default()
-                            };
-                            p.path_power = Some(stat.power(&cands.uncached(&ovr)?, base));
+                            })?;
+                            p.path_power = Some(stat.power(&out, base));
                         }
                     }
                 }
@@ -517,12 +619,13 @@ pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowe
             };
             let mut ep = Power::default();
             add_power(
-                &mut cands,
+                cands,
                 &mut max,
                 &mut ep,
                 n.path_dist,
                 on_path(i),
                 &out,
+                format!("\0mastery {i} {}", effect.to_bits()),
                 &path,
             )?;
             let p = &mut powers[i].power;
