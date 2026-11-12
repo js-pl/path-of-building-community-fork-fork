@@ -447,6 +447,13 @@ impl<'a> Perform<'a> {
         self.sd(i, k).and_then(ModValue::as_number)
     }
 
+    pub(crate) fn sd_str(&self, i: usize, k: &str) -> Option<String> {
+        match self.sd(i, k)? {
+            ModValue::Str(s) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+
     pub(crate) fn sd_truthy(&self, i: usize, k: &str) -> bool {
         self.sd(i, k).is_some_and(ModValue::truthy)
     }
@@ -459,6 +466,13 @@ impl<'a> Perform<'a> {
     pub(crate) fn config_num(&self, k: &str) -> Option<f64> {
         match self.input.config.get(k) {
             Some(Val::Number(n)) => Some(*n),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn config_str(&self, k: &str) -> Option<&str> {
+        match self.input.config.get(k) {
+            Some(Val::Str(s)) => Some(s),
             _ => None,
         }
     }
@@ -930,6 +944,13 @@ impl<'a> Perform<'a> {
                 .set_out(PLAYER, "FlaskChargeOnCritChance", m_min(100.0, crit));
         }
 
+        if self.input.breakdown {
+            let player = actor_cfg("player");
+            let effect = self.c.inc(pdb, Some(&player), &["TinctureEffect"])?;
+            let limit = self.c.base(pdb, None, &["TinctureLimit"])?;
+            self.c.set_out(PLAYER, "TinctureEffect", effect);
+            self.c.set_out(PLAYER, "TinctureLimit", limit);
+        }
         let mode = self.env.mode;
         if mode.combat {
             self.merge_flasks(&flasks, false, true)?;
@@ -1788,10 +1809,6 @@ impl<'a> Perform<'a> {
         let effect_inc = self.c.inc(pdb, Some(&player), &["TinctureEffect"])?;
         let effect_inc_magic = self.c.inc(pdb, Some(&player), &["MagicTinctureEffect"])?;
         let mut limit = self.c.base(pdb, None, &["TinctureLimit"])?;
-        if self.input.breakdown {
-            self.c.set_out(PLAYER, "TinctureEffect", effect_inc);
-            self.c.set_out(PLAYER, "TinctureLimit", limit);
-        }
         let not_burn = m_min(
             self.c.base(pdb, None, &["TincturesNotInflictManaBurn"])?,
             100.0,

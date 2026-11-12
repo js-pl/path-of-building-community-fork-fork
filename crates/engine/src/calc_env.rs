@@ -74,10 +74,23 @@ pub struct Env {
 /// `calcs.initEnv(build, mode)`. The build's Skills tab takes the socket
 /// groups with the granted skills and the gems' selections.
 pub fn init_env(build: &mut Build, data: &CalcData, calc_mode: CalcMode) -> Result<Env> {
-    match init_env_pass(build, data, calc_mode, false)? {
+    init_env_on(build, data, calc_mode, calc_mode.buff_mode(build))
+}
+
+/// `calcs.initEnv(build, mode, override, specEnv)` whose base databases
+/// (`specEnv.cachedPlayerDB`, `cachedEnemyDB`) come from a calculation in
+/// the buff mode `base`: their `Buffed`, `Combat` and `Effective`
+/// conditions are its
+pub fn init_env_on(
+    build: &mut Build,
+    data: &CalcData,
+    calc_mode: CalcMode,
+    base: BuffMode,
+) -> Result<Env> {
+    match init_env_pass(build, data, calc_mode, base, false)? {
         Some(env) => Ok(env),
         // An enabled Energy Blade: everything again, with its condition
-        None => init_env_pass(build, data, calc_mode, true)?
+        None => init_env_pass(build, data, calc_mode, base, true)?
             .ok_or_else(|| "Energy Blade asked for a second rerun".to_string()),
     }
 }
@@ -89,6 +102,7 @@ fn init_env_pass(
     build: &mut Build,
     data: &CalcData,
     calc_mode: CalcMode,
+    base_mode: BuffMode,
     energy_blade: bool,
 ) -> Result<Option<Env>> {
     let calcs = calc_mode == CalcMode::Calcs;
@@ -125,7 +139,7 @@ fn init_env_pass(
         config_input: &config,
         config_mods: &build.config_mods,
         config_enemy_mods: &build.config_enemy_mods,
-        mode,
+        mode: base_mode,
     };
     let (mut player_db, enemy_db) = calc_setup::base_dbs(data.setup, data.parser, &base)?;
     if energy_blade {

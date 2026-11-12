@@ -3,9 +3,9 @@
 //! (`configTable`) and `defaultTriggerHandler`, with the simulation of
 //! skill rotations (`calcMultiSpellRotationImpact`).
 //!
-//! Not ported yet: breakdowns, Arcanist Brand's
-//! activation, Manaforged Arrows, Cast while Channelling's handler, and every
-//! configuration but those in [`Perform::trigger_config`].
+//! Not ported yet: Manaforged Arrows, the uptime of exerting warcries as a
+//! trigger, the helmet's Focus, and every configuration but those in
+//! [`Perform::trigger_config`].
 //!
 //! In sync with upstream `16de4b82d57f1c0de6eb40f37143c32d4da36a02`.
 
@@ -16,6 +16,7 @@ use crate::calc::{PLAYER, m_max, m_min, round};
 use crate::calc_cache::CachedCalc;
 use crate::calc_perform::{Perform, Result, src};
 use crate::mods::{ModType, ModValue};
+use crate::sf;
 
 /// A skill as the rotation simulation sees it
 /// (`packageSkillDataForSimulation`)
@@ -51,6 +52,9 @@ pub(crate) struct TriggerConfig {
     pub trig_rate: Option<f64>,
     pub allow_triggered: bool,
     pub trigger_on_use: bool,
+    /// `useCastRate`: the breakdown names the source's rate a cast rate
+    pub use_cast_rate: bool,
+    pub assuming_every_hit_kills: bool,
     pub ignore_source_rate: bool,
     pub source_weapon: bool,
     pub stages_are_overlaps: Option<f64>,
@@ -61,6 +65,63 @@ pub(crate) struct TriggerConfig {
     /// frequency's increase and more multipliers
     /// (`triggeredBy.mainSkill`, `activationFreqInc`, `activationFreqMore`)
     pub brand: Option<(usize, f64, f64)>,
+}
+
+/// A rotation simulation's main rate, simulated time and each skill's rate
+/// by uuid
+type Sim = (f64, f64, Vec<(String, f64)>);
+
+/// The cooldowns `breakdown.TriggerRateCap` shows
+struct TriggerCaps<'n> {
+    actor: usize,
+    main: usize,
+    /// `config.triggerName`
+    name: &'n str,
+    cd_override: Option<f64>,
+    triggered_cd: Option<f64>,
+    added: Option<f64>,
+    trigger_cd: Option<f64>,
+    adds_cast_time: Option<f64>,
+    icdr: f64,
+    triggered_adj: f64,
+    trigger_adj: f64,
+    action_tick: f64,
+    cap: f64,
+    /// Arcanist Brand, whose activation ignores the tick rate
+    brand: bool,
+}
+
+/// `breakdown.SimData`: each simulated skill's rate, its uuid split into
+/// name, slot and gem index
+fn sim_breakdown(sim_time: f64, rates: &[(String, f64)]) -> crate::breakdown::Breakdown {
+    use crate::breakdown::{Breakdown, Col, Row};
+    let rows = rates
+        .iter()
+        .map(|(uuid, rate)| {
+            let mut row: Row = vec![("rate", crate::calc::round(*rate, 2.0).into())];
+            for (k, part) in ["skillName", "slotName", "gemIndex"]
+                .into_iter()
+                .zip(uuid.split('_').filter(|p| !p.is_empty()))
+            {
+                row.push((k, part.into()));
+            }
+            row
+        })
+        .collect();
+    Breakdown {
+        lines: vec![sf!(
+            "Simulation duration: %.2f ^8(In game source skill usage duration in seconds)",
+            sim_time
+        )],
+        rows: Some(rows),
+        cols: Some(vec![
+            Col::new("Rate", "rate"),
+            Col::new("Skill Name", "skillName"),
+            Col::new("Slot Name", "slotName"),
+            Col::new("Gem Index", "gemIndex"),
+        ]),
+        ..Breakdown::default()
+    }
 }
 
 /// `ceil_b(x, base)` and `floor_b(x, base)` of `Modules/Common.lua`
@@ -287,6 +348,7 @@ impl<'a> Perform<'a> {
             "jorrhast's blacksteel" => {
                 self.sd_set(main, "sourceRateIsFinal", true);
                 TriggerConfig {
+                    assuming_every_hit_kills: true,
                     trigger_skill_cond: Some(|p, s| {
                         p.has_type(s, "Damage") || p.has_type(s, "Attack")
                     }),
@@ -316,6 +378,18 @@ impl<'a> Perform<'a> {
                 let list = self.lists[main].list;
                 let threshold = self.c.calc_mod(list, None, &["CWDTThreshold"])?;
                 self.c.set_out(PLAYER, "CWDTThreshold", base * threshold);
+                if base * threshold != base
+                    && let Some(b) = self.bd(PLAYER)
+                {
+                    b.set_lines(
+                        "CWDTThreshold",
+                        vec![
+                            sf!("%.2f ^8(base threshold)", base),
+                            sf!("x %.2f ^8(threshold modifier)", threshold),
+                            sf!("= %.2f", base * threshold),
+                        ],
+                    );
+                }
                 set_global(self);
                 TriggerConfig {
                     source: Some(main),
@@ -397,6 +471,15 @@ impl<'a> Perform<'a> {
                 }
                 set_global(self);
                 self.sd_set(main, "triggerRateCapOverride", 1.0 / interval);
+                if let Some(b) = self.bd(PLAYER) {
+                    b.set_lines(
+                        "TriggerRateCap",
+                        vec![
+                            sf!("1 / %.2f ^8(Hextoad trigger interval)", interval),
+                            sf!("= %.2f", 1.0 / interval),
+                        ],
+                    );
+                }
                 TriggerConfig {
                     source: Some(main),
                     ..TriggerConfig::default()
@@ -432,6 +515,7 @@ impl<'a> Perform<'a> {
                 }
                 TriggerConfig {
                     trigger_on_use: true,
+                    use_cast_rate: true,
                     source: Some(main),
                     ..TriggerConfig::default()
                 }
@@ -460,6 +544,7 @@ impl<'a> Perform<'a> {
                 };
                 TriggerConfig {
                     overlaps,
+                    use_cast_rate: true,
                     trigger_skill_cond: Some(|p, s| p.has_type(s, "Hex") && p.slot_match(s)),
                     ..TriggerConfig::default()
                 }
@@ -575,16 +660,162 @@ impl<'a> Perform<'a> {
         Ok(Some((base / csi, csi)))
     }
 
+    /// `breakdown.AddedCastTime` of `processAddedCastTime(skill,
+    /// breakdown)`
+    fn added_cast_time_lines(&self, i: usize) -> Result<Option<Vec<String>>> {
+        let Some((t, _)) = self.added_cast_time(i)? else {
+            return Ok(None);
+        };
+        let (list, cfg) = (self.lists[i].list, self.cfg(i));
+        let c = Some(&cfg);
+        let base = self
+            .sd_num(i, "castTimeOverride")
+            .or(self.skill(i).active_effect.granted_effect.cast_time)
+            .unwrap_or(1.0);
+        Ok(Some(vec![
+            sf!("%.2f ^8(base cast time of %s)", base, self.skill_name(i)),
+            sf!(
+                "%.2f ^8(increased/reduced)",
+                1.0 + self.c.inc(list, c, &["Speed"])? / 100.0
+            ),
+            sf!("%.2f ^8(more/less)", self.c.more(list, c, &["Speed"])?),
+            sf!("= %.2f ^8cast time", t),
+        ]))
+    }
+
+    /// `breakdown.TriggerRateCap` of the default trigger handler
+    fn trigger_rate_cap_lines(&self, t: TriggerCaps) -> Vec<String> {
+        let triggered_name = if t.actor == PLAYER {
+            self.skill_name(t.main)
+        } else {
+            "Triggered skill"
+        };
+        let mut l = Vec::new();
+        if let Some(o) = t.cd_override {
+            l.push(sf!(
+                "%.2f ^8(hard override of cooldown of %s)",
+                o,
+                triggered_name
+            ));
+        } else if t.triggered_adj == 0.0 {
+            l.push(format!(
+                "{triggered_name} has no base cooldown or cooldown override"
+            ));
+        } else {
+            match t.triggered_cd {
+                Some(cd) => l.push(sf!("%.2f ^8(base cooldown of triggered skill)", cd)),
+                None => l.push(format!(
+                    "{triggered_name} has no base cooldown or cooldown override"
+                )),
+            }
+            if let Some(a) = t.added {
+                l.push(sf!("+ %.2f ^8(flat added cooldown)", a));
+            }
+            l.push(sf!(
+                "/ %.2f ^8(increased/reduced cooldown recovery)",
+                t.icdr
+            ));
+            l.push(sf!(
+                "= %.4f ^8(final cooldown of triggered skill)",
+                t.triggered_adj
+            ));
+        }
+        l.push(String::new());
+        if t.actor == PLAYER {
+            if t.trigger_adj == 0.0 {
+                l.push(sf!("Trigger rate based on %s cooldown", triggered_name));
+            } else {
+                match t.trigger_cd {
+                    Some(cd) => l.push(sf!("%.2f ^8(base cooldown of %s)", cd, t.name)),
+                    None => l.push(format!("{} has no base cooldown", t.name)),
+                }
+                if let Some(a) = t.adds_cast_time {
+                    l.push(sf!(
+                        "+ %.2f ^8(this skill adds cast time to cooldown when triggered)",
+                        a
+                    ));
+                }
+                l.push(sf!(
+                    "/ %.2f ^8(increased/reduced cooldown recovery)",
+                    t.icdr
+                ));
+                l.push(sf!("= %.4f ^8(final cooldown of trigger)", t.trigger_adj));
+            }
+        }
+        l.push(String::new());
+        let action_adj = t
+            .cd_override
+            .unwrap_or(m_max(t.trigger_adj, t.triggered_adj));
+        if t.triggered_adj != 0.0 && t.trigger_adj != 0.0 {
+            l.push(sf!(
+                "%.3f ^8(biggest of trigger cooldown and triggered skill cooldown)",
+                action_adj
+            ));
+        }
+        let rounding = (!self.sd_truthy(t.main, "ignoresTickRate") && t.triggered_adj != 0.0)
+            || (self.mods(t.main).triggered_by.is_some() && !t.brand && t.trigger_adj != 0.0);
+        if rounding {
+            l.push(sf!("%.3f ^8(adjusted for server tick rate)", t.action_tick));
+        }
+        let action_cd = t.cd_override.unwrap_or(m_max(
+            t.trigger_cd.unwrap_or(0.0) + t.adds_cast_time.unwrap_or(0.0),
+            t.triggered_cd.unwrap_or(0.0) + t.added.unwrap_or(0.0),
+        ));
+        let tick_time = self.misc_data("ServerTickTime");
+        let extra = |affected: f64| -> Option<f64> {
+            if t.cd_override.is_some() {
+                return None;
+            }
+            let next = t.action_tick - tick_time;
+            let over = action_adj - next;
+            let reduced = action_cd - action_adj;
+            (over < affected).then(|| {
+                let div = affected / (affected - over - reduced);
+                ((div - 1.0) * 100.0).ceil() - (t.icdr - 1.0) * 100.0
+            })
+        };
+        if let Some(x) = extra(action_cd) {
+            l.push(sf!("^8(extra ICDR of %d%% would reach next breakpoint)", x));
+        }
+        if let Some(x) = t.adds_cast_time.and_then(extra) {
+            l.push(sf!("^8(extra ICS  of %d%% would reach next breakpoint)", x));
+        }
+        l.push(String::new());
+        if t.triggered_cd.is_none() && t.trigger_cd.is_none() && t.cd_override.is_none() {
+            l.push("Assuming cast on every kill/attack/hit".into());
+        } else {
+            l.push("Trigger rate:".into());
+            l.push(sf!("1 / %.3f", t.action_tick));
+            l.push(sf!("= %.2f ^8per second", t.cap));
+        }
+        l
+    }
+
     /// `calcMultiSpellRotationImpact(env, skillRotation, sourceRate,
     /// triggerCD, chance, actor)`: the main skill's rate
     fn rotation_impact(
+        &self,
+        rotation: Vec<SimSkill>,
+        source_rate: f64,
+        trigger_cd: f64,
+        chance: f64,
+        actor: usize,
+    ) -> Result<f64> {
+        Ok(self
+            .rotation_sim(rotation, source_rate, trigger_cd, chance, actor)?
+            .0)
+    }
+
+    /// `calcMultiSpellRotationImpact` with its table: the simulated time
+    /// and each skill's rate by uuid
+    fn rotation_sim(
         &self,
         mut rotation: Vec<SimSkill>,
         source_rate: f64,
         trigger_cd: f64,
         chance: f64,
         actor: usize,
-    ) -> Result<f64> {
+    ) -> Result<Sim> {
         let increment = 1.0 / source_rate;
         let sim_time = increment * 1000.0;
         let tick = self.misc_data("ServerTickTime");
@@ -624,16 +855,18 @@ impl<'a> Perform<'a> {
             .map(|m| self.skill_uuid(m))
             .unwrap_or_default();
         let mut main_rate = 0.0;
+        let mut rates = Vec::with_capacity(n);
         for (k, s) in rotation.drain(..).enumerate() {
             let rate = 1.0 / (sim_time / count[k] + (increment / chance * 100.0) - increment);
             if s.uuid == main_uuid {
                 main_rate = rate;
             }
+            rates.push((s.uuid, rate));
         }
-        Ok(main_rate)
+        Ok((main_rate, sim_time, rates))
     }
 
-    /// `defaultTriggerHandler(env, config)` without its breakdowns
+    /// `defaultTriggerHandler(env, config)`
     fn default_trigger_handler(&mut self, config: TriggerConfig) -> Result<()> {
         let actor = config.actor.unwrap_or(PLAYER);
         let main = self
@@ -695,6 +928,45 @@ impl<'a> Perform<'a> {
             return Ok(());
         }
         self.sd_set(main, "triggered", true);
+        let bd = self.has_bd(actor);
+        // `breakdown.EffectiveSourceRate`
+        let mut esr_l: Vec<String> = Vec::new();
+        if bd {
+            if self.sd_truthy(main, "triggeredByBrand") {
+                let (brand, inc, more) = config
+                    .brand
+                    .ok_or("attempt to index a nil value (field 'mainSkill')")?;
+                esr_l = vec![
+                    sf!(
+                        "%.2f ^8(base activation cooldown of %s)",
+                        self.sd_num(brand, "repeatFrequency").unwrap_or(f64::NAN),
+                        config.trigger_name.as_deref().unwrap_or("nil")
+                    ),
+                    sf!("* %.2f ^8(more activation frequency)", more),
+                    sf!("* %.2f ^8(increased activation frequency)", inc),
+                    sf!(
+                        "* %d ^8(attached Brands)",
+                        self.sd_num(brand, "attachedBrandCount").unwrap_or(f64::NAN)
+                    ),
+                    sf!(
+                        "= %.2f ^8(activation rate of %s)",
+                        trig_rate.unwrap_or(f64::NAN),
+                        self.skill_name(brand)
+                    ),
+                ];
+            } else if let (Some(r), Some(s)) = (trig_rate, source) {
+                if config.assuming_every_hit_kills {
+                    esr_l.push("Assuming every attack kills".into());
+                }
+                let what = if config.use_cast_rate {
+                    "cast rate"
+                } else {
+                    "attack rate"
+                };
+                esr_l.push(sf!("%.2f ^8(%s %s)", r, self.skill_name(s), what));
+            }
+        }
+        let esr_insert = |l: &mut Vec<String>, at: usize, x: String| l.insert(at.min(l.len()), x);
 
         // Dual wield triggers
         let item_support_trigger = self.mods(main).triggered_by.is_some_and(|t| {
@@ -711,6 +983,9 @@ impl<'a> Perform<'a> {
                 && (source_weapon_trigger || item_support_trigger)
             {
                 trig_rate = Some(rate / 2.0);
+                if bd {
+                    esr_insert(&mut esr_l, 1, "/ 2 ^8(due to dual wielding)".into());
+                }
             }
         }
         let cached = match (&source_uuid, self.input.recalc) {
@@ -731,6 +1006,9 @@ impl<'a> Perform<'a> {
                 trig_rate = trig_rate.map(|r| r * mult);
                 self.set_flag(main, "HasSeals", true);
                 self.sd_set(main, "ignoresTickRate", true);
+                if bd {
+                    esr_l.push(sf!("x %.2f ^8(multiplier from Unleash)", mult));
+                }
             }
             let part = self.mods(s).skill_part_name.clone().unwrap_or_default();
             if crate::pat::find(&part, "(.*)All(.*)Projectiles(.*)").is_some()
@@ -738,6 +1016,9 @@ impl<'a> Perform<'a> {
             {
                 let mult = c.out("ProjectileCount").unwrap_or(1.0);
                 trig_rate = trig_rate.map(|r| r * mult);
+                if bd {
+                    esr_l.push(sf!("x %.2f ^8(%d projectiles hit)", mult, mult));
+                }
             }
         }
         let stored = self.sd_num(main, "storedUses");
@@ -748,6 +1029,12 @@ impl<'a> Perform<'a> {
             let s = source.ok_or("attempt to index a nil value (local 'source')")?;
             let repeats = 1.0 + self.c.base(self.lists[s].list, None, &["RepeatCount"])?;
             trig_rate = trig_rate.map(|r| r / repeats);
+            if bd && repeats > 1.0 {
+                esr_l.push(sf!(
+                    "/%d ^8(repeated attacks/casts do not count as they don't use mana)",
+                    repeats
+                ));
+            }
         }
         let melee_source = source.is_some_and(|s| self.has_type(s, "Melee"));
         if (self.sd_truthy(main, "triggeredByBattleMageCry") || self.skill_name(main) == "Combust")
@@ -798,6 +1085,9 @@ impl<'a> Perform<'a> {
             trigger_cd = Some(freq / more / inc * icdr);
         }
         let adds_cast_time = self.added_cast_time(player_main)?.map(|(t, _)| t);
+        if bd && let Some(l) = self.added_cast_time_lines(player_main)? {
+            self.bd(actor).unwrap().set_lines("AddedCastTime", l);
+        }
         match adds_cast_time {
             Some(t) => {
                 self.set_flag(player_main, "addsCastTime", true);
@@ -833,6 +1123,25 @@ impl<'a> Perform<'a> {
             cap = 1.0 / action_tick;
         }
         self.c.set_out(actor, "TriggerRateCap", cap);
+        if bd && self.bd(actor).unwrap().get("TriggerRateCap").is_none() {
+            let l = self.trigger_rate_cap_lines(TriggerCaps {
+                actor,
+                main,
+                name: config.trigger_name.as_deref().unwrap_or("nil"),
+                cd_override,
+                triggered_cd,
+                added,
+                trigger_cd,
+                adds_cast_time,
+                icdr,
+                triggered_adj,
+                trigger_adj,
+                action_tick,
+                cap,
+                brand: config.brand.is_some(),
+            });
+            self.bd(actor).unwrap().set_lines("TriggerRateCap", l);
+        }
         let doom_source = self.doom_blast_source();
         let doom_trigger = config.trigger_name.as_deref() == Some("Doom Blast");
         let pdb = self.pdb();
@@ -844,12 +1153,28 @@ impl<'a> Perform<'a> {
                 .out("Duration")
                 .unwrap_or(f64::NAN);
             let expiration = 1.0 / duration;
+            if bd && !esr_l.is_empty() {
+                esr_l[0] = sf!("1 / %.2f ^8(source curse duration)", duration);
+            }
             let rate = trig_rate.ok_or("attempt to compare nil with number")?;
             if expiration > rate {
                 self.c.add(
                     pdb,
                     crate::calc_perform::src("UsesCurseOverlaps", ModType::Flag, true, "Config"),
                 );
+                if bd {
+                    esr_insert(
+                        &mut esr_l,
+                        1,
+                        sf!(
+                            "max(%.2f, %.2f) ^8(If a curse expires instantly curse expiration is equivalent to curse replacement)",
+                            expiration,
+                            rate
+                        ),
+                    );
+                    let name = source.map_or("nil", |s| self.skill_name(s));
+                    esr_insert(&mut esr_l, 1, sf!("%.2f ^8(%s cast rate)", rate, name));
+                }
             } else {
                 trig_rate = Some(expiration);
             }
@@ -866,6 +1191,18 @@ impl<'a> Perform<'a> {
                     rate.ok_or("attempt to perform arithmetic on a nil value")?,
                 );
                 trig_rate = Some(1.0 / (1.0 / t + 1.0 / r));
+                if bd {
+                    let l = sf!(
+                        "1 / (%.2f + %.2f) ^8(sum of triggered curse and hexblast cast time)",
+                        1.0 / t,
+                        1.0 / r
+                    );
+                    if esr_l.is_empty() {
+                        esr_l.push(l);
+                    } else {
+                        esr_l[0] = l;
+                    }
+                }
             }
         }
         let esr = if self.skill_name(player_main) == "Doom Blast" && doom_source == Some("vixen") {
@@ -909,6 +1246,20 @@ impl<'a> Perform<'a> {
                 "VixensTooMuchCastSpeedWarn",
                 crate::actor::OutVal::Bool(vixens_cd > 1.0 / rate),
             );
+            if bd {
+                esr_l.push(sf!(
+                    "%.2f / %.2f = %.2f ^8(Vixen's trigger cooldown)",
+                    vixens_cd * icdr,
+                    icdr,
+                    vixens_cd
+                ));
+                esr_l.push(sf!(
+                    "%.2f ^8(Simulated trigger rate of a curse socketed in Vixen's given ^7%.2f ^8CD and ^7%.2f ^8source rate)",
+                    esr,
+                    vixens_cd,
+                    rate
+                ));
+            }
             esr
         } else if let Some(r) = trig_rate
             && !global(self)
@@ -920,6 +1271,16 @@ impl<'a> Perform<'a> {
             cap
         };
         self.c.set_out(actor, "EffectiveSourceRate", esr);
+        if bd {
+            if !self.sd_truthy(main, "sourceRateIsFinal") {
+                esr_l.push(sf!("= %.2f ^8(Effective source rate)", esr));
+            }
+            self.bd(actor)
+                .unwrap()
+                .set_lines("EffectiveSourceRate", esr_l);
+        }
+        let mut chance_l: Vec<String> = Vec::new();
+        let mut rate_l: Option<Vec<String>> = None;
 
         let rate = if esr != 0.0 && !self.has_flag(player_main, "skipEffectiveRate") {
             let mut chance = 100.0;
@@ -945,12 +1306,16 @@ impl<'a> Perform<'a> {
                     m * o / 100.0 + m * (100.0 - o) / 100.0 + (100.0 - m) * o / 100.0
                 };
                 let hit = c.out("HitChance").unwrap_or(0.0);
+                let name = self.skill_name(s).to_string();
                 if hit != 100.0 {
-                    chance = if dual {
-                        chance * both("HitChance") / 100.0
+                    if dual {
+                        let h = both("HitChance");
+                        chance = chance * h / 100.0;
+                        chance_l.push(sf!("x %.2f%% ^8(%s effective hit chance for skills that hit with both weapons)", h, name.as_str()));
                     } else {
-                        chance * hit / 100.0
-                    };
+                        chance = chance * hit / 100.0;
+                        chance_l.push(sf!("x %.2f%% ^8(%s hit chance)", hit, name.as_str()));
+                    }
                 }
                 if self.sd_truthy(main, "triggerOnCrit") {
                     let on_crit = self.sd_num(main, "chanceToTriggerOnCrit").or_else(|| {
@@ -965,11 +1330,14 @@ impl<'a> Perform<'a> {
                     }
                     let crit = c.out("CritChance").unwrap_or(0.0);
                     if crit != 100.0 {
-                        chance = if dual {
-                            chance * both("CritChance") / 100.0
+                        if dual {
+                            let h = both("CritChance");
+                            chance = chance * h / 100.0;
+                            chance_l.push(sf!("x %.2f%% ^8(%s effective crit chance for skills that hit with both weapons)", h, name.as_str()));
                         } else {
-                            chance * crit / 100.0
-                        };
+                            chance = chance * crit / 100.0;
+                            chance_l.push(sf!("x %.2f%% ^8(%s crit chance)", crit, name.as_str()));
+                        }
                     }
                 }
             }
@@ -977,6 +1345,7 @@ impl<'a> Perform<'a> {
                 && tc != 100.0
             {
                 chance = chance * tc / 100.0;
+                chance_l.push(sf!("x %.2f%% ^8(chance to trigger)", tc));
             }
             if self.sd_truthy(main, "ignoresTickRate") && config.triggered_skill_cond.is_none() {
                 let overlaps = if config.stages_are_overlaps.is_some()
@@ -986,6 +1355,10 @@ impl<'a> Perform<'a> {
                 } else {
                     config.overlaps
                 };
+                rate_l = Some(vec![match overlaps {
+                    Some(n) => sf!("min(%.2f, %.2f *  %d) ^8(%d overlaps)", cap, esr, n, n),
+                    None => sf!("min(%.2f, %.2f)", cap, esr),
+                }]);
                 m_min(cap, esr * overlaps.unwrap_or(1.0))
             } else if global(self) && config.triggered_skill_cond.is_none() {
                 esr
@@ -1000,9 +1373,12 @@ impl<'a> Perform<'a> {
                 } else {
                     trigger_cd.or(triggered_cd).unwrap_or(0.0)
                 };
-                let mut r = self.rotation_impact(rotation, esr, cd, chance, actor)?;
+                let (mut r, sim_time, rates) =
+                    self.rotation_sim(rotation, esr, cd, chance, actor)?;
                 let db = self.c.db(actor);
-                if self.c.flag(db, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell") {
+                let bots =
+                    self.c.flag(db, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell");
+                if bots {
                     r *= 2.0;
                 }
                 let hits = if config.stages_are_overlaps.is_some()
@@ -1012,11 +1388,67 @@ impl<'a> Perform<'a> {
                 } else {
                     1.0
                 };
-                hits * r
+                let r = hits * r;
+                if bd {
+                    let what = if by_brand {
+                        let name = source.map_or("nil", |s| self.skill_name(s));
+                        sf!("%s activations per second", name)
+                    } else if trig_rate.is_none() {
+                        let name = match source {
+                            Some(s) => self.skill_name(s).to_string(),
+                            None => match self.mods(main).triggered_by {
+                                Some(t) => {
+                                    self.skill(main).effect_list[t].granted_effect.name.clone()
+                                }
+                                None => self.skill_name(main).to_string(),
+                            },
+                        };
+                        sf!("%s triggers per second", name.as_str())
+                    } else {
+                        "Effective source rate".into()
+                    };
+                    let mut l = vec![
+                        sf!("%.2f ^8(%s)", esr, what.as_str()),
+                        sf!(
+                            "/ %.2f ^8(Estimated impact of skill rotation, cooldown alignment and trigger chance)",
+                            m_max(esr / r, 1.0)
+                        ),
+                        sf!("= %.2f ^8per second", r),
+                    ];
+                    if bots {
+                        l.insert(
+                            2,
+                            "x 2 ^8(Trigger bots effectively cause the skill to trigger twice)"
+                                .into(),
+                        );
+                    }
+                    if hits > 1.0 {
+                        l.insert(2, sf!("x %.2f ^8(hits per triggered skill cast)", hits));
+                    }
+                    if chance != 100.0 {
+                        l.insert(0, String::new());
+                        l.insert(0, sf!("= %.2f%% ^8(Effective chance to trigger)", chance));
+                        for x in std::mem::take(&mut chance_l) {
+                            l.insert(0, x);
+                        }
+                        l.insert(0, "100% ^8(Base chance)".into());
+                    }
+                    rate_l = Some(l);
+                    self.bd(actor)
+                        .unwrap()
+                        .set("SimData", sim_breakdown(sim_time, &rates));
+                }
+                r
             }
         } else {
+            rate_l = Some(vec![
+                "The trigger needs to be triggered for any skill to be triggered.".into(),
+            ]);
             0.0
         };
+        if bd && let Some(l) = rate_l {
+            self.bd(actor).unwrap().set_lines("SkillTriggerRate", l);
+        }
         self.c.set_out(actor, "SkillTriggerRate", rate);
         self.sd_set(main, "triggerRate", rate);
         self.c.set_out(actor, "Speed", rate);
@@ -1048,7 +1480,7 @@ impl<'a> Perform<'a> {
         Ok(())
     }
 
-    /// `CWCHandler(env)` without its breakdowns: Cast while Channelling
+    /// `CWCHandler(env)`: Cast while Channelling
     /// triggers the main skill while its source channels
     fn cwc_handler(&mut self) -> Result<()> {
         let main = self.main();
@@ -1107,6 +1539,11 @@ impl<'a> Perform<'a> {
             }
             None => self.c.clear_out(PLAYER, "addsCastTime"),
         }
+        let bd = self.has_bd(PLAYER);
+        if bd && let Some(l) = self.added_cast_time_lines(main)? {
+            self.bd(PLAYER).unwrap().set_lines("AddedCastTime", l);
+        }
+        let n_triggered = triggered.len();
         let (list, cfg) = (self.lists[main].list, self.cfg(main));
         let icdr = self.c.calc_mod(list, Some(&cfg), &["CooldownRecovery"])?;
         let interval = self.sd_num(source, "triggerTime").unwrap_or(f64::NAN);
@@ -1124,17 +1561,122 @@ impl<'a> Perform<'a> {
         let tick = self.misc_data("ServerTickRate");
         let adjusted = (total * tick).ceil() / tick;
         let effective = (adjusted * rate_of_trigger).ceil() / rate_of_trigger;
-        self.c.set_out(
-            PLAYER,
-            "TriggerRateCap",
-            m_min(1.0 / effective, rate_of_trigger),
-        );
-        let mut rate = self.rotation_impact(triggered, rate_of_trigger, 0.0, 100.0, PLAYER)?;
+        let cap = m_min(1.0 / effective, rate_of_trigger);
+        self.c.set_out(PLAYER, "TriggerRateCap", cap);
+        let (mut rate, sim_time, rates) =
+            self.rotation_sim(triggered, rate_of_trigger, 0.0, 100.0, PLAYER)?;
         let pdb = self.pdb();
-        if self.c.flag(pdb, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell") {
+        let bots = self.c.flag(pdb, None, &["HaveTriggerBots"])? && self.has_type(main, "Spell");
+        if bots {
             rate *= 2.0;
         }
         self.c.set_out(PLAYER, "SkillTriggerRate", rate);
+        if bd {
+            let name = self.skill_name(main).to_string();
+            let first = sf!(
+                "Cast While Channeling triggers %s every %.2fs while channeling %s ",
+                name.as_str(),
+                interval,
+                self.skill_name(source)
+            );
+            let mut l = if triggered_cd.is_some() || cd_override.is_some() {
+                let cd =
+                    triggered_cd.ok_or("bad argument #2 to 'format' (number expected, got nil)")?;
+                let mut l = vec![
+                    first,
+                    String::new(),
+                    sf!("%.2f ^8(base cooldown of triggered skill)", cd),
+                    sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr),
+                    sf!("= %.4f ^8(final cooldown of triggered skill)", cd / icdr),
+                    String::new(),
+                ];
+                if let Some(o) = cd_override {
+                    l[3] = sf!("%.2f ^8(hard override of cooldown of %s)", o, name.as_str());
+                    l.remove(4);
+                    l.remove(4);
+                }
+                l
+            } else {
+                vec![
+                    first,
+                    String::new(),
+                    format!("{name} has no base cooldown or cooldown override"),
+                    String::new(),
+                ]
+            };
+            let extra = |affected: f64| -> Option<f64> {
+                if cd_override.is_some() {
+                    return None;
+                }
+                let next = effective - interval;
+                let over = total - next;
+                let reduced = total * icdr - total;
+                (over < affected).then(|| {
+                    let div = affected / (affected - over - reduced);
+                    ((div - 1.0) * 100.0).ceil() - (icdr - 1.0) * 100.0
+                })
+            };
+            if let Some(a) = adds_cast_time {
+                l.push("Cast While Channeling had no base cooldown".into());
+                l.push(sf!(
+                    "+ %.2f ^8(%s adds cast time as cooldown to trigger)",
+                    a,
+                    name.as_str()
+                ));
+                l.push(sf!("/ %.2f ^8(increased/reduced cooldown recovery)", icdr));
+                l.push(sf!(
+                    "= %.4f ^8(final cooldown of triggered skill)",
+                    a / icdr
+                ));
+                l.push(String::new());
+                l.push(sf!("%.3f ^8(adjusted for server tick rate)", adjusted));
+                l.push(String::new());
+                let csi = extra(a);
+                if let Some(x) = extra(total * icdr) {
+                    l.push(sf!("^8(extra ICDR of %d%% would reach next breakpoint)", x));
+                }
+                if let Some(x) = csi {
+                    l.push(sf!(
+                        "^8(extra Cast Rate Increase of %d%% would reach next breakpoint)",
+                        x
+                    ));
+                    l.push(String::new());
+                }
+            } else if let Some(x) = extra(total * icdr) {
+                l.push(sf!("^8(extra ICDR of %d%% would reach next breakpoint)", x));
+                l.push(String::new());
+            }
+            l.push("Trigger rate:".into());
+            l.push(sf!(
+                "1 / %.3f ^8(trigger rate adjusted for triggering interval)",
+                1.0 / cap
+            ));
+            l.push(sf!("= %.2f ^8 %s casts per second", cap, name.as_str()));
+            let b = self.bd(PLAYER).unwrap();
+            b.set_lines("TriggerRateCap", l);
+            if n_triggered > 1 {
+                let mut l = vec![
+                    sf!(
+                        "%.2f ^8(%s triggers per second)",
+                        rate_of_trigger,
+                        "Cast While Channeling"
+                    ),
+                    sf!(
+                        "/ %.2f ^8(Estimated impact of linked spells)",
+                        rate_of_trigger / rate
+                    ),
+                    sf!("= %.2f ^8%s casts per second", rate, name.as_str()),
+                ];
+                if bots {
+                    l.insert(
+                        2,
+                        "x 2 ^8(Trigger bots effectively cause the skill to trigger twice)".into(),
+                    );
+                }
+                b.set_lines("SkillTriggerRate", l);
+                b.set("SimData", sim_breakdown(sim_time, &rates));
+            }
+        }
         self.add_trigger_inc_more(main, main)?;
         self.c.set_out(PLAYER, "ChannelTimeToTrigger", interval);
         self.sd_set(main, "triggered", true);

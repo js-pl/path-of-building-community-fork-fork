@@ -1,33 +1,27 @@
 //! The Calcs tab's breakdowns: the typed calculation of the Calcs tab
 //! (`engine::calcs::build_outputs`) writes the breakdowns the translated
 //! `calcs.buildOutput(build, "CALCS")` leaves in `env.player.breakdown` and
-//! `env.minion.breakdown`, value for value; a missing or extra breakdown
-//! fails. Builds that reach a part not ported yet are skipped and listed.
-//!
-//! The breakdowns of the triggers, mirages and offence are not ported yet:
-//! of the translation's, only those present when `calcs.triggers` starts
-//! for the actor, and those `calcs.perform` and `calcs.buildOutput` write
-//! after the offence, are compared.
+//! `env.minion.breakdown`, and its outputs, value for value; a missing or
+//! extra breakdown or output fails. Builds that reach a part not ported yet
+//! are skipped and listed.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
+use engine::actor::OutVal;
 use engine::breakdown::{Breakdown, Breakdowns, Cell, Row};
 use engine::items_tab::ItemsTab;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
+use engine::skill_data::{Gem, SkillData};
 use equivalence::typed_build::TypedData;
-use equivalence::{corpus, typed_json, upstream_src};
+use equivalence::{corpus_builds, gem_variants, skill_variants, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use serde_json::{Map, Value as J, json};
-use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 use upstream::host::Host;
 use upstream::imported::Imported;
-
-/// What the later calculations write after the offence
-const LATE: [&str; 4] = ["SkillBuffs", "SkillDebuffs", "GemLevel", "GemQuality"];
 
 fn s(x: &str) -> Value {
     Value::str(x)
@@ -197,6 +191,7 @@ fn typed_breakdown(b: &Breakdown, tab: &ItemsTab) -> J {
         ("label", &b.label),
         ("footer", &b.footer),
         ("source", &b.source),
+        ("breakdownSource", &b.breakdown_source),
     ] {
         if let Some(v) = v {
             m.insert(k.into(), json!(v));
@@ -278,6 +273,90 @@ fn typed_breakdowns(b: &Breakdowns, tab: &ItemsTab) -> BTreeMap<String, J> {
         .collect()
 }
 
+/// An output of the translation as JSON: arrays under `#`, gems and items
+/// by name
+fn lua_out(v: &Value, key: &str) -> J {
+    match v {
+        Value::Table(_) if key == "sourceGem" => {
+            json!({"$gem": lua::to_string(&get(v, "nameSpec")).to_str_lossy()})
+        }
+        Value::Table(_) if key == "sourceItem" => {
+            json!({"$item": lua::to_string(&get(v, "name")).to_str_lossy()})
+        }
+        Value::Table(_) => {
+            let mut m = Map::new();
+            let mut list: BTreeMap<i64, J> = BTreeMap::new();
+            for (k, x) in entries(v) {
+                match k {
+                    Key::Int(i) => {
+                        list.insert(i, lua_out(&x, ""));
+                    }
+                    k => {
+                        let k = key_str(&k);
+                        let j = lua_out(&x, &k);
+                        m.insert(k, j);
+                    }
+                }
+            }
+            if !list.is_empty() {
+                m.insert("#".into(), J::Array(list.into_values().collect()));
+            }
+            J::Object(m)
+        }
+        v => lua_json(v, key, &Converter::default()),
+    }
+}
+
+/// A typed output as [`lua_out`] encodes the translation's
+fn typed_out(v: &OutVal) -> J {
+    match v {
+        OutVal::Num(n) => number(*n),
+        OutVal::Bool(b) => J::Bool(*b),
+        OutVal::Str(x) => json!(&**x),
+        OutVal::Gem(n) => json!({"$gem": &**n}),
+        OutVal::Item(n) => json!({"$item": &**n}),
+        OutVal::List(l) => list(l.iter().map(typed_out).collect()),
+        OutVal::Table(t) => {
+            let mut m = Map::new();
+            let mut ints: BTreeMap<i64, J> = BTreeMap::new();
+            for (k, v) in t.iter() {
+                match k.parse::<i64>() {
+                    Ok(i) => {
+                        ints.insert(i, typed_out(v));
+                    }
+                    Err(_) => {
+                        m.insert(k.clone(), typed_out(v));
+                    }
+                }
+            }
+            if !ints.is_empty() {
+                m.insert("#".into(), J::Array(ints.into_values().collect()));
+            }
+            J::Object(m)
+        }
+    }
+}
+
+/// An actor's outputs by name
+fn lua_outputs(out: &Value) -> BTreeMap<String, J> {
+    entries(out)
+        .into_iter()
+        .map(|(k, v)| {
+            let k = key_str(&k);
+            let j = lua_out(&v, &k);
+            (k, j)
+        })
+        // `Minion` is the minion's output, compared as its own
+        .filter(|(k, _)| k != "Minion")
+        .collect()
+}
+
+fn typed_outputs(out: &engine::calcs::Output) -> BTreeMap<String, J> {
+    out.iter()
+        .map(|(k, v)| (k.as_str().to_string(), typed_out(v)))
+        .collect()
+}
+
 /// `false` in Lua is a missing key's value in a row: drop `false` cells
 /// both sides agree on by encoding them the same; a nil cell is absent
 fn compare(
@@ -295,16 +374,90 @@ fn compare(
     }
 }
 
-/// The translated breakdowns the typed ones are compared with: those of
-/// the actor's before `calcs.triggers`, and the late ones
-fn filtered(all: BTreeMap<String, J>, before: &BTreeSet<String>) -> BTreeMap<String, J> {
-    all.into_iter()
-        .filter(|(k, _)| before.contains(k) || LATE.contains(&k.as_str()))
-        .collect()
-}
-
 #[test]
 fn breakdowns_match_upstream() {
+    run(&|_| corpus_builds());
+}
+
+/// The skills whose functions write breakdowns, in each of their parts
+#[test]
+fn skill_function_breakdowns_match_upstream() {
+    const WRITERS: [&str; 8] = [
+        "BallLightning",
+        "ExplosiveTrap",
+        "FlamethrowerTrap",
+        "ForbiddenRite",
+        "KineticFusillade",
+        "LightningSpireTrap",
+        "MoltenStrike",
+        "SeismicTrap",
+    ];
+    run(&|data| {
+        skill_variants(data, |ge| {
+            !ge.funcs.is_empty() && WRITERS.iter().any(|w| ge.id.starts_with(w))
+        })
+    });
+}
+
+/// The Calcs tab's inputs the corpus leaves at their defaults: its other
+/// buff modes and main socket groups, and the gems' own selections of
+/// skill part and active skill
+#[test]
+fn calcs_inputs_match_upstream() {
+    run(&|data| {
+        let mut out = Vec::new();
+        for (id, xml) in corpus_builds()
+            .into_iter()
+            .filter(|(id, _)| id.starts_with("gen-"))
+            .take(8)
+        {
+            let effective = "<Input name=\"misc_buffMode\" string=\"EFFECTIVE\"/>";
+            for mode in ["COMBAT", "BUFFED", "UNBUFFED"] {
+                let v = xml.replace(
+                    effective,
+                    &format!("<Input name=\"misc_buffMode\" string=\"{mode}\"/>"),
+                );
+                out.push((format!("{id}-{mode}"), v));
+            }
+            if xml.matches("<Skill ").count() >= 2 {
+                let v = xml.replace(
+                    "<Input name=\"skill_number\" number=\"1\"/>",
+                    "<Input name=\"skill_number\" number=\"2\"/>",
+                );
+                out.push((format!("{id}-skill2"), v));
+            }
+        }
+        let parts = |g: &Gem| g.granted_effect.parts.as_ref().map_or(0, Vec::len);
+        let main = "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string();
+        let part = gem_variants(
+            data,
+            |g| parts(g) >= 2,
+            |g| {
+                vec![(
+                    format!("part-{}", g.id),
+                    main.clone(),
+                    format!("skillPart=\"1\" skillPartCalcs=\"{}\"", parts(g)),
+                )]
+            },
+        );
+        out.extend(part.into_iter().take(8));
+        let active = gem_variants(
+            data,
+            |g| g.secondary_granted_effect.is_some(),
+            |g| {
+                vec![(
+                    format!("active2-{}", g.id),
+                    "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"2\"".to_string(),
+                    String::new(),
+                )]
+            },
+        );
+        out.extend(active.into_iter().take(6));
+        out
+    });
+}
+
+fn run(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
@@ -314,58 +467,15 @@ fn breakdowns_match_upstream() {
     let mut failures = Vec::new();
     let mut compared = 0;
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for (id, path) in corpus() {
-        if !id.contains(&filter) || !path.extension().is_some_and(|e| e == "xml") {
+    for (id, xml) in make(&data.skills) {
+        if !id.contains(&filter) {
             continue;
         }
-        let xml = std::fs::read_to_string(&path).unwrap();
         host.load_build_xml(xml.as_bytes(), &id)
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let build = host.build().unwrap();
         let calcs = get(&get(&build, "calcsTab"), "calcs");
-        // The Calcs tab's calculation again, noting the breakdowns present
-        // when `calcs.triggers` starts for the player and the minion
-        let main_env: Rc<RefCell<Option<Value>>> = Rc::default();
-        let before: Rc<RefCell<[Option<BTreeSet<String>>; 2]>> = Rc::default();
-        let (init_orig, triggers_orig) = (get(&calcs, "initEnv"), get(&calcs, "triggers"));
-        let init_hook = {
-            let (main_env, orig) = (main_env.clone(), init_orig.clone());
-            rt::func("initEnv", move |args| {
-                let r = rt::call(&orig, args)?;
-                let mut m = main_env.borrow_mut();
-                if m.is_none() {
-                    *m = r.first().cloned();
-                }
-                Ok(r)
-            })
-        };
-        let triggers_hook = {
-            let (main_env, before, orig) =
-                (main_env.clone(), before.clone(), triggers_orig.clone());
-            rt::func("triggers", move |args| {
-                if let (Some(env), Some(e), Some(actor)) =
-                    (&*main_env.borrow(), args.first(), args.get(1))
-                    && e.raw_eq(env)
-                {
-                    for (k, who) in ["player", "minion"].iter().enumerate() {
-                        if actor.raw_eq(&get(env, who)) && before.borrow()[k].is_none() {
-                            let keys = entries(&get(actor, "breakdown"))
-                                .iter()
-                                .map(|(k, _)| key_str(k))
-                                .collect();
-                            before.borrow_mut()[k] = Some(keys);
-                        }
-                    }
-                }
-                rt::call(&orig, args)
-            })
-        };
-        let t = calcs.as_table().unwrap();
-        t.set_str("initEnv", init_hook);
-        t.set_str("triggers", triggers_hook);
         let result = rt::call(&get(&calcs, "buildOutput"), &[build.clone(), s("CALCS")]);
-        t.set_str("initEnv", init_orig);
-        t.set_str("triggers", triggers_orig);
         let env = match result {
             Ok(r) => r.into_iter().next().unwrap_or_default(),
             Err(e) => {
@@ -376,18 +486,12 @@ fn breakdowns_match_upstream() {
                 continue;
             }
         };
-        let before = std::mem::take(&mut *before.borrow_mut());
-        let want_player = filtered(
-            lua_breakdowns(&get(&get(&env, "player"), "breakdown"), &conv),
-            before[0].as_ref().unwrap_or(&BTreeSet::new()),
-        );
+        let want_player = lua_breakdowns(&get(&get(&env, "player"), "breakdown"), &conv);
+        let want_out = lua_outputs(&get(&get(&env, "player"), "output"));
         let minion = get(&env, "minion");
-        let want_minion = (!minion.is_nil()).then(|| {
-            filtered(
-                lua_breakdowns(&get(&minion, "breakdown"), &conv),
-                before[1].as_ref().unwrap_or(&BTreeSet::new()),
-            )
-        });
+        let want_minion =
+            (!minion.is_nil()).then(|| lua_breakdowns(&get(&minion, "breakdown"), &conv));
+        let want_minion_out = (!minion.is_nil()).then(|| lua_outputs(&get(&minion, "output")));
 
         // The typed calculation
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
@@ -415,6 +519,17 @@ fn breakdowns_match_upstream() {
         compared += 1;
         let tab = &typed_build.items;
         let mut fail = Vec::new();
+        compare(
+            "player output",
+            &typed_outputs(&got.player),
+            &want_out,
+            &mut fail,
+        );
+        match (&got.minion, &want_minion_out) {
+            (None, None) => {}
+            (Some(g), Some(w)) => compare("minion output", &typed_outputs(g), w, &mut fail),
+            (g, _) => fail.push(format!("minion: typed {}, translated differs", g.is_some())),
+        }
         let empty = Breakdowns::default();
         compare(
             "player",

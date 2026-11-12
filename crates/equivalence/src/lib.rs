@@ -3,8 +3,10 @@
 //! `oracle/json.lua` encodes upstream's.
 
 use engine::data::Data;
+use engine::skill_data::{Gem, GrantedEffect, SkillData};
 use lua::Value;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 pub mod bridge;
 pub mod typed_build;
@@ -162,4 +164,127 @@ fn encode(v: &Value, out: &mut String, func: &dyn Fn(&Value) -> String) {
             }
         }
     }
+}
+
+/// The corpus builds' XML by id
+pub fn corpus_builds() -> Vec<(String, String)> {
+    corpus()
+        .into_iter()
+        .filter(|(_, p)| !p.extension().is_some_and(|e| e == "json"))
+        .map(|(id, p)| (id, std::fs::read_to_string(&p).unwrap()))
+        .collect()
+}
+
+/// The main skill of a build's XML, by its first gem's skill id
+fn main_skill_id(xml: &str) -> Option<String> {
+    let root = engine::xml::parse(xml).ok()?;
+    let pob = root.child("PathOfBuilding")?;
+    let main: usize = pob.child("Build")?.attr("mainSocketGroup")?.parse().ok()?;
+    let skills = pob.child("Skills")?;
+    let active = skills.attr("activeSkillSet").unwrap_or("1");
+    let set = skills
+        .elements()
+        .find(|e| e.elem == "SkillSet" && e.attr("id") == Some(active))?;
+    let group = set.elements().filter(|e| e.elem == "Skill").nth(main - 1)?;
+    group
+        .elements()
+        .filter(|e| e.elem == "Gem")
+        .find_map(|g| g.attr("skillId").map(String::from))
+}
+
+/// Every active gem `keep` selects, in each of its parts, as the main
+/// skill (the first socket group) of a generated corpus build whose main
+/// skill uses the same weapons or is a spell like it; ids
+/// `fn-<skill>-<part>-<template>`
+pub fn skill_variants(
+    data: &SkillData,
+    keep: impl Fn(&GrantedEffect) -> bool,
+) -> Vec<(String, String)> {
+    gem_variants(
+        data,
+        |g| keep(&g.granted_effect),
+        |g| {
+            let parts = g
+                .granted_effect
+                .parts
+                .as_ref()
+                .map_or(1, |p| p.len().max(1));
+            (1..=parts)
+                .map(|part| {
+                    (
+                        format!("fn-{}-{part}", g.id),
+                        "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string(),
+                        format!("skillPart=\"{part}\""),
+                    )
+                })
+                .collect()
+        },
+    )
+}
+
+/// Every active gem `keep` selects as the main skill of a generated corpus
+/// build whose main skill uses the same weapons or is a spell like it, once
+/// for each of `variants`: the id's prefix, the socket group's attributes
+/// and the gem's; ids `<prefix>-<template>`
+pub fn gem_variants(
+    data: &SkillData,
+    keep: impl Fn(&Gem) -> bool,
+    variants: impl Fn(&Gem) -> Vec<(String, String, String)>,
+) -> Vec<(String, String)> {
+    let builds: Vec<(String, String, Option<Rc<GrantedEffect>>)> = corpus_builds()
+        .into_iter()
+        .filter(|(id, _)| id.starts_with("gen-"))
+        .map(|(id, xml)| {
+            let ge = main_skill_id(&xml).and_then(|s| data.skills.get(&s).cloned());
+            (id, xml, ge)
+        })
+        .collect();
+    let spell = |ge: &GrantedEffect| {
+        ge.weapon_types.is_none() && ge.base_flags.iter().any(|f| f == "spell")
+    };
+    let mut out = Vec::new();
+    for gem in data.gems() {
+        let ge = &gem.granted_effect;
+        if !keep(gem) || ge.support || gem.name.contains("Unknown") {
+            continue;
+        }
+        let template = builds.iter().find(|(_, _, t)| {
+            t.as_ref()
+                .is_some_and(|t| match (&ge.weapon_types, &t.weapon_types) {
+                    (Some(w), Some(tw)) => w.first().is_some_and(|f| tw.contains(f)),
+                    (None, None) => spell(ge) == spell(t),
+                    _ => false,
+                })
+        });
+        let Some((tid, xml, _)) = template else {
+            continue;
+        };
+        for (prefix, group, attrs) in variants(gem) {
+            let gem_xml = format!(
+                "<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\" {attrs}/>",
+                gem.game_id, gem.natural_max_level, gem.name, gem.id, gem.variant_id
+            );
+            if let Some(v) = with_group(xml, &group, &gem_xml) {
+                out.push((format!("{prefix}-{tid}"), v));
+            }
+        }
+    }
+    out
+}
+
+/// A build's XML with a socket group of `gems` before its others, as the
+/// main skill's; `attrs` are the group's own
+pub fn with_group(xml: &str, attrs: &str, gems: &str) -> Option<String> {
+    let set = xml.find("<SkillSet id=\"1\">")?;
+    let at = set + "<SkillSet id=\"1\">".len();
+    let v = format!(
+        "{}\n<Skill enabled=\"true\" label=\"Variant\" {attrs}>\n{gems}\n</Skill>\n{}",
+        &xml[..at],
+        &xml[at..]
+    );
+    Some(engine::pat::gsub(
+        &v,
+        "mainSocketGroup=\"%d+\"",
+        "mainSocketGroup=\"1\"",
+    ))
 }
