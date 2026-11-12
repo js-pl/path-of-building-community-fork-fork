@@ -167,6 +167,24 @@ instead, family by family; `tests/game_data.rs` compares the two (items,
 skills, setup and config so far: 6.2 MB, 1.6 MB compressed, read in
 about 0.15 s natively, where starting upstream's host takes about 10 s).
 
+## Performance
+
+`cargo run --release -p equivalence --bin bench` (see `docs/design.md`,
+"Performance targets"): the sum over the default sample (6 builds) of each
+operation's median of 5 runs, in ms, typed against the translation, on a
+shared 4-core machine (expect noise of 10 to 30 %):
+
+| operation | baseline typed | translation | speedup |
+|---|---|---|---|
+| load | 594 | - | - |
+| init_env | 25.1 | 50.4 | 2.0x |
+| perform | 55.5 | 108 | 1.9x |
+| build_outputs | 705 | 653 | 0.9x |
+| misc calculator | 230 | 298 | 1.3x |
+| recalc | 793 | 1069 | 1.3x |
+| override | 99.8 | 211 | 2.1x |
+| node power (depth 1) | 8014 | 35836 | 4.5x |
+
 ## Not ported yet in `initEnv`
 
 - Rebuilding cluster jewel subgraphs after an edit (they are built once,

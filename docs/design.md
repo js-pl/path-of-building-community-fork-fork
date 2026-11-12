@@ -295,6 +295,16 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 - anoint power,
 - data download and startup time.
 
+`cargo run --release -p equivalence --bin bench` times the typed engine's
+calculations against the translation's on corpus builds (every tenth by
+default, `--all`, `--filter <id>`), the median of `--reps` runs, per build
+and summed: loading a build, `init_env`, `perform` (`MAIN`), `build_outputs`
+(`MAIN` and `CALCS` with Full DPS, against `calcs.buildOutput` twice), the
+misc calculator, a recalc (`CalcsTab:BuildOutput`), one calculator override
+(a node added or removed, with Full DPS) and node power at a depth of one
+point (combined offence and defence, no cluster notables). The baseline and
+each optimisation's numbers are in `docs/progress.md`.
+
 ## Phases
 
 0. **Harness first.** Oracle runner and JSON dumper in CI, initial corpus,
