@@ -447,7 +447,7 @@ impl<'a> Perform<'a> {
             let main = self.actor_main(a).ok_or("a minion without a main skill")?;
             self.offence(a, main)?;
         }
-        Ok(())
+        self.party_exports()
     }
 
     /// `cacheData(cacheSkillUUID(env.player.mainSkill, env), env)`
