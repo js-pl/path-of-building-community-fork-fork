@@ -424,9 +424,11 @@ impl<'d> TypedSession<'d> {
                 let node = s.node_id?;
                 let id = item.id?;
                 let sb = self.sidebar().ok()?;
+                // `jewelRadiusData[nodeId]` is set by each of the jewel's
+                // radius functions in turn: the last one's data shows
                 sb.jewel_radius_data
                     .iter()
-                    .find(|(i, n, _)| *i == id && *n == node)
+                    .rfind(|(i, n, _)| *i == id && *n == node)
                     .map(|(_, _, a)| *a)
             });
             if let Some(a) = radius {
@@ -447,10 +449,8 @@ impl<'d> TypedSession<'d> {
                         });
                     }
                 }
-                if line.is_some() {
-                    // Upstream keeps the table of the calculation that last
-                    // set it on the item, which the typed one need not match
-                    return Err(unported("a jewel's attributes in radius"));
+                if let Some(line) = line {
+                    tip.add_line(BIG, &format!("{GREY}Attributes in Radius: {line}"));
                 }
             }
         }
