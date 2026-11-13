@@ -4,7 +4,8 @@
 //! per corpus build: unallocated nodes next to the tree allocated,
 //! allocated nodes removed, items replaced or taken off, flasks toggled and
 //! a condition set. Builds that reach a part not ported yet are skipped and
-//! listed.
+//! listed. A build that differs is calculated again by a fresh translation,
+//! since upstream changes shared skill data for the rest of the process.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run.
 
@@ -130,7 +131,7 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
             .map(|s| s.sel_item_id)
             .filter(|&id| tab.item(id).is_some())
     };
-    for slot in ["Helmet", "Body Armour", "Weapon 1"] {
+    for slot in ["Helmet", "Body Armour", "Weapon 1", "Amulet"] {
         if selected(slot).is_some() {
             out.push(Case {
                 name: format!("take off {slot}"),
@@ -223,6 +224,7 @@ fn overrides_match_upstream() {
     let mut data = TypedData::load();
     let mut failures = Vec::new();
     let (mut compared, mut calcs) = (0, 0);
+    let mut aligned: Vec<String> = Vec::new();
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (id, xml) in corpus_builds() {
         if !id.contains(&filter) {
@@ -285,6 +287,46 @@ fn overrides_match_upstream() {
                 Err(e) => fail.push(format!("{}: typed failed: {e}", case.name)),
             }
         }
+        // Upstream changes shared skill data for good (`ProcessSocketGroup`
+        // clears a triggered granted skill's level cost), so a build loaded
+        // earlier can change the translation's answers: a build that
+        // differs is calculated again by a fresh translation, and aligned
+        // when that one agrees
+        if !fail.is_empty() {
+            let fresh = Host::new(Rc::new(Imported::new(upstream_src())));
+            fresh
+                .start()
+                .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+            fresh
+                .load_build_xml(xml.as_bytes(), &id)
+                .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
+            let lbuild = fresh.build().unwrap();
+            let misc = get(&get(&lbuild, "calcsTab"), "miscCalculator");
+            let calc_func = rt::index(&misc, &Value::Number(1.0)).unwrap();
+            let calc_base = rt::index(&misc, &Value::Number(2.0)).unwrap();
+            let mut again = Vec::new();
+            compare_outputs("base", calc.base(), &calc_base, &mut again);
+            for case in cases(&build, &lbuild) {
+                let Ok(got) = calc.calculate(&case.typed, true) else {
+                    continue;
+                };
+                match rt::call(&calc_func, std::slice::from_ref(&case.lua)) {
+                    Ok(r) => {
+                        let want = r.into_iter().next().unwrap_or_default();
+                        compare_outputs(&case.name, &got, &want, &mut again);
+                    }
+                    Err(e) => again.push(format!(
+                        "{}: translated failed: {}",
+                        case.name,
+                        describe(&e)
+                    )),
+                }
+            }
+            if again.is_empty() {
+                aligned.push(id.clone());
+                fail.clear();
+            }
+        }
         if !fail.is_empty() {
             let n = fail.len();
             fail.truncate(if filter.is_empty() { 20 } else { 500 });
@@ -296,6 +338,7 @@ fn overrides_match_upstream() {
     }
     let skipped: usize = skips.values().map(Vec::len).sum();
     eprintln!("{compared} builds, {calcs} overrides compared, {skipped} skipped: {skips:?}");
+    eprintln!("aligned with a fresh translation: {aligned:?}");
     assert!(
         failures.is_empty(),
         "{} builds differ:\n{}",

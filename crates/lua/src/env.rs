@@ -752,7 +752,7 @@ pub fn string_format(a: &[Value]) -> LResult<Vec<Value>> {
             b'd' | b'i' => {
                 let x = check_num(a, idx, "format")?;
                 let v = x as i64;
-                let mut b = v.abs().to_string();
+                let mut b = v.unsigned_abs().to_string();
                 if let Some(p) = prec
                     && b.len() < p
                 {
