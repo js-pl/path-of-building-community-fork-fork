@@ -537,6 +537,7 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
+    let mut popups = 0;
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -872,6 +873,9 @@ fn items_edits_match(d: &mut Dispatcher) {
                             break;
                         }
                         let label = format!("step {step} {r}");
+                        if r.contains("displayItemAnoint") || r.contains("displayItemEnchant") {
+                            popups += 1;
+                        }
                         if r.contains("displayItemAnoint") {
                             compare(d, &json!({"cmd": "state"}), &label, &mut out);
                             let button = ["save", "save", "close"][rng.below(3)];
@@ -1043,7 +1047,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} enchant and anoint popups): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
