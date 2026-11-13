@@ -89,7 +89,9 @@ pub(super) enum MinionEntry {
 /// upstream's do
 #[derive(Clone, Debug, Default)]
 pub struct Controls {
-    level: Edit,
+    pub(super) level: Edit,
+    /// The level box was typed in: its text stays as typed
+    pub(super) level_typed: bool,
     class: Drop,
     ascend: Drop,
     secondary: Drop,
@@ -552,7 +554,9 @@ impl TypedSession<'_> {
         let spec = &self.build.spec;
         let tree = spec.tree;
         let c = &mut self.controls;
-        c.level.text = engine::pat::num(self.build.info.character_level);
+        if !c.level_typed {
+            c.level.text = engine::pat::num(self.build.info.character_level);
+        }
         // `UpdateClassDropdowns(treeVersion)`
         let mut classes: Vec<_> = tree.classes.iter().collect();
         classes.sort_by(|a, b| a.1.name.cmp(&b.1.name));

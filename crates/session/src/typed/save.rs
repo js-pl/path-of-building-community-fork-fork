@@ -168,6 +168,9 @@ impl TypedSession<'_> {
     /// `saveXml`: `buildMode:SaveDB("code")`
     pub fn save_xml(&mut self) -> Result<String> {
         self.check_main()?;
+        // Upstream's frame made the Calcs tab's calculation, which writes
+        // its selections back to the gems
+        self.calcs_output()?;
         let party = self.section("Import").and_then(|i| i.attr("exportParty")) == Some("true");
         if party {
             return Err(format!("{NOT_PORTED}: exported party buffs"));
@@ -831,27 +834,11 @@ impl TypedSession<'_> {
     fn save_tree(&self) -> Result<X> {
         let (active, _) = &self.specs;
         let mut x = X::new("Tree").a("activeSpec", active.to_string());
-        let saved: Vec<&Element> = self
-            .section("Tree")
-            .iter()
-            .flat_map(|t| t.elements())
-            .filter(|e| e.elem == "Spec")
-            .collect();
-        if saved.is_empty() {
-            x.push(save_spec(&self.build.spec, None));
-            return Ok(x);
+        if self.other_specs.is_empty() {
+            x.push(save_spec(&self.build.spec));
         }
-        for (i, e) in saved.iter().enumerate() {
-            if i + 1 == *active {
-                x.push(save_spec(&self.build.spec, Some(e)));
-            } else {
-                let version = e.attr("treeVersion").unwrap_or("2_6");
-                let tree = self.data.tree(version)?;
-                let mut spec = engine::spec::PassiveSpec::new(tree, &self.data.parser)?;
-                spec.load(e)?;
-                spec.build_cluster_jewel_graphs(&self.build.items, &self.data.game.items)?;
-                x.push(save_spec(&spec, Some(e)));
-            }
+        for s in &self.other_specs {
+            x.push(save_spec(s.as_deref().unwrap_or(&self.build.spec)));
         }
         Ok(x)
     }
@@ -902,7 +889,7 @@ fn stat_value(v: &OutVal) -> Option<String> {
 }
 
 /// `PassiveSpec:Save(xml)`
-fn save_spec(spec: &engine::spec::PassiveSpec, _saved: Option<&Element>) -> X {
+fn save_spec(spec: &engine::spec::PassiveSpec) -> X {
     let mut alloc: Vec<u32> = spec.alloc_nodes.iter().map(|(id, _)| id).collect();
     alloc.sort_unstable();
     let mut masteries: Vec<(u32, f64)> = spec

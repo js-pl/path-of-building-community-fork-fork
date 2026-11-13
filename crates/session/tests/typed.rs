@@ -109,6 +109,152 @@ fn typed_session_matches_translated() {
     if run("save") {
         saves_match(&mut d);
     }
+    if run("items") {
+        items_edits_match(&mut d);
+    }
+}
+
+/// Random sequences of item, set, spec, config set, level and socket
+/// group copy edits give the translation's items, skills, sidebar,
+/// outputs and specs after each step, and its file at the end
+fn items_edits_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 11);
+        let mut out = Vec::new();
+        let compare = |d: &mut Dispatcher, req: &J, label: &str, out: &mut Vec<String>| {
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed");
+            let tr = answer(d.translated_request(&r), "translated");
+            diff(&typed, &tr, &format!("{label} {r}"), out);
+            typed
+        };
+        let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
+        for step in 0..steps_per_build {
+            if !out.is_empty() {
+                break;
+            }
+            let pick = |rng: &mut Lcg, a: &J| -> Option<J> {
+                let a = a.as_array()?;
+                (!a.is_empty()).then(|| a[rng.below(a.len())].clone())
+            };
+            let slots: Vec<J> = items["ok"]["slots"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| s["shown"] == true)
+                .collect();
+            let specs = answer(d.request(r#"{"cmd":"treeSpecs"}"#), "treeSpecs");
+            let n_specs = specs["ok"]["list"].as_array().map_or(1, Vec::len);
+            let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+                .as_array()
+                .map_or(0, Vec::len);
+            let req = match rng.below(8) {
+                0 | 1 if !slots.is_empty() => {
+                    let slot = &slots[rng.below(slots.len())];
+                    let item = pick(&mut rng, &slot["candidates"])
+                        .filter(|_| rng.below(4) != 0)
+                        .unwrap_or(json!(0));
+                    json!({"cmd": "equipItem", "slot": slot["name"], "id": item})
+                }
+                2 => match pick(&mut rng, &items["ok"]["items"]) {
+                    Some(i) => json!({"cmd": "deleteItem", "id": i["id"]}),
+                    None => continue,
+                },
+                3 => match pick(&mut rng, &items["ok"]["itemSets"]) {
+                    Some(s) => json!({"cmd": "selectItemSet", "id": s["id"]}),
+                    None => continue,
+                },
+                4 => json!({"cmd": "selectTreeSpec", "index": rng.below(n_specs) + 1}),
+                5 => json!({"cmd": "selectConfigSet", "id": rng.below(2) + 1}),
+                6 if groups > 0 => {
+                    let c = compare(
+                        d,
+                        &json!({"cmd": "copySocketGroup", "index": rng.below(groups) + 1}),
+                        &format!("step {step}"),
+                        &mut out,
+                    );
+                    match c["ok"]["text"].as_str() {
+                        Some(t) => json!({"cmd": "pasteSocketGroup", "text": t}),
+                        None => continue,
+                    }
+                }
+                _ => {
+                    let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
+                    json!({"cmd": "control", "path": "build.characterLevel", "text": text})
+                }
+            };
+            let label = format!("step {step}");
+            let r = req.to_string();
+            let t = Instant::now();
+            answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label} {r}: {e}");
+                skipped.push(format!("{id}: {r}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            times[1] += t.elapsed();
+            for f in ["state", "outputs", "skills", "treeSpecs"] {
+                compare(d, &json!({"cmd": f}), &format!("{label} {r}"), &mut out);
+            }
+            let paths = [
+                "build.characterLevel",
+                "build.classDrop",
+                "build.ascendDrop",
+            ];
+            compare(
+                d,
+                &json!({"cmd": "controls", "paths": paths}),
+                &format!("{label} {r}"),
+                &mut out,
+            );
+            items = compare(
+                d,
+                &json!({"cmd": "items"}),
+                &format!("{label} {r}"),
+                &mut out,
+            );
+            steps += 1;
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the edits", &mut out);
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} item and set edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// `saveXml` of both on the dispatcher's build: where they differ

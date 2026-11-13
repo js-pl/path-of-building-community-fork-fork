@@ -56,7 +56,7 @@ pub struct GroupEdit {
 }
 
 impl TypedSession<'_> {
-    fn skills_tab(&mut self) -> Result<&mut Skills> {
+    pub(super) fn skills_tab(&mut self) -> Result<&mut Skills> {
         self.build
             .skills
             .as_mut()
@@ -392,6 +392,12 @@ impl TypedSession<'_> {
     /// selection or a text calls them
     pub fn control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().ok_or("no control path")?;
+        if path == "build.characterLevel" {
+            if let Some(t) = req.get("text").and_then(J::as_str) {
+                self.set_character_level(t)?;
+            }
+            return Ok(json!([]));
+        }
         let (host, name) = path.split_once('.').ok_or("no control")?;
         let which = match host {
             "build" => Select::Sidebar,

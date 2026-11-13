@@ -352,7 +352,7 @@ impl ItemsTab {
     }
 
     /// `IsItemValidForSlot(item, slotName)`
-    fn valid_for_slot(
+    pub fn valid_for_slot(
         &self,
         item: &Item,
         slot_name: &str,
@@ -471,6 +471,34 @@ impl ItemsTab {
                 }
             }
             self.ordered_slots[i].sel_item_id = sel;
+        }
+        // The abyssal sockets past the parent item's count are emptied
+        for i in 0..self.ordered_slots.len() {
+            let Some(parent) = self.ordered_slots[i].parent_slot.clone() else {
+                continue;
+            };
+            let parent_sel = self
+                .ordered_slots
+                .iter()
+                .find(|s| s.slot_name == parent)
+                .map_or(0.0, |s| s.sel_item_id);
+            let count = if parent_sel > 0.0 {
+                self.item(parent_sel)
+                    .map_or(0.0, |it| it.abyssal_socket_count)
+            } else {
+                0.0
+            };
+            if self.ordered_slots[i].slot_num.unwrap_or(0.0) > count {
+                let name = self.ordered_slots[i].slot_name.clone();
+                if let Some(s) = self
+                    .item_sets
+                    .get_mut(&set_id)
+                    .and_then(|s| s.slots.get_mut(&name))
+                {
+                    s.sel_item_id = 0.0;
+                }
+                self.ordered_slots[i].sel_item_id = 0.0;
+            }
         }
     }
 }
