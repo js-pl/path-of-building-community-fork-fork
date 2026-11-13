@@ -706,7 +706,7 @@ impl Item {
     }
 
     /// `NormaliseVariantSelections`
-    fn normalise_variant_selections(&mut self) {
+    pub fn normalise_variant_selections(&mut self) {
         match &self.version_list {
             Some(list) if !list.is_empty() => {
                 let len = list.len() as f64;

@@ -10,6 +10,7 @@ mod geometry;
 mod item_db;
 mod item_display;
 mod item_editor;
+mod item_editor_controls;
 mod item_popups;
 mod item_tooltip;
 mod items;

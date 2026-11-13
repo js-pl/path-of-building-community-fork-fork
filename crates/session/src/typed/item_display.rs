@@ -513,17 +513,7 @@ impl<'d> TypedSession<'d> {
         let count = if eldritch { INFLUENCES.len() } else { 6 };
         let mut influence_list = vec![json!("Influence")];
         influence_list.extend(INFLUENCES[..count].iter().map(|(_, d)| json!(d)));
-        let (mut infl1, mut infl2) = (1.0, 1.0);
-        for (i, on) in item.influences.iter().enumerate() {
-            if *on {
-                if infl1 == 1.0 {
-                    infl1 = (i + 2) as f64;
-                } else if infl2 == 1.0 {
-                    infl2 = (i + 2) as f64;
-                    break;
-                }
-            }
-        }
+        let [infl1, infl2] = self.editor.influence;
         let infl_a = l.add(
             "displayItemInfluence",
             Some((Point::TopLeft, si, Point::TopRight, false)),
@@ -536,7 +526,7 @@ impl<'d> TypedSession<'d> {
         );
         for (i, sel) in [(infl_a, infl1), (infl_b, infl2)] {
             l.ctls[i].shown = item.can_be_influenced;
-            let mut d = drop_desc(influence_list.clone(), clamp_sel(sel, influence_list.len()));
+            let mut d = drop_desc(influence_list.clone(), sel);
             d.insert("tooltip".into(), json!(INFLUENCE_TIP));
             l.ctls[i].desc = Some(d);
         }
@@ -558,12 +548,7 @@ impl<'d> TypedSession<'d> {
             [2.0, 0.0, 60.0, 20.0],
         );
         l.ctls[quality_edit].shown = item.quality.is_some();
-        l.ctls[quality_edit].desc = Some(edit_desc(
-            &item
-                .quality
-                .map(lua::value::format_number)
-                .unwrap_or_default(),
-        ));
+        l.ctls[quality_edit].desc = Some(edit_desc(&self.editor.quality_buf));
         l.ctls[sq].h = if l.is_shown(quality) && l.is_shown(quality_edit) {
             28.0
         } else {
@@ -594,8 +579,7 @@ impl<'d> TypedSession<'d> {
             [2.0, 0.0, 60.0, 20.0],
         );
         l.ctls[cat_quality].shown = (item.crafted || item.has_mod_tags) && cat > 0.0;
-        let cq = item.catalyst_quality.map_or(0.0, |q| q.max(0.0));
-        l.ctls[cat_quality].desc = Some(edit_desc(&lua::value::format_number(cq)));
+        l.ctls[cat_quality].desc = Some(edit_desc(&self.editor.catalyst_quality_buf));
         l.ctls[sc].h = if l.is_shown(catalyst) || l.is_shown(cat_quality) {
             28.0
         } else {
@@ -650,9 +634,7 @@ impl<'d> TypedSession<'d> {
                 skills.iter().map(|(n, _)| json!(n)).collect(),
                 sel,
             ));
-            let count = item.cluster_jewel_node_count.unwrap_or(cj.min_nodes);
-            let val = (count - cj.min_nodes) / (cj.max_nodes - cj.min_nodes);
-            let mut d = slider_desc(Some(val));
+            let mut d = slider_desc(Some(self.editor.cluster_count_val));
             d.insert("label".into(), json!("^7Added Passives:"));
             l.ctls[cj_count].desc = Some(d);
         }
@@ -811,12 +793,8 @@ impl<'d> TypedSession<'d> {
         let unique = item.rarity == "UNIQUE";
         let range_line = l.add("displayItemRangeLine", tl(sr), [0.0, 0.0, 350.0, 18.0]);
         l.ctls[range_line].shown = !range_lines.is_empty() && !(SHOW_ALL_ITEM_AFFIXES && unique);
-        let listed: Vec<J> = range_lines
-            .iter()
-            .filter(|ml| (ml.mod_id.is_some() && ml.new_mod_id.is_some()) || ml.range.is_some())
-            .map(|ml| json!(ml.line))
-            .collect();
-        l.ctls[range_line].desc = Some(drop_desc(listed, 1.0));
+        let listed: Vec<J> = self.editor.range_list.iter().map(|l| json!(l)).collect();
+        l.ctls[range_line].desc = Some(drop_desc(listed, self.editor.range_sel as f64));
         let mutated = l.add(
             "displayItemMutatedCheckbox",
             Some((Point::Left, range_line, Point::Right, true)),
@@ -828,10 +806,12 @@ impl<'d> TypedSession<'d> {
             Some((Point::Left, mutated, Point::Right, true)),
             [4.0, 0.0, 100.0, 18.0],
         );
-        let first = range_lines.first();
+        // The line of the selection's index, not of the list's entry
+        let selected = range_lines.get(self.editor.range_sel.wrapping_sub(1));
         l.ctls[range_slider].shown =
-            !(SHOW_ALL_ITEM_AFFIXES && unique) && first.is_some_and(|ml| ml.show_slider);
-        l.ctls[range_slider].desc = Some(slider_desc(first.and_then(|ml| ml.range)));
+            !(SHOW_ALL_ITEM_AFFIXES && unique) && selected.is_some_and(|ml| ml.show_slider);
+        let val = selected.and_then(|ml| ml.range).or(self.editor.range_val);
+        l.ctls[range_slider].desc = Some(slider_desc(val));
         let mut box_y = 2.0;
         for i in 1..=20usize {
             let line = range_lines.get(i - 1);
@@ -878,22 +858,92 @@ impl<'d> TypedSession<'d> {
         Ok(J::Array(out.into_iter().map(|(_, _, d)| d).collect()))
     }
 
+    /// `SetDisplayItem`'s controls: the influences, quality, catalyst
+    /// quality and range lines
+    pub(super) fn set_display_controls(&mut self) {
+        let Some(item) = &self.display_item else {
+            return;
+        };
+        let typ = item.typ.as_deref().unwrap_or("");
+        let eldritch = item.can_have_eldritch_influence
+            || ["Helmet", "Body Armour", "Gloves", "Boots"].contains(&typ);
+        let len = 1 + if eldritch { INFLUENCES.len() } else { 6 };
+        let (mut a, mut b) = (1.0, 1.0);
+        for (i, on) in item.influences.iter().enumerate() {
+            if *on {
+                if a == 1.0 {
+                    a = (i + 2) as f64;
+                } else if b == 1.0 {
+                    b = (i + 2) as f64;
+                    break;
+                }
+            }
+        }
+        self.editor.influence = [clamp_sel(a, len), clamp_sel(b, len)];
+        self.editor.quality_buf = item
+            .quality
+            .map_or_else(|| "nil".to_string(), lua::value::format_number);
+        self.editor.catalyst_quality_buf =
+            lua::value::format_number(item.catalyst_quality.map_or(0.0, |q| q.max(0.0)));
+        // `UpdateDisplayItemRangeLines`
+        let lines = self.range_line_list(item);
+        if let Some(first) = lines.first() {
+            self.editor.range_list = lines
+                .iter()
+                .filter(|ml| (ml.mod_id.is_some() && ml.new_mod_id.is_some()) || ml.range.is_some())
+                .map(|ml| ml.line.clone())
+                .collect();
+            self.editor.range_sel = 1;
+            self.editor.range_val = first.range;
+        }
+    }
+
     /// `item.rangeLineList`: the lines `BuildModList` gave a range slider
     /// or a Foulborn transformation, in its order
-    fn range_line_list<'a>(&self, item: &'a Item) -> Vec<&'a engine::item::ModLine> {
-        item.enchant_mod_lines
-            .iter()
-            .chain(&item.scourge_mod_lines)
-            .chain(&item.class_requirement_mod_lines)
-            .chain(&item.implicit_mod_lines)
-            .chain(&item.explicit_mod_lines)
-            .chain(&item.crucible_mod_lines)
-            .filter(|ml| {
-                !ml.flags.disabled
-                    && item.mod_line_variant_count(ml) > 0
-                    && ((ml.show_slider && ml.extra.is_none())
-                        || (ml.mod_id.is_some() && ml.new_mod_id.is_some()))
-            })
+    pub(super) fn range_line_list<'a>(&self, item: &'a Item) -> Vec<&'a engine::item::ModLine> {
+        range_line_index(item)
+            .into_iter()
+            .map(|(k, i)| &mod_lines(item)[k][i])
             .collect()
     }
+}
+
+/// The mod line lists `BuildModList` goes through, in its order
+pub(super) fn mod_lines(item: &Item) -> [&Vec<engine::item::ModLine>; 6] {
+    [
+        &item.enchant_mod_lines,
+        &item.scourge_mod_lines,
+        &item.class_requirement_mod_lines,
+        &item.implicit_mod_lines,
+        &item.explicit_mod_lines,
+        &item.crucible_mod_lines,
+    ]
+}
+
+pub(super) fn mod_lines_mut(item: &mut Item, k: usize) -> &mut Vec<engine::item::ModLine> {
+    match k {
+        0 => &mut item.enchant_mod_lines,
+        1 => &mut item.scourge_mod_lines,
+        2 => &mut item.class_requirement_mod_lines,
+        3 => &mut item.implicit_mod_lines,
+        4 => &mut item.explicit_mod_lines,
+        _ => &mut item.crucible_mod_lines,
+    }
+}
+
+/// `item.rangeLineList` as (list, index) pairs of [`mod_lines`]
+pub(super) fn range_line_index(item: &Item) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    for (k, list) in mod_lines(item).iter().enumerate() {
+        for (i, ml) in list.iter().enumerate() {
+            if !ml.flags.disabled
+                && item.mod_line_variant_count(ml) > 0
+                && ((ml.show_slider && ml.extra.is_none())
+                    || (ml.mod_id.is_some() && ml.new_mod_id.is_some()))
+            {
+                out.push((k, i));
+            }
+        }
+    }
+    out
 }
