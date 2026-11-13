@@ -22,7 +22,6 @@ use serde_json::{Map, Value as J, json};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::sync::{Condvar, Mutex};
 use upstream::host::Host;
 use upstream::imported::Imported;
 
@@ -479,19 +478,14 @@ fn mirages_match_upstream() {
 
 /// Builds one process compares
 const CHUNK: usize = 25;
-/// Processes comparing at once, over all the tests
-const JOBS: usize = 3;
-static RUNNING: Mutex<usize> = Mutex::new(0);
-static DONE: Condvar = Condvar::new();
 
 /// Compares the builds of the test `test` in processes of their own, `CHUNK`
-/// builds each and `JOBS` at once: the translated program keeps about
+/// builds each (`testkit::run_shards`): the translated program keeps about
 /// 12 MB of every build it loaded, next to the 1.6 GB it starts with, so a
-/// thousand builds in one process, and the tests' processes side by side,
-/// run out of memory. The processes are this test again, given their builds
-/// in the file `PERFORM_BUILDS` names
+/// thousand builds in one process run out of memory. The processes are
+/// this test again, given their builds in the file their shard names
 fn run_builds(test: &str, make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
-    if let Some(path) = std::env::var_os("PERFORM_BUILDS") {
+    if let Some(path) = testkit::shard() {
         let builds = std::fs::read(path).unwrap();
         return compare_builds(serde_json::from_slice(&builds).unwrap());
     }
@@ -506,47 +500,22 @@ fn run_builds(test: &str, make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>
     let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join(format!("perform-{}-{test}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let exe = std::env::current_exe().unwrap();
-    let outputs: Vec<std::process::Output> = std::thread::scope(|scope| {
-        let runs: Vec<_> = builds
-            .chunks(CHUNK)
-            .enumerate()
-            .map(|(k, chunk)| {
-                let path = dir.join(k.to_string());
-                std::fs::write(&path, serde_json::to_vec(chunk).unwrap()).unwrap();
-                let exe = &exe;
-                scope.spawn(move || {
-                    let mut running = RUNNING.lock().unwrap();
-                    while *running >= JOBS {
-                        running = DONE.wait(running).unwrap();
-                    }
-                    *running += 1;
-                    drop(running);
-                    let out = std::process::Command::new(exe)
-                        .args([test, "--exact", "--nocapture"])
-                        .env("PERFORM_BUILDS", &path)
-                        .output();
-                    *RUNNING.lock().unwrap() -= 1;
-                    DONE.notify_all();
-                    out.unwrap()
-                })
-            })
-            .collect();
-        runs.into_iter().map(|r| r.join().unwrap()).collect()
+    let shards: Vec<String> = builds
+        .chunks(CHUNK)
+        .enumerate()
+        .map(|(k, chunk)| {
+            let path = dir.join(k.to_string());
+            std::fs::write(&path, serde_json::to_vec(chunk).unwrap()).unwrap();
+            path.to_string_lossy().into_owned()
+        })
+        .collect();
+    let result = std::panic::catch_unwind(|| {
+        testkit::run_shards(test, &shards, &["performs compared"]);
     });
     std::fs::remove_dir_all(&dir).unwrap();
-    let mut failures = Vec::new();
-    for out in outputs {
-        let text = String::from_utf8_lossy(&out.stderr);
-        if out.status.success() {
-            for line in text.lines().filter(|l| l.contains("performs compared")) {
-                eprintln!("{line}");
-            }
-        } else {
-            failures.push(format!("{}: {text}", out.status));
-        }
+    if let Err(e) = result {
+        std::panic::resume_unwind(e);
     }
-    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 fn compare_builds(builds: Vec<(String, String)>) {

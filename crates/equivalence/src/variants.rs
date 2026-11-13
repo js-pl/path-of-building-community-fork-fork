@@ -491,25 +491,33 @@ pub fn tattoo_variants(data: &mut TypedData) -> Vec<(String, String)> {
 }
 
 /// Generated corpus builds with a timeless jewel of each kind and
-/// conqueror socketed in the allocated socket with the most allocated
+/// conqueror (the Abyss jewels with them) socketed in the allocated socket with the most allocated
 /// nodes in its radius, with a seed of their own; ids
 /// `timeless-<jewel>-<variant>-<template>`
 pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
-    const JEWELS: [&str; 6] = [
+    const JEWELS: [&str; 11] = [
         "Glorious Vanity",
         "Lethal Pride",
         "Brutal Restraint",
         "Militant Faith",
         "Elegant Hubris",
         "Heroic Tragedy",
+        // The Abyss jewels: Tecrod, Ulaman, Kurgal, Amanamu, Zorath
+        "Festering Vengeance",
+        "Extinguishing Grasp",
+        "Baleful Dominion",
+        "Destructive Aspiration",
+        "Reclaimed Malevolence",
     ];
     let texts: Vec<String> = uniques()
         .into_iter()
         .filter(|t| JEWELS.contains(&t.lines().next().unwrap_or("")))
         .collect();
-    let mut out = Vec::new();
+    let (mut out, mut abyss_out) = (Vec::new(), Vec::new());
     for (n, (id, xml)) in corpus_builds().into_iter().enumerate() {
-        if !id.starts_with("gen-") || n % 15 != 0 {
+        // The Abyss jewels, whose changes depend on the socket and the
+        // path to it, in three times as many builds
+        if !id.starts_with("gen-") || n % 5 != 0 {
             continue;
         }
         let root = engine::xml::parse(&xml).unwrap();
@@ -541,6 +549,9 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
         };
         for text in &texts {
             let name = text.lines().next().unwrap_or("");
+            if n % 15 != 0 && JEWELS[..6].contains(&name) {
+                continue;
+            }
             let variants = text
                 .lines()
                 .filter(|l| l.starts_with("Variant:"))
@@ -558,10 +569,17 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
                     continue;
                 };
                 let short: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-                out.push((format!("timeless-{short}-{v}-{id}"), x));
+                let abyss = !JEWELS[..6].contains(&name);
+                (if abyss { &mut abyss_out } else { &mut out })
+                    .push((format!("timeless-{short}-{v}-{id}"), x));
             }
         }
     }
+    // The Abyss jewels last: a conquered node's `setSource` rewrites the
+    // source of the mod parser's cached mods, which the legion keystones
+    // share, so in a translation that calculated them before a keystone
+    // conquered by another jewel names another node
+    out.extend(abyss_out);
     out
 }
 
