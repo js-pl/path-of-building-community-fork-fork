@@ -167,7 +167,6 @@ impl TypedSession<'_> {
 
     /// `saveXml`: `buildMode:SaveDB("code")`
     pub fn save_xml(&mut self) -> Result<String> {
-        self.check_main()?;
         // Upstream's frame made the Calcs tab's calculation, which writes
         // its selections back to the gems
         self.calcs_output()?;
@@ -508,8 +507,6 @@ impl TypedSession<'_> {
 
     fn save_items(&mut self) -> Result<X> {
         let ctx = self.data.item_context();
-        let new_build = self.new_build;
-        let second_set = |v: bool| if new_build { "nil".to_string() } else { b(v) };
         let tab = &mut self.build.items;
         let active = tab
             .item_sets
@@ -522,12 +519,14 @@ impl TypedSession<'_> {
         let show = xml
             .and_then(|i| i.attr("showStatDifferences"))
             .is_none_or(|v| v == "true");
+        // Without an `Items` section `ItemsTab:Load` leaves it nil
+        let second = match xml {
+            Some(_) => b(active.use_second_weapon_set),
+            None => "nil".to_string(),
+        };
         let mut x = X::new("Items")
             .a("activeItemSet", n(tab.active_item_set_id))
-            .a(
-                "useSecondWeaponSet",
-                second_set(active.use_second_weapon_set),
-            )
+            .a("useSecondWeaponSet", second)
             .a("showStatDifferences", b(show));
         for id in tab.item_order_list.clone() {
             let Some(item) = tab.items.get_mut(&(id as i64)) else {
@@ -593,7 +592,13 @@ impl TypedSession<'_> {
             let mut c = X::new("ItemSet")
                 .a("id", n(*set_id))
                 .a("title", set.title.clone())
-                .a("useSecondWeaponSet", second_set(set.use_second_weapon_set));
+                .a(
+                    "useSecondWeaponSet",
+                    match xml {
+                        Some(_) => b(set.use_second_weapon_set),
+                        None => "nil".to_string(),
+                    },
+                );
             for slot in &tab.ordered_slots {
                 let name = &slot.slot_name;
                 match slot.node_id {
@@ -667,7 +672,8 @@ impl TypedSession<'_> {
                 );
             }
         }
-        if !self.new_build {
+        // `ItemsTab:Load` makes the trade weights' list
+        if xml.is_some() {
             x.push(weights);
         }
         Ok(x)
@@ -757,7 +763,7 @@ impl TypedSession<'_> {
             )
             .a(
                 "defaultGemQuality",
-                if self.new_build {
+                if self.gem_quality_nil {
                     "nil".to_string()
                 } else {
                     n(skills.default_gem_quality)

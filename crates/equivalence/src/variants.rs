@@ -279,6 +279,73 @@ pub fn trigger_variants(data: &mut TypedData) -> Vec<(String, String)> {
     out
 }
 
+/// Mirages of skills with minions: The Saviour's Reflection and Tawhoa's
+/// Felling's Tawhoa's Chosen (Mirage Archer and Sacred Wisps support no
+/// minion skill) as the main skill of each template, its weapon the
+/// unique and Dominating Blow its only other skill; ids
+/// `mirage-<item>-<template>`
+pub fn mirage_variants(data: &mut TypedData) -> Vec<(String, String)> {
+    let templates = templates(data);
+    let Some(blow) = data.skills.gem_for_skill("DominatingBlow").cloned() else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (name, short) in [("The Saviour", "saviour"), ("Tawhoa's Felling", "tawhoa")] {
+        let Some(text) = uniques()
+            .into_iter()
+            .find(|t| t.lines().next() == Some(name))
+        else {
+            continue;
+        };
+        for t in &templates {
+            let Some((xml, id)) = with_item(&t.xml, &text, "Weapon 1") else {
+                continue;
+            };
+            // Dominating Blow the only attack the mirage can use
+            let xml = xml.replace("<Skill enabled=\"true\"", "<Skill enabled=\"false\"");
+            let Some(xml) = with_group(
+                &xml,
+                "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"",
+                &gem_xml(&blow, ""),
+            ) else {
+                continue;
+            };
+            let root = engine::xml::parse(&xml).unwrap();
+            data.load_tree(&root);
+            let Ok(mut build) = data.load_build(&root) else {
+                continue;
+            };
+            let Ok(env) = engine::calc_env::init_env(
+                &mut build,
+                &data.calc_data(),
+                engine::calc_env::CalcMode::Main,
+            ) else {
+                continue;
+            };
+            let source = format!("Item:{id}:");
+            if let Some(k) = env
+                .groups
+                .iter()
+                .position(|g| g.source.as_deref().is_some_and(|s| s.starts_with(&source)))
+            {
+                // The sidebar's main skill and the Calcs tab's
+                let v = engine::pat::gsub(
+                    &xml,
+                    "mainSocketGroup=\"%d+\"",
+                    &format!("mainSocketGroup=\"{}\"", k + 1),
+                );
+                let v = engine::pat::gsub(
+                    &v,
+                    "<Input name=\"skill_number\" number=\"%d+\"/>",
+                    &format!("<Input name=\"skill_number\" number=\"{}\"/>", k + 1),
+                );
+                out.push((format!("mirage-{short}-{}", t.id), v));
+            }
+        }
+    }
+    out
+}
+
 /// One build of each of [`trigger_variants`]' gems, items, socket groups
 /// and main skills: its templates in turn, so every trigger configuration
 /// runs and every template is used. A trigger variant takes over a second

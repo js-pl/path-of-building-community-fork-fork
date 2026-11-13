@@ -56,8 +56,10 @@ impl TypedSession<'_> {
                 .ok_or("no config set")?
         };
         config.active_config_set_id = id;
+        self.update_config_controls();
         self.build
             .build_config_mods(&self.data.game.config, &self.data.parser)?;
+        self.config_mods_built();
         self.rebuild()?;
         Ok(json!([]))
     }
@@ -69,6 +71,7 @@ impl TypedSession<'_> {
         self.build.info.character_level_auto_mode = false;
         self.build
             .build_config_mods(&self.data.game.config, &self.data.parser)?;
+        self.config_mods_built();
         self.controls.level.text = text.to_string();
         self.controls.level_typed = true;
         self.rebuild()

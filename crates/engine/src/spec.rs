@@ -204,6 +204,9 @@ pub struct PassiveSpec<'t> {
     pub cur_class_id: Option<i64>,
     pub cur_ascend_class_id: Option<i64>,
     pub cur_secondary_ascend_class_id: Option<i64>,
+    /// `curSecondaryAscendClass`, by id: unlike the id, selecting nil
+    /// leaves it
+    pub cur_secondary_ascend_class: Option<i64>,
     pub allocated_mastery_count: u32,
     pub allocated_notable_count: u32,
     pub allocated_keystone_count: u32,
@@ -247,6 +250,7 @@ impl<'t> PassiveSpec<'t> {
             cur_class_id: None,
             cur_ascend_class_id: None,
             cur_secondary_ascend_class_id: None,
+            cur_secondary_ascend_class: None,
             allocated_mastery_count: 0,
             allocated_notable_count: 0,
             allocated_keystone_count: 0,
@@ -450,6 +454,11 @@ impl<'t> PassiveSpec<'t> {
             self.dealloc(i);
         }
         self.cur_secondary_ascend_class_id = ascend_class_id;
+        match ascend_class_id {
+            Some(0) => self.cur_secondary_ascend_class = None,
+            Some(id) if find(id).is_some() => self.cur_secondary_ascend_class = Some(id),
+            _ => {}
+        }
         if let Some(id) = ascend_class_id.filter(|id| *id != 0)
             && let Some(a) = find(id)
             && let Some(i) = self.start_index(a.start_node_id)
@@ -762,6 +771,32 @@ impl<'t> PassiveSpec<'t> {
             self.mastery_selections.remove(self.nodes[i].id);
         }
         Ok(())
+    }
+
+    /// `IsClassConnected(classId)`: whether an allocated node next to the
+    /// class's start node leads back to the current class's start
+    pub fn is_class_connected(&mut self, class_id: i64) -> Result<bool> {
+        let start = self.class(class_id)?.start_node_id;
+        let Some(start) = self.start_index(start) else {
+            return Ok(false);
+        };
+        for li in 0..self.nodes[start].linked.len() {
+            let other = self.nodes[start].linked[li];
+            if !self.nodes[other].alloc {
+                continue;
+            }
+            self.nodes[other].visited = true;
+            let mut visited = Vec::new();
+            let found = self.find_start(other, &mut visited, true);
+            for v in visited {
+                self.nodes[v].visited = false;
+            }
+            self.nodes[other].visited = false;
+            if found {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// `FindStartFromNode(node, visited, noAscend)`: whether an allocated

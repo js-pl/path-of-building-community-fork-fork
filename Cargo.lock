@@ -81,6 +81,7 @@ dependencies = [
  "mimalloc",
  "miniz_oxide",
  "serde_json",
+ "testkit",
  "upstream",
 ]
 
@@ -241,6 +242,7 @@ dependencies = [
  "lua",
  "miniz_oxide",
  "serde_json",
+ "testkit",
  "upstream",
 ]
 
@@ -260,6 +262,10 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "testkit"
+version = "0.0.0"
 
 [[package]]
 name = "unicode-ident"

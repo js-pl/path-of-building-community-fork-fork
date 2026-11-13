@@ -821,7 +821,7 @@ impl Item {
     }
 
     /// `NormaliseQuality`
-    fn normalise_quality(&mut self) {
+    pub fn normalise_quality(&mut self) {
         let Some(base) = &self.base else {
             return;
         };
