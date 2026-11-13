@@ -160,13 +160,19 @@ impl<'d> Dispatcher<'d> {
                 let xml = decode_build_code(req["code"].as_str()?)?;
                 self.load(data, &xml, name, json)
             }
-            "state" => self.typed.as_ref()?.state().ok().map(ok),
+            "state" => view(&mut self.typed_error, self.typed.as_ref()?.state()),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
-            "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
-            "tree" => self.typed.as_ref()?.tree().ok().map(ok),
-            "treeState" => self.typed.as_ref()?.tree_state().ok().map(ok),
-            "nodePath" => self.typed.as_ref()?.node_path(id(&req)?).ok().map(ok),
-            "masteryOptions" => self.typed.as_ref()?.mastery_options(id(&req)?).ok().map(ok),
+            "calcs" => view(&mut self.typed_error, self.typed.as_mut()?.calcs()),
+            "tree" => view(&mut self.typed_error, self.typed.as_ref()?.tree()),
+            "treeState" => view(&mut self.typed_error, self.typed.as_ref()?.tree_state()),
+            "nodePath" => view(
+                &mut self.typed_error,
+                self.typed.as_ref()?.node_path(id(&req)?),
+            ),
+            "masteryOptions" => view(
+                &mut self.typed_error,
+                self.typed.as_ref()?.mastery_options(id(&req)?),
+            ),
             "treeSpecs" => Some(ok(self.typed.as_ref()?.tree_specs())),
             "powerStats" => {
                 self.typed.as_ref()?;
@@ -181,7 +187,7 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.select_mastery(id, effect))
             }
             "resetTree" => self.edit(json, |s| s.reset_tree()),
-            "skills" => self.typed.as_ref()?.skills().ok().map(ok),
+            "skills" => view(&mut self.typed_error, self.typed.as_ref()?.skills()),
             "gemList" => Some(ok(self.typed.as_ref()?.gem_list())),
             "setMainSocketGroup" => {
                 let i = req["index"].as_f64()?;
@@ -243,12 +249,15 @@ impl<'d> Dispatcher<'d> {
                     .iter()
                     .map(|v| v.as_u64().map(|n| n as usize))
                     .collect::<Option<_>>()?;
-                self.typed.as_mut()?.breakdown(&cell).ok().map(ok)
+                view(&mut self.typed_error, self.typed.as_mut()?.breakdown(&cell))
             }
-            "items" => self.typed.as_mut()?.items().ok().map(ok),
+            "items" => view(&mut self.typed_error, self.typed.as_mut()?.items()),
             "copySocketGroup" => {
                 let i = req["index"].as_f64()?;
-                self.typed.as_ref()?.copy_socket_group(i).ok().map(ok)
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.copy_socket_group(i),
+                )
             }
             "pasteSocketGroup" => {
                 let text = req["text"].as_str()?.to_string();
@@ -291,7 +300,7 @@ impl<'d> Dispatcher<'d> {
             }
             "saveXml" => self.edit(json, |s| Ok(json!({ "xml": s.save_xml()? }))),
             "saveCode" => self.edit(json, |s| Ok(json!({ "code": s.save_code()? }))),
-            "config" => self.typed.as_ref()?.config().ok().map(ok),
+            "config" => view(&mut self.typed_error, self.typed.as_ref()?.config()),
             "undo" => self.edit(json, |s| s.undo()),
             "newBuild" => match TypedSession::new_build(data) {
                 Ok(mut s) => {
@@ -318,7 +327,10 @@ impl<'d> Dispatcher<'d> {
             "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
-                self.typed.as_ref()?.node_power(index).ok().map(ok)
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.node_power(index),
+                )
             }
             _ => None,
         }
@@ -369,6 +381,11 @@ impl<'d> Dispatcher<'d> {
             }
         }
     }
+}
+
+/// A view's answer; why the typed engine has none
+fn view(error: &mut Option<String>, r: crate::typed::Result<J>) -> Option<String> {
+    r.map_err(|e| *error = Some(e)).ok().map(ok)
 }
 
 /// A request's node id
