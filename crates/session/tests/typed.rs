@@ -168,11 +168,12 @@ fn typed_session_matches_translated() {
 }
 
 /// The Skills tab's gem dropdown sorted by DPS (`gemList` of a group's
-/// gem slot: `GemSelectControl`'s list, each gem's DPS in the slot) gives
-/// the translation's, on every eighth corpus build: the main group's
-/// second slot, or the slot after its last gem
+/// gem slot: `GemSelectControl`'s list, each gem's DPS in the slot) and the
+/// Items tab's item databases (`controls` of `items.uniqueDB` sorted by a
+/// stat and searched, its inputs, `items.rareDB` searched) give the
+/// translation's, on every eighth corpus build
 fn power_sorts_match(d: &mut Dispatcher) {
-    let (mut failures, mut compared) = (Vec::new(), 0);
+    let (mut failures, mut compared, mut items_compared) = (Vec::new(), 0, 0);
     let (mut t_typed, mut t_tr) = (Duration::ZERO, Duration::ZERO);
     let builds: Vec<_> = corpus().into_iter().step_by(8).collect();
     for (n, (id, path)) in mine(builds).into_iter().enumerate() {
@@ -216,8 +217,64 @@ fn power_sorts_match(d: &mut Dispatcher) {
             failures.push(format!("{id}: {n} differences\n    {}", out.join("\n    ")));
         }
         compared += 1;
+        // The unique database sorted by a stat, its search limiting it to a
+        // few items (one a flask), and the rare one searched
+        const SEARCHES: [&str; 6] = ["kaom", "atziri", "doryani", "lioneye", "berek", "rigwald"];
+        const SORTS: [usize; 5] = [3, 12, 2, 15, 1];
+        let edits = [
+            json!({"cmd": "control", "path": "items.uniqueDB.search", "text": SEARCHES[n % SEARCHES.len()]}),
+            json!({"cmd": "control", "path": "items.uniqueDB.sort", "sel": SORTS[n % SORTS.len()]}),
+            json!({"cmd": "control", "path": "items.rareDB.search", "text": "amulet"}),
+        ];
+        for e in &edits {
+            let r = answer(d.request(&e.to_string()), "item db control");
+            if let Some(err) = d.typed_error.take() {
+                failures.push(format!("{id}: {e}: fell back: {err}"));
+            }
+            assert!(r.get("error").is_none(), "{id}: {e}: {r}");
+        }
+        let paths = [
+            "items.uniqueDB",
+            "items.rareDB",
+            "items.uniqueDB.sort",
+            "items.uniqueDB.search",
+            "items.uniqueDB.slot",
+            "items.uniqueDB.type",
+            "items.uniqueDB.league",
+            "items.uniqueDB.requirement",
+            "items.uniqueDB.obtainable",
+            "items.uniqueDB.searchMode",
+            "items.rareDB.search",
+            "items.rareDB.sort",
+        ];
+        let req = json!({"cmd": "controls", "paths": paths}).to_string();
+        let t = Instant::now();
+        let typed = answer(d.request(&req), "typed item db");
+        t_typed += t.elapsed();
+        if let Some(e) = d.typed_error.take() {
+            failures.push(format!("{id}: item db fell back: {e}"));
+            continue;
+        }
+        let t = Instant::now();
+        let tr = answer(d.translated_request(&req), "translated item db");
+        t_tr += t.elapsed();
+        let mut out = Vec::new();
+        diff(&typed, &tr, "itemDb", &mut out);
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(10);
+            failures.push(format!(
+                "{id}: {n} item db differences\n    {}",
+                out.join("\n    ")
+            ));
+        }
+        items_compared += typed["ok"]["items.uniqueDB"]["list"]
+            .as_array()
+            .map_or(0, Vec::len);
     }
-    eprintln!("{compared} gem lists compared: typed {t_typed:.1?}, translated {t_tr:.1?}");
+    eprintln!(
+        "{compared} gem lists and item databases compared ({items_compared} unique rows): typed {t_typed:.1?}, translated {t_tr:.1?}"
+    );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 

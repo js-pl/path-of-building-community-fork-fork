@@ -90,6 +90,9 @@ local function listLabel(value)
 	return tostring(value)
 end
 
+-- Builds a list control's list now (defined below)
+local buildList
+
 local function describeControl(control)
 	local c = { class = control._className }
 	c.shown = control:IsShown() and true or false
@@ -110,6 +113,15 @@ local function describeControl(control)
 		c.val = control.val
 	elseif control._className == "LabelControl" then
 		c.label = control:GetProperty("label")
+	elseif control._className == "ItemDBControl" then
+		-- The items the filters let through, in the sort's order, each with
+		-- its power by the sort's stat
+		-- Drawing the tab updates the jewel sockets' activity first
+		build().itemsTab:UpdateSockets()
+		buildList(control)
+		c.list = arrayOf(control.list, function(item)
+			return { name = item.name, power = control.sortDetail and control.sortDetail.stat and item.measuredPower or nil }
+		end)
 	end
 	local label = control.label
 	if type(label) == "string" and c.label == nil then
@@ -123,8 +135,9 @@ local function describeControl(control)
 	return c
 end
 
--- A list a coroutine builds as it draws (NotableDBControl), built now
-local function buildList(control)
+-- A list a coroutine builds as it draws (NotableDBControl, ItemDBControl),
+-- built now
+function buildList(control)
 	if control.ListBuilder and (control.listBuildFlag or control.listOutputRevision ~= build().outputRevision) then
 		control.listBuildFlag = false
 		control.listBuilder = nil

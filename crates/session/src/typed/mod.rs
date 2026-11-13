@@ -14,6 +14,7 @@ mod item_anoint;
 mod item_corrupt;
 mod item_crucible;
 mod item_db;
+mod item_db_list;
 mod item_display;
 mod item_editor;
 mod item_editor_controls;
@@ -290,6 +291,8 @@ pub struct TypedSession<'d> {
     party_laid_out: std::cell::Cell<bool>,
     /// The item editor's controls
     editor: item_editor::Editor,
+    /// The unique and rare item database lists' inputs
+    item_db_lists: [item_db_list::DbList; 2],
 }
 
 impl<'d> TypedSession<'d> {
@@ -328,6 +331,7 @@ impl<'d> TypedSession<'d> {
             display_item: None,
             party_laid_out: Default::default(),
             editor: Default::default(),
+            item_db_lists: Default::default(),
             root,
         };
         // `ConfigTab:Load` shows the loaded set
@@ -361,6 +365,12 @@ impl<'d> TypedSession<'d> {
                 ("calcs", name) => self.calcs_control(name)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
+                ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                // An input the database's list does not have (the rare
+                // one's sort), which upstream leaves out
+                ("items", name) if name.starts_with("uniqueDB.") || name.starts_with("rareDB.") => {
+                    continue;
+                }
                 _ => return None,
             };
             out.insert(p.to_string(), c);
