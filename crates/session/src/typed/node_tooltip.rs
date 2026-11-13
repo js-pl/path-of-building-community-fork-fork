@@ -341,10 +341,9 @@ impl TypedSession<'_> {
         // An allocated mastery with a popup open (the mastery popup's
         // options, upstream) compares with the node added again
         let realloc = node.alloc && kind == NodeType::Mastery && self.ui.popups != J::Array(vec![]);
+        // Masteries link to no node, so none depends on one
         if realloc && path_len > 1 {
-            return Err(format!(
-                "{NOT_PORTED}: a mastery tooltip with a popup open and dependent nodes"
-            ));
+            return Err(format!("mastery {} with dependent nodes", node.id));
         }
         let mut path_out = None;
         let node_out = if realloc {

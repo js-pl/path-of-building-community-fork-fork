@@ -848,6 +848,11 @@ fn config_edits_match(d: &mut Dispatcher) {
                     .as_object()
                     .and_then(|m| m.keys().next()?.parse::<u32>().ok());
                 if let Some(m) = mastery {
+                    // An allocated mastery has no dependent nodes: its path
+                    // (`depends`) is itself
+                    let p = json!({"cmd": "nodePath", "id": m}).to_string();
+                    let path = answer(d.request(&p), "nodePath");
+                    assert_eq!(path["ok"]["path"], json!([m]), "{id}: {label}: {p}");
                     let q = json!({"cmd": "nodeTooltip", "id": m}).to_string();
                     let t = answer(d.request(&q), "typed tooltip");
                     let tr = answer(d.translated_request(&q), "translated tooltip");
@@ -2041,6 +2046,12 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             let (_, o, _) = compare_calcs(data, d, id, &mut [Duration::ZERO; 2]);
             out.extend(o);
         }
+        // The tab's view, twice: its first layout wraps the notes label
+        for k in 0..2 {
+            let t = answer(d.request(r#"{"cmd":"party"}"#), "party");
+            let tr = answer(d.translated_request(r#"{"cmd":"party"}"#), "party");
+            diff(&t, &tr, &format!("party view {k}"), &mut out);
+        }
         let typed_save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
         let tr = answer(
             d.translated_request(r#"{"cmd":"saveXml"}"#),
@@ -2087,7 +2098,12 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         buffs.retain(|(name, _)| name != "PartyMemberStats" && name != "Link Skills");
         buffs.push(("PartyMemberStats".into(), PARTY_STATS.into()));
         buffs.push(("Link Skills".into(), PARTY_LINKS.into()));
-        let xml = with_party(xml, &buffs);
+        // With the advanced info shown: the texts in their edit boxes
+        let xml = with_party(xml, &buffs).replacen(
+            "ShowAdvanceTools=\"false\"",
+            "ShowAdvanceTools=\"true\"",
+            1,
+        );
         check(d, &format!("{id}-party-stats"), &xml, &mut failures);
     }
     eprintln!(
