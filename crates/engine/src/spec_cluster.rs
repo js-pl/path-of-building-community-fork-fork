@@ -762,6 +762,8 @@ impl<'t> PassiveSpec<'t> {
             unknown,
             extra,
             nodes_in_radius: None,
+            reminder_text: None,
+            flavour_text: None,
         })
     }
 }

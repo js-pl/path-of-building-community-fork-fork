@@ -101,6 +101,10 @@ pub struct Stat {
     pub modifier: bool,
     pub hide: bool,
     pub chaos_inoc: bool,
+    /// `lowerIsBetter` and `compPercent` of the comparisons, which
+    /// [`with_compares`] takes from upstream's rows
+    pub lower_is_better: bool,
+    pub comp_percent: bool,
 }
 
 const GAP: Stat = Stat {
@@ -122,6 +126,8 @@ const GAP: Stat = Stat {
     modifier: false,
     hide: false,
     chaos_inoc: false,
+    lower_is_better: false,
+    comp_percent: false,
 };
 
 /// The format of the Full DPS rows
@@ -791,4 +797,30 @@ pub fn minion_display_stats() -> Vec<Stat> {
         s("EnergyShieldRegenRecovery", "ES Recovery", ".1f").color(ES),
         s("EnergyShieldLeechGainRate", "ES Leech/On Hit Rate", ".1f").color(ES),
     ]
+}
+
+/// The rows with `lowerIsBetter` and `compPercent` of upstream's rows
+/// (read from `Modules/BuildDisplayStats.lua` at build time), which match
+/// them one for one
+pub fn with_compares(mut stats: Vec<Stat>, minion: bool) -> Vec<Stat> {
+    static ROWS: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    let rows = ROWS.get_or_init(|| {
+        let text = include_str!(concat!(env!("OUT_DIR"), "/display_stat_compares.json"));
+        serde_json::from_str(text).expect("display_stat_compares.json")
+    });
+    let rows = rows[if minion { "minion" } else { "player" }]
+        .as_array()
+        .expect("display stat rows");
+    assert_eq!(rows.len(), stats.len(), "display stat rows");
+    for (s, r) in stats.iter_mut().zip(rows) {
+        assert_eq!(
+            r[0].as_str().unwrap_or(""),
+            s.label,
+            "display stat row {:?}",
+            s.stat
+        );
+        s.lower_is_better = r[1] == true;
+        s.comp_percent = r[2] == true;
+    }
+    stats
 }

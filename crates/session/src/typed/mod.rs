@@ -5,11 +5,16 @@
 
 mod calcs;
 pub mod display_stats;
+mod item_tooltip;
 mod items;
+mod node_tooltip;
+mod notes;
+mod party;
 mod save;
 mod sets;
 mod sidebar;
 mod skills;
+pub mod tooltip;
 mod tree;
 
 pub use skills::{GemEdit, GroupEdit};
@@ -201,6 +206,8 @@ pub struct TypedSession<'d> {
     item_keys: lua::ljtab::LjMap<()>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
+    /// The Notes tab's text
+    notes: String,
 }
 
 impl<'d> TypedSession<'d> {
@@ -231,6 +238,7 @@ impl<'d> TypedSession<'d> {
             other_specs: Vec::new(),
             item_keys: Default::default(),
             socket_labels: HashMap::new(),
+            notes: notes::load_notes(&root),
             root,
         };
         s.load_specs()?;

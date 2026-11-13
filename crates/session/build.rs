@@ -24,6 +24,19 @@ fn main() {
         "cargo:rerun-if-changed={}",
         up.join("Modules/CalcSections.lua").display()
     );
+    let stats = display_stat_compares(&up);
+    std::fs::write(out.join("display_stat_compares.json"), stats.to_string()).unwrap();
+    println!(
+        "cargo:rerun-if-changed={}",
+        up.join("Modules/BuildDisplayStats.lua").display()
+    );
+    let misc = up.join("Data/Misc.lua");
+    std::fs::write(
+        out.join("gold_respec_prices.json"),
+        gold_respec_prices(&misc),
+    )
+    .unwrap();
+    println!("cargo:rerun-if-changed={}", misc.display());
     let tab = up.join("Classes/CalcsTab.lua");
     std::fs::write(out.join("calcs_mode_tooltip.txt"), mode_tooltip(&tab)).unwrap();
     println!("cargo:rerun-if-changed={}", tab.display());
@@ -82,4 +95,58 @@ fn json(v: &Value) -> J {
         }
         _ => panic!("CalcSections.lua: unexpected function"),
     }
+}
+
+/// What the stat comparisons read of `Modules/BuildDisplayStats.lua`'s
+/// `displayStats` and `minionDisplayStats`: each row's label,
+/// `lowerIsBetter` and `compPercent`
+fn display_stat_compares(up: &Path) -> J {
+    let mut im = importer::Importer::new(up);
+    im.load("Data/Global", vec![])
+        .unwrap_or_else(|e| panic!("Data/Global.lua: {e}"));
+    let v = im
+        .load1("Modules/BuildDisplayStats", vec![])
+        .unwrap_or_else(|e| panic!("Modules/BuildDisplayStats.lua: {e}"));
+    let t = v.as_table().expect("BuildDisplayStats.lua: a table");
+    let list = |name: &str| -> J {
+        let l = t.get_str(name);
+        let l = l.as_table().expect("BuildDisplayStats.lua: a list");
+        let rows = l.array();
+        let rows = rows.iter().map(|row| {
+            let row = row.as_table().expect("BuildDisplayStats.lua: a row");
+            let label = row.get_str("label");
+            let flag = |k: &str| J::Bool(row.get_str(k).truthy());
+            serde_json::json!([
+                label.as_str().map(|s| s.to_str_lossy().into_owned()),
+                flag("lowerIsBetter"),
+                flag("compPercent"),
+            ])
+        });
+        J::Array(rows.collect())
+    };
+    serde_json::json!({
+        "player": list("displayStats"),
+        "minion": list("minionDisplayStats"),
+    })
+}
+
+/// `data.goldRespecPrices` of `Data/Misc.lua`, by character level, as a
+/// JSON list
+fn gold_respec_prices(misc: &Path) -> String {
+    let s = std::fs::read_to_string(misc).unwrap();
+    let start = s
+        .find("data.goldRespecPrices = {")
+        .map(|i| i + "data.goldRespecPrices = {".len())
+        .expect("Misc.lua: goldRespecPrices");
+    let end = start
+        + s[start..]
+            .find('}')
+            .expect("Misc.lua: end of goldRespecPrices");
+    let prices: Vec<f64> = s[start..end]
+        .split(',')
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(|v| v.parse().expect("Misc.lua: a gold price"))
+        .collect();
+    serde_json::to_string(&prices).unwrap()
 }

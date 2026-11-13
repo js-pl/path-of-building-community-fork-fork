@@ -50,6 +50,34 @@ pub struct DisplaySkill {
     pub minion_list: Vec<String>,
     /// The names of its minion's skills (`minion.activeSkillList`)
     pub minion_skills: Option<Vec<String>>,
+    /// `activeSkill.effectList`
+    pub effects: Vec<EffectInfo>,
+    /// The active effect of its minion's main skill
+    pub minion_effect: Option<EffectInfo>,
+}
+
+/// An effect of a skill's effect list, as the socket group tooltip
+/// shows it
+#[derive(Clone, Debug, PartialEq)]
+pub struct EffectInfo {
+    pub name: String,
+    pub color: Option<f64>,
+    pub level: Option<f64>,
+    pub quality: f64,
+    /// The gem it is of (`srcInstance`)
+    pub src: Option<(usize, usize)>,
+}
+
+impl EffectInfo {
+    fn of(e: &crate::calc_skills::SkillEffect) -> EffectInfo {
+        EffectInfo {
+            name: e.granted_effect.name.clone(),
+            color: e.granted_effect.color,
+            level: e.level,
+            quality: e.quality,
+            src: e.src,
+        }
+    }
 }
 
 /// What the sidebar reads of the sidebar's calculation
@@ -77,6 +105,68 @@ pub struct Sidebar {
     /// Whether Saviour's mirage replaced the main skill, whose gem level
     /// and quality outputs are not ported
     pub main_copy: bool,
+    /// The gems' `displayEffect`
+    pub gem_display: std::collections::HashMap<(usize, usize), crate::calc_skills::GemDisplay>,
+    /// The groups' `displayGemList`
+    pub display_gem_list: Vec<Option<Vec<(usize, usize)>>>,
+    /// The `BASE` strength, dexterity and intelligence of each node the
+    /// calculation built a mod list for (`node.finalModList`)
+    pub node_attributes: std::collections::HashMap<u32, [f64; 3]>,
+    /// What item tooltips read of the player's mod database, by
+    /// [`ITEM_QUERIES`]' keys
+    pub item_queries: std::collections::HashMap<&'static str, f64>,
+    /// The flasks and tinctures in use (`env.flasks`, `env.tinctures`), by
+    /// item id
+    pub flasks: Vec<i64>,
+    pub tinctures: Vec<i64>,
+    /// The attributes each radius jewel counted in its socket's radius
+    /// (`item.jewelRadiusData[nodeId]`): item id, socket, `Str`, `Dex`,
+    /// `Int`
+    pub jewel_radius_data: Vec<(f64, u32, [Option<f64>; 3])>,
+}
+
+/// The queries of the player's mod database the item tooltips make: how
+/// (`BASE`, `INC`, `MORE` sums, `More` products and flags), with the cfg
+/// `{ actor = "player" }` or none, and the mod name
+pub const ITEM_QUERIES: &[(&str, bool, &str)] = &[
+    ("FLAG", false, "OmniscienceRequirements"),
+    ("INC", false, "OmniAttributeRequirements"),
+    ("INC", false, "FlaskDuration"),
+    ("INC", true, "FlaskEffect"),
+    ("INC", true, "MagicUtilityFlaskEffect"),
+    ("INC", false, "FlaskRecoveryRate"),
+    ("INC", false, "FlaskLifeRecovery"),
+    ("MORE", false, "FlaskLifeRecovery"),
+    ("INC", false, "FlaskLifeRecoveryRate"),
+    ("BASE", false, "LifeFlaskInstantRecovery"),
+    ("MORE", false, "FlaskLifeRecoveryLowLife"),
+    ("FLAG", false, "LifeFlaskAppliesToEnergyShield"),
+    ("INC", false, "FlaskManaRecovery"),
+    ("INC", false, "FlaskManaRecoveryRate"),
+    ("BASE", false, "ManaFlaskInstantRecovery"),
+    ("FLAG", false, "ManaFlaskAppliesToLife"),
+    ("INC", false, "FlaskChargesUsed"),
+    ("INC", false, "FlaskChargesGained"),
+    ("BASE", false, "FlaskChargesGenerated"),
+    ("BASE", false, "LifeFlaskChargesGenerated"),
+    ("BASE", false, "ManaFlaskChargesGenerated"),
+    ("BASE", false, "UtilityFlaskChargesGenerated"),
+    ("BASE", false, "IronFlaskChargesGeneratedOnWardBreak"),
+    ("BASE", false, "FlaskChargesGeneratedPerEmptyFlask"),
+    ("BASE", false, "FlaskChanceNotConsumeCharges"),
+    ("FLAG", false, "LifeFlaskEffectNotRemoved"),
+    ("FLAG", false, "ManaFlaskEffectNotRemoved"),
+    ("INC", true, "TinctureEffect"),
+    ("INC", true, "MagicTinctureEffect"),
+    ("INC", true, "TinctureManaBurnRate"),
+    ("SUMMORE", true, "TinctureManaBurnRate"),
+    ("BASE", false, "TincturesNotInflictManaBurn"),
+    ("INC", true, "TinctureCooldownRecovery"),
+];
+
+/// The key of a query of [`ITEM_QUERIES`] in [`Sidebar::item_queries`]
+pub fn item_query_key(how: &str, player: bool, name: &str) -> String {
+    format!("{how}{}:{name}", if player { "@player" } else { "" })
 }
 
 fn num(v: Option<&ModValue>) -> Option<f64> {
@@ -117,6 +207,13 @@ pub(crate) fn collect(p: &Perform) -> Result<Sidebar> {
                                 .map(|&k| p.skill_name(k).to_string())
                                 .collect()
                         }),
+                        // The active effect as building the mod list left it
+                        effects: std::iter::once(&skill.active_effect)
+                            .chain(skill.effect_list.iter().skip(1))
+                            .map(EffectInfo::of)
+                            .collect(),
+                        minion_effect: minion
+                            .map(|m| EffectInfo::of(&p.skill(m.main_skill).active_effect)),
                     }
                 })
                 .collect()
@@ -154,5 +251,94 @@ pub(crate) fn collect(p: &Perform) -> Result<Sidebar> {
         slot_enabled: p.env.skills.slot_enabled.clone(),
         additional_ring_slot: p.c.flag(p.c.db(PLAYER), None, &["AdditionalRingSlot"])?,
         main_copy: p.main_copy.is_some(),
+        gem_display: gem_display(p),
+        display_gem_list: p.env.skills.display_gem_list.clone(),
+        node_attributes: node_attributes(&p.env.setup.tree.node_mods)?,
+        item_queries: item_queries(p)?,
+        flasks: p.active_flasks.clone(),
+        tinctures: p.env.setup.items.tinctures.clone(),
+        jewel_radius_data: p
+            .env
+            .setup
+            .items
+            .radius_jewels
+            .iter()
+            .map(|r| {
+                let v = |k: &str| r.data.values.get(k).copied();
+                (r.item_id, r.node_id, [v("Str"), v("Dex"), v("Int")])
+            })
+            .collect(),
     })
+}
+
+/// Each node's `finalModList:Sum("BASE", nil, attrib)` of the attributes
+fn node_attributes(
+    nodes: &[(u32, crate::calc_setup::NodeMods)],
+) -> Result<std::collections::HashMap<u32, [f64; 3]>> {
+    use crate::mods::{ModType, list};
+    let mut out = std::collections::HashMap::new();
+    for (id, n) in nodes {
+        let mut a = [0.0; 3];
+        for (k, name) in ["Str", "Dex", "Int"].iter().enumerate() {
+            a[k] = list::sum(&n.mods, ModType::Base, name)?;
+        }
+        out.insert(*id, a);
+    }
+    Ok(out)
+}
+
+/// The values of [`ITEM_QUERIES`], keyed by their place in it
+fn item_queries(p: &Perform) -> Result<std::collections::HashMap<&'static str, f64>> {
+    use crate::mods::{Cfg, ModType, Sym};
+    let db = p.c.db(PLAYER);
+    let player = Cfg {
+        actor: Some(Sym::new("player")),
+        ..Cfg::default()
+    };
+    let mut out = std::collections::HashMap::new();
+    for (k, (how, on_player, name)) in ITEM_QUERIES.iter().enumerate() {
+        let cfg = on_player.then_some(&player);
+        let v = match *how {
+            "FLAG" => f64::from(u8::from(p.c.flag(db, cfg, &[name])?)),
+            "MORE" => p.c.more(db, cfg, &[name])?,
+            "SUMMORE" => p.c.sum(db, ModType::More, cfg, &[name])?,
+            "INC" => p.c.sum(db, ModType::Inc, cfg, &[name])?,
+            _ => p.c.sum(db, ModType::Base, cfg, &[name])?,
+        };
+        out.insert(ITEM_QUERY_KEYS[k], v);
+    }
+    Ok(out)
+}
+
+/// The keys of [`ITEM_QUERIES`], as [`item_query_key`] makes them
+static ITEM_QUERY_KEYS: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| {
+    ITEM_QUERIES
+        .iter()
+        .map(|(h, p, n)| &*Box::leak(item_query_key(h, *p, n).into_boxed_str()))
+        .collect()
+});
+
+/// The gems' `displayEffect`: an active effect as building its skill's
+/// mod list left it
+fn gem_display(
+    p: &Perform,
+) -> std::collections::HashMap<(usize, usize), crate::calc_skills::GemDisplay> {
+    let mut out = p.env.skills.gem_display.clone();
+    let mut last: std::collections::HashMap<(usize, usize), &crate::calc_skills::SkillEffect> =
+        Default::default();
+    for list in &p.env.skills.group_skills {
+        for &i in list {
+            let e = &p.skill(i).active_effect;
+            if let Some(src) = e.src {
+                last.insert(src, e);
+            }
+        }
+    }
+    for (src, e) in last {
+        if let Some(d) = out.get_mut(&src).filter(|d| d.active) {
+            d.level = e.level;
+            d.quality = e.quality;
+        }
+    }
+    out
 }

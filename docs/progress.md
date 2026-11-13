@@ -253,6 +253,43 @@ What remains for the full migration, in order:
    translated 71 s with its replays). Saving first makes the Calcs
    tab's calculation, as a frame does, for its write-backs to the gems.
 
+   Tooltips, notes and the party view are typed
+   (`session::typed::tooltip`, `node_tooltip`, `item_tooltip`, `notes`,
+   `party`): `socketGroupTooltip` (`SkillsTab:AddSocketGroupTooltip`;
+   the setup now keeps each gem's `displayEffect`, whether supports are
+   superseded and whom they support, and `displayGemList`),
+   `nodeTooltip` (`PassiveTreeView:AddNodeTooltip` with its stat
+   comparisons on the misc calculator; the tree keeps the nodes'
+   `reminderText` and `flavourText`), `itemTooltip` and `previewItem`
+   (`ItemsTab:AddItemTooltip` and `AddItemStatDifferences`: every slot
+   the item fits, or the named slot, flasks' and tinctures' effective
+   stats; the item data keeps `data.flavourText` and the bases' flavour
+   text), `buildMode:CompareStatList` with `lowerIsBetter` and
+   `compPercent` read from `BuildDisplayStats.lua` at build time,
+   `notes`, `setNotes` (saving turns escaped colour codes back, as
+   `NotesTab:Save` does) and `party` without imported party data.
+   `tooltips_match` (every corpus build: every socket group's and
+   item's tooltip, three items in their own slot, the first item as a
+   preview, 10 nodes on and around the tree and the allocated sockets,
+   notes and party, then notes set and a node clicked) gives the
+   translation's: 1133 item tooltips (typed 19 s, translated 54 s), 695
+   node tooltips (10 s, 44 s), 379 socket group tooltips, 59 previews,
+   182 notes and 61 party views; 40 requests fell back (listed by the
+   test), and taking off Ashes of the Stars in gen-0018 (a level 4
+   Gluttony with the main skill) differs in the misc calculator's mana
+   cost (translated 0, typed 19; not investigated, listed as a known
+   calculator difference). Upstream keeps `displayEffect`,
+   `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
+   across calculations; the typed tooltips read the sidebar's last
+   calculation. Falling back: tattooed and conquered nodes, sockets
+   whose radius has nodes the calculation did not build (upstream reads
+   their stale `finalModList`, or fails), a radius jewel's "Attributes
+   in Radius" (upstream's `jewelRadiusData` counts differently from the
+   typed radius data, e.g. 40 against 20 Str in gen-0029), comparing a
+   jewel that changes the tree, toggling a previewed flask, a mastery
+   tooltip with a popup open, the party view with imported data. The translated runtime's `%d` of `-2^63` printed two
+   minus signs; it now prints LuaJIT's.
+
    Still on the translation, before it can be dropped:
    - Edits with a recalculation: `control` of the class, ascendancy and
      bloodline drop-downs (`buildMode` opens a popup when points are
@@ -261,13 +298,11 @@ What remains for the full migration, in order:
    - Read-only views: `tree` (the typed tree has no geometry), `config`
      (each option's visibility, `ConfigVisibility.lua` and the options'
      `ifCond`, `ifSkill`, ... rules on the sidebar's calculation, and
-     their tooltips), `itemDb`, `party`, `notes`, `controls` of other
-     tabs.
-   - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
-     `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
-     `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
+     their tooltips), `itemDb`, `party` with imported party data,
+     `controls` of other tabs.
+   - Tooltips in the cases above that fall back.
    - Items and crafting: `addItem`, `editItem`, `displayItem`,
-     `setDisplayItem`, `craftItem`, `saveDisplayItem`, `setNotes`,
+     `setDisplayItem`, `craftItem`, `saveDisplayItem`,
      `popupButton`, `closePopup` (the item editor's controls, popups).
    - Engine gaps that make a build fall back: Saviour's mirage as the
      main skill, Combust's trigger (gen-0028), tree edits with Intuitive

@@ -10,7 +10,7 @@ use engine::item::Item;
 use serde_json::{Map, Value as J, json};
 use std::sync::Arc;
 
-fn describe(item: &Item) -> J {
+pub(super) fn describe(item: &Item) -> J {
     let mut o = Map::new();
     if let Some(id) = item.id {
         o.insert("id".into(), num(id));
@@ -31,8 +31,31 @@ fn describe(item: &Item) -> J {
 }
 
 impl<'d> TypedSession<'d> {
+    /// `slot.inactive`: an unallocated jewel socket, or an abyssal socket
+    /// past its item's count
+    pub(super) fn slot_inactive(&self, s: &engine::items_tab::Slot) -> bool {
+        let tab = &self.build.items;
+        let abyssal_count = |parent: &str| {
+            let sel = tab
+                .ordered_slots
+                .iter()
+                .find(|s| s.slot_name == parent)
+                .map_or(0.0, |s| s.sel_item_id);
+            if sel > 0.0 {
+                tab.item(sel).map_or(0.0, |i| i.abyssal_socket_count)
+            } else {
+                0.0
+            }
+        };
+        match (&s.node_id, &s.parent_slot) {
+            (Some(n), _) => !self.build.spec.alloc_nodes.contains(*n),
+            (None, Some(p)) => s.slot_num.unwrap_or(0.0) > abyssal_count(p),
+            _ => false,
+        }
+    }
+
     /// Whether an item goes in a slot (`IsItemValidForSlot`)
-    fn valid_for_slot(&self, item: &Item, slot: &str) -> bool {
+    pub(super) fn valid_for_slot(&self, item: &Item, slot: &str) -> bool {
         let info = &self.data.game.setup.weapon_type_info;
         let one_hand = |t: &str| info.get(t).map(|w| w.one_hand);
         self.build
@@ -75,28 +98,12 @@ impl<'d> TypedSession<'d> {
             .filter_map(|id| tab.item(*id))
             .map(describe)
             .collect();
-        let abyssal_count = |parent: &str| {
-            let sel = tab
-                .ordered_slots
-                .iter()
-                .find(|s| s.slot_name == parent)
-                .map_or(0.0, |s| s.sel_item_id);
-            if sel > 0.0 {
-                tab.item(sel).map_or(0.0, |i| i.abyssal_socket_count)
-            } else {
-                0.0
-            }
-        };
         let slots: Vec<J> = tab
             .ordered_slots
             .iter()
             .map(|s| {
                 let name = s.slot_name.as_str();
-                let inactive = match (&s.node_id, &s.parent_slot) {
-                    (Some(n), _) => !spec.alloc_nodes.contains(*n),
-                    (None, Some(p)) => s.slot_num.unwrap_or(0.0) > abyssal_count(p),
-                    _ => false,
-                };
+                let inactive = self.slot_inactive(s);
                 let second = set.use_second_weapon_set;
                 let shown = !inactive
                     && match s.weapon_set {

@@ -7,8 +7,7 @@
 //! Upstream marks the supports items grant as from an item on the shared
 //! granted effect (`grantedEffect.fromItem = true`), so it stays marked
 //! for every later calculation; here the mark holds for the calculation
-//! that makes it. Not ported yet: whether supports are superseded, and
-//! the gems' requirements.
+//! that makes it. Not ported yet: the gems' requirements.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -319,6 +318,34 @@ pub struct SkillsSetup {
     pub slot_enabled: Vec<bool>,
     /// The supports marked `fromItem` on the shared skill data
     pub from_item: HashSet<String>,
+    /// The effect each gem of the groups in use shows (`displayEffect`)
+    pub gem_display: HashMap<(usize, usize), GemDisplay>,
+    /// Each group's gems with the supports of other groups that apply to
+    /// it (`displayGemList`), for the groups with an active skill
+    pub display_gem_list: Vec<Option<Vec<(usize, usize)>>>,
+}
+
+/// A gem's `displayEffect`: its active effect, or its support effect
+/// with whether another supersedes it and whether it supports a skill
+#[derive(Clone, Debug, PartialEq)]
+pub struct GemDisplay {
+    pub level: Option<f64>,
+    pub quality: f64,
+    pub superseded: bool,
+    pub supporting: bool,
+    /// The effect is the gem's active effect
+    pub active: bool,
+}
+
+/// A support effect of a gem: its gem and granted effect
+type SupportKey = ((usize, usize), String);
+
+/// A gem's display effect: its support effect's key, or none for its
+/// active effect, with the level and quality
+type DisplayRecord = (Option<SupportKey>, Option<f64>, f64);
+
+fn support_key(e: &SkillEffect) -> Option<SupportKey> {
+    Some((e.src?, e.granted_effect.id.clone()))
 }
 
 /// `calcLib.doesTypeExpressionMatch(checkTypes, skillTypes, minionTypes)`
@@ -630,9 +657,19 @@ impl SupportContext<'_> {
 }
 
 /// `addBestSupport(supportEffect, appliedSupportList)`: adds a support,
-/// unless the list has the same or a better one; a better one replaces it
-fn add_best_support(support: &SkillEffect, list: &mut Vec<SkillEffect>) {
+/// unless the list has the same or a better one; a better one replaces it.
+/// The supports that lose are marked superseded.
+fn add_best_support(
+    support: &SkillEffect,
+    list: &mut Vec<SkillEffect>,
+    superseded: &mut HashSet<SupportKey>,
+) {
     let e = &support.granted_effect;
+    let mut mark = |s: &SkillEffect| {
+        if let Some(k) = support_key(s) {
+            superseded.insert(k);
+        }
+    };
     for other in list.iter_mut() {
         let o = &other.granted_effect;
         if Arc::ptr_eq(e, o) || e.id == o.id {
@@ -641,13 +678,18 @@ fn add_best_support(support: &SkillEffect, list: &mut Vec<SkillEffect>) {
                 other.level.unwrap_or(f64::NAN),
             );
             if l > ol || (l == ol && support.quality > other.quality) {
+                mark(other);
                 *other = support.clone();
+            } else {
+                mark(support);
             }
             return;
         } else if e.plus_version_of.as_deref() == Some(o.id.as_str()) {
+            mark(other);
             *other = support.clone();
             return;
         } else if o.plus_version_of.as_deref() == Some(e.id.as_str()) {
+            mark(support);
             return;
         }
     }
@@ -1012,6 +1054,9 @@ fn active_skills(
         .collect();
     let mut processed: HashSet<(usize, usize)> = HashSet::new();
     let mut from_item: HashSet<String> = HashSet::new();
+    let mut superseded: HashSet<SupportKey> = HashSet::new();
+    let mut display: HashMap<(usize, usize), DisplayRecord> = HashMap::new();
+    let mut display_gem_list: Vec<Option<Vec<(usize, usize)>>> = vec![None; groups.len()];
     // Each group's supports; groups in a slot also by slot, in order
     let mut supports: Vec<Vec<SkillEffect>> = vec![vec![]; groups.len()];
     let mut slot_groups: Vec<(String, Vec<usize>)> = Vec::new();
@@ -1108,7 +1153,7 @@ fn active_skills(
             );
             s.gem = gem;
             s.applies_to_granted = value.is_some_and(|v| field_truthy(v, "appliesToGrantedSkills"));
-            add_best_support(&s, &mut supports[gi]);
+            add_best_support(&s, &mut supports[gi], &mut superseded);
         };
         for v in db.list(Some(&cfgs[gi].cfg()), "ExtraSupport")? {
             if group.source.is_none() || field_truthy(&v, "appliesToGrantedSkills") {
@@ -1129,6 +1174,7 @@ fn active_skills(
             }
         }
         for (i, gem) in group.gem_list.iter().enumerate() {
+            display.remove(&(gi, i));
             if !gem.enabled {
                 continue;
             }
@@ -1151,7 +1197,8 @@ fn active_skills(
                     gem_effect(db, &mut cfgs, &mut s, gi, i)?;
                 }
                 validate_effect_level(&mut s);
-                add_best_support(&s, &mut supports[gi]);
+                display.insert((gi, i), (support_key(&s), s.level, s.quality));
+                add_best_support(&s, &mut supports[gi], &mut superseded);
             }
         }
     }
@@ -1198,16 +1245,38 @@ fn active_skills(
                 if active.gem.is_some() {
                     gem_effect(db, &mut cfgs, &mut active, gi, i)?;
                 }
+                display.insert((gi, i), (None, active.level, active.quality));
                 let mut applied = Vec::new();
                 if !group.no_supports {
                     applied = supports[gi].clone();
+                    let mut shown: Vec<(usize, usize)> =
+                        (0..group.gem_list.len()).map(|k| (gi, k)).collect();
+                    // The support gems of the groups in a slot
+                    let mut slot_supports = |slot: &str, skip_source: bool| {
+                        for (oi, other) in groups.iter().enumerate() {
+                            if other.slot.as_deref() == Some(slot)
+                                && !(skip_source
+                                    && other.source.is_some()
+                                    && other.source == group.source)
+                            {
+                                for (k, g) in other.gem_list.iter().enumerate() {
+                                    if g.gem.as_ref().is_some_and(|d| d.granted_effect.support) {
+                                        shown.push((oi, k));
+                                    }
+                                }
+                            }
+                        }
+                    };
                     if group.source.is_some()
                         && let Some(slot) = &slot
                         && let Some((_, list)) = slot_groups.iter().find(|(s, _)| s == slot)
                     {
+                        if let Some(raw) = &group.slot {
+                            slot_supports(raw, true);
+                        }
                         for &other in list {
                             for s in &supports[other] {
-                                add_best_support(s, &mut applied);
+                                add_best_support(s, &mut applied, &mut superseded);
                             }
                         }
                     }
@@ -1216,14 +1285,16 @@ fn active_skills(
                             if Some(target) == slot.as_ref()
                                 && let Some((_, list)) = slot_groups.iter().find(|(s, _)| s == from)
                             {
+                                slot_supports(from, false);
                                 for &other in list {
                                     for s in &supports[other] {
-                                        add_best_support(s, &mut applied);
+                                        add_best_support(s, &mut applied, &mut superseded);
                                     }
                                 }
                             }
                         }
                     }
+                    display_gem_list[gi] = Some(shown);
                 }
                 let has_gem = active.gem.is_some();
                 let mut skill = create_active_skill(active, applied, Some(gi), &ctx);
@@ -1271,6 +1342,26 @@ fn active_skills(
             return Ok(None);
         }
     }
+    // `isSupporting`: the supports in the effect list of a gem's skill
+    let mut supporting: HashSet<SupportKey> = HashSet::new();
+    for skill in &active_skills {
+        if skill.active_effect.src.is_some() {
+            supporting.extend(skill.effect_list[1..].iter().filter_map(support_key));
+        }
+    }
+    let gem_display = display
+        .into_iter()
+        .map(|(gem, (key, level, quality))| {
+            let d = GemDisplay {
+                level,
+                quality,
+                superseded: key.as_ref().is_some_and(|k| superseded.contains(k)),
+                supporting: key.as_ref().is_some_and(|k| supporting.contains(k)),
+                active: key.is_none(),
+            };
+            (gem, d)
+        })
+        .collect();
     let main_skill = match main_skill {
         Some(i) => i,
         None => {
@@ -1289,5 +1380,7 @@ fn active_skills(
         weapon_data,
         slot_enabled,
         from_item: ctx.from_item,
+        gem_display,
+        display_gem_list,
     }))
 }

@@ -133,7 +133,12 @@ const ACTS: [(f64, f64); 11] = [
 
 pub(super) fn display_stats() -> &'static (Vec<Stat>, Vec<Stat>) {
     static STATS: OnceLock<(Vec<Stat>, Vec<Stat>)> = OnceLock::new();
-    STATS.get_or_init(|| (ds::display_stats(), ds::minion_display_stats()))
+    STATS.get_or_init(|| {
+        (
+            ds::with_compares(ds::display_stats(), false),
+            ds::with_compares(ds::minion_display_stats(), true),
+        )
+    })
 }
 
 /// `InsertIfNew`

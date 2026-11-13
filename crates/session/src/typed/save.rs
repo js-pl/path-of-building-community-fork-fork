@@ -1,7 +1,7 @@
 //! `saveXml` and `saveCode`: `buildMode:SaveDB` (`Modules/Build.lua`) with
 //! every tab's `Save`, written as `xml.ComposeXML` writes it. What the
-//! typed build does not hold (notes, party, import and tree view
-//! settings, timeless jewel search, item set links, trade weights) comes
+//! typed build does not hold (party, import and tree view settings,
+//! timeless jewel search, item set links, trade weights) comes
 //! from the loaded file as each tab's `Load` kept it.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
@@ -666,10 +666,9 @@ impl TypedSession<'_> {
         Ok(x)
     }
 
-    fn save_notes(&self) -> X {
+    fn save_notes(&mut self) -> X {
         let mut x = X::new("Notes");
-        let text = self.section("Notes").and_then(first_text).unwrap_or("");
-        x.text(text);
+        x.text(self.notes_for_save());
         x
     }
 

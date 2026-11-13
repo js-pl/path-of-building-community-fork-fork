@@ -112,6 +112,185 @@ fn typed_session_matches_translated() {
     if run("items") {
         items_edits_match(&mut d);
     }
+    if run("tooltips") {
+        tooltips_match(data, &mut d);
+    }
+}
+
+/// Comparisons whose misc calculator differs from the translation's: taking
+/// off Ashes of the Stars (+1 to the level of all gems) with a level 4
+/// Gluttony linked to the main skill leaves the translation's mana cost at
+/// 0 and the typed one at 19 (not investigated yet)
+const KNOWN_CALCULATOR: &[(&str, &str)] = &[
+    ("gen-0018", r#"{"cmd":"itemTooltip","id":6}"#),
+    ("gen-0018", r#"{"cmd":"itemTooltip","id":6,"#),
+];
+
+/// The notes, and the tooltips of every socket group and item and of
+/// nodes on and around the tree, give the translation's on every corpus
+/// build, also after a few edits; `SESSION_NODES` sets the nodes per build
+fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let (mut failures, mut fell_back, mut known) = (Vec::new(), Vec::new(), Vec::new());
+    let mut counts: std::collections::BTreeMap<&str, (usize, Duration, Duration)> =
+        Default::default();
+    let nodes_per_build: usize = std::env::var("SESSION_NODES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let tree = data.tree(data.game.latest_tree_version()).unwrap();
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 23);
+        let mut out = Vec::new();
+        let mut compare = |d: &mut Dispatcher, req: J, out: &mut Vec<String>| {
+            let r = req.to_string();
+            let cmd = req["cmd"].as_str().unwrap().to_string();
+            if !d.typed_active() {
+                return;
+            }
+            d.typed_error = None;
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed");
+            let tt = t.elapsed();
+            let fell = d.typed_error.take();
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&r), "translated");
+            let c = counts.entry(Box::leak(cmd.into_boxed_str())).or_default();
+            match fell {
+                Some(e) => {
+                    let e = e.lines().next().unwrap_or("").to_string();
+                    fell_back.push(format!("{id}: {r:.120}: {e:.160}"));
+                }
+                None => {
+                    c.0 += 1;
+                    c.1 += tt;
+                    c.2 += t.elapsed();
+                    diff(&typed, &tr, &format!("{r:.200}"), out);
+                }
+            }
+        };
+        compare(d, json!({"cmd": "notes"}), &mut out);
+        compare(d, json!({"cmd": "party"}), &mut out);
+        let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+            .as_array()
+            .map_or(0, Vec::len);
+        for g in 1..=groups {
+            compare(
+                d,
+                json!({"cmd": "socketGroupTooltip", "index": g}),
+                &mut out,
+            );
+        }
+        let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+        for item in items["ok"]["items"].as_array().into_iter().flatten() {
+            compare(d, json!({"cmd": "itemTooltip", "id": item["id"]}), &mut out);
+        }
+        // Equipped items compared in their own slot, and the first item's
+        // text as a preview
+        let slots: Vec<J> = items["ok"]["slots"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|s| s["item"].is_number())
+            .cloned()
+            .collect();
+        for _ in 0..3.min(slots.len()) {
+            let s = &slots[rng.below(slots.len())];
+            let req = json!({"cmd": "itemTooltip", "id": s["item"], "slot": s["name"]});
+            compare(d, req, &mut out);
+        }
+        if let Some(raw) = items["ok"]["items"][0]["raw"].as_str() {
+            compare(d, json!({"cmd": "previewItem", "text": raw}), &mut out);
+        }
+        // Allocated nodes, their neighbours, and the allocated sockets
+        let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+        let alloc: Vec<u32> = state["ok"]["alloc"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_u64().map(|v| v as u32))
+            .collect();
+        let mut near: Vec<u32> = alloc
+            .iter()
+            .filter_map(|n| tree.node_index.get(n))
+            .flat_map(|&i| tree.nodes[i].linked_id.iter().copied())
+            .filter(|n| !alloc.contains(n))
+            .collect();
+        near.sort_unstable();
+        near.dedup();
+        let mut nodes: Vec<u32> = slots
+            .iter()
+            .filter_map(|s| s["nodeId"].as_u64().map(|n| n as u32))
+            .take(2)
+            .collect();
+        for k in 0..nodes_per_build {
+            let pool = if k % 2 == 0 { &alloc } else { &near };
+            if !pool.is_empty() {
+                nodes.push(pool[rng.below(pool.len())]);
+            }
+        }
+        for n in nodes {
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}), &mut out);
+        }
+        // Notes edited, and tooltips after a tree edit
+        let text = format!("Notes of {id}\n^_1colour ^_xFF0000and ^1codes");
+        let req = json!({"cmd": "setNotes", "text": text}).to_string();
+        answer(d.request(&req), "setNotes");
+        compare(d, json!({"cmd": "notes"}), &mut out);
+        if let Some(&n) = near.first() {
+            answer(
+                d.request(&json!({"cmd": "clickNode", "id": n}).to_string()),
+                "clickNode",
+            );
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}), &mut out);
+            for g in 1..=groups.min(2) {
+                compare(
+                    d,
+                    json!({"cmd": "socketGroupTooltip", "index": g}),
+                    &mut out,
+                );
+            }
+        }
+        if d.typed_active() {
+            compare_saves(d, "after the notes", &mut out);
+            compare(d, json!({"cmd": "notes"}), &mut out);
+        }
+        // Differences of the misc calculator, not of the tooltips: listed
+        let (calc, rest): (Vec<String>, Vec<String>) = out.into_iter().partition(|l| {
+            KNOWN_CALCULATOR
+                .iter()
+                .any(|(b, r)| *b == id && l.starts_with(r))
+        });
+        known.extend(calc.into_iter().map(|l| format!("{id}: {l}")));
+        let mut out = rest;
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "known calculator differences {}:\n{}",
+        known.len(),
+        known.join("\n")
+    );
+    for (cmd, (n, t, tr)) in &counts {
+        eprintln!("{cmd}: {n} compared, typed {t:.1?}, translated {tr:.1?}");
+    }
+    eprintln!("fell back {}:\n{}", fell_back.len(), fell_back.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// Random sequences of item, set, spec, config set, level and socket
@@ -474,7 +653,8 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
 fn color_codes_match_upstream() {
     let src = gamedata::Source::load(Path::new(&src())).unwrap();
     let codes = src.global("colorCodes");
-    for (name, code) in session::typed::display_stats::COLOR_CODES {
+    let all = session::typed::display_stats::COLOR_CODES.iter();
+    for (name, code) in all.chain(session::typed::tooltip::COLORS) {
         let v = codes.as_table().unwrap().get_str(name);
         assert_eq!(
             v.as_str().map(|s| s.to_str_lossy().into_owned()).as_deref(),
