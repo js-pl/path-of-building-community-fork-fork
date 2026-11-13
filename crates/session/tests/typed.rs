@@ -383,6 +383,31 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
                 nodes.push(pool[rng.below(pool.len())]);
             }
         }
+        // Tattooed nodes, and nodes in the radius of socketed jewels,
+        // which timeless jewels conquer
+        for o in xml.split("<Override ").skip(1) {
+            let id = o
+                .split("nodeId=\"")
+                .nth(1)
+                .and_then(|v| v.split('"').next()?.parse::<u32>().ok());
+            nodes.extend(id);
+        }
+        for s in &slots {
+            let Some(radius) = s["nodeId"]
+                .as_u64()
+                .and_then(|n| tree.node(n as u32)?.nodes_in_radius.as_ref()?.last())
+            else {
+                continue;
+            };
+            let (on, off): (Vec<u32>, Vec<u32>) = radius.iter().partition(|n| alloc.contains(n));
+            for pool in [&on, &on, &off] {
+                if !pool.is_empty() {
+                    nodes.push(pool[rng.below(pool.len())]);
+                }
+            }
+        }
+        nodes.sort_unstable();
+        nodes.dedup();
         for n in nodes {
             compare(d, json!({"cmd": "nodeTooltip", "id": n}));
         }
