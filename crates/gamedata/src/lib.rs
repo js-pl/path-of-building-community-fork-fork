@@ -212,6 +212,18 @@ impl Source {
         Value::Table(self.data.clone())
     }
 
+    /// The mods of the item editor's Add Modifier popup
+    pub fn craft(&self) -> Result<engine::item_data::CraftData> {
+        let mut im = self.importer();
+        let delve = im
+            .load1("Data/DelveDropOnly", vec![])
+            .map_err(|e| e.to_string())?;
+        let incursion = im
+            .load1("Data/IncursionDropOnly", vec![])
+            .map_err(|e| e.to_string())?;
+        engine::item_data::CraftData::from_lua(&Value::Table(self.data.clone()), &delve, &incursion)
+    }
+
     pub fn game_data(&self) -> Result<GameData> {
         let versions = self.tree_versions()?;
         Ok(GameData {
@@ -227,6 +239,8 @@ impl Source {
             rares: self.rares()?,
             item_base_lists: self.item_base_lists()?,
             enchantments: self.enchantments()?,
+            vestigial_mod_mappings: self.vestigial_mod_mappings()?,
+            craft: self.craft()?,
         })
     }
 }

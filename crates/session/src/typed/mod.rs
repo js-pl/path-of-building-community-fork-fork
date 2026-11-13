@@ -7,6 +7,8 @@ mod calcs;
 mod config;
 pub mod display_stats;
 mod geometry;
+mod item_add_implicit;
+mod item_add_modifier;
 mod item_anoint;
 mod item_corrupt;
 mod item_db;
@@ -73,6 +75,8 @@ pub struct TypedData {
         std::cell::OnceCell<item_db::ItemDb>,
         std::cell::OnceCell<item_db::ItemDb>,
     ),
+    /// `main.uniqueDB.byTitle`, once asked for
+    unique_titles: std::cell::OnceCell<item_db::ItemDb>,
 }
 
 pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
@@ -88,6 +92,7 @@ impl TypedData {
             timeless_source: None,
             timeless: Default::default(),
             item_dbs: Default::default(),
+            unique_titles: Default::default(),
         };
         let latest = data.tree(data.game.latest_tree_version())?;
         let socket_ids = latest

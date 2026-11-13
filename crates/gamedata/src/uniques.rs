@@ -106,6 +106,20 @@ impl Source {
             .collect()
     }
 
+    /// `data.vestigialModMappings`: each mod id's unique title, by id
+    pub fn vestigial_mod_mappings(&self) -> Result<Vec<(String, String)>> {
+        let mut im = self.importer();
+        let t = im
+            .load1("Data/Vestigial", vec![])
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for (k, v) in sorted_by_key(&table(&t)?)? {
+            let title = table(&v)?.get_int(1);
+            out.push((k, text(&title)?));
+        }
+        Ok(out)
+    }
+
     /// `data.rares`
     pub fn rares(&self) -> Result<Vec<String>> {
         let mut im = self.importer();

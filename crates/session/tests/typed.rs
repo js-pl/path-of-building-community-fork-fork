@@ -1109,12 +1109,18 @@ fn items_edits_match(d: &mut Dispatcher) {
                                         || p.contains("Enchant")
                                         || p.contains("Anoint")
                                         || p.contains("Corrupt")
+                                        || p.contains("AddImplicit")
+                                        || p.contains("AddCustom")
                                         || p.contains("CustomModifierRemove"))
                             })
                             .collect();
                         // The popups more often than the other controls
                         let opens = |p: &str| {
-                            p.contains("Enchant") || p.contains("Anoint") || p.contains("Corrupt")
+                            p.contains("Enchant")
+                                || p.contains("Anoint")
+                                || p.contains("Corrupt")
+                                || p.contains("AddImplicit")
+                                || p.contains("AddCustom")
                         };
                         let openers: Vec<J> = controls
                             .iter()
@@ -1346,7 +1352,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits ({popups} enchant, anoint and corrupt popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} item editor popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")

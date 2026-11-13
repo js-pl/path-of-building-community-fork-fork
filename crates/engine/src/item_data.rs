@@ -97,6 +97,142 @@ pub struct AffixSet {
     index: HashMap<String, usize>,
 }
 
+impl Affix {
+    /// A mod of a table of mods (`data.itemMods.*`, `data.masterMods`, ...)
+    pub fn from_lua(id: &str, m: &Value) -> Result<Affix> {
+        let strings = |field: &str| -> Result<Vec<String>> {
+            array(&get(m, field)).iter().map(string).collect()
+        };
+        let numbers = |field: &str| -> Result<Vec<f64>> {
+            array(&get(m, field)).iter().map(number).collect()
+        };
+        Ok(Affix {
+            id: id.to_string(),
+            typ: opt_string(&get(m, "type"))?,
+            affix: opt_string(&get(m, "affix"))?,
+            lines: array(m).iter().map(string).collect::<Result<_>>()?,
+            stat_order: numbers("statOrder")?,
+            mod_tags: strings("modTags")?,
+            weight_key: strings("weightKey")?,
+            weight_val: numbers("weightVal")?,
+            weight_multiplier_key: strings("weightMultiplierKey")?,
+            weight_multiplier_val: numbers("weightMultiplierVal")?,
+            level: opt_number(&get(m, "level"))?,
+            group: opt_string(&get(m, "group"))?,
+            tags: strings("tags")?,
+        })
+    }
+}
+
+/// The mods of the item editor's Add Modifier popup
+/// (`ItemsTab:AddCustomModifierToDisplayItem`): crafting bench, essences,
+/// veiled, beastcraft, Necropolis and drop-restricted mods, the tables in
+/// `pairs` order
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CraftData {
+    /// `data.masterMods` with each craft's item types
+    pub master_mods: Vec<(Arc<Affix>, Vec<String>)>,
+    pub essences: Vec<Essence>,
+    pub veiled_mods: Vec<Arc<Affix>>,
+    pub beast_craft: Vec<Arc<Affix>>,
+    pub necropolis_mods: Vec<Arc<Affix>>,
+    /// `Data/DelveDropOnly` and `Data/IncursionDropOnly`: mod id and the
+    /// item categories it drops on
+    pub delve_drop_only: Vec<(String, Vec<String>)>,
+    pub incursion_drop_only: Vec<(String, Vec<String>)>,
+    /// `supportsCustomModifiers` of the rare-like uniques: title and source ids
+    pub custom_modifier_sources: Vec<(String, Vec<String>)>,
+}
+
+/// An essence of `data.essences`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Essence {
+    pub name: String,
+    pub typ: f64,
+    pub tier: f64,
+    /// Mod id by item type
+    pub mods: Vec<(String, String)>,
+}
+
+crate::codec_struct!(Essence {
+    name,
+    typ,
+    tier,
+    mods
+});
+crate::codec_struct!(CraftData {
+    master_mods,
+    essences,
+    veiled_mods,
+    beast_craft,
+    necropolis_mods,
+    delve_drop_only,
+    incursion_drop_only,
+    custom_modifier_sources,
+});
+
+impl CraftData {
+    /// From upstream's `data`, with the drop-restricted tables of their files
+    pub fn from_lua(data: &Value, delve: &Value, incursion: &Value) -> Result<CraftData> {
+        let set = |v: &Value| -> Result<Vec<Arc<Affix>>> {
+            pairs(v)
+                .into_iter()
+                .map(|(k, m)| Ok(Arc::new(Affix::from_lua(&key_string(&k)?, &m)?)))
+                .collect()
+        };
+        let drop_only = |v: &Value| -> Result<Vec<(String, Vec<String>)>> {
+            pairs(v)
+                .into_iter()
+                .map(|(k, e)| {
+                    let cats = array(&get(&e, "categories"))
+                        .iter()
+                        .map(string)
+                        .collect::<Result<_>>()?;
+                    Ok((key_string(&k)?, cats))
+                })
+                .collect()
+        };
+        let mut d = CraftData::default();
+        for (i, m) in array(&get(data, "masterMods")).iter().enumerate() {
+            let types = pairs(&get(m, "types"))
+                .into_iter()
+                .filter(|(_, v)| v.truthy())
+                .map(|(k, _)| key_string(&k))
+                .collect::<Result<_>>()?;
+            d.master_mods
+                .push((Arc::new(Affix::from_lua(&(i + 1).to_string(), m)?), types));
+        }
+        for (_, e) in pairs(&get(data, "essences")) {
+            d.essences.push(Essence {
+                name: string(&get(&e, "name"))?,
+                typ: number(&get(&e, "type"))?,
+                tier: number(&get(&e, "tier"))?,
+                mods: pairs(&get(&e, "mods"))
+                    .into_iter()
+                    .map(|(k, v)| Ok((key_string(&k)?, string(&v)?)))
+                    .collect::<Result<_>>()?,
+            });
+        }
+        d.veiled_mods = set(&get(data, "veiledMods"))?;
+        d.beast_craft = set(&get(data, "beastCraft"))?;
+        d.necropolis_mods = set(&get(data, "necropolisMods"))?;
+        d.delve_drop_only = drop_only(delve)?;
+        d.incursion_drop_only = drop_only(incursion)?;
+        for (k, v) in pairs(&get(data, "rareLikeUniques")) {
+            let sources = get(&v, "supportsCustomModifiers");
+            if sources.truthy() {
+                let ids = pairs(&sources)
+                    .into_iter()
+                    .filter(|(_, v)| v.truthy())
+                    .map(|(k, _)| key_string(&k))
+                    .collect::<Result<_>>()?;
+                d.custom_modifier_sources.push((key_string(&k)?, ids));
+            }
+        }
+        Ok(d)
+    }
+}
+
 impl AffixSet {
     pub fn get(&self, id: &str) -> Option<&Affix> {
         self.index.get(id).map(|&i| &*self.list[i])
@@ -116,28 +252,7 @@ impl AffixSet {
                 set.list.push(a.clone());
                 continue;
             }
-            let strings = |field: &str| -> Result<Vec<String>> {
-                array(&get(&m, field)).iter().map(string).collect()
-            };
-            let numbers = |field: &str| -> Result<Vec<f64>> {
-                array(&get(&m, field)).iter().map(number).collect()
-            };
-            let affix = Affix {
-                id: id.clone(),
-                typ: opt_string(&get(&m, "type"))?,
-                affix: opt_string(&get(&m, "affix"))?,
-                lines: array(&m).iter().map(string).collect::<Result<_>>()?,
-                stat_order: numbers("statOrder")?,
-                mod_tags: strings("modTags")?,
-                weight_key: strings("weightKey")?,
-                weight_val: numbers("weightVal")?,
-                weight_multiplier_key: strings("weightMultiplierKey")?,
-                weight_multiplier_val: numbers("weightMultiplierVal")?,
-                level: opt_number(&get(&m, "level"))?,
-                group: opt_string(&get(&m, "group"))?,
-                tags: strings("tags")?,
-            };
-            let affix = Arc::new(affix);
+            let affix = Arc::new(Affix::from_lua(&id, &m)?);
             if let Some(p) = addr {
                 seen.insert(p, affix.clone());
             }
