@@ -438,12 +438,18 @@ What remains for the full migration, in order:
      jewel skill and node count, affixes and their rolls, range lines,
      custom modifier removal, and the Save, Edit and Cancel buttons;
      upstream's state on the controls, such as the edits' text and the
-     sliders' values, is kept in `item_editor::Editor`). All in `items_edits_match`, with
+     sliders' values, is kept in `item_editor::Editor`), the Enchant Item
+     popup (`session::typed::item_enchant`, with `data.enchantments` from
+     `gamedata::enchantments` and `engine::item_enchant`: skill, all
+     skills, source, sort by a power stat's calculation with the
+     enchanted item, enchantment; Enchant, Remove, Cancel) and Anoint Item
+     (saved without a node: the session has no input for its notable
+     list). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
-     counts a `displayItem` whose lines differ only as `previewItem` of
-     its text does. The same gap shows in outputs: upstream clears a
+     asks a `displayItem` whose lines differ again of a fresh translation
+     with the edits since the load. The same gap shows in outputs: upstream clears a
      triggered granted skill's level cost on the shared skill data for
      the rest of the process, the typed engine for the build only
      (`calc_offence::cost_cleared`), so gen-0018 without its amulet

@@ -826,10 +826,23 @@ fn items_edits_match(d: &mut Dispatcher) {
                                     && c["class"] != "LabelControl"
                                     && (c["class"] != "ButtonControl"
                                         || p.contains("AddSocket")
+                                        || p.contains("Enchant")
+                                        || p.contains("Anoint")
                                         || p.contains("CustomModifierRemove"))
                             })
                             .collect();
-                        let Some(c) = pick(&mut rng, &J::Array(controls)) else {
+                        // The Enchant popup more often than the others
+                        let enchant = controls
+                            .iter()
+                            .find(|c| {
+                                c["path"]
+                                    .as_str()
+                                    .is_some_and(|p| p.contains("Enchant") || p.contains("Anoint"))
+                            })
+                            .cloned()
+                            .filter(|_| rng.below(3) == 0);
+                        let Some(c) = enchant.or_else(|| pick(&mut rng, &J::Array(controls)))
+                        else {
                             break;
                         };
                         let path = c["path"].clone();
@@ -859,6 +872,68 @@ fn items_edits_match(d: &mut Dispatcher) {
                             break;
                         }
                         let label = format!("step {step} {r}");
+                        if r.contains("displayItemAnoint") {
+                            compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                            let button = ["save", "save", "close"][rng.below(3)];
+                            let r = json!({"cmd": "popupButton", "name": button}).to_string();
+                            answer(d.request(&r), "anoint button");
+                            log.push(r.clone());
+                            if !d.typed_active() {
+                                fell_back = true;
+                                break;
+                            }
+                        }
+                        if r.contains("displayItemEnchant") {
+                            // Enchant Item: random choices, then Enchant,
+                            // Remove or Cancel
+                            compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                            let mut closed = false;
+                            for _ in 0..rng.below(5) + 1 {
+                                let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                                let inputs: Vec<J> = st["ok"]["popups"][0]["controls"]
+                                    .as_array()
+                                    .cloned()
+                                    .unwrap_or_default()
+                                    .into_iter()
+                                    // Sorting by power only now and then
+                                    .filter(|c| c["path"] != "popup.sort" || rng.below(4) == 0)
+                                    .collect();
+                                let Some(c) = pick(&mut rng, &J::Array(inputs)) else {
+                                    break;
+                                };
+                                let r = if c["class"] == "CheckBoxControl" {
+                                    json!({"cmd": "control", "path": c["path"], "state": c["state"] != true})
+                                } else {
+                                    let n = c["list"].as_array().map_or(1, Vec::len);
+                                    json!({"cmd": "control", "path": c["path"], "sel": rng.below(n) + 1})
+                                }
+                                .to_string();
+                                answer(d.request(&r), "enchant control");
+                                log.push(r.clone());
+                                if !d.typed_active() {
+                                    closed = true;
+                                    break;
+                                }
+                                compare(
+                                    d,
+                                    &json!({"cmd": "state"}),
+                                    &format!("step {step} {r}"),
+                                    &mut out,
+                                );
+                            }
+                            if closed {
+                                fell_back = true;
+                                break;
+                            }
+                            let button = ["save", "save", "remove", "close"][rng.below(4)];
+                            let r = json!({"cmd": "popupButton", "name": button}).to_string();
+                            answer(d.request(&r), "enchant button");
+                            log.push(r.clone());
+                            if !d.typed_active() {
+                                fell_back = true;
+                                break;
+                            }
+                        }
                         compare_display(d, &label, &log, &mut out);
                         compare(d, &json!({"cmd": "state"}), &label, &mut out);
                     }
