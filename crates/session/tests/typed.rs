@@ -155,7 +155,6 @@ fn typed_session_matches_translated() {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
-    "copying a gem without a level, quality or quality id",
     "undo with tattoos or cluster jewels",
     "crafting a cluster jewel",
 ];
@@ -1125,6 +1124,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         if let Ok(dir) = std::env::var("PARTY_DUMP") {
             std::fs::write(Path::new(&dir).join(format!("{id}.xml")), xml).unwrap();
         }
+        at_build(d, id);
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
@@ -1135,6 +1135,10 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             let tr = answer(d.translated_request(r#"{"cmd":"outputs"}"#), "translated");
             if !e.starts_with("not ported") && tr.get("error").is_none() {
                 failures.push(format!("{id}: typed fails ({e}), the translation does not"));
+            }
+            if tr.get("error").is_some() {
+                // A build neither loads is not a fallback
+                d.fallbacks.clear();
             }
             skipped.push(format!("{id}: {e}"));
             return None;
