@@ -360,7 +360,7 @@ impl<'d> TypedSession<'d> {
     /// item (crafted without the control's own affix); the new selection
     fn sort_affixes_by_power(
         &self,
-        list: &mut Vec<Option<AffixSeries>>,
+        list: &mut [Option<AffixSeries>],
         table: AffixTable,
         index: usize,
         stat: &engine::power::PowerStat,
@@ -425,9 +425,9 @@ impl<'d> TypedSession<'d> {
         let mut powers: std::collections::HashMap<String, f64> = Default::default();
         for s in list.iter().flatten() {
             let id = pick(s);
-            if !powers.contains_key(&id) {
-                let p = power(&id)?;
-                powers.insert(id, p);
+            if let std::collections::hash_map::Entry::Vacant(e) = powers.entry(id) {
+                let p = power(e.key())?;
+                e.insert(p);
             }
         }
         engine::calcs::lua_sort(list, |a, b| match (a, b) {

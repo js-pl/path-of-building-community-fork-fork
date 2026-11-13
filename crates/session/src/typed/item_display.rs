@@ -842,7 +842,8 @@ impl<'d> TypedSession<'d> {
         let mut out: Vec<(f64, f64, J)> = Vec::new();
         for (i, c) in l.ctls.iter().enumerate() {
             let Some(d) = &c.desc else { continue };
-            if !c.name.starts_with("displayItem") || !l.is_shown(i) {
+            let listed = c.name.starts_with("displayItem") || c.name == "craftingSorting";
+            if !listed || !l.is_shown(i) {
                 continue;
             }
             let (x, y) = l.pos(i);
