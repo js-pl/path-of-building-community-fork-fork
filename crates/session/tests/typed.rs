@@ -84,39 +84,60 @@ fn session() -> Session {
     Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The typed engine's commands on one session (one data and one translated
-/// session keep the memory down): the sidebar and outputs, the Calcs tab
-/// and tree edits, each over the corpus
+/// The phases of `typed_session_matches_translated`, with the number of
+/// shards each splits the corpus into
+const PHASES: [(&str, usize); 8] = [
+    ("commands", 2),
+    ("geometry", 3),
+    ("calcs", 3),
+    ("tree", 3),
+    ("skills", 3),
+    ("save", 3),
+    ("items", 3),
+    ("config", 3),
+];
+
+/// The typed engine's commands against the translated session's: the
+/// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
+/// and item edits and the saved files, each over the corpus. Each phase runs on shards of the
+/// corpus, each in a process of its own with one data and one translated
+/// session (`testkit::run_shards`): the translation keeps about 12 MB of
+/// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
+/// `SESSION_SHARDS=<n>` splits each phase in `n` shards.
 #[test]
 fn typed_session_matches_translated() {
+    let test = "typed_session_matches_translated";
+    let Some(shard) = testkit::shard() else {
+        let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
+        let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
+        let count: Option<usize> = std::env::var("SESSION_SHARDS")
+            .ok()
+            .and_then(|s| s.parse().ok());
+        let shards: Vec<String> = PHASES
+            .iter()
+            .filter(|(p, _)| run(p))
+            .flat_map(|&(p, n)| {
+                let n = count.unwrap_or(n);
+                (0..n).map(move |k| format!("{p} {k}/{n}"))
+            })
+            .collect();
+        return testkit::run_shards(test, &shards, &[" builds", " edits", " trees", "skipped "]);
+    };
+    let (phase, part) = shard.split_once(' ').unwrap();
+    let (k, n) = part.split_once('/').unwrap();
+    SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    // `SESSION_PHASES=calcs,tree` runs only these
-    let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
-    let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
-    if run("commands") {
-        commands_match(data, &mut d);
-    }
-    if run("geometry") {
-        geometry_matches(&mut d);
-    }
-    if run("calcs") {
-        calcs_match(data, &mut d);
-    }
-    if run("tree") {
-        tree_edits_match(&mut d);
-    }
-    if run("skills") {
-        skills_edits_match(&mut d);
-    }
-    if run("save") {
-        saves_match(&mut d);
-    }
-    if run("items") {
-        items_edits_match(&mut d);
-    }
-    if run("config") {
-        config_edits_match(&mut d);
+    match phase {
+        "commands" => commands_match(data, &mut d),
+        "geometry" => geometry_matches(&mut d),
+        "calcs" => calcs_match(data, &mut d),
+        "tree" => tree_edits_match(&mut d),
+        "skills" => skills_edits_match(&mut d),
+        "save" => saves_match(&mut d),
+        "items" => items_edits_match(&mut d),
+        "config" => config_edits_match(&mut d),
+        _ => panic!("unknown phase {phase}"),
     }
 }
 
@@ -202,7 +223,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -246,30 +267,32 @@ fn config_edits_match(d: &mut Dispatcher) {
             failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
         }
     }
-    // A new build, a class change on it and its undo
+    // A new build, a class change on it and its undo, in the first shard
     let mut out = Vec::new();
-    answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
-    assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
-    let views = [
-        "config",
-        "state",
-        "outputs",
-        "treeState",
-        "skills",
-        "items",
-        "treeSpecs",
-    ];
-    compare_views(d, &views, "newBuild", &mut out);
-    compare_saves(d, "new build", &mut out);
-    for req in [
-        json!({"cmd": "control", "path": "build.classDrop", "sel": 3}),
-        json!({"cmd": "control", "path": "build.ascendDrop", "sel": 2}),
-        json!({"cmd": "undo"}),
-        json!({"cmd": "undo"}),
-        json!({"cmd": "undo"}),
-    ] {
-        answer(d.request(&req.to_string()), "new build edit");
-        compare_views(d, &CONFIG_VIEWS, &format!("new build {req}"), &mut out);
+    if SHARD.get().is_none_or(|&(k, _)| k == 0) {
+        answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+        assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
+        let views = [
+            "config",
+            "state",
+            "outputs",
+            "treeState",
+            "skills",
+            "items",
+            "treeSpecs",
+        ];
+        compare_views(d, &views, "newBuild", &mut out);
+        compare_saves(d, "new build", &mut out);
+        for req in [
+            json!({"cmd": "control", "path": "build.classDrop", "sel": 3}),
+            json!({"cmd": "control", "path": "build.ascendDrop", "sel": 2}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+        ] {
+            answer(d.request(&req.to_string()), "new build edit");
+            compare_views(d, &CONFIG_VIEWS, &format!("new build {req}"), &mut out);
+        }
     }
     if !out.is_empty() {
         let n = out.len();
@@ -290,9 +313,24 @@ fn config_edits_match(d: &mut Dispatcher) {
     );
 }
 
+/// This process's shard of the corpus: the `k`-th of every `n` builds
+static SHARD: std::sync::OnceLock<(usize, usize)> = std::sync::OnceLock::new();
+
+/// The builds of this process's shard
+fn mine<T>(builds: Vec<T>) -> Vec<T> {
+    let (k, n) = SHARD.get().copied().unwrap_or((0, 1));
+    builds
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % n == k)
+        .map(|(_, b)| b)
+        .collect()
+}
+
 /// Random sequences of item, set, spec, config set, level and socket
-/// group copy edits give the translation's items, skills, sidebar,
-/// outputs and specs after each step, and its file at the end
+/// group copy edits, items added, edited and saved from the editor give
+/// the translation's items, skills, sidebar, outputs and specs after each
+/// step, and its file at the end
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
@@ -300,7 +338,9 @@ fn items_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in corpus() {
+    // Item texts of the builds so far, for adding and editing items
+    let mut pool: Vec<J> = Vec::new();
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -319,6 +359,9 @@ fn items_edits_match(d: &mut Dispatcher) {
             typed
         };
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
+        if let Some(a) = items["ok"]["items"].as_array() {
+            pool.extend(a.iter().map(|i| i["raw"].clone()));
+        }
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -339,7 +382,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(8) {
+            let req = match rng.below(12) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -368,6 +411,30 @@ fn items_edits_match(d: &mut Dispatcher) {
                         Some(t) => json!({"cmd": "pasteSocketGroup", "text": t}),
                         None => continue,
                     }
+                }
+                8 => {
+                    let text = &pool[rng.below(pool.len())];
+                    match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
+                        Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
+                        None => json!({"cmd": "addItem", "text": text}),
+                    }
+                }
+                9 => match pick(&mut rng, &items["ok"]["items"]) {
+                    Some(i) => {
+                        let text = &pool[rng.below(pool.len())];
+                        json!({"cmd": "editItem", "id": i["id"], "text": text})
+                    }
+                    None => continue,
+                },
+                10 | 11 => {
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    compare(d, &open, &format!("step {step}"), &mut out);
+                    json!({"cmd": "saveDisplayItem"})
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
@@ -469,7 +536,7 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
 /// and outputs (design layer 8)
 fn saves_match(d: &mut Dispatcher) {
     let (mut failures, mut times, mut n) = (Vec::new(), [Duration::ZERO; 2], 0);
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -588,6 +655,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         })
         .collect();
     builds.extend(auto);
+    let builds = mine(builds);
     for (id, xml) in builds {
         if let Err(e) = TypedSession::load(data, &xml, None) {
             skipped.push(format!("{id}: {e}"));
@@ -678,6 +746,7 @@ fn geometry_matches(d: &mut Dispatcher) {
             builds.push((format!("empty {v}"), xml));
         }
     }
+    let builds = mine(builds);
     let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
     let mut times = [Duration::ZERO; 2];
     for (id, xml) in builds {
@@ -773,7 +842,7 @@ fn node_power_matches_translated() {
     let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
     let filter = std::env::var("SESSION_POWER").ok();
     let mut failures = Vec::new();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let sample = id == "gen-0001";
         if !filter.as_deref().map_or(sample, |f| id.contains(f)) {
             continue;
@@ -888,7 +957,7 @@ fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTre
 fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
         answer(d.request(&load), "load");
@@ -946,7 +1015,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1124,7 +1193,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         .iter()
         .filter_map(|g| g["name"].as_str().map(String::from))
         .collect();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1313,7 +1382,7 @@ fn replay_sequence() {
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
     let seq: Vec<J> = serde_json::from_str(&std::env::var("SESSION_SEQ").unwrap()).unwrap();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),

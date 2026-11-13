@@ -10,7 +10,7 @@ use engine::item::Item;
 use serde_json::{Map, Value as J, json};
 use std::sync::Arc;
 
-fn describe(item: &Item) -> J {
+pub(super) fn describe(item: &Item) -> J {
     let mut o = Map::new();
     if let Some(id) = item.id {
         o.insert("id".into(), num(id));
@@ -31,8 +31,43 @@ fn describe(item: &Item) -> J {
 }
 
 impl<'d> TypedSession<'d> {
+    /// Whether the slot at this index is shown and active (`IsShown()`
+    /// and not `inactive`); `ring3` is `AdditionalRingSlot`
+    pub(super) fn slot_shown(&self, i: usize, ring3: bool) -> bool {
+        let tab = &self.build.items;
+        let spec = &self.build.spec;
+        let s = &tab.ordered_slots[i];
+        let abyssal_count = |parent: &str| {
+            let sel = tab
+                .ordered_slots
+                .iter()
+                .find(|s| s.slot_name == parent)
+                .map_or(0.0, |s| s.sel_item_id);
+            if sel > 0.0 {
+                tab.item(sel).map_or(0.0, |i| i.abyssal_socket_count)
+            } else {
+                0.0
+            }
+        };
+        let inactive = match (&s.node_id, &s.parent_slot) {
+            (Some(n), _) => !spec.alloc_nodes.contains(*n),
+            (None, Some(p)) => s.slot_num.unwrap_or(0.0) > abyssal_count(p),
+            _ => false,
+        };
+        let second = tab.active_item_set().use_second_weapon_set;
+        let name = s.slot_name.as_str();
+        !inactive
+            && match s.weapon_set {
+                Some(1) => !second,
+                Some(2) => second,
+                _ if name == "Graft 1" || name == "Graft 2" => spec.tree.version.contains("3_27"),
+                _ if name == "Ring 3" => ring3,
+                _ => true,
+            }
+    }
+
     /// Whether an item goes in a slot (`IsItemValidForSlot`)
-    fn valid_for_slot(&self, item: &Item, slot: &str) -> bool {
+    pub(super) fn valid_for_slot(&self, item: &Item, slot: &str) -> bool {
         let info = &self.data.game.setup.weapon_type_info;
         let one_hand = |t: &str| info.get(t).map(|w| w.one_hand);
         self.build
@@ -67,47 +102,20 @@ impl<'d> TypedSession<'d> {
         }
         let sb = self.sidebar()?;
         let tab = &self.build.items;
-        let spec = &self.build.spec;
-        let set = tab.active_item_set();
         let items: Vec<J> = tab
             .item_order_list
             .iter()
             .filter_map(|id| tab.item(*id))
             .map(describe)
             .collect();
-        let abyssal_count = |parent: &str| {
-            let sel = tab
-                .ordered_slots
-                .iter()
-                .find(|s| s.slot_name == parent)
-                .map_or(0.0, |s| s.sel_item_id);
-            if sel > 0.0 {
-                tab.item(sel).map_or(0.0, |i| i.abyssal_socket_count)
-            } else {
-                0.0
-            }
-        };
+        let ring3 = sb.additional_ring_slot;
         let slots: Vec<J> = tab
             .ordered_slots
             .iter()
-            .map(|s| {
+            .enumerate()
+            .map(|(i, s)| {
                 let name = s.slot_name.as_str();
-                let inactive = match (&s.node_id, &s.parent_slot) {
-                    (Some(n), _) => !spec.alloc_nodes.contains(*n),
-                    (None, Some(p)) => s.slot_num.unwrap_or(0.0) > abyssal_count(p),
-                    _ => false,
-                };
-                let second = set.use_second_weapon_set;
-                let shown = !inactive
-                    && match s.weapon_set {
-                        Some(1) => !second,
-                        Some(2) => second,
-                        _ if name == "Graft 1" || name == "Graft 2" => {
-                            spec.tree.version.contains("3_27")
-                        }
-                        _ if name == "Ring 3" => sb.additional_ring_slot,
-                        _ => true,
-                    };
+                let shown = self.slot_shown(i, ring3);
                 let label = match s.node_id {
                     Some(n) => self
                         .socket_labels
@@ -158,7 +166,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `ItemSlotControl:SetSelItemId(id)`
-    fn set_sel_item(&mut self, slot: usize, id: f64) -> Result<()> {
+    pub(super) fn set_sel_item(&mut self, slot: usize, id: f64) -> Result<()> {
         let b = &mut self.build;
         let s = &b.items.ordered_slots[slot];
         match s.node_id {

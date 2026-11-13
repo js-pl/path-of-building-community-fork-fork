@@ -3460,73 +3460,117 @@ impl<'a> Perform<'a> {
             self.generals_cry(main)?;
         }
         let mirage = !generals_cry && self.mirages()?;
-        // The gem level and quality below go to the output the copy's
-        // replaced
         if mirage && self.main_copy.is_some() {
+            // The copy is the main skill: its gem level and quality go to
+            // the output it replaced, and only reach the breakdown
+            if let Some(g) = self.main_copy_gem.clone() {
+                self.gem_outputs(&g, false)?;
+            }
             return Ok(());
         }
         if !mirage {
             self.offence(crate::calc::PLAYER, main)?;
         }
-        // The main skill's gem level and quality
+        if let Some(g) = self.gem_sums(main)? {
+            self.gem_outputs(&g, true)?;
+        }
+        Ok(())
+    }
+
+    /// The main skill's gem level and quality and their sums, if it comes
+    /// from a gem
+    pub(crate) fn gem_sums(&self, main: usize) -> Result<Option<crate::calc_mirage::GemSums>> {
         let e = &self.skill(main).active_effect;
-        if e.src.is_some() {
-            let (level, list, cfg) = (e.level, self.lists[main].list, self.cfg(main));
-            let c = Some(&cfg);
-            let actor = crate::calc::PLAYER;
-            let sum = |p: &Self, n: &str| p.c.base(list, c, &[n]);
-            // "+ 2 ^8(level from items)" for each source that adds any
-            let sources = |l: &mut Vec<String>, what: &str, sources: &[(f64, &str)]| {
-                for &(v, from) in sources {
-                    if v != 0.0 {
-                        let sign = if v > 0.0 { "+" } else { "-" };
-                        l.push(sf!("%s %d ^8(%s from %s)", sign, v.abs(), what, from));
-                    }
-                }
-            };
-            if let Some(level) = level {
-                let base = sum(self, "GemLevel")?;
-                let item = sum(self, "GemItemLevel")?;
-                let global = sum(self, "GemGlobalLevel")?;
-                let support = sum(self, "GemSupportLevel")?;
-                self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
-                self.c.set_out(actor, "GemLevel", level);
-                if let Some(b) = self.bd(actor) {
-                    let mut l = vec![sf!("%d ^8(level from gem)", base)];
-                    let from = [
-                        (item, "items"),
-                        (global, "global modifiers"),
-                        (support, "support"),
-                    ];
-                    sources(&mut l, "level", &from);
-                    if level != base + item + global + support {
-                        l.push(sf!("^8Limited to Level %d", level));
-                    }
-                    l.push(sf!("= %d", level));
-                    b.set_lines("GemLevel", l);
+        if e.src.is_none() {
+            return Ok(None);
+        }
+        let (list, cfg) = (self.lists[main].list, self.cfg(main));
+        let mut sums = [0.0; 9];
+        let names = [
+            "GemLevel",
+            "GemItemLevel",
+            "GemGlobalLevel",
+            "GemSupportLevel",
+            "GemQuality",
+            "GemItemQuality",
+            "GemGlobalQuality",
+            "GemSupportQuality",
+            "GemSocketQuality",
+        ];
+        for (k, n) in names.iter().enumerate() {
+            // Upstream sums the level's only if the effect has a level
+            if k < 4 && e.level.is_none() {
+                continue;
+            }
+            sums[k] = self.c.base(list, Some(&cfg), &[n])?;
+        }
+        Ok(Some(crate::calc_mirage::GemSums {
+            level: e.level,
+            sums,
+        }))
+    }
+
+    /// The main skill's gem level and quality, into the player's output
+    /// when `output` and its breakdown
+    fn gem_outputs(&mut self, g: &crate::calc_mirage::GemSums, output: bool) -> Result<()> {
+        let actor = crate::calc::PLAYER;
+        // "+ 2 ^8(level from items)" for each source that adds any
+        let sources = |l: &mut Vec<String>, what: &str, sources: &[(f64, &str)]| {
+            for &(v, from) in sources {
+                if v != 0.0 {
+                    let sign = if v > 0.0 { "+" } else { "-" };
+                    l.push(sf!("%s %d ^8(%s from %s)", sign, v.abs(), what, from));
                 }
             }
-            let base = sum(self, "GemQuality")?;
-            let item = sum(self, "GemItemQuality")?;
-            let global = sum(self, "GemGlobalQuality")?;
-            let support = sum(self, "GemSupportQuality")?;
-            let socket = sum(self, "GemSocketQuality")?;
-            let v = base + support + item + global + socket;
-            self.c
-                .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
-            self.c.set_out(actor, "GemQuality", v);
+        };
+        let [
+            base,
+            item,
+            global,
+            support,
+            q_base,
+            q_item,
+            q_global,
+            q_support,
+            socket,
+        ] = g.sums;
+        if let Some(level) = g.level {
+            if output {
+                self.c.set_out_val(actor, "GemHasLevel", OutVal::Bool(true));
+                self.c.set_out(actor, "GemLevel", level);
+            }
             if let Some(b) = self.bd(actor) {
-                let mut l = vec![sf!("%d ^8(quality from gem)", base)];
+                let mut l = vec![sf!("%d ^8(level from gem)", base)];
                 let from = [
                     (item, "items"),
                     (global, "global modifiers"),
                     (support, "support"),
-                    (socket, "socket colour"),
                 ];
-                sources(&mut l, "quality", &from);
-                l.push(sf!("= %d", v));
-                b.set_lines("GemQuality", l);
+                sources(&mut l, "level", &from);
+                if level != base + item + global + support {
+                    l.push(sf!("^8Limited to Level %d", level));
+                }
+                l.push(sf!("= %d", level));
+                b.set_lines("GemLevel", l);
             }
+        }
+        let v = q_base + q_support + q_item + q_global + socket;
+        if output {
+            self.c
+                .set_out_val(actor, "GemHasQuality", OutVal::Bool(true));
+            self.c.set_out(actor, "GemQuality", v);
+        }
+        if let Some(b) = self.bd(actor) {
+            let mut l = vec![sf!("%d ^8(quality from gem)", q_base)];
+            let from = [
+                (q_item, "items"),
+                (q_global, "global modifiers"),
+                (q_support, "support"),
+                (socket, "socket colour"),
+            ];
+            sources(&mut l, "quality", &from);
+            l.push(sf!("= %d", v));
+            b.set_lines("GemQuality", l);
         }
         Ok(())
     }

@@ -74,8 +74,8 @@ pub struct Sidebar {
     pub slot_enabled: Vec<bool>,
     /// The player's `AdditionalRingSlot` flag, which shows the third ring
     pub additional_ring_slot: bool,
-    /// Whether Saviour's mirage replaced the main skill, whose gem level
-    /// and quality outputs are not ported
+    /// Whether a mirage's copy replaced the main skill (The Saviour,
+    /// Tawhoa's Chosen)
     pub main_copy: bool,
     /// What the configuration's options are shown by
     pub used: ConfigUsed,
@@ -296,6 +296,21 @@ fn flag_names(p: &Perform, id: StoreId, out: &mut BTreeSet<Sym>) {
     }
 }
 
+/// The flags the main skill's `skillModList` (and its parents) set, which
+/// the config tab's `ifFlag` reads
+pub(crate) fn main_skill_mod_flags(p: &Perform) -> Result<BTreeSet<String>> {
+    let list = p.lists[p.main()].list;
+    let mut names = BTreeSet::new();
+    flag_names(p, list, &mut names);
+    let mut out = BTreeSet::new();
+    for n in names {
+        if p.c.flag(list, None, &[n.as_str()])? {
+            out.insert(n.as_str().to_string());
+        }
+    }
+    Ok(out)
+}
+
 /// `env.skillsUsed`, `env.conditionsUsed`, ... of `calcs.buildOutput`
 fn config_used(p: &Perform) -> Result<ConfigUsed> {
     let mut u = ConfigUsed::default();
@@ -372,16 +387,12 @@ fn config_used(p: &Perform) -> Result<ConfigUsed> {
         .filter(|(_, v)| **v)
         .map(|(k, _)| k.as_str().to_string())
         .collect();
-    if p.main_copy.is_none() {
-        let list = p.lists[p.main()].list;
-        let mut names = BTreeSet::new();
-        flag_names(p, list, &mut names);
-        for n in names {
-            if p.c.flag(list, None, &[n.as_str()])? {
-                u.main_skill_mod_flags.insert(n.as_str().to_string());
-            }
-        }
-    }
+    u.main_skill_mod_flags = match &p.main_copy {
+        // A mirage's copy is the main skill: its mod list as the mirage's
+        // calculation left it
+        Some(_) => p.main_copy_mod_flags.clone(),
+        None => main_skill_mod_flags(p)?,
+    };
     u.keystones_added = p.keystones_added.clone();
     Ok(u)
 }

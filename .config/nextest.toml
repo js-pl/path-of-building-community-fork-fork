@@ -1,0 +1,20 @@
+# cargo-nextest runs each test in a process of its own, the tests of every
+# binary side by side. CI builds the tests once (`cargo nextest archive`)
+# and runs them on several runners, see .github/workflows/ci.yml.
+#
+# The tests that split their builds over child processes
+# (`testkit::run_shards`) bound those children over the machine by cores
+# and memory themselves; the other tests take about 1 to 3 GB each.
+
+[profile.default]
+# The equivalence tests run for minutes, not hung
+slow-timeout = { period = "120s" }
+# Report every failure, not the first only
+fail-fast = false
+final-status-level = "slow"
+
+[profile.ci]
+slow-timeout = { period = "120s", terminate-after = 20 }
+fail-fast = false
+final-status-level = "all"
+failure-output = "immediate-final"

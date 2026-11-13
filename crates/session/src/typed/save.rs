@@ -167,7 +167,6 @@ impl TypedSession<'_> {
 
     /// `saveXml`: `buildMode:SaveDB("code")`
     pub fn save_xml(&mut self) -> Result<String> {
-        self.check_main()?;
         // Upstream's frame made the Calcs tab's calculation, which writes
         // its selections back to the gems
         self.calcs_output()?;

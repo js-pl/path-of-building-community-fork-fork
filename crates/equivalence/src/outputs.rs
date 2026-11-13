@@ -117,7 +117,9 @@ pub fn lua_outputs(out: &Value) -> BTreeMap<String, J> {
 }
 
 pub fn typed_outputs(out: &engine::calcs::Output) -> BTreeMap<String, J> {
+    // `output.Minion`, a mirage's copy's minion's, as `lua_outputs`
     out.iter()
+        .filter(|(k, _)| k.as_str() != "Minion")
         .map(|(k, v)| (k.as_str().to_string(), typed_out(v)))
         .collect()
 }
