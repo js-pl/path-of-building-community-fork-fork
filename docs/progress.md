@@ -300,8 +300,10 @@ What remains for the full migration, in order:
    slot in `ItemsTab.items`' `pairs` order), `equipItem`, `deleteItem`
    (with upstream's `allocNodes[index]` quirk on other specs' jewel
    sockets), `selectItemSet`, `selectTreeSpec` (every spec loaded, the
-   sockets' jewels moved between them; a spec on another tree version
-   falls back), `selectConfigSet`, `copySocketGroup`,
+   sockets' jewels moved between them, also to a spec on another tree
+   version, which carries its own tree: phase `overlays` switches every
+   eighth build to copies of its spec on 3_15 and 3_25 and back),
+   `selectConfigSet`, `copySocketGroup`,
    `pasteSocketGroup` and the level box's `control`.
    `PopulateSlots` now empties abyssal sockets past their item's count.
    `items_edits_match`: random sequences of these (6 per build) give the
