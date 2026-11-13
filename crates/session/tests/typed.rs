@@ -151,7 +151,6 @@ fn typed_session_matches_translated() {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
-    "copying a gem without a level, quality or quality id",
     "undo with tattoos or cluster jewels",
     "crafting a cluster jewel",
 ];
