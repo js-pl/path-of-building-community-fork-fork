@@ -73,11 +73,27 @@ impl TypedSession<'_> {
             let sb = self.sidebar()?;
             let mut totals: Option<[f64; 3]> = None;
             for id in radius.get(1).into_iter().flatten() {
-                let a = sb.node_attributes.get(id).ok_or_else(|| {
-                    format!(
-                        "{NOT_PORTED}: a socket tooltip with nodes the calculation did not build"
-                    )
-                })?;
+                // `CalcsTab:BuildOutput` sets each node's `finalModList` to
+                // its `modList` before the calculation sets the ones it builds
+                let a = match sb.node_attributes.get(id) {
+                    Some(a) => *a,
+                    None => {
+                        let k = *spec
+                            .index
+                            .get(id)
+                            .ok_or_else(|| format!("no node {id} in a socket's radius"))?;
+                        let list = match &spec.nodes[k].stats {
+                            Some(s) => &s.mod_list,
+                            None => &spec.tree_node(k).mod_list,
+                        };
+                        let mut a = [0.0; 3];
+                        for (k, name) in ["Str", "Dex", "Int"].iter().enumerate() {
+                            a[k] =
+                                engine::mods::list::sum(list, engine::mods::ModType::Base, name)?;
+                        }
+                        a
+                    }
+                };
                 let t = totals.get_or_insert([0.0; 3]);
                 for k in 0..3 {
                     t[k] += a[k];

@@ -1501,8 +1501,10 @@ pub fn build_mod_list_for_node_list(
         per_node.push((spec.nodes[i].id, node));
     }
     if finish {
+        // Their lists are their `finalModList` too, in MAIN mode
         for &i in extra {
-            build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+            let node = build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+            per_node.push((spec.nodes[i].id, node));
         }
         for rad in rads.iter_mut() {
             rad.func.run(None, &mut out, &mut rad.data)?;
