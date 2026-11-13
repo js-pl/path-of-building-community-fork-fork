@@ -106,6 +106,129 @@ fn typed_session_matches_translated() {
     if run("skills") {
         skills_edits_match(&mut d);
     }
+    if run("save") {
+        saves_match(&mut d);
+    }
+}
+
+/// `saveXml` of both on the dispatcher's build: where they differ
+fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    let typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+    let tr = answer(
+        d.translated_request(r#"{"cmd":"saveXml"}"#),
+        "translated save",
+    );
+    let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
+    if a != b {
+        let (a, b) = (a.unwrap_or(""), b.unwrap_or(""));
+        let line = a.lines().zip(b.lines()).position(|(x, y)| x != y);
+        let at = |s: &str| {
+            line.and_then(|l| s.lines().nth(l))
+                .unwrap_or("")
+                .to_string()
+        };
+        out.push(format!(
+            "{label}: saveXml differs:\n  typed {:?}\n  translated {:?}",
+            at(a),
+            at(b)
+        ));
+    }
+}
+
+/// `saveXml` and `saveCode` give the translation's file, byte for byte;
+/// a file saved by either loads in the other to the same file, sidebar
+/// and outputs (design layer 8)
+fn saves_match(d: &mut Dispatcher) {
+    let (mut failures, mut times, mut n) = (Vec::new(), [Duration::ZERO; 2], 0);
+    for (id, path) in corpus() {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut out = Vec::new();
+        answer(
+            d.translated_request(r#"{"cmd":"treeState"}"#),
+            "translated load",
+        );
+        let t = Instant::now();
+        let typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+        times[0] += t.elapsed();
+        if !d.typed_active() {
+            let e = d.typed_error.clone().unwrap_or_default();
+            assert!(e.starts_with("not ported"), "{id}: saveXml: {e}");
+            continue;
+        }
+        // The translation replays the typed save first
+        answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+        let t = Instant::now();
+        let tr = answer(
+            d.translated_request(r#"{"cmd":"saveXml"}"#),
+            "translated save",
+        );
+        times[1] += t.elapsed();
+        diff(&typed, &tr, "saveXml", &mut out);
+        let code = |d: &mut Dispatcher, typed: bool| {
+            let r = r#"{"cmd":"saveCode"}"#;
+            answer(
+                if typed {
+                    d.request(r)
+                } else {
+                    d.translated_request(r)
+                },
+                "saveCode",
+            )
+        };
+        let (a, b) = (code(d, true), code(d, false));
+        diff(&a, &b, "saveCode", &mut out);
+        let typed_xml = typed["ok"]["xml"].as_str().unwrap().to_string();
+        let tr_xml = tr["ok"]["xml"].as_str().unwrap().to_string();
+        // The typed file in the translation
+        let views: Vec<J> = ["state", "outputs"]
+            .iter()
+            .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
+            .collect();
+        let load = json!({"cmd": "loadXml", "xml": typed_xml}).to_string();
+        answer(d.translated_request(&load), "translated load");
+        for (c, v) in ["state", "outputs"].iter().zip(&views) {
+            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
+            diff(
+                v,
+                &tr,
+                &format!("typed file in the translation: {c}"),
+                &mut out,
+            );
+        }
+        answer(d.request(&load), "typed load");
+        compare_saves(d, "typed file", &mut out);
+        // The translated file in the typed engine
+        let load = json!({"cmd": "loadXml", "xml": tr_xml}).to_string();
+        answer(d.request(&load), "typed load");
+        compare_saves(d, "translated file", &mut out);
+        for c in ["state", "outputs"] {
+            let t = answer(d.request(&json!({"cmd": c}).to_string()), c);
+            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
+            diff(&t, &tr, &format!("translated file: {c}"), &mut out);
+        }
+        n += 1;
+        if !out.is_empty() {
+            out.truncate(6);
+            failures.push(format!("{id}:\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{n} builds saved: typed saveXml {:.1?}, translated {:.1?}",
+        times[0], times[1]
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// `loadXml`, `loadCode`, `state` and `outputs`
@@ -530,6 +653,9 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 break;
             }
         }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the edits", &mut out);
+        }
         if !out.is_empty() {
             let n = out.len();
             out.truncate(8);
@@ -557,7 +683,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
 /// outputs, Calcs tab and controls after each step
 fn skills_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
-    let (mut skipped, mut full_dps) = (Vec::new(), Vec::new());
+    let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -691,28 +817,50 @@ fn skills_edits_match(d: &mut Dispatcher) {
                 break;
             }
         }
-        // Upstream's `calcFullDPS` calculates every Full DPS skill on the
-        // environment of the one before (`calcs.perform(fullEnv, true)`),
-        // the typed engine each afresh: where only the Full DPS results
-        // differ, that is known (docs/progress.md) and reported apart
-        let full_dps_only = out.iter().any(|p| p.contains("FullDPS"))
-            && out.iter().all(|p| {
-                ["FullDPS", "SkillDPS", "FullDotDPS", "\"state\"}.ok.stats["]
-                    .iter()
-                    .any(|k| p.contains(k))
-            });
-        if full_dps_only {
-            full_dps.push(format!("{id}: {}", out[0]));
-        } else if !out.is_empty() {
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the edits", &mut out);
+        }
+        // Then every group in Full DPS, one after another
+        let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+            .as_array()
+            .map_or(0, Vec::len);
+        for g in 1..=groups {
+            if !out.is_empty() || !d.typed_active() {
+                break;
+            }
+            let req = json!({"cmd": "setSocketGroup", "index": g, "includeInFullDPS": true});
+            answer(d.request(&req.to_string()), "typed edit");
+            if d.typed_active() {
+                for f in ["state", "outputs"] {
+                    compare(d, &json!({"cmd": f}), &format!("full dps {req}"), &mut out);
+                }
+            }
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the edits", &mut out);
+        }
+        // Then every group in Full DPS, one after another
+        let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+            .as_array()
+            .map_or(0, Vec::len);
+        for g in 1..=groups {
+            if !out.is_empty() || !d.typed_active() {
+                break;
+            }
+            let req = json!({"cmd": "setSocketGroup", "index": g, "includeInFullDPS": true});
+            answer(d.request(&req.to_string()), "typed edit");
+            if d.typed_active() {
+                for f in ["state", "outputs"] {
+                    compare(d, &json!({"cmd": f}), &format!("full dps {req}"), &mut out);
+                }
+            }
+        }
+        if !out.is_empty() {
             let n = out.len();
             out.truncate(8);
             failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
         }
     }
-    eprintln!(
-        "Full DPS of skills calculated one after another, differing:\n{}",
-        full_dps.join("\n")
-    );
     eprintln!(
         "{steps} skills edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],

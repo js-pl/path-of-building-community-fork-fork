@@ -21,6 +21,9 @@ pub struct OptionDefault {
     pub var: String,
     pub state: Option<Val>,
     pub placeholder: Option<Val>,
+    /// `configTab.defaultState[var]`: the value a saved input is compared
+    /// with
+    pub saved: Option<Val>,
 }
 
 fn val(v: &Value) -> Option<Val> {
@@ -39,15 +42,34 @@ pub fn option_defaults(var_list: &Value) -> Vec<OptionDefault> {
         let Value::Str(var) = get(&v, "var") else {
             continue;
         };
-        let mut state = val(&get(&v, "defaultState"));
-        if let Some(i) = get(&v, "defaultIndex").as_number() {
-            let list = array(&get(&v, "list"));
+        let default = val(&get(&v, "defaultState"));
+        let mut state = default.clone();
+        let index = get(&v, "defaultIndex").as_number();
+        let list = array(&get(&v, "list"));
+        if let Some(i) = index {
             state = list.get(i as usize - 1).and_then(|e| val(&get(e, "val")));
         }
+        let typ = get(&v, "type");
+        let saved = match typ
+            .as_str()
+            .map(|t| t.to_str_lossy().into_owned())
+            .as_deref()
+        {
+            Some("check") => default.or(Some(Val::Bool(false))),
+            Some("count" | "integer" | "countAllowZero" | "float") => {
+                default.or(Some(Val::Number(0.0)))
+            }
+            Some("list") => list
+                .get(index.map_or(0, |i| i as usize - 1))
+                .and_then(|e| val(&get(e, "val"))),
+            Some("text") => default.or(Some(Val::Str("".into()))),
+            _ => default,
+        };
         out.push(OptionDefault {
             var: var.to_str_lossy().into_owned(),
             state,
             placeholder: val(&get(&v, "defaultPlaceholderState")),
+            saved,
         });
     }
     out
@@ -293,5 +315,6 @@ impl ConfigTab {
 crate::codec_struct!(OptionDefault {
     var,
     state,
-    placeholder
+    placeholder,
+    saved
 });

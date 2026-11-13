@@ -226,7 +226,10 @@ written by hand. Details, the JSON format and the determinism checks are in
    results equal a from-scratch single-threaded calc. Engine-only, so it also
    runs on inputs the oracle cannot handle quickly: `tests/fast_path.rs`.
 8. **Round trip.** Builds saved by the engine load in upstream with identical
-   outputs, and the other way round.
+   outputs, and the other way round. The engine API's `saveXml` is byte for
+   byte upstream's (attributes sorted as `xml.ComposeXML` sorts them,
+   numbers as `tostring`), after loading and after edit sequences:
+   `saves_match` in `crates/session/tests/typed.rs`.
 
 ### Corpus
 

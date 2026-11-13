@@ -28,8 +28,14 @@ pub struct Store {
     pub mods: Mods,
     /// Queries continue into the parent
     pub parent: Option<StoreId>,
+    /// A parent shared between calculations (`specEnv.cachedPlayerDB`);
+    /// queries continue into it before `parent`
+    pub base: Option<Arc<Store>>,
     pub conditions: crate::mods::SymMap<bool>,
     pub multipliers: crate::mods::SymMap<f64>,
+    /// Mods a `ReplaceMod` put in a ModDB, by name and place, which later
+    /// ones pass over (upstream marks them `replaced`)
+    pub replaced: Vec<(Sym, usize)>,
 }
 
 impl Store {
@@ -37,8 +43,10 @@ impl Store {
         Store {
             mods: Mods::Db(Default::default()),
             parent: None,
+            base: None,
             conditions: Default::default(),
             multipliers: Default::default(),
+            replaced: Vec::new(),
         }
     }
 
@@ -244,11 +252,10 @@ impl<'a> Query<'a> {
     /// Stops when `f` returns false.
     fn each(
         &self,
-        id: StoreId,
+        store: &'a Store,
         names: &[Sym],
         mut f: impl FnMut(Option<&'a Mod>) -> Result<bool>,
     ) -> Result<bool> {
-        let store = self.store(id);
         for name in names {
             match &store.mods {
                 Mods::Db(by_name) => {
@@ -273,29 +280,36 @@ impl<'a> Query<'a> {
         Ok(true)
     }
 
-    fn is_db(&self, id: StoreId) -> bool {
-        matches!(self.store(id).mods, Mods::Db(_))
+    fn is_db(store: &Store) -> bool {
+        matches!(store.mods, Mods::Db(_))
+    }
+
+    /// Where a query continues after a store: its base, else its parent
+    fn up(&self, s: &'a Store) -> Option<&'a Store> {
+        s.base
+            .as_deref()
+            .or_else(|| s.parent.map(|p| self.store(p)))
     }
 
     /// `Sum(modType, cfg, ...)`
     pub fn sum(&self, id: StoreId, typ: ModType, cfg: Option<&Cfg>, names: &[Sym]) -> Result<f64> {
-        self.sum_in(id, id, typ, cfg, &Filter::new(cfg), names)
+        self.sum_in(self.store(id), id, typ, cfg, &Filter::new(cfg), names)
     }
 
     fn sum_in(
         &self,
-        id: StoreId,
+        store: &'a Store,
         context: StoreId,
         typ: ModType,
         cfg: Option<&Cfg>,
         flt: &Filter,
         names: &[Sym],
     ) -> Result<f64> {
-        let db = self.is_db(id);
+        let db = Self::is_db(store);
         // A ModDB shares one globalLimits across the names, a ModList none
         let mut limits = db.then(crate::mods::SymMap::default);
         let mut result = 0.0;
-        self.each(id, names, |m| {
+        self.each(store, names, |m| {
             let Some(m) = m else {
                 return Ok(true);
             };
@@ -312,7 +326,7 @@ impl<'a> Query<'a> {
             }
             Ok(true)
         })?;
-        if let Some(p) = self.store(id).parent {
+        if let Some(p) = self.up(store) {
             result += self.sum_in(p, context, typ, cfg, flt, names)?;
         }
         Ok(result)
@@ -320,23 +334,23 @@ impl<'a> Query<'a> {
 
     /// `More(cfg, ...)`
     pub fn more(&self, id: StoreId, cfg: Option<&Cfg>, names: &[Sym]) -> Result<f64> {
-        self.more_in(id, id, cfg, &Filter::new(cfg), names)
+        self.more_in(self.store(id), id, cfg, &Filter::new(cfg), names)
     }
 
     fn more_in(
         &self,
-        id: StoreId,
+        store: &'a Store,
         context: StoreId,
         cfg: Option<&Cfg>,
         flt: &Filter,
         names: &[Sym],
     ) -> Result<f64> {
-        let db = self.is_db(id);
+        let db = Self::is_db(store);
         let mut limits = db.then(crate::mods::SymMap::default);
         let mut result = 1.0;
         let mut precision: Option<f64> = None;
         let mut mod_result = 1.0;
-        self.each(id, names, |m| {
+        self.each(store, names, |m| {
             let Some(m) = m else {
                 // Each name's product is rounded before it is applied
                 match precision {
@@ -367,7 +381,7 @@ impl<'a> Query<'a> {
             }
             Ok(true)
         })?;
-        if let Some(p) = self.store(id).parent {
+        if let Some(p) = self.up(store) {
             result *= self.more_in(p, context, cfg, flt, names)?;
         }
         Ok(result)
@@ -376,7 +390,7 @@ impl<'a> Query<'a> {
     /// The first matching mod of `typ` with a value: `Flag` and `Override`.
     fn first_in(
         &self,
-        id: StoreId,
+        store: &'a Store,
         context: StoreId,
         typ: ModType,
         cfg: Option<&Cfg>,
@@ -384,7 +398,7 @@ impl<'a> Query<'a> {
         names: &[Sym],
     ) -> Result<Option<ModValue>> {
         let mut found = None;
-        self.each(id, names, |m| {
+        self.each(store, names, |m| {
             let Some(m) = m else {
                 return Ok(true);
             };
@@ -404,7 +418,7 @@ impl<'a> Query<'a> {
         if found.is_some() {
             return Ok(found);
         }
-        match self.store(id).parent {
+        match self.up(store) {
             Some(p) => self.first_in(p, context, typ, cfg, flt, names),
             None => Ok(None),
         }
@@ -413,7 +427,14 @@ impl<'a> Query<'a> {
     /// `Flag(cfg, ...)`
     pub fn flag(&self, id: StoreId, cfg: Option<&Cfg>, names: &[Sym]) -> Result<bool> {
         Ok(self
-            .first_in(id, id, ModType::Flag, cfg, &Filter::new(cfg), names)?
+            .first_in(
+                self.store(id),
+                id,
+                ModType::Flag,
+                cfg,
+                &Filter::new(cfg),
+                names,
+            )?
             .is_some())
     }
 
@@ -424,14 +445,21 @@ impl<'a> Query<'a> {
         cfg: Option<&Cfg>,
         names: &[Sym],
     ) -> Result<Option<ModValue>> {
-        self.first_in(id, id, ModType::Override, cfg, &Filter::new(cfg), names)
+        self.first_in(
+            self.store(id),
+            id,
+            ModType::Override,
+            cfg,
+            &Filter::new(cfg),
+            names,
+        )
     }
 
     /// `List(cfg, ...)`
     pub fn list(&self, id: StoreId, cfg: Option<&Cfg>, names: &[Sym]) -> Result<Vec<ModValue>> {
         let flt = Filter::new(cfg);
         let mut out = Vec::new();
-        let mut cur = Some(id);
+        let mut cur = Some(self.store(id));
         while let Some(s) = cur {
             self.each(s, names, |m| {
                 let Some(m) = m else {
@@ -449,7 +477,7 @@ impl<'a> Query<'a> {
                 }
                 Ok(true)
             })?;
-            cur = self.store(s).parent;
+            cur = self.up(s);
         }
         Ok(out)
     }
@@ -464,9 +492,9 @@ impl<'a> Query<'a> {
     ) -> Result<Vec<Row<'a>>> {
         let flt = Filter::new(cfg);
         let mut out = Vec::new();
-        let mut cur = Some(id);
+        let mut cur = Some(self.store(id));
         while let Some(s) = cur {
-            let mut limits = self.is_db(s).then(crate::mods::SymMap::default);
+            let mut limits = Self::is_db(s).then(crate::mods::SymMap::default);
             self.each(s, names, |m| {
                 let Some(m) = m else {
                     return Ok(true);
@@ -485,7 +513,7 @@ impl<'a> Query<'a> {
                 }
                 Ok(true)
             })?;
-            cur = self.store(s).parent;
+            cur = self.up(s);
         }
         Ok(out)
     }
@@ -526,9 +554,9 @@ impl<'a> Query<'a> {
         names: &[Sym],
     ) -> Result<bool> {
         let flt = Filter::new(cfg);
-        let mut cur = Some(id);
+        let mut cur = Some(self.store(id));
         while let Some(s) = cur {
-            if !self.is_db(s) {
+            if !Self::is_db(s) {
                 return Err("attempt to call method 'HasModInternal' (a nil value)".into());
             }
             let mut found = false;
@@ -542,7 +570,7 @@ impl<'a> Query<'a> {
             if found {
                 return Ok(true);
             }
-            cur = self.store(s).parent;
+            cur = self.up(s);
         }
         Ok(false)
     }
@@ -555,14 +583,12 @@ impl<'a> Query<'a> {
         cfg: Option<&Cfg>,
         no_mod: bool,
     ) -> Result<bool> {
-        let store = self.store(id);
-        if store.conditions.get(&var).copied().unwrap_or(false) {
-            return Ok(true);
-        }
-        if let Some(p) = store.parent
-            && self.condition(p, var, cfg, true)?
-        {
-            return Ok(true);
+        let mut store = Some(self.store(id));
+        while let Some(s) = store {
+            if s.conditions.get(&var).copied().unwrap_or(false) {
+                return Ok(true);
+            }
+            store = self.up(s);
         }
         if no_mod {
             return Ok(false);
@@ -587,10 +613,17 @@ impl<'a> Query<'a> {
         }
         let store = self.store(id);
         let own = store.multipliers.get(&var).copied().unwrap_or(0.0);
-        let inherited = match store.parent {
-            Some(p) => self.multiplier(p, var, cfg, true)?,
-            None => 0.0,
-        };
+        let mut inherited = 0.0;
+        let mut up = self.up(store);
+        // `(self.multipliers[var] or 0) + parent:GetMultiplier(var, cfg, true)`
+        let mut chain = Vec::new();
+        while let Some(s) = up {
+            chain.push(s.multipliers.get(&var).copied().unwrap_or(0.0));
+            up = self.up(s);
+        }
+        for v in chain.into_iter().rev() {
+            inherited += v;
+        }
         let summed = match name {
             Some(name) => self.sum(id, ModType::Base, cfg, &[name])?,
             None => 0.0,

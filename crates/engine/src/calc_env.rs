@@ -79,8 +79,9 @@ pub struct Env {
 #[derive(Clone, Default)]
 pub struct BaseDbs(Arc<Mutex<Vec<BaseEntry>>>);
 
-/// The player's and the enemy's databases
-type Dbs = (Store, Store);
+/// The player's and the enemy's base databases
+pub type Bases = (Arc<Store>, Arc<Store>);
+type Dbs = Bases;
 
 struct BaseEntry {
     key: BaseKey,
@@ -118,8 +119,12 @@ impl BaseDbs {
     /// The base databases of a build's calculation, set up once for its
     /// inputs with [`reuse_setup`]
     fn get(&self, build: &Build, data: &CalcData, b: &BaseInput) -> Result<Dbs> {
+        let make = || {
+            calc_setup::base_dbs(data.setup, data.parser, b)
+                .map(|(p, e)| (Arc::new(p), Arc::new(e)))
+        };
         if !reuse_setup() {
-            return calc_setup::base_dbs(data.setup, data.parser, b);
+            return make();
         }
         let [s, d, i] = b.class_stats.map(f64::to_bits);
         let key = BaseKey {
@@ -140,7 +145,7 @@ impl BaseDbs {
         if let Some(e) = cache.iter().find(|e| e.key.same(&key)) {
             return Ok(e.dbs.clone());
         }
-        let dbs = calc_setup::base_dbs(data.setup, data.parser, b)?;
+        let dbs = make()?;
         cache.push(BaseEntry {
             key,
             dbs: dbs.clone(),
@@ -193,6 +198,33 @@ pub fn init_env_with(
     base: BuffMode,
     ovr: &Override,
 ) -> Result<Env> {
+    init_env_for(build, data, calc_mode, base, ovr, None)
+}
+
+/// [`init_env_with`] with `specEnv`'s cached databases: the base
+/// databases are the parents of the calculation's own, as in
+/// `calcs.calcFullDPS`
+/// `calcs.calcFullDPS`; `bases` are the databases an earlier calculation
+/// changed (`ReplaceMod` on a base mod), else the build's
+pub fn init_env_cached(
+    build: &mut Build,
+    data: &CalcData,
+    calc_mode: CalcMode,
+    base: BuffMode,
+    ovr: &Override,
+    bases: Option<Bases>,
+) -> Result<Env> {
+    init_env_for(build, data, calc_mode, base, ovr, Some(bases))
+}
+
+fn init_env_for(
+    build: &mut Build,
+    data: &CalcData,
+    calc_mode: CalcMode,
+    base: BuffMode,
+    ovr: &Override,
+    cached: Option<Option<Bases>>,
+) -> Result<Env> {
     if let Some((_, Some(item))) = &ovr.rep_item {
         let mut item = item.clone();
         item.id = Some(REP_ITEM_ID as f64);
@@ -201,10 +233,10 @@ pub fn init_env_with(
             .items
             .insert(REP_ITEM_ID, std::sync::Arc::new(item));
     }
-    match init_env_pass(build, data, calc_mode, base, ovr, false)? {
+    match init_env_pass(build, data, calc_mode, base, ovr, false, cached.clone())? {
         Some(env) => Ok(env),
         // An enabled Energy Blade: everything again, with its condition
-        None => init_env_pass(build, data, calc_mode, base, ovr, true)?
+        None => init_env_pass(build, data, calc_mode, base, ovr, true, cached)?
             .ok_or_else(|| "Energy Blade asked for a second rerun".to_string()),
     }
 }
@@ -219,6 +251,7 @@ fn init_env_pass(
     base_mode: BuffMode,
     ovr: &Override,
     energy_blade: bool,
+    cached: Option<Option<Bases>>,
 ) -> Result<Option<Env>> {
     let calcs = calc_mode == CalcMode::Calcs;
     let mode = calc_mode.buff_mode(build);
@@ -257,7 +290,22 @@ fn init_env_pass(
         config_enemy_mods: &build.config_enemy_mods,
         mode: base_mode,
     };
-    let (mut player_db, enemy_db) = build.base_dbs.clone().get(build, data, &base)?;
+    let (player_base, enemy_base) = match cached.clone().flatten() {
+        Some(b) => b,
+        None => build.base_dbs.clone().get(build, data, &base)?,
+    };
+    let (mut player_db, enemy_db) = if cached.is_some() {
+        let child = |b| Store {
+            base: Some(b),
+            ..Store::db()
+        };
+        (child(player_base), child(enemy_base))
+    } else {
+        (
+            Arc::unwrap_or_clone(player_base),
+            Arc::unwrap_or_clone(enemy_base),
+        )
+    };
     for c in ovr
         .conditions
         .iter()

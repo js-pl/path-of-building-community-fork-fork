@@ -1538,6 +1538,7 @@ impl<'a> Perform<'a> {
                     if bd {
                         let mut row = self.slot_row(actor, slot, es_base, None, 0.0, more);
                         row.total = sf!("%.2f", es_base * more);
+                        row.no_inc = true;
                         self.push_slot(actor, "EnergyShield", row)?;
                     }
                 } else if !self.c.flag(db, None, &["ConvertArmourESToLife"])? {

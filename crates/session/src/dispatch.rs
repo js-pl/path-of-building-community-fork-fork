@@ -224,6 +224,8 @@ impl<'d> Dispatcher<'d> {
                     .collect::<Option<_>>()?;
                 self.typed.as_mut()?.breakdown(&cell).ok().map(ok)
             }
+            "saveXml" => self.edit(json, |s| Ok(json!({ "xml": s.save_xml()? }))),
+            "saveCode" => self.edit(json, |s| Ok(json!({ "code": s.save_code()? }))),
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
                 self.typed.as_ref()?.node_power(index).ok().map(ok)

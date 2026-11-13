@@ -285,6 +285,9 @@ impl<'a> Perform<'a> {
                 g.skill_minion_skill_calcs = Some(index);
             } else {
                 g.skill_minion_skill = Some(index);
+                // The Calcs tab's calculation picks from the same skills
+                let calcs = g.skill_minion_skill_calcs.unwrap_or(1.0).min(n).max(1.0);
+                g.skill_minion_skill_calcs = Some(calcs);
             }
         }
         let main = self.minions[m].skills[index as usize - 1];

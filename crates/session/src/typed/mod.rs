@@ -5,6 +5,7 @@
 
 mod calcs;
 pub mod display_stats;
+mod save;
 mod sidebar;
 mod skills;
 mod tree;
@@ -93,9 +94,17 @@ impl TypedData {
         }
     }
 
-    fn load_build<'d>(&'d self, xml: &str) -> Result<Build<'d>> {
-        let root = engine::xml::parse(xml)?;
-        let tree = self.tree(&engine::build::tree_version(&root))?;
+    pub fn item_context(&self) -> engine::item::ItemContext<'_> {
+        engine::item::ItemContext {
+            data: &self.game.items,
+            parser: &self.parser,
+            jewel_radius: &self.game.jewel_radius,
+            default_affix_quality: 0.5,
+        }
+    }
+
+    fn load_build<'d>(&'d self, root: &engine::xml::Element) -> Result<Build<'d>> {
+        let tree = self.tree(&engine::build::tree_version(root))?;
         let one_hand = |t: &str| self.game.setup.weapon_type_info.get(t).map(|w| w.one_hand);
         let minions = |m: &str| self.game.setup.minions.contains_key(m);
         let ctx = LoadContext {
@@ -113,7 +122,7 @@ impl TypedData {
             one_hand: &one_hand,
             minions: &minions,
         };
-        Build::load(&root, &ctx, tree, &self.parser)
+        Build::load(root, &ctx, tree, &self.parser)
     }
 }
 
@@ -152,12 +161,19 @@ pub struct TypedSession<'d> {
     specs: (usize, Vec<String>),
     pub ui: Ui,
     controls: Controls,
+    /// The loaded file, for what the typed build does not hold
+    root: engine::xml::Element,
+    /// `buildMode.viewMode`
+    view_mode: String,
+    /// Whether the Calcs tab's `showMinion` input was set
+    show_minion_set: bool,
 }
 
 impl<'d> TypedSession<'d> {
     /// `loadXml`: the build, calculated
     pub fn load(data: &'d TypedData, xml: &str, name: Option<&str>) -> Result<TypedSession<'d>> {
-        let mut build = data.load_build(xml)?;
+        let root = engine::xml::parse(xml)?;
+        let mut build = data.load_build(&root)?;
         if build.info.character_level_auto_mode {
             return Err(format!("{NOT_PORTED}: the character level's auto mode"));
         }
@@ -171,9 +187,17 @@ impl<'d> TypedSession<'d> {
             calcs: None,
             calcs_select: Default::default(),
             calcs_rows: Vec::new(),
-            specs: tree::spec_titles(&engine::xml::parse(xml)?),
+            specs: tree::spec_titles(&root),
             ui: Ui::default(),
             controls: Controls::default(),
+            view_mode: root
+                .child("PathOfBuilding")
+                .and_then(|p| p.child("Build"))
+                .and_then(|b| b.attr("viewMode"))
+                .unwrap_or("TREE")
+                .to_string(),
+            show_minion_set: false,
+            root,
         };
         s.update_display_labels(true);
         s.refresh_controls()?;
