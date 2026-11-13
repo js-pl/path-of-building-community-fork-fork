@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 8] = [
+const PHASES: [(&str, usize); 9] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
