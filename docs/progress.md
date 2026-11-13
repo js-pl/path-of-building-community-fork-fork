@@ -184,9 +184,26 @@ What remains for the full migration, in order:
    each step (417 edits: typed 16 s, translated 89 s with its replays).
    Builds with Intuitive Leap and the like are typed too.
    Bloodline nodes are told by their ascendancy being an alternate one
-   (the typed tree has no `isBloodline`). `tree` (geometry: positions,
-   icons, connectors, which the typed tree does not import yet) and
-   `nodeTooltip` stay on the translation.
+   (the typed tree has no `isBloodline`). `nodeTooltip` stays on the
+   translation.
+
+   The tree's geometry is typed (`session::typed::geometry`): `tree`
+   gives the spec's nodes with positions, icons and class art, the
+   connectors (`PassiveTree:BuildConnector`'s pairs, arcs on a shared
+   orbit) and the classes. The typed tree imports each node's `icon`,
+   `orbitRadii`, the bounds and the connector pairs; the cluster jewel
+   subgraphs' nodes get their positions on the proxy's group and their
+   icons, and `PassiveSpec::sub_graphs` their connectors
+   (`linkNodes`). `geometry_matches` (`SESSION_PHASES=geometry`): equal
+   to the translation's for every corpus build and for an empty build on
+   each of the 41 tree versions; `tree_edits_match` compares it after the
+   large cluster sockets are taken off and put back, and
+   `trees_match_upstream` the imported icons, connectors, radii and
+   bounds. Ported on the way: `BuildAllDependsAndPaths`'
+   `ReplaceNode(node, self.tree.nodes[id])` where the data lists its
+   nodes as an array (2_6): each node with an id up to the node count
+   takes the name, lines, mods and icon of the node at that place
+   (`PassiveTree::keyed_as`), in the calculations too.
 
    Skills edits are typed (`session::typed::skills`): `skills`,
    `gemList`, `setMainSocketGroup`, `setSocketGroup`, `addSocketGroup`,
@@ -258,7 +275,7 @@ What remains for the full migration, in order:
      bloodline drop-downs (`buildMode` opens a popup when points are
      spent) and of the config options (`ConfigTab`'s option controls),
      `undo`, `newBuild`.
-   - Read-only views: `tree` (the typed tree has no geometry), `config`
+   - Read-only views: `config`
      (each option's visibility, `ConfigVisibility.lua` and the options'
      `ifCond`, `ifSkill`, ... rules on the sidebar's calculation, and
      their tooltips), `itemDb`, `party`, `notes`, `controls` of other
