@@ -340,6 +340,21 @@ impl<'t> PassiveSpec<'t> {
         self.alloc_nodes.remove(self.nodes[i].id);
     }
 
+    /// What `ItemsTab:DeleteItem` does to a socket whose jewel goes: the
+    /// nodes depending on it lose their allocation, and `allocNodes` the
+    /// keys of their places in `depends` (upstream's `ipairs` index)
+    pub fn drop_jewel_socket(&mut self, node: u32) {
+        let Some(&i) = self.index.get(&node) else {
+            return;
+        };
+        let depends = self.nodes[i].depends.clone();
+        for (k, d) in depends.iter().enumerate() {
+            self.nodes[*d].alloc = false;
+            self.alloc_nodes.remove(k as u32 + 1);
+        }
+        self.dealloc(i);
+    }
+
     fn class(&self, id: i64) -> Result<&'t tree::Class> {
         self.tree
             .classes

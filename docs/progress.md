@@ -236,21 +236,41 @@ What remains for the full migration, in order:
    replays the typed edits on the translation (its load alone took
    about 1.2 s per corpus build). `undo` is not ported.
 
+   Items, sets and specs are typed (`session::typed::items`, `sets`):
+   `items` (`UpdateSockets`' labels, which slots show, what fits each
+   slot in `ItemsTab.items`' `pairs` order), `equipItem`, `deleteItem`
+   (with upstream's `allocNodes[index]` quirk on other specs' jewel
+   sockets), `selectItemSet`, `selectTreeSpec` (every spec loaded, the
+   sockets' jewels moved between them; a spec on another tree version
+   falls back), `selectConfigSet`, `copySocketGroup`,
+   `pasteSocketGroup` and the level box's `control`.
+   `PopulateSlots` now empties abyssal sockets past their item's count.
+   `items_edits_match`: random sequences of these (6 per build) give the
+   translation's items, skills, sidebar, outputs, specs and controls
+   after each step and its file at the end (357 edits: typed 7 s,
+   translated 71 s with its replays). Saving first makes the Calcs
+   tab's calculation, as a frame does, for its write-backs to the gems.
+
    Still on the translation, before it can be dropped:
-   - Edits on the typed model with a recalculation: `equipItem`,
-     `selectItemSet`, `selectConfigSet`, `selectTreeSpec`, `control` of
-     the class and level, config options and other tabs, `undo`,
-     `newBuild`.
-   - Read-only views: `tree`, `skills`, `copySocketGroup`,
-     `gemList`, `items`, `itemDb`, `config`, `party`, `notes`,
-     `controls` of other tabs.
+   - Edits with a recalculation: `control` of the class, ascendancy and
+     bloodline drop-downs (`buildMode` opens a popup when points are
+     spent) and of the config options (`ConfigTab`'s option controls),
+     `undo`, `newBuild`.
+   - Read-only views: `tree` (the typed tree has no geometry), `config`
+     (each option's visibility, `ConfigVisibility.lua` and the options'
+     `ifCond`, `ifSkill`, ... rules on the sidebar's calculation, and
+     their tooltips), `itemDb`, `party`, `notes`, `controls` of other
+     tabs.
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
      `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
      `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
-   - Items and crafting: `addItem`, `editItem`, `deleteItem`,
-     `displayItem`, `setDisplayItem`, `craftItem`, `saveDisplayItem`,
-     `pasteSocketGroup`, `setNotes`, `popupButton`, `closePopup` (the
-     item editor's controls and popups).
+   - Items and crafting: `addItem`, `editItem`, `displayItem`,
+     `setDisplayItem`, `craftItem`, `saveDisplayItem`, `setNotes`,
+     `popupButton`, `closePopup` (the item editor's controls, popups).
+   - Engine gaps that make a build fall back: Saviour's mirage as the
+     main skill, Combust's trigger (gen-0028), tree edits with Intuitive
+     Leap and the like, tattoos, specs in the URL format only, exported
+     party buffs, the character level's auto mode.
 
 ## Done
 

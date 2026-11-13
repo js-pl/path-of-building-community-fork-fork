@@ -210,6 +210,30 @@ fn active_spec(root: &Element) -> Option<&Element> {
 }
 
 impl<'t> Build<'t> {
+    /// `configTab:BuildModList()` of the active config set
+    pub fn build_config_mods(
+        &mut self,
+        data: &crate::config::ConfigData,
+        parser: &ModParser,
+    ) -> Result<()> {
+        let mut state = ConfigState::default();
+        let config = Arc::make_mut(&mut self.config);
+        let set = config.active_mut();
+        let (mods, enemy_mods) = config::build_mod_list(
+            data,
+            parser,
+            &mut set.input,
+            &mut set.placeholder,
+            &set.custom_mods.clone(),
+            &mut state,
+            self.info.character_level,
+        )?;
+        self.config_mods = Arc::new(mods);
+        self.config_enemy_mods = Arc::new(enemy_mods);
+        self.config_state = state;
+        Ok(())
+    }
+
     /// Loads a build file. `tree` is the tree of [`tree_version`].
     pub fn load(
         root: &Element,
