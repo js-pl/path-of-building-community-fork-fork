@@ -14,6 +14,13 @@ use engine::item::{Item, ModLine};
 use engine::item_data::Affix;
 use serde_json::Value as J;
 
+/// A new item of the popup: upstream compares items by identity, so it is
+/// none of the build's
+fn unowned(mut item: Item) -> Item {
+    item.id = None;
+    item
+}
+
 impl<'d> TypedSession<'d> {
     /// `ItemsTab:AddModComparisonTooltip(tooltip, mod, replaceImplicits)`
     pub(super) fn add_mod_comparison_tooltip(
@@ -94,7 +101,7 @@ impl<'d> TypedSession<'d> {
         match (&popup, name.as_str()) {
             (ItemPopup::Enchant(p), "enchantment") => {
                 if let Some(item) = self.enchant_entry_item(p, idx)? {
-                    self.add_item_tooltip_mode(&mut tip, &item, None, true)?;
+                    self.add_item_tooltip_mode(&mut tip, &unowned(item), None, true)?;
                 }
             }
             (ItemPopup::Corrupt(p), n) if n.starts_with("implicit") => {
@@ -104,7 +111,7 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::Corrupt(p), "save") => {
                 let item = self.corrupt_save_item(p)?;
-                self.add_item_tooltip_mode(&mut tip, &item, None, false)?;
+                self.add_item_tooltip_mode(&mut tip, &unowned(item), None, false)?;
             }
             (ItemPopup::AddImplicit(p), "modGroupSelect") => {
                 if let Some((m, title, vestigial)) = self.implicit_group_entry(p, idx) {
@@ -136,7 +143,7 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::AddImplicit(p), "save") => {
                 let item = self.add_implicit_save_item(p)?;
-                self.add_item_tooltip_mode(&mut tip, &item, None, false)?;
+                self.add_item_tooltip_mode(&mut tip, &unowned(item), None, false)?;
             }
             (ItemPopup::AddModifier(p), "modSelect") => {
                 if let Some(m) = self.modifier_entry(p, idx) {
@@ -145,7 +152,7 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::AddModifier(p), "save") => {
                 let item = self.add_modifier_save_item(p)?;
-                self.add_item_tooltip_mode(&mut tip, &item, None, false)?;
+                self.add_item_tooltip_mode(&mut tip, &unowned(item), None, false)?;
             }
             (ItemPopup::Crucible(p), n) if n.starts_with("modSelectNode") => {
                 if let Some(m) = self.crucible_entry(p, n, idx) {
@@ -154,7 +161,7 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::Crucible(p), "save") => {
                 let item = self.crucible_save_item(p)?;
-                self.add_item_tooltip_mode(&mut tip, &item, None, false)?;
+                self.add_item_tooltip_mode(&mut tip, &unowned(item), None, false)?;
             }
             (ItemPopup::Anoint(p), "save" | "notableDB") => {
                 self.anoint_tooltip(&mut tip, p, &name, idx)?;
@@ -162,7 +169,7 @@ impl<'d> TypedSession<'d> {
             // The other inputs and buttons have no tooltip function
             (_, _) => {
                 let known = self.describe_item_popup_names(&popup);
-                if !known.iter().any(|k| *k == name) {
+                if !known.contains(&name) {
                     return unported();
                 }
             }

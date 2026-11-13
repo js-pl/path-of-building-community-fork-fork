@@ -616,7 +616,7 @@ impl<'d> TypedSession<'d> {
                 tip.add_line(BIG, &format!("{YELLOW}Version: {name}"));
             }
             let mut selected = Vec::new();
-            for (&group, _) in &item.variant_groups {
+            for &group in item.variant_groups.keys() {
                 if let Some(&v) = item.variant_group_selections.get(&group)
                     && item.variant_group_option_eligible(group, v as i64)
                 {
