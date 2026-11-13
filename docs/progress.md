@@ -337,10 +337,12 @@ What remains for the full migration, in order:
      and a Forbidden jewel whose counterpart is missing fall back. The
      display item is held typed, so `displayItem` answers on the
      translation after its replays.
-   - Engine gaps that make a build fall back: Combust's trigger
-     (gen-0028), tree edits with Intuitive
-     Leap and the like, tattoos, specs in the URL format only, exported
-     party buffs, the character level's auto mode.
+   - Engine gaps that make a build fall back: exported party buffs.
+     Combust (gen-0028), the character level's auto mode, tattoos and
+     tree edits with Intuitive Leap no longer do (no fallback over the
+     corpus); specs in the old URL format (`PassiveSpec:DecodeURL`) are
+     typed, and `commands_match` loads every tenth build with its specs
+     as tree links.
 
 ## Done
 
