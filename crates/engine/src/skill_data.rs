@@ -48,6 +48,8 @@ pub struct GrantedEffect {
     pub unsupported: bool,
     /// By level, from 1
     pub levels: BTreeMap<i64, SkillLevel>,
+    /// The level `next(levels)` gives: the first in the data's `pairs` order
+    pub first_level: Option<i64>,
     /// `skillTypes`: the types the skill has
     pub skill_types: HashSet<i64>,
     pub minion_skill_types: Option<HashSet<i64>>,
@@ -341,10 +343,12 @@ fn level_from_lua(v: &Value) -> Result<SkillLevel> {
 impl GrantedEffect {
     fn from_lua(id: &str, v: &Value) -> Result<GrantedEffect> {
         let mut levels = BTreeMap::new();
+        let mut first_level = None;
         for (k, l) in pairs(&get(v, "levels")) {
             let Key::Int(n) = k else {
                 return Err(format!("levels key {k:?}"));
             };
+            first_level.get_or_insert(n);
             levels.insert(
                 n,
                 level_from_lua(&l).map_err(|e| format!("level {n}: {e}"))?,
@@ -359,6 +363,7 @@ impl GrantedEffect {
             plus_version_of: opt_string(&get(v, "plusVersionOf"))?,
             unsupported: get(v, "unsupported").truthy(),
             levels,
+            first_level,
             skill_types: int_set(&get(v, "skillTypes"))?,
             minion_skill_types: match get(v, "minionSkillTypes") {
                 Value::Nil => None,
@@ -721,6 +726,7 @@ crate::codec_struct!(GrantedEffect {
     plus_version_of,
     unsupported,
     levels,
+    first_level,
     skill_types,
     minion_skill_types,
     base_flags,

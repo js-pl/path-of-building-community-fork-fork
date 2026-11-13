@@ -2584,7 +2584,7 @@ impl<'a> Perform<'a> {
                 .cloned()
                 .unwrap_or_default();
             let mut level = level;
-            if self.cost_wiped(i) {
+            if self.cost_cleared(i) {
                 level.cost.clear();
             }
             let has_cost = !level.cost.is_empty();

@@ -157,23 +157,27 @@ impl<'a> Perform<'a> {
     }
 
     /// `activeSkill.activeEffect.grantedEffectLevel`
-    /// Whether the skill's level has no cost: `SkillsTab:ProcessGemInstance`
-    /// empties the cost of the level of each triggered skill an item or
-    /// a node grants, on the shared skill data
-    pub(crate) fn cost_wiped(&self, i: usize) -> bool {
-        let e = &self.skill(i).active_effect;
-        self.env.groups.iter().flat_map(|g| &g.gem_list).any(|g| {
-            g.triggered
-                && g.gem_id.is_none()
-                && g.skill_id.as_deref() == Some(e.granted_effect.id.as_str())
-                && g.level.is_some()
-                && g.level == e.level
-        })
-    }
-
     pub(crate) fn effect_level(&self, i: usize) -> Option<&crate::skill_data::SkillLevel> {
         let e = &self.skill(i).active_effect;
         e.granted_effect.level(e.level?)
+    }
+
+    /// `SkillsTab:ProcessSocketGroup` clears the cost of a triggered
+    /// granted skill's level on the shared skill data
+    /// (`grantedEffect.levels[level].cost = {}`), which every skill of that
+    /// effect and level then has
+    pub(crate) fn cost_cleared(&self, i: usize) -> bool {
+        let e = &self.skill(i).active_effect;
+        let Some(level) = e.level else {
+            return false;
+        };
+        self.env.groups.iter().flat_map(|g| &g.gem_list).any(|g| {
+            g.triggered
+                && g.level == Some(level)
+                && g.granted_effect
+                    .as_ref()
+                    .is_some_and(|ge| ge.id == e.granted_effect.id)
+        })
     }
 
     pub(crate) fn weapon_num(&self, actor: usize, n: usize, k: &str) -> Option<f64> {
@@ -2861,7 +2865,7 @@ impl<'a> Perform<'a> {
             let hybrid_life = self.c.base(list, c, &["HybridManaAndLifeCost_Life"])? / 100.0;
             let mut costs = costs();
             let idx = |costs: &[Cost], r: &str| costs.iter().position(|x| x.resource == r).unwrap();
-            let level_cost: Vec<(String, f64)> = if self.cost_wiped(i) {
+            let level_cost: Vec<(String, f64)> = if self.cost_cleared(i) {
                 Vec::new()
             } else {
                 self.effect_level(i)
