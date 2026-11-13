@@ -43,6 +43,7 @@ const READ_ONLY: &[&str] = &[
     "previewItem",
     "itemDb",
     "displayItem",
+    "controlTooltip",
     "config",
     "calcs",
     "breakdown",
@@ -407,6 +408,14 @@ impl<'d> Dispatcher<'d> {
             }
             "craftItem" => self.edit(json, |s| s.craft_item()),
             "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
+            "controlTooltip" if self.typed.as_ref()?.has_item_popup() => {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_popup_tooltip(&path, index),
+                )
+            }
             "popupButton" => {
                 // The typed session's popups are the class change popups,
                 // whose only button with a name is Continue's

@@ -165,6 +165,25 @@ function api.control(req)
 	return { }
 end
 
+-- The tooltip a control shows when hovered (its tooltipFunc): a
+-- drop-down's entry or a list's row by index, or a button
+function api.controlTooltip(req)
+	local control = findControl(req.path)
+	local tooltip = newTooltip()
+	if control.ListBuilder then
+		buildList(control)
+		local node = control.list[req.index]
+		if node and control.AddValueTooltip then
+			control:AddValueTooltip(tooltip, req.index, node)
+		end
+	elseif control.tooltipFunc then
+		local index = req.index
+		local value = index and control.list and control.list[index]
+		control.tooltipFunc(tooltip, "HOVER", index, value)
+	end
+	return { lines = tooltipLines(tooltip) }
+end
+
 function api.controls(req)
 	local out = { }
 	for _, path in ipairs(req.paths) do

@@ -398,6 +398,23 @@ impl<'d> TypedSession<'d> {
         self.ui.popups = J::Array(all);
     }
 
+    /// The names of a popup's inputs and buttons
+    pub(super) fn describe_item_popup_names(&self, popup: &ItemPopup) -> Vec<String> {
+        let d = self.describe_item_popup(popup);
+        let mut out: Vec<String> = Vec::new();
+        for c in d["controls"].as_array().into_iter().flatten() {
+            if let Some(p) = c["path"].as_str() {
+                out.push(p.trim_start_matches("popup.").to_string());
+            }
+        }
+        for b in d["buttons"].as_array().into_iter().flatten() {
+            if let Some(n) = b["name"].as_str() {
+                out.push(n.to_string());
+            }
+        }
+        out
+    }
+
     fn describe_item_popup(&self, popup: &ItemPopup) -> J {
         match popup {
             ItemPopup::Enchant(p) => self.describe_enchant_popup(p),

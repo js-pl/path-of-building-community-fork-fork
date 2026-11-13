@@ -446,6 +446,12 @@ impl<'d> TypedSession<'d> {
 
     /// Add: `SetDisplayItem(addModifier())`
     pub(super) fn add_modifier_popup_save(&mut self, p: &AddModifierPopup) -> Result<()> {
+        let item = self.add_modifier_save_item(p)?;
+        self.set_display_item_value(Some(item))
+    }
+
+    /// The item the save button makes
+    pub(super) fn add_modifier_save_item(&self, p: &AddModifierPopup) -> Result<Item> {
         let item = if p.source() == "CUSTOM" {
             let display = self.display_item.as_ref().ok_or("no item in the editor")?;
             let mut item = Item::new(&self.data.item_context(), &display.build_raw(), None, false)?;
@@ -473,7 +479,7 @@ impl<'d> TypedSession<'d> {
                 }
             }
         };
-        self.set_display_item_value(Some(item))
+        Ok(item)
     }
 
     /// `describePopups` of the popup
@@ -509,5 +515,16 @@ impl<'d> TypedSession<'d> {
             ],
             "controls": controls,
         })
+    }
+}
+
+impl<'d> TypedSession<'d> {
+    /// The mod of an entry
+    pub(super) fn modifier_entry(
+        &self,
+        p: &AddModifierPopup,
+        idx: Option<usize>,
+    ) -> Option<Arc<Affix>> {
+        p.list.get(idx?.wrapping_sub(1)).map(|m| m.m.clone())
     }
 }

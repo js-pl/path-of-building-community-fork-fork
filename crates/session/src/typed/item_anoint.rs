@@ -296,3 +296,120 @@ impl<'d> TypedSession<'d> {
         })
     }
 }
+
+impl<'d> TypedSession<'d> {
+    /// `ItemsTab:AppendAnointTooltip(tooltip, node)`: the stats anointing
+    /// the node (or nothing) gives
+    fn append_anoint_tooltip(
+        &self,
+        tip: &mut super::tooltip::Tooltip,
+        p: &AnointPopup,
+        node: Option<&Node>,
+    ) -> Result<()> {
+        let Some(display) = self.display_item.as_ref() else {
+            return Ok(());
+        };
+        let header = match node {
+            Some(n) => {
+                if self.build.spec.alloc_nodes.get(n.id).is_some() {
+                    tip.add_line(
+                        14.0,
+                        &format!("^7Anointing {} changes nothing because this node is already allocated on the tree.", n.dn),
+                    );
+                    return Ok(());
+                }
+                if anoints(display).iter().any(|a| *a == *n.dn) {
+                    tip.add_line(
+                        14.0,
+                        &format!(
+                            "^7Anointing {} changes nothing because this node is already anointed.",
+                            n.dn
+                        ),
+                    );
+                    return Ok(());
+                }
+                format!("^7Anointing {} will give you: ", n.dn)
+            }
+            None => "^7Anointing nothing will give you: ".to_string(),
+        };
+        let slot = display
+            .base
+            .as_ref()
+            .map_or("Amulet".to_string(), |b| b.typ.clone());
+        let data = self.data.calc_data();
+        let calc = MiscCalculator::new(&self.build, &data)?;
+        let rep = |item: Item| Override {
+            rep_item: Some((slot.clone(), Some(item))),
+            ..Override::default()
+        };
+        let base = calc.calculate(&rep(display.clone()), false)?;
+        let new = calc.calculate(&rep(self.anoint_item(p.slot, node)?), false)?;
+        let changes = self.add_stat_compares(
+            tip,
+            &super::tooltip::Outputs {
+                player: &base.player,
+                minion: base.minion.as_ref(),
+            },
+            &super::tooltip::Outputs {
+                player: &new.player,
+                minion: new.minion.as_ref(),
+            },
+            &header,
+            None,
+        )?;
+        if let Some(n) = node
+            && changes == 0
+        {
+            tip.add_line(14.0, &format!("^7Anointing {} changes nothing.", n.dn));
+        }
+        Ok(())
+    }
+
+    /// The tooltips of Anoint Item: the save button's, a notable's row
+    /// (`NotableDBControl:AddValueTooltip`)
+    pub(super) fn anoint_tooltip(
+        &self,
+        tip: &mut super::tooltip::Tooltip,
+        p: &AnointPopup,
+        name: &str,
+        idx: Option<usize>,
+    ) -> Result<()> {
+        if name == "save" {
+            return self.append_anoint_tooltip(tip, p, self.anoint_node(p));
+        }
+        let tree = self.build.spec.tree;
+        let Some(node) = idx
+            .and_then(|i| p.list.get(i.wrapping_sub(1)))
+            .and_then(|id| tree.node_index.get(id))
+            .map(|&i| &tree.nodes[i])
+        else {
+            return Ok(());
+        };
+        // `AddNodeName`
+        tip.header = true;
+        tip.add_line(24.0, &format!("^xF8E6CA{}", node.dn));
+        if !node.sd.is_empty() {
+            tip.add_line(16.0, "");
+            for (i, line) in node.sd.iter().enumerate() {
+                let m = node.mods.get(i);
+                let unsupported = m.is_none_or(|m| m.extra.is_some() || m.list.is_none());
+                if &**line != " " && unsupported {
+                    tip.add_line(
+                        16.0,
+                        &format!("^xF05050{line} ^8(Not supported in PoB yet)"),
+                    );
+                } else {
+                    tip.add_line(16.0, &format!("^x8888FF{line}"));
+                }
+            }
+        }
+        if let Some(reminder) = &node.reminder_text {
+            tip.add_separator(14.0);
+            for l in reminder {
+                tip.add_line(14.0, &format!("^xA0A080{l}"));
+            }
+        }
+        tip.add_separator(14.0);
+        self.append_anoint_tooltip(tip, p, Some(node))
+    }
+}

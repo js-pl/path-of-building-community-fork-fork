@@ -410,3 +410,15 @@ impl<'d> TypedSession<'d> {
         })
     }
 }
+
+impl<'d> TypedSession<'d> {
+    /// The enchanted item of an entry (`enchantItem(index)`), the
+    /// selection's without an index
+    pub(super) fn enchant_entry_item(
+        &self,
+        p: &EnchantPopup,
+        idx: Option<usize>,
+    ) -> Result<Option<Item>> {
+        self.enchant_item(p, idx.unwrap_or(p.sel), false).map(Some)
+    }
+}

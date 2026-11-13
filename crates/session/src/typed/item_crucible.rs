@@ -157,6 +157,12 @@ impl<'d> TypedSession<'d> {
 
     /// Add: the item with the selected mods as its crucible lines
     pub(super) fn crucible_popup_save(&mut self, p: &CruciblePopup) -> Result<()> {
+        let item = self.crucible_save_item(p)?;
+        self.set_display_item_value(Some(item))
+    }
+
+    /// The item the save button makes
+    pub(super) fn crucible_save_item(&self, p: &CruciblePopup) -> Result<Item> {
         let display = self.display_item.as_ref().ok_or("no item in the editor")?;
         let mut item = Item::new(&self.data.item_context(), &display.build_raw(), None, false)?;
         item.id = display.id;
@@ -182,7 +188,7 @@ impl<'d> TypedSession<'d> {
             }
         }
         self.build_and_parse_raw(&mut item)?;
-        self.set_display_item_value(Some(item))
+        Ok(item)
     }
 
     /// `describePopups` of the popup
@@ -216,5 +222,21 @@ impl<'d> TypedSession<'d> {
             ],
             "controls": controls,
         })
+    }
+}
+
+impl<'d> TypedSession<'d> {
+    /// The mod of a node's entry ("None" has none)
+    pub(super) fn crucible_entry(
+        &self,
+        p: &CruciblePopup,
+        name: &str,
+        idx: Option<usize>,
+    ) -> Option<std::sync::Arc<engine::item_data::Affix>> {
+        let n: usize = name.strip_prefix("modSelectNode")?.parse().ok()?;
+        match p.lists.get(n.wrapping_sub(1))?.get(idx?.wrapping_sub(1))? {
+            Entry::Mod { index, .. } => Some(self.data.game.craft.crucible[*index].m.clone()),
+            Entry::None => None,
+        }
     }
 }

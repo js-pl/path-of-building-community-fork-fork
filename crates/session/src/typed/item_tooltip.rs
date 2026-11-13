@@ -167,6 +167,18 @@ impl<'d> TypedSession<'d> {
         item: &Item,
         slot: Option<&Slot>,
     ) -> Result<()> {
+        self.add_item_tooltip_mode(tip, item, slot, false)
+    }
+
+    /// `ItemsTab:AddItemTooltip(tooltip, item, slot, dbMode)`: a database
+    /// item's variants and league, and its lines without their rolls
+    pub(super) fn add_item_tooltip_mode(
+        &self,
+        tip: &mut Tooltip,
+        item: &Item,
+        slot: Option<&Slot>,
+        db_mode: bool,
+    ) -> Result<()> {
         let rarity_code = color(&item.rarity).ok_or_else(|| unported("an item rarity"))?;
         tip.header = true;
         let (Some(base), Some(base_name)) = (&item.base, &item.base_name) else {
@@ -198,6 +210,9 @@ impl<'d> TypedSession<'d> {
             }
         }
         tip.add_separator(10.0);
+        if db_mode {
+            self.add_db_fields(tip, item)?;
+        }
         let slot_num = slot.map_or(Some(1.0), |s| s.slot_num);
         let quality = item.quality.unwrap_or(0.0);
         let magic = cc("MAGIC");
@@ -500,7 +515,7 @@ impl<'d> TypedSession<'d> {
             for ml in list {
                 let count = item.mod_line_variant_count(ml);
                 if count > 0
-                    && let Some(line) = self.format_mod_line(ml)?
+                    && let Some(line) = self.format_mod_line_mode(ml, db_mode)?
                 {
                     for _ in 0..count {
                         tip.add_line(BIG, &line);
@@ -587,7 +602,66 @@ impl<'d> TypedSession<'d> {
 
     /// `itemLib.formatModLine(modLine)`
     pub(super) fn format_mod_line(&self, ml: &ModLine) -> Result<Option<String>> {
-        let line = if ml.range.is_some() || ml.corrupted_range.is_some() {
+        self.format_mod_line_mode(ml, false)
+    }
+
+    /// The database items' sources aren't ported: `FormatItemSource`
+    fn add_db_fields(&self, tip: &mut Tooltip, item: &Item) -> Result<()> {
+        const YELLOW: &str = "^xFFFF30";
+        if item.uses_variant_groups {
+            if let (Some(list), Some(v)) = (&item.version_list, item.selected_version) {
+                let name = list
+                    .get((v as usize).wrapping_sub(1))
+                    .ok_or("bad version")?;
+                tip.add_line(BIG, &format!("{YELLOW}Version: {name}"));
+            }
+            let mut selected = Vec::new();
+            for (&group, _) in &item.variant_groups {
+                if let Some(&v) = item.variant_group_selections.get(&group)
+                    && item.variant_group_option_eligible(group, v as i64)
+                {
+                    let name = item
+                        .variant_list
+                        .as_ref()
+                        .and_then(|l| l.get((v as usize).wrapping_sub(1)))
+                        .ok_or("bad variant")?;
+                    selected.push(name.clone());
+                }
+            }
+            if !selected.is_empty() {
+                tip.add_line(BIG, &format!("{YELLOW}Variants: {}", selected.join(", ")));
+            }
+        } else if let Some(list) = &item.variant_list {
+            if list.len() == 1 {
+                tip.add_line(BIG, &format!("{YELLOW}Variant: {}", list[0]));
+            } else {
+                let v = item.variant.ok_or("no variant")?;
+                let name = list
+                    .get((v as usize).wrapping_sub(1))
+                    .ok_or("bad variant")?;
+                tip.add_line(
+                    BIG,
+                    &format!("{YELLOW}Variant: {name} ({} variants)", list.len()),
+                );
+            }
+        }
+        if let Some(l) = &item.league {
+            tip.add_line(BIG, &format!("^xFF5555Exclusive to: {l}"));
+        }
+        if item.unreleased || item.source.is_some() || !item.upgrade_paths.is_empty() {
+            return Err(unported("a database item's source"));
+        }
+        tip.add_separator(10.0);
+        Ok(())
+    }
+
+    /// `itemLib.formatModLine(modLine, dbMode)`
+    pub(super) fn format_mod_line_mode(
+        &self,
+        ml: &ModLine,
+        db_mode: bool,
+    ) -> Result<Option<String>> {
+        let line = if !db_mode && (ml.range.is_some() || ml.corrupted_range.is_some()) {
             let range = engine::item_tools::Range::One(ml.range.unwrap_or(0.5));
             engine::item_tools::apply_range(
                 &self.data.game.items,

@@ -1242,6 +1242,21 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 break;
                             }
                             let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                            // Hover tooltips: an entry of an input, and the
+                            // save button
+                            let inputs = st["ok"]["popups"][0]["controls"].clone();
+                            if let Some(c) = pick(&mut rng, &inputs).filter(|c| {
+                                c["path"] != "popup.sort" && c["path"] != "popup.notableDB.sort"
+                            }) {
+                                let n = c["list"].as_array().map_or(1, Vec::len);
+                                let req = json!({"cmd": "controlTooltip", "path": c["path"], "index": rng.below(n) + 1});
+                                compare(d, &req, &format!("step {step}"), &mut out);
+                                *popup_inputs.entry("tooltip".into()).or_default() += 1;
+                            }
+                            if rng.below(2) == 0 {
+                                let req = json!({"cmd": "controlTooltip", "path": "popup.save"});
+                                compare(d, &req, &format!("step {step}"), &mut out);
+                            }
                             let mut closing: Vec<String> = st["ok"]["popups"][0]["buttons"]
                                 .as_array()
                                 .into_iter()
