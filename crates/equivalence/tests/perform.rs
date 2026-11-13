@@ -6,7 +6,8 @@
 //! estimations, hooking `calcs.buildDefenceEstimations` and
 //! `calcs.triggers`.
 //!
-//! `CALCS_FILTER=<substring>` limits the builds run.
+//! `CALCS_FILTER=<substring>` limits the builds run, `CALCS_SKIP=<a>,<b>`
+//! leaves out the builds whose ids contain any.
 
 use engine::actor::OutVal;
 use engine::calc_env::CalcMode;
@@ -21,6 +22,7 @@ use serde_json::{Map, Value as J, json};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::{Condvar, Mutex};
 use upstream::host::Host;
 use upstream::imported::Imported;
 
@@ -405,43 +407,133 @@ fn compare_stage(
 
 #[test]
 fn perform_matches_upstream() {
-    run_builds(&|_| corpus_builds());
+    run_builds("perform_matches_upstream", &|_| corpus_builds());
 }
 
 /// Every gem whose skill has functions of its own (`preDamageFunc`, ...)
 #[test]
 fn skill_functions_match_upstream() {
-    run_builds(&|data| skill_variants(&data.skills, |ge| !ge.funcs.is_empty()));
+    run_builds("skill_functions_match_upstream", &|data| {
+        skill_variants(&data.skills, |ge| !ge.funcs.is_empty())
+    });
 }
 
 /// Every trigger configuration's gems and uniques
-/// (`equivalence::variants::trigger_variants`)
+/// (`equivalence::variants::trigger_variants`): each gem, item, socket
+/// group and main skill in one of its templates, in all of them with
+/// `TRIGGERS_FULL=1`
 #[test]
 fn triggers_match_upstream() {
-    run_builds(&equivalence::variants::trigger_variants);
+    run_builds("triggers_match_upstream", &|data| {
+        let all = equivalence::variants::trigger_variants(data);
+        if std::env::var_os("TRIGGERS_FULL").is_some() {
+            all
+        } else {
+            equivalence::variants::trigger_sample(all)
+        }
+    });
 }
 
 /// Mod lines the corpus does not reach
 /// (`equivalence::variants::mod_variants`)
 #[test]
 fn mods_match_upstream() {
-    run_builds(&|_| equivalence::variants::mod_variants());
+    run_builds("mods_match_upstream", &|_| {
+        equivalence::variants::mod_variants()
+    });
 }
 
 /// Tattoos (`equivalence::variants::tattoo_variants`)
 #[test]
 fn tattoos_match_upstream() {
-    run_builds(&equivalence::variants::tattoo_variants);
+    run_builds(
+        "tattoos_match_upstream",
+        &equivalence::variants::tattoo_variants,
+    );
 }
 
 /// Timeless jewels (`equivalence::variants::timeless_variants`)
 #[test]
 fn timeless_match_upstream() {
-    run_builds(&equivalence::variants::timeless_variants);
+    run_builds(
+        "timeless_match_upstream",
+        &equivalence::variants::timeless_variants,
+    );
 }
 
-fn run_builds(make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
+/// Builds one process compares
+const CHUNK: usize = 25;
+/// Processes comparing at once, over all the tests
+const JOBS: usize = 3;
+static RUNNING: Mutex<usize> = Mutex::new(0);
+static DONE: Condvar = Condvar::new();
+
+/// Compares the builds of the test `test` in processes of their own, `CHUNK`
+/// builds each and `JOBS` at once: the translated program keeps about
+/// 12 MB of every build it loaded, next to the 1.6 GB it starts with, so a
+/// thousand builds in one process, and the tests' processes side by side,
+/// run out of memory. The processes are this test again, given their builds
+/// in the file `PERFORM_BUILDS` names
+fn run_builds(test: &str, make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
+    if let Some(path) = std::env::var_os("PERFORM_BUILDS") {
+        let builds = std::fs::read(path).unwrap();
+        return compare_builds(serde_json::from_slice(&builds).unwrap());
+    }
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
+    // `CALCS_SKIP=<a>,<b>`: leaves out the builds whose ids contain any
+    let skip = std::env::var("CALCS_SKIP").unwrap_or_default();
+    let skip: Vec<&str> = skip.split(',').filter(|s| !s.is_empty()).collect();
+    let builds: Vec<(String, String)> = make(&mut TypedData::load())
+        .into_iter()
+        .filter(|(id, _)| id.contains(&filter) && !skip.iter().any(|s| id.contains(s)))
+        .collect();
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("perform-{}-{test}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let exe = std::env::current_exe().unwrap();
+    let outputs: Vec<std::process::Output> = std::thread::scope(|scope| {
+        let runs: Vec<_> = builds
+            .chunks(CHUNK)
+            .enumerate()
+            .map(|(k, chunk)| {
+                let path = dir.join(k.to_string());
+                std::fs::write(&path, serde_json::to_vec(chunk).unwrap()).unwrap();
+                let exe = &exe;
+                scope.spawn(move || {
+                    let mut running = RUNNING.lock().unwrap();
+                    while *running >= JOBS {
+                        running = DONE.wait(running).unwrap();
+                    }
+                    *running += 1;
+                    drop(running);
+                    let out = std::process::Command::new(exe)
+                        .args([test, "--exact", "--nocapture"])
+                        .env("PERFORM_BUILDS", &path)
+                        .output();
+                    *RUNNING.lock().unwrap() -= 1;
+                    DONE.notify_all();
+                    out.unwrap()
+                })
+            })
+            .collect();
+        runs.into_iter().map(|r| r.join().unwrap()).collect()
+    });
+    std::fs::remove_dir_all(&dir).unwrap();
+    let mut failures = Vec::new();
+    for out in outputs {
+        let text = String::from_utf8_lossy(&out.stderr);
+        if out.status.success() {
+            for line in text.lines().filter(|l| l.contains("performs compared")) {
+                eprintln!("{line}");
+            }
+        } else {
+            failures.push(format!("{}: {text}", out.status));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+fn compare_builds(builds: Vec<(String, String)>) {
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
@@ -463,13 +555,7 @@ fn run_builds(make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
     let partial = std::env::var("OFFENCE_PARTIAL").is_ok();
     let stage_name = |k: usize| ["defence", "buildDefenceEstimations", "triggers", "offence"][k];
     let mut skip_reasons: BTreeMap<String, usize> = BTreeMap::new();
-    // `CALCS_SKIP=<a>,<b>`: leaves out the builds whose ids contain any
-    let skip = std::env::var("CALCS_SKIP").unwrap_or_default();
-    let skip: Vec<&str> = skip.split(',').filter(|s| !s.is_empty()).collect();
-    for (id, xml) in make(&mut data) {
-        if !id.contains(&filter) || skip.iter().any(|s| id.contains(s)) {
-            continue;
-        }
+    for (id, xml) in builds {
         for (level, cost) in &costs {
             if let Some(t) = level.as_table() {
                 t.set_str("cost", cost.clone());

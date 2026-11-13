@@ -260,19 +260,45 @@ pub fn trigger_variants(data: &mut TypedData) -> Vec<(String, String)> {
                 continue;
             };
             let source = format!("Item:{id}:");
+            // Numbered among the item's own groups, so a group has the
+            // same id in every template
+            let mut granted = 0;
             for (k, g) in env.groups.iter().enumerate() {
                 if g.source.as_deref().is_some_and(|s| s.starts_with(&source)) {
+                    granted += 1;
                     let v = engine::pat::gsub(
                         &xml,
                         "mainSocketGroup=\"%d+\"",
                         &format!("mainSocketGroup=\"{}\"", k + 1),
                     );
-                    out.push((format!("trig-{short}-granted{}-{}", k + 1, t.id), v));
+                    out.push((format!("trig-{short}-granted{granted}-{}", t.id), v));
                 }
             }
         }
     }
     out
+}
+
+/// One build of each of [`trigger_variants`]' gems, items, socket groups
+/// and main skills: its templates in turn, so every trigger configuration
+/// runs and every template is used. A trigger variant takes over a second
+/// in the translated program, and the whole set half an hour
+pub fn trigger_sample(all: Vec<(String, String)>) -> Vec<(String, String)> {
+    // An id without its template
+    let key = |id: &str| id.rsplit_once("-gen-").map_or(id, |(k, _)| k).to_string();
+    let mut groups: Vec<(String, Vec<(String, String)>)> = Vec::new();
+    for (id, xml) in all {
+        let k = key(&id);
+        match groups.iter_mut().find(|(g, _)| *g == k) {
+            Some((_, v)) => v.push((id, xml)),
+            None => groups.push((k, vec![(id, xml)])),
+        }
+    }
+    groups
+        .into_iter()
+        .enumerate()
+        .map(|(n, (_, mut v))| v.swap_remove(n % v.len()))
+        .collect()
 }
 
 /// Mod lines the corpus does not reach, each given to a few generated

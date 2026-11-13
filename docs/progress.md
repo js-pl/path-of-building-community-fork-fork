@@ -98,7 +98,9 @@ State at the handoff:
   a melee, bow, wand and spell build, in each of its active skills (379
   variants), and every unique a key names or that triggers skills,
   equipped, with a spell socketed in its slot (372) and as each socket
-  group it grants next to a slam and a spell (257).
+  group it grants next to a slam and a spell (257). CI runs each gem,
+  item, socket group and main skill in one of its templates (287
+  variants); `TRIGGERS_FULL=1` runs them in all (1008, half an hour).
   `mods_match_upstream` gives builds mod lines as custom modifiers.
 
 What remains for the full migration, in order:
@@ -556,6 +558,11 @@ the tests align these:
 - Equivalence tests take about 5 minutes each (`cargo test --release -p
   equivalence --test <name>`); `CALCS_FILTER=<substring>` limits the builds
   (`fn-` for the skill variants, whose ids are `fn-<skill>-<part>-<template>`)
+- The translated program keeps about 12 MB of every build it loads (the
+  cycle collector does not free it; not found yet what holds it), next to
+  the 1.6 GB it starts with: a test over hundreds of builds runs them in
+  processes of their own, as `perform.rs` does (`run_builds`), or runs out
+  of memory on CI's 16 GB
 - Missing ports return errors starting with `not ported`; the tests count
   them as skips and print the reasons, the quickest list of what to do next
 - Run `cargo fmt --all` last, then `cargo clippy --all-targets -- -D
