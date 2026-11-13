@@ -27,6 +27,29 @@ pub type Result<T> = std::result::Result<T, String>;
 
 /// A spec's `masteryEffects` attribute as upstream's table by mastery:
 /// (mastery node, effect) in its `pairs` order.
+/// `base64.decode` of upstream's runtime: characters outside the alphabet
+/// are dropped, a last incomplete byte too
+fn base64_decode(data: &str) -> Vec<u8> {
+    let (mut bits, mut n, mut out) = (0u32, 0, Vec::new());
+    for c in data.bytes() {
+        let v = match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => continue,
+        };
+        bits = (bits << 6 | u32::from(v)) & 0xffff;
+        n += 6;
+        if n >= 8 {
+            n -= 8;
+            out.push((bits >> n) as u8);
+        }
+    }
+    out
+}
+
 pub fn mastery_effects(attr: &str) -> Vec<(u32, f64)> {
     let mut effects = LjMap::default();
     for c in crate::pat::gmatch(attr, "{(%d+),(%d+)}") {
@@ -486,8 +509,8 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `PassiveSpecClass:Load(xml)`: the spec of a `<Spec>` element, its
-    /// jewel sockets, tattoos (`<Overrides>`) and allocations. Specs in the
-    /// old URL format only are not ported.
+    /// jewel sockets, tattoos (`<Overrides>`) and allocations, or the tree
+    /// link of the old format (`<URL>`).
     pub fn load(&mut self, xml: &crate::xml::Element) -> Result<()> {
         self.load_with(xml, None)
     }
@@ -508,10 +531,10 @@ impl<'t> PassiveSpec<'t> {
             } else {
                 2.0
             });
-        let mut url = false;
+        let mut url = None;
         for node in xml.elements() {
             if node.elem == "URL" {
-                url = true;
+                url = Some(node.text().ok_or("'URL' element missing content")?);
             }
             if node.elem == "Sockets" {
                 for child in node.elements().filter(|c| c.elem == "Socket") {
@@ -533,8 +556,8 @@ impl<'t> PassiveSpec<'t> {
             self.set_tree_jewels(tab);
         }
         let Some(nodes) = xml.attr("nodes") else {
-            if url {
-                return Err("specs in the URL format are not ported".into());
+            if let Some(url) = url {
+                self.decode_url(url)?;
             }
             return Ok(());
         };
@@ -619,6 +642,84 @@ impl<'t> PassiveSpec<'t> {
             }
         }
         self.build_all_depends_and_paths()
+    }
+
+    /// `DecodeURL(url)`: a tree link of the official tree's format, as old
+    /// files keep it. Its errors are messages `Load` ignores; the paths
+    /// are left for `PostLoad`, and cluster nodes, which the spec does not
+    /// have yet, are dropped.
+    pub fn decode_url(&mut self, url: &str) -> Result<()> {
+        let url = match url.rfind('/') {
+            Some(i) if i > 0 => &url[i + 1..],
+            _ => url,
+        };
+        let b = base64_decode(&url.replace('-', "+").replace('_', "/"));
+        if b.len() < 6 {
+            return Ok(());
+        }
+        let byte = |i: usize| b.get(i - 1).copied().map_or(0, usize::from);
+        let ver = (byte(1) << 24) + (byte(2) << 16) + (byte(3) << 8) + byte(4);
+        if ver > 6 {
+            return Ok(());
+        }
+        let class_id = byte(5) as i64;
+        let ascendancy_ids = if ver >= 4 { byte(6) } else { 0 };
+        if self.class(class_id).is_err() {
+            return Ok(());
+        }
+        self.reset_nodes();
+        self.select_class(class_id)?;
+        self.select_ascend_class((ascendancy_ids & 3) as i64)?;
+        self.select_secondary(Some(((ascendancy_ids & 12) >> 2) as i64))?;
+        // `b:sub(i, j)`, 1-based, `j` -1 for the end
+        let sub = |i: usize, j: Option<usize>| -> Vec<u8> {
+            let j = j.unwrap_or(b.len()).min(b.len());
+            if i == 0 || i > j {
+                return Vec::new();
+            }
+            b[i - 1..j].to_vec()
+        };
+        let nodes_start = if ver >= 4 { 8 } else { 7 };
+        let nodes_end = (ver >= 5).then(|| 7 + byte(7) * 2);
+        self.allocate_decoded_nodes(&sub(nodes_start, nodes_end), 0);
+        let Some(nodes_end) = nodes_end else {
+            return Ok(());
+        };
+        let cluster_start = nodes_end + 1;
+        let cluster_end = cluster_start + byte(cluster_start) * 2;
+        self.allocate_decoded_nodes(&sub(cluster_start + 1, Some(cluster_end)), 65536);
+        if ver < 6 {
+            return Ok(());
+        }
+        let mastery_start = cluster_end + 1;
+        let mastery_end = mastery_start + byte(mastery_start) * 4;
+        let effects = sub(mastery_start + 1, Some(mastery_end));
+        for c in effects.as_chunks::<4>().0 {
+            let effect = u32::from(c[0]) * 256 + u32::from(c[1]);
+            let id = u32::from(c[2]) * 256 + u32::from(c[3]);
+            if self
+                .tree
+                .mastery_effects
+                .contains_key(&f64::from(effect).to_bits())
+            {
+                // Upstream indexes `allocNodes[id]` without a check
+                if !self.alloc_nodes.contains(id) {
+                    return Err(format!("mastery {id} of a tree link is not allocated"));
+                }
+                self.mastery_selections.insert(id, f64::from(effect));
+            }
+        }
+        Ok(())
+    }
+
+    /// `AllocateDecodedNodes(nodes, isCluster, "big")`
+    fn allocate_decoded_nodes(&mut self, nodes: &[u8], offset: u32) {
+        for c in nodes.as_chunks::<2>().0 {
+            let id = u32::from(c[0]) * 256 + u32::from(c[1]) + offset;
+            if let Some(&i) = self.index.get(&id) {
+                self.alloc(i);
+            }
+        }
     }
 
     /// `PostLoad()`, which rebuilds the cluster jewel subgraphs (not ported:
