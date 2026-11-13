@@ -309,7 +309,10 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
-    "crafting a cluster jewel",
+    "specs on another tree version",
+    // The tooltip's stat comparison, where the translation carries another
+    // build's change of upstream's shared data (see `compare_display`)
+    "upstream's shared data changed by another build",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
