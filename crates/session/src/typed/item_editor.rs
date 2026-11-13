@@ -38,6 +38,19 @@ pub struct Editor {
     pub range_list: Vec<String>,
     pub range_sel: usize,
     pub range_val: Option<f64>,
+    /// `craftingSorting`'s selection, 0-based (0: Default)
+    pub crafting_sort: usize,
+}
+
+/// `sortingOptions`: Default, then the power stats for items but Name
+pub(super) fn crafting_sort_options() -> Vec<(String, Option<engine::power::PowerStat>)> {
+    let mut list = vec![("Default".to_string(), None)];
+    for p in engine::power::power_stats() {
+        if !p.ignore_for_items && p.label != "Name" {
+            list.push((p.label.clone(), Some(p)));
+        }
+    }
+    list
 }
 
 /// An affix drop-down and its roll slider
@@ -274,8 +287,19 @@ impl<'d> TypedSession<'d> {
             .as_ref()
             .and_then(|r| data.rare_like_uniques.get(r))
             .is_some_and(|r| r.ignore_mod_type);
+        // `craftingSorting`, when shown: the series by power
+        let base = item.base.as_ref().ok_or("no base")?;
+        let shown =
+            item.crafted && !(base.typ == "Jewel" && base.sub_type.as_deref() == Some("Cluster"));
+        let sort_stat = crafting_sort_options()
+            .get(self.editor.crafting_sort)
+            .and_then(|o| o.1.clone())
+            .filter(|_| shown);
+        let mut shared: std::collections::HashMap<String, f64> = Default::default();
+        let limit = item.affix_limit;
         let mut i = 1.0;
-        while i <= item.affix_limit {
+        while i <= limit {
+            let item = self.display_item.as_ref().ok_or("no item in the editor")?;
             let n = i as usize;
             let (typ, table, index) = if i <= prefix_limit {
                 let typ = (!ignore_mod_type).then_some("Prefix");
@@ -288,7 +312,11 @@ impl<'d> TypedSession<'d> {
                 )
             };
             i += 1.0;
-            let (list, sel) = item.affix_options(data, typ, table, index)?;
+            let (mut list, mut sel) = item.affix_options(data, typ, table, index)?;
+            if let Some(stat) = &sort_stat {
+                sel = self.sort_affixes_by_power(&mut list, table, index, stat, &mut shared)?;
+            }
+            let item = self.display_item.as_ref().ok_or("no item in the editor")?;
             let c = self.editor.affix.get_mut(n - 1).ok_or("no affix control")?;
             c.table = table;
             c.index = index;
@@ -325,6 +353,97 @@ impl<'d> TypedSession<'d> {
             c.sel = sel;
         }
         Ok(())
+    }
+
+    /// The power sort of `UpdateAffixControl`: "None" first, then the
+    /// series by the power of the stat with their middle tier added to the
+    /// item (crafted without the control's own affix); the new selection
+    fn sort_affixes_by_power(
+        &self,
+        list: &mut Vec<Option<AffixSeries>>,
+        table: AffixTable,
+        index: usize,
+        stat: &engine::power::PowerStat,
+        shared: &mut std::collections::HashMap<String, f64>,
+    ) -> Result<usize> {
+        let display = self.display_item.as_ref().ok_or("no item in the editor")?;
+        let ctx = self.data.item_context();
+        let sel_affix = display.affix_slots(table)[index - 1].mod_id.clone();
+        let mut subject = Item::new(&ctx, &display.build_raw(), None, false)?;
+        let mut own = std::collections::HashMap::new();
+        let cache = if sel_affix != "None" {
+            subject.affix_slots_mut(table)[index - 1] = engine::item::AffixSlot {
+                mod_id: "None".into(),
+                range: None,
+                fractured: false,
+            };
+            subject.craft(&ctx)?;
+            &mut own
+        } else {
+            shared
+        };
+        let calc_data = self.data.calc_data();
+        let calc = engine::calculator::MiscCalculator::new(&self.build, &calc_data)?;
+        let slot = display.primary_slot();
+        let mut power = |id: &str| -> Result<f64> {
+            if let Some(&p) = cache.get(id) {
+                return Ok(p);
+            }
+            let m = subject
+                .affixes
+                .as_ref()
+                .and_then(|a| a.get(id))
+                .ok_or("attempt to get length of a nil value (local 'mod')")?;
+            let mut item = subject.clone();
+            for l in &m.lines {
+                item.explicit_mod_lines.push(engine::item::ModLine {
+                    line: l.clone(),
+                    mod_tags: m.mod_tags.clone(),
+                    ..Default::default()
+                });
+            }
+            let raw = item.build_raw();
+            item.parse_raw(&ctx, &raw, None, false)?;
+            let ovr = engine::calc_override::Override {
+                rep_item: Some((slot.clone(), Some(item))),
+                ..Default::default()
+            };
+            let p = stat.value(&calc.calculate(&ovr, false)?);
+            cache.insert(id.to_string(), p);
+            Ok(p)
+        };
+        // `pickModifierFromList`: the middle tier
+        let pick = |s: &AffixSeries| -> String {
+            let n = s.mod_list.len();
+            let i = if n == 1 {
+                0
+            } else {
+                ((n - 1) as f64 * DEFAULT_AFFIX_QUALITY + 0.5).floor() as usize
+            };
+            s.mod_list[i].clone()
+        };
+        let mut powers: std::collections::HashMap<String, f64> = Default::default();
+        for s in list.iter().flatten() {
+            let id = pick(s);
+            if !powers.contains_key(&id) {
+                let p = power(&id)?;
+                powers.insert(id, p);
+            }
+        }
+        engine::calcs::lua_sort(list, |a, b| match (a, b) {
+            (None, _) => true,
+            (_, None) => false,
+            (Some(a), Some(b)) => powers[&pick(a)] > powers[&pick(b)],
+        });
+        // `findSelectedIdx()`
+        let sel = list
+            .iter()
+            .position(|e| match e {
+                Some(s) => s.mod_list.contains(&sel_affix),
+                None => sel_affix == "None",
+            })
+            .unwrap_or(0);
+        Ok(sel)
     }
 
     /// `UpdateClusterJewelControls()`: the skill and node count in their
