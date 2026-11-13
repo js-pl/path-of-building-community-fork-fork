@@ -4,14 +4,22 @@
 //! copies bytes in with `alloc`, calls a function, and reads the result
 //! (UTF-8 JSON) from `result_ptr`/`result_len`. One engine instance per
 //! module instance; the engine does no I/O, data files are handed in.
+//!
+//! Commands run on the typed engine, whose data comes in its binary form
+//! (`session::bundle`). With the `translation` feature (the default) the
+//! commands it does not have yet run on upstream's translated program,
+//! which reads upstream's Lua data files from the bundle; without it they
+//! are "not ported" errors.
 
-use session::{Files, Session};
+use session::typed::TypedData;
+use session::{Dispatcher, Files};
 use std::cell::RefCell;
 use std::rc::Rc;
 
 thread_local! {
     static FILES: Rc<Files> = Rc::new(Files::new());
-    static SESSION: RefCell<Option<Session>> = const { RefCell::new(None) };
+    static DATA: RefCell<Option<&'static TypedData>> = const { RefCell::new(None) };
+    static SESSION: RefCell<Option<Dispatcher<'static>>> = const { RefCell::new(None) };
     static RESULT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -72,6 +80,13 @@ pub extern "C" fn result_len() -> usize {
     RESULT.with(|r| r.borrow().len())
 }
 
+/// 1 when commands the typed engine does not have fall back to the
+/// translation, 0 when they are "not ported" errors
+#[unsafe(no_mangle)]
+pub extern "C" fn has_translation() -> u32 {
+    cfg!(feature = "translation") as u32
+}
+
 /// Adds one data file (path relative to upstream's `src/`).
 ///
 /// # Safety
@@ -111,13 +126,49 @@ fn missing_json() -> String {
     format!("[{}]", list.join(","))
 }
 
+/// The typed data, read once
+fn typed_data() -> Result<&'static TypedData, String> {
+    if let Some(d) = DATA.with(|d| *d.borrow()) {
+        return Ok(d);
+    }
+    let d: &'static TypedData =
+        Box::leak(Box::new(TypedData::from_files(FILES.with(|f| f.clone()))?));
+    DATA.with(|cell| *cell.borrow_mut() = Some(d));
+    Ok(d)
+}
+
+/// The session, with a new build open on the typed engine
+fn dispatcher() -> Result<Dispatcher<'static>, String> {
+    let mut d = session()?;
+    let r = d.request(r#"{"cmd":"newBuild"}"#)?;
+    if r.starts_with("{\"error\"") {
+        return Err(r);
+    }
+    Ok(d)
+}
+
+#[cfg(feature = "translation")]
+fn session() -> Result<Dispatcher<'static>, String> {
+    let data = typed_data()?;
+    let translated = session::Session::new(FILES.with(|f| f.clone()))?;
+    Ok(Dispatcher::new(
+        translated,
+        Some(data),
+        session::Prefer::Typed,
+    ))
+}
+
+#[cfg(not(feature = "translation"))]
+fn session() -> Result<Dispatcher<'static>, String> {
+    Ok(Dispatcher::typed(typed_data()?))
+}
+
 /// Starts the engine. On a missing data file the result is
 /// `{"error": ..., "missing": [...]}`; add the files and start again.
 #[unsafe(no_mangle)]
 pub extern "C" fn start() {
     FILES.with(|f| f.take_missing());
-    let files = FILES.with(|f| f.clone());
-    let r = match Session::new(files) {
+    let r = match dispatcher() {
         Ok(s) => {
             SESSION.with(|cell| *cell.borrow_mut() = Some(s));
             "{\"ok\":{}}".to_string()
@@ -139,7 +190,7 @@ pub extern "C" fn start() {
 pub unsafe extern "C" fn request(ptr: *const u8, len: usize) {
     let req = String::from_utf8_lossy(unsafe { bytes(ptr, len) }).into_owned();
     FILES.with(|f| f.take_missing());
-    let r = SESSION.with(|cell| match &*cell.borrow() {
+    let r = SESSION.with(|cell| match &mut *cell.borrow_mut() {
         Some(s) => s.request(&req).unwrap_or_else(|e| error(&e)),
         None => error("engine not started"),
     });
