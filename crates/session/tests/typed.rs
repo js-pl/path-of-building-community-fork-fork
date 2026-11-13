@@ -1002,11 +1002,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                         let opens = |p: &str| {
                             p.contains("Enchant") || p.contains("Anoint") || p.contains("Corrupt")
                         };
-                        let popup = controls
+                        let openers: Vec<J> = controls
                             .iter()
-                            .find(|c| c["path"].as_str().is_some_and(opens))
+                            .filter(|c| c["path"].as_str().is_some_and(opens))
                             .cloned()
-                            .filter(|_| rng.below(3) == 0);
+                            .collect();
+                        let popup =
+                            pick(&mut rng, &J::Array(openers)).filter(|_| rng.below(3) == 0);
                         let Some(c) = popup.or_else(|| pick(&mut rng, &J::Array(controls))) else {
                             break;
                         };

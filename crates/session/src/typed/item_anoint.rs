@@ -279,7 +279,7 @@ impl<'d> TypedSession<'d> {
                 },
                 {
                     "class": "EditControl", "enabled": true, "shown": true,
-                    "text": p.search, "placeholder": "Search", "path": "popup.notableDB.search",
+                    "text": p.search, "path": "popup.notableDB.search",
                 },
                 {
                     "class": "DropDownControl", "enabled": true, "shown": true,
