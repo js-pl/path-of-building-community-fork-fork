@@ -20,17 +20,22 @@ pub use dispatch::{Dispatcher, Prefer};
 #[cfg(feature = "translation")]
 pub use translated::{Recording, Session};
 
-use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Data files in memory, by path relative to upstream's `src/`. Files that
 /// are asked for but missing are recorded, so a caller can fetch them and
-/// retry the request.
-#[derive(Default)]
+/// retry the request. A clone shares the files, also across threads (the
+/// timeless jewels' look-up tables are read through one).
+#[derive(Clone, Default)]
 pub struct Files {
-    files: RefCell<HashMap<String, Rc<Vec<u8>>>>,
-    missing: RefCell<BTreeSet<String>>,
+    inner: Arc<Mutex<FileStore>>,
+}
+
+#[derive(Default)]
+struct FileStore {
+    files: HashMap<String, Arc<Vec<u8>>>,
+    missing: BTreeSet<String>,
 }
 
 impl Files {
@@ -38,27 +43,32 @@ impl Files {
         Files::default()
     }
 
-    pub fn insert(&self, path: impl Into<String>, bytes: Vec<u8>) {
-        self.files.borrow_mut().insert(path.into(), Rc::new(bytes));
+    fn store(&self) -> std::sync::MutexGuard<'_, FileStore> {
+        self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub fn get(&self, path: &str) -> Option<Rc<Vec<u8>>> {
+    pub fn insert(&self, path: impl Into<String>, bytes: Vec<u8>) {
+        self.store().files.insert(path.into(), Arc::new(bytes));
+    }
+
+    pub fn get(&self, path: &str) -> Option<Arc<Vec<u8>>> {
         let path = path.trim_start_matches("./");
-        let found = self.files.borrow().get(path).cloned();
+        let mut store = self.store();
+        let found = store.files.get(path).cloned();
         if found.is_none() {
-            self.missing.borrow_mut().insert(path.to_string());
+            store.missing.insert(path.to_string());
         }
         found
     }
 
     /// Drops a file, to free its memory once it is read
     pub fn remove(&self, path: &str) {
-        self.files.borrow_mut().remove(path);
+        self.store().files.remove(path);
     }
 
     /// Files asked for since the last call that were not there.
     pub fn take_missing(&self) -> Vec<String> {
-        std::mem::take(&mut *self.missing.borrow_mut())
+        std::mem::take(&mut self.store().missing)
             .into_iter()
             .collect()
     }

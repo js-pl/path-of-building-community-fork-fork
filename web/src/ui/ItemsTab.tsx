@@ -11,6 +11,8 @@ import type { DisplayItem, Item, Items, TooltipLine } from "../engine/types";
 import { ColorText } from "./ColorText";
 import { ControlView } from "./Control";
 import { TooltipView } from "./Tooltip";
+import { isNotPorted } from "../engine/client";
+import { NotPorted, notPortedTitle } from "./NotPorted";
 
 type Template = { name: string; type: string; base?: string; raw: string };
 
@@ -28,7 +30,7 @@ export function ItemsTab({ act, rev, setControl }: TabProps) {
   const [tip, setTip] = useState<TooltipLine[] | null>(null);
   const [text, setText] = useState("");
   const [display, setDisplay] = useState<DisplayItem | null>(null);
-  const [db, setDb] = useState<{ kind: string; list: Template[] } | null>(null);
+  const [db, setDb] = useState<{ kind: string; list: Template[] | null } | null>(null);
   const [dbSearch, setDbSearch] = useState("");
 
   useEffect(() => {
@@ -44,7 +46,10 @@ export function ItemsTab({ act, rev, setControl }: TabProps) {
   }, [selected, rev]);
 
   useEffect(() => {
-    engine.call<DisplayItem>("displayItem").then(setDisplay);
+    engine
+      .call<DisplayItem>("displayItem")
+      .then(setDisplay)
+      .catch(() => setDisplay(null));
   }, [rev]);
 
   const byId = useMemo(() => new Map((items?.items ?? []).map((i) => [i.id, i])), [items]);
@@ -53,10 +58,15 @@ export function ItemsTab({ act, rev, setControl }: TabProps) {
 
   const openDb = async (kind: string) => {
     if (db?.kind === kind) return setDb(null);
-    setDb({ kind, list: await engine.call<Template[]>("itemDb", { kind }) });
+    try {
+      setDb({ kind, list: await engine.call<Template[]>("itemDb", { kind }) });
+    } catch (e) {
+      if (!isNotPorted(e)) throw e;
+      setDb({ kind, list: null });
+    }
   };
   const q = dbSearch.trim().toLowerCase();
-  const dbList = db ? db.list.filter((t) => !q || t.name.toLowerCase().includes(q) || (t.base ?? "").toLowerCase().includes(q)).slice(0, 200) : [];
+  const dbList = db?.list ? db.list.filter((t) => !q || t.name.toLowerCase().includes(q) || (t.base ?? "").toLowerCase().includes(q)).slice(0, 200) : [];
 
   return (
     <div class="items-tab">
@@ -119,11 +129,18 @@ export function ItemsTab({ act, rev, setControl }: TabProps) {
       </div>
       <div class="item-editor">
         <div class="buttons">
-          <button onClick={() => act("craftItem")}>Craft item...</button>
-          <button onClick={() => openDb("unique")}>Uniques...</button>
-          <button onClick={() => openDb("rare")}>Rare templates...</button>
+          <button onClick={() => act("craftItem")} disabled={!engine.ported("craftItem")} title={engine.ported("craftItem") ? undefined : notPortedTitle}>
+            Craft item...
+          </button>
+          <button onClick={() => openDb("unique")} disabled={!engine.ported("itemDb")} title={engine.ported("itemDb") ? undefined : notPortedTitle}>
+            Uniques...
+          </button>
+          <button onClick={() => openDb("rare")} disabled={!engine.ported("itemDb")} title={engine.ported("itemDb") ? undefined : notPortedTitle}>
+            Rare templates...
+          </button>
         </div>
-        {db ? (
+        {db && !db.list ? <NotPorted what={db.kind === "rare" ? "rare templates" : "uniques"} /> : null}
+        {db?.list ? (
           <div class="item-db">
             <input type="search" placeholder={`Search ${db.kind === "rare" ? "rare templates" : "uniques"}`} value={dbSearch} onInput={(e) => setDbSearch((e.target as HTMLInputElement).value)} />
             <ul>

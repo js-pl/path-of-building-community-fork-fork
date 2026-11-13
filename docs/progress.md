@@ -88,8 +88,10 @@ State at the handoff:
   Zorath's eye jewels): the legion passives and `NodeIndexMapping`
   (`engine::timeless::Timeless`, made by `gamedata::Source::timeless`),
   the look-up tables decompressed from the submodule's `.zip` files when
-  a build first needs them (a loader the caller gives; without one a
-  conquered node is `not ported`), and the conquered nodes of
+  a build first needs them (a loader the caller gives; without the table
+  a conquered node is `not ported`, and the loader is asked again next
+  time), the rest in `engine::codec`'s binary form (`Timeless::encode`,
+  shipped in the bundle), and the conquered nodes of
   `BuildAllDependsAndPaths` (replacements, additions, rolled values,
   `ReconnectNodeToClassStart`). The Abyss jewels' tables are read by
   socket, Zorath's by the nodes of the allocated path from its socket to
@@ -589,11 +591,25 @@ Data no longer goes through Lua at load. `pob bundle <out>` ships the
 typed engine's data in `engine::codec`'s binary form (`session::bundle`):
 `core.bin` holds the game data, the mod parser (with upstream's ModCache)
 and the current tree, each compressed; every tree version is a separate
-file under `files/`, fetched when a build needs an older one. With
+file under `files/`, fetched when a build needs an older one. So are
+the timeless jewels' data (`typed/timeless.bin`, 47 kB) and each jewel's
+look-up table (`typed/timeless/<Name>.bin`, upstream's zlib stream, 0.9 to
+30 MB): a build with a timeless jewel asks for them, the worker fetches
+them and retries (`session::bundle::decode_timeless`). `tests/bundle.rs`
+in `equivalence` loads a build with each of the 11 jewels on the data
+read from a bundle, adding the files each asks for, and gets the same
+sidebar, outputs and tree as on the data made from source. With
 `pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
 data files the translation reads starting up and loading the given builds,
 and every tree version's Lua data, for an engine built with the
 translation (`build-data.mjs` without `--typed`).
+
+The frontend takes `not ported` answers as such
+(`isNotPorted` in `web/src/engine/client.ts`, `web/src/ui/NotPorted.tsx`): an edit the engine
+does not have shows a notice instead of an error, a view it does not have
+(notes, party, the item database) a note in its place, the controls of
+commands that answered `not ported` are disabled, and tooltips it does
+not have are left out.
 
 ### Size and load time
 
