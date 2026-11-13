@@ -34,6 +34,9 @@ pub struct GameData {
     /// `data.enchantments` by key (a base type, a weapon type, `Flask` or
     /// `UtilityFlask`)
     pub enchantments: Vec<(String, Enchantments)>,
+    /// `data.vestigialModMappings`: the unique title of each vestigial mod
+    /// id, by id
+    pub vestigial_mod_mappings: Vec<(String, String)>,
 }
 
 /// Enchantment lines by source
@@ -73,6 +76,7 @@ crate::codec_struct!(GameData {
     rares,
     item_base_lists,
     enchantments,
+    vestigial_mod_mappings,
 });
 
 impl GameData {
