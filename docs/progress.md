@@ -366,7 +366,9 @@ What remains for the full migration, in order:
    options' functions set, tooltips), `control` of the option controls
    with `BuildModList` and the recalculation, of the class, ascendancy
    and bloodline drop-downs (with `IsClassConnected` and the class change
-   popup, whose Continue `popupButton` and `closePopup` are typed),
+   popup, whose Continue `popupButton` and `closePopup` are typed; the
+   typed session's popups are these, so any other button gets the
+   translation's "no popup button" error without falling back),
    `undo` (the active spec's `UndoHandler`, also with tattoos and
    cluster jewel subgraphs: `RestoreUndoState` keeps the subgraphs, and
    `ImportFromNodeList` allocates again every subgraph node

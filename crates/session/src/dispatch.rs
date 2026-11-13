@@ -367,11 +367,14 @@ impl<'d> Dispatcher<'d> {
             "undo" => self.edit(json, |s| s.undo()),
             "newBuild" => self.open(TypedSession::new_build(data), json),
             "popupButton" => {
-                let name = req["name"].as_str()?.to_string();
-                if !self.typed.as_ref()?.has_class_popup() {
-                    return None;
+                // The typed session's popups are the class change popups,
+                // whose only button with a name is Continue's
+                let name = req["name"].as_str().unwrap_or("nil").to_string();
+                if !self.typed.as_ref()?.has_class_popup() || name != "confirm" {
+                    let e = format!("no popup button {name}");
+                    return Some(json!({ "error": e }).to_string());
                 }
-                self.edit(json, |s| s.popup_button(&name))
+                self.edit(json, |s| s.popup_button())
             }
             "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {

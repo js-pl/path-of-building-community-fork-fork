@@ -609,11 +609,8 @@ impl TypedSession<'_> {
     }
 
     /// `popupButton`: Continue of the class change popup
-    pub fn popup_button(&mut self, name: &str) -> Result<J> {
+    pub fn popup_button(&mut self) -> Result<J> {
         let id = *self.class_popups.first().ok_or("no popup")?;
-        if name != "confirm" {
-            return Err(format!("{}: popup button {name}", super::NOT_PORTED));
-        }
         self.close_popup();
         self.select_class(id)?;
         Ok(json!([]))
