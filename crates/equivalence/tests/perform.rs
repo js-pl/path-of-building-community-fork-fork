@@ -338,6 +338,12 @@ fn compare_stage(
             .collect()
     };
     let mut got = out_json(0);
+    // A mirage's copy's minion's output, which became the player's
+    if let Some(J::Object(m)) = got.remove("Minion") {
+        for (k, v) in m {
+            got.insert(format!("Minion.{k}"), v);
+        }
+    }
     let mut want_out = want.output.clone();
     // `output.Minion` is the minion's output: compared by key
     if let Some(a) = p.minion_actor() {
@@ -457,6 +463,16 @@ fn timeless_match_upstream() {
     run_builds(
         "timeless_match_upstream",
         &equivalence::variants::timeless_variants,
+    );
+}
+
+/// Mirages of skills with minions
+/// (`equivalence::variants::mirage_variants`)
+#[test]
+fn mirages_match_upstream() {
+    run_builds(
+        "mirages_match_upstream",
+        &equivalence::variants::mirage_variants,
     );
 }
 

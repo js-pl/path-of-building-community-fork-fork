@@ -307,7 +307,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/CalcBreakdown.lua" = { status = "ported", port = "crates/engine/src/breakdown.rs crates/engine/src/calc_offence_hit.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcDefence.lua" = { status = "partial", port = "crates/engine/src/calc_defence.rs crates/engine/src/calc_ehp.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcFormat.lua" = { status = "ported", port = "crates/session/src/typed/calcs.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/CalcMirages.lua" = { status = "partial", port = "crates/engine/src/calc_mirage.rs crates/engine/src/calc_offence.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/CalcMirages.lua" = { status = "partial", port = "crates/engine/src/calc_mirage.rs crates/engine/src/calc_cache.rs crates/engine/src/calc_offence.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcOffence.lua" = { status = "partial", port = "crates/engine/src/calc_offence.rs crates/engine/src/calc_offence_hit.rs crates/engine/src/calc_offence_ailments.rs crates/engine/src/calc_offence_dot.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcPerform.lua" = { status = "partial", port = "crates/engine/src/calc.rs crates/engine/src/calc_perform.rs crates/engine/src/calc_minion.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/CalcSections.lua" = { status = "ported", port = "crates/session/build.rs crates/session/src/typed/calcs.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
