@@ -242,6 +242,20 @@ impl<'d> Dispatcher<'d> {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.delete_item(id))
             }
+            "addItem" => {
+                let text = req["text"].as_str()?.to_string();
+                let slot = req["slot"].as_str().map(String::from);
+                self.edit(json, |s| s.add_item_text(&text, slot.as_deref()))
+            }
+            "editItem" => {
+                let (id, text) = (req["id"].as_f64()?, req["text"].as_str()?.to_string());
+                self.edit(json, |s| s.edit_item(id, &text))
+            }
+            "setDisplayItem" => {
+                let (id, text) = (req["id"].as_f64(), req["text"].as_str().map(String::from));
+                self.edit(json, |s| s.set_display_item(id, text.as_deref()))
+            }
+            "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.select_item_set(id))
