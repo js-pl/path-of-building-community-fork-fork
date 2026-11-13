@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { Engine } from "./engine/client";
+import { Engine, isNotPorted } from "./engine/client";
 import type { State } from "./engine/types";
 import { Sidebar } from "./ui/Sidebar";
 import { TreeTab } from "./ui/TreeTab";
@@ -30,6 +30,8 @@ type Tab = (typeof tabs)[number];
 export function App() {
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // An edit the engine does not have yet: a notice, not an error
+  const [notice, setNotice] = useState<string | null>(null);
   const [rev, setRev] = useState(0);
   const [tab, setTab] = useState<Tab>("Tree");
   const [busy, setBusy] = useState(false);
@@ -43,12 +45,17 @@ export function App() {
   const act = useCallback(
     async <T,>(cmd: string, args: Record<string, unknown> = {}) => {
       setBusy(true);
+      setNotice(null);
       try {
         const r = await engine.call<T>(cmd, args);
         await refresh();
         return r;
       } catch (e) {
-        setError(String(e instanceof Error ? e.message : e));
+        if (isNotPorted(e)) {
+          setNotice(`Not available in this engine yet: ${cmd}.`);
+          // The build stays as it was; show it as it is now
+          await refresh().catch(() => undefined);
+        } else setError(String(e instanceof Error ? e.message : e));
         return undefined;
       } finally {
         setBusy(false);
@@ -98,6 +105,11 @@ export function App() {
         {error ? (
           <div class="error-bar" onClick={() => setError(null)}>
             {error} <span class="dismiss">(dismiss)</span>
+          </div>
+        ) : null}
+        {notice ? (
+          <div class="notice-bar" onClick={() => setNotice(null)}>
+            {notice} <span class="dismiss">(dismiss)</span>
           </div>
         ) : null}
         {tab === "Import/Export" ? <ImportTab {...props} /> : null}

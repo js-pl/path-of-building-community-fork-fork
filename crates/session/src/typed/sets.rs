@@ -92,12 +92,13 @@ impl TypedSession<'_> {
             text.push_str(&format!("Slot: {s}\r\n"));
         }
         for gem in &g.gem_list {
-            let (Some(level), Some(quality), Some(qid)) = (gem.level, gem.quality, &gem.quality_id)
-            else {
+            // `%d` of nil fails in the translation too; `%s` writes "nil"
+            let (Some(level), Some(quality)) = (gem.level, gem.quality) else {
                 return Err(format!(
-                    "{NOT_PORTED}: copying a gem without a level, quality or quality id"
+                    "{NOT_PORTED}: copying a gem without a level or quality"
                 ));
             };
+            let qid = gem.quality_id.as_deref().unwrap_or("nil");
             text.push_str(&format!(
                 "{} {}/{} {} {} {}\r\n",
                 gem.name_spec,
