@@ -316,7 +316,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `checkLineForAllocates(line, spec.nodes)`
-    fn line_for_allocates(&self, line: &str) -> String {
+    pub(super) fn line_for_allocates(&self, line: &str) -> String {
         if is_match(line, "Allocates")
             && let Some(id) = capture(line, "%d+").and_then(|n| n.parse::<u32>().ok())
             && let Some(&i) = self.build.spec.tree.node_index.get(&id)

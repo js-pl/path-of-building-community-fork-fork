@@ -12,6 +12,7 @@ mod item_add_implicit;
 mod item_add_modifier;
 mod item_anoint;
 mod item_corrupt;
+mod item_crucible;
 mod item_db;
 mod item_display;
 mod item_editor;

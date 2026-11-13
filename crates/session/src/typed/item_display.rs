@@ -631,6 +631,20 @@ impl<'d> TypedSession<'d> {
         let sort_label = l.add("craftingSortingLabel", below(scj), [0.0, 0.0, 0.0, 16.0]);
         l.ctls[sort_label].shown =
             item.crafted && !(base.typ == "Jewel" && base.sub_type.as_deref() == Some("Cluster"));
+        let sorting = l.add(
+            "craftingSorting",
+            Some((Point::Left, sort_label, Point::Right, false)),
+            [4.0, 0.0, 200.0, 20.0],
+        );
+        if l.ctls[sort_label].shown {
+            let options: Vec<J> = super::item_editor::crafting_sort_options()
+                .into_iter()
+                .map(|(l, _)| json!(l))
+                .collect();
+            let mut d = drop_desc(options, (self.editor.crafting_sort + 1) as f64);
+            d.insert("label".into(), json!("^7Modifier sorting:"));
+            l.ctls[sorting].desc = Some(d);
+        }
         let sa = l.add(
             "displayItemSectionAffix",
             Some((Point::TopLeft, sort_label, Point::BottomLeft, true)),
@@ -828,7 +842,8 @@ impl<'d> TypedSession<'d> {
         let mut out: Vec<(f64, f64, J)> = Vec::new();
         for (i, c) in l.ctls.iter().enumerate() {
             let Some(d) = &c.desc else { continue };
-            if !c.name.starts_with("displayItem") || !l.is_shown(i) {
+            let listed = c.name.starts_with("displayItem") || c.name == "craftingSorting";
+            if !listed || !l.is_shown(i) {
                 continue;
             }
             let (x, y) = l.pos(i);

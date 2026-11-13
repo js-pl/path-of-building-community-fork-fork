@@ -1072,7 +1072,7 @@ function api.displayItem()
 		controls = layoutControls(tab.controls, "items.", function(name, control)
 			return name:match("^displayItem") and not name:match("Label%d*$") and not name:match("^displayItemSection")
 				and name ~= "displayItemTooltipAnchor" and name ~= "displayItemBuySimilar" and control._className ~= "LabelControl"
-				or name == "displayItemQuality"
+				or name == "displayItemQuality" or name == "craftingSorting"
 		end),
 	}
 end
