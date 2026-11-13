@@ -86,8 +86,9 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 6] = [
+const PHASES: [(&str, usize); 7] = [
     ("commands", 2),
+    ("geometry", 3),
     ("calcs", 3),
     ("tree", 3),
     ("skills", 3),
@@ -96,8 +97,8 @@ const PHASES: [(&str, usize); 6] = [
 ];
 
 /// The typed engine's commands against the translated session's: the
-/// sidebar and outputs, the Calcs tab, tree, skills and item edits and the
-/// saved files, each over the corpus. Each phase runs on shards of the
+/// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
+/// and item edits and the saved files, each over the corpus. Each phase runs on shards of the
 /// corpus, each in a process of its own with one data and one translated
 /// session (`testkit::run_shards`): the translation keeps about 12 MB of
 /// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
@@ -119,7 +120,7 @@ fn typed_session_matches_translated() {
                 (0..n).map(move |k| format!("{p} {k}/{n}"))
             })
             .collect();
-        return testkit::run_shards(test, &shards, &[" builds", " edits", "skipped "]);
+        return testkit::run_shards(test, &shards, &[" builds", " edits", " trees", "skipped "]);
     };
     let (phase, part) = shard.split_once(' ').unwrap();
     let (k, n) = part.split_once('/').unwrap();
@@ -128,6 +129,7 @@ fn typed_session_matches_translated() {
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
     match phase {
         "commands" => commands_match(data, &mut d),
+        "geometry" => geometry_matches(&mut d),
         "calcs" => calcs_match(data, &mut d),
         "tree" => tree_edits_match(&mut d),
         "skills" => skills_edits_match(&mut d),
@@ -507,6 +509,81 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     );
 }
 
+/// `tree` (the geometry: nodes, cluster jewel subgraphs, connectors,
+/// classes) gives the translation's for every corpus build, and for an
+/// empty build on each tree version
+fn geometry_matches(d: &mut Dispatcher) {
+    let mut builds: Vec<(String, String)> = corpus()
+        .into_iter()
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    let src = gamedata::Source::load(&src()).unwrap_or_else(|e| panic!("{e}"));
+    if std::env::var("SESSION_FILTER").is_err() {
+        for v in src.tree_versions().unwrap_or_else(|e| panic!("{e}")) {
+            let xml = format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+	<Build level="1" targetVersion="3_0" className="Scion" ascendClassName="None" mainSocketGroup="1" viewMode="TREE" characterLevelAutoMode="false" bandit="None" pantheonMajorGod="None" pantheonMinorGod="None"/>
+	<Tree activeSpec="1">
+		<Spec treeVersion="{v}" classId="0" ascendClassId="0" nodes=""/>
+	</Tree>
+	<Skills activeSkillSet="1"><SkillSet id="1"/></Skills>
+	<Items activeItemSet="1"><ItemSet id="1"/></Items>
+	<Config/>
+</PathOfBuilding>"#
+            );
+            builds.push((format!("empty {v}"), xml));
+        }
+    }
+    let builds = mine(builds);
+    let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
+    let mut times = [Duration::ZERO; 2];
+    for (id, xml) in builds {
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            skipped.push(format!("{id}: {:?}", d.typed_error));
+            continue;
+        }
+        let t = Instant::now();
+        let typed = answer(d.request(r#"{"cmd":"tree"}"#), "typed tree");
+        times[0] += t.elapsed();
+        assert!(d.typed_active(), "{id}: {:?}", d.typed_error);
+        let t = Instant::now();
+        let tr = answer(d.translated_request(r#"{"cmd":"tree"}"#), "translated tree");
+        times[1] += t.elapsed();
+        assert!(tr.get("ok").is_some(), "{id}: {tr}");
+        let mut out = Vec::new();
+        diff(&typed, &tr, "tree", &mut out);
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(400) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+        compared += 1;
+    }
+    eprintln!(
+        "{compared} trees: typed {:.1?}, translated {:.1?} (with its loads)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        skipped.is_empty() && failures.is_empty(),
+        "{} skipped, {} differ:\n{}",
+        skipped.len(),
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
 /// The colour codes the sidebar uses are upstream's
 #[test]
 fn color_codes_match_upstream() {
@@ -842,6 +919,10 @@ fn tree_edits_match(d: &mut Dispatcher) {
             ];
             if let Some(i) = req.get("id") {
                 follow.push(json!({"cmd": "nodePath", "id": i}));
+            }
+            if step < socket_clicks.len() {
+                // The subgraphs taken off and built again
+                follow.push(json!({"cmd": "tree"}));
             }
             if let Some(opts) = typed["ok"]["mastery"].as_array() {
                 follow.push(json!({"cmd": "masteryOptions", "id": req["id"]}));

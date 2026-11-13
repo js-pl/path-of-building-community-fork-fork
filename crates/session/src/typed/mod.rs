@@ -5,6 +5,7 @@
 
 mod calcs;
 pub mod display_stats;
+mod geometry;
 mod items;
 mod save;
 mod sets;
