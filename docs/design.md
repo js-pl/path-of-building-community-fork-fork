@@ -95,12 +95,14 @@ web/ (TypeScript, Preact)               crates/
   `Dispatcher` answers the commands ported to the typed engine with it
   and the rest with the translation, with the same JSON. Upstream's UI
   data (`CalcSections.lua`) is evaluated at build time like game data.
-- **Data delivery.** `pob bundle` writes the data files the engine reads when
-  starting and loading a build on the current tree into one compressed bundle
-  (`core.bin`), and every tree version as separate files. The site serves them
-  as static assets; files the engine finds missing (older trees) are fetched
-  and the request retried. They are not compiled into the wasm module.
-  The typed engine's game data is made at build time by `crates/gamedata`
+- **Data delivery.** `pob bundle` writes the typed engine's data (game
+  data, mod parser, the current tree) into one compressed bundle
+  (`core.bin`), and every tree version as a separate file
+  (`session::bundle`). The site serves them as static assets; files the
+  engine finds missing (older trees) are fetched and the request retried.
+  They are not compiled into the wasm module. With `--lua`, the bundle also
+  holds the Lua data files the translation reads, for an engine built with
+  it. The typed engine's game data is made at build time by `crates/gamedata`
   (the importer's tables with `Data.lua`'s processing, read into the
   engine's typed tables) and stored in `engine::codec`'s binary form:
   varints, interned strings, shared tables written once, compressed by the
@@ -108,6 +110,11 @@ web/ (TypeScript, Preact)               crates/
   running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.
+  The cargo feature `translation` (on by default in `session` and `wasm`)
+  links the translated program as the fallback of commands the typed
+  engine does not have; built without it (`build-wasm.mjs --typed`), the
+  module holds neither the translation nor the Lua runtime's interpreter,
+  and those commands are `not ported: <cmd>` errors.
 - **Workers.** One engine instance per worker, communicating by messages: a
   main worker holds the build being edited, a background worker runs slow
   calculations (node power) on a copy, so edits never wait for them.
@@ -355,8 +362,8 @@ each optimisation's numbers are in `docs/progress.md`.
    tooltips and node power, natively and in the browser
    (`crates/session/tests`, `web/tests` compares the wasm engine with the
    native one). Open: incremental and parallel calcs and the performance
-   targets, which come with the typed engine, and the wasm size (78 MB, 15 MB
-   gzipped).
+   targets, which come with the typed engine. The wasm size: 80 MB (15 MB
+   gzipped) with the translation, 8.2 MB (2.0 MB gzipped) without it.
 4. **Frontend MVP.** Done: import a build code or XML, stat sidebar, passive
    tree with node power, calcs tab with breakdowns.
 5. **Full frontend.** Skills, items (including crafting), config, notes, party,

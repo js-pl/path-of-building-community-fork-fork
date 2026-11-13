@@ -1,7 +1,8 @@
 // The browser engine (public/engine.wasm with public/data, see
 // scripts/build-wasm.mjs and scripts/build-data.mjs) run under Node: it
 // starts, loads a corpus build, and gives the same sidebar as the native
-// engine (`pob serve`).
+// engine (`pob serve`). Built without the translation (--typed), commands
+// the typed engine does not have are "not ported" errors.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
@@ -13,9 +14,12 @@ const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const root = join(web, "..");
 const pub = join(web, "public");
 
+let translation;
+
 async function engine() {
   const { instance } = await WebAssembly.instantiate(readFileSync(join(pub, "engine.wasm")), {});
   const ex = instance.exports;
+  translation = ex.has_translation() === 1;
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const put = (bytes) => {
@@ -64,6 +68,11 @@ for (const rel of ["corpus/generated/gen-0001.xml", "upstream/PathOfBuilding/spe
     const xml = readFileSync(join(root, rel), "utf8");
     const reqs = [{ cmd: "loadXml", xml }, { cmd: "state" }, { cmd: "saveCode" }];
     const got = reqs.map(call);
+    // A command the typed engine does not have goes to the translation,
+    // or is "not ported" without it
+    const other = call({ cmd: "noSuchCommand" });
+    if (translation) assert.equal(other.error, "unknown command noSuchCommand");
+    else assert.equal(other.error, "not ported: noSuchCommand");
     for (const r of got) assert.equal(r.error, undefined, r.error);
     const want = native(reqs);
     assert.deepEqual(got[1].ok.stats, want[1].ok.stats);
