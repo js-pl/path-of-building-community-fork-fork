@@ -38,6 +38,7 @@ pub mod game_data;
 pub mod item;
 pub mod item_craft;
 pub mod item_data;
+pub mod item_enchant;
 mod item_raw;
 pub mod item_tools;
 pub mod items_tab;

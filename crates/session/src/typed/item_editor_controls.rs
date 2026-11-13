@@ -237,6 +237,25 @@ impl<'d> TypedSession<'d> {
                     }
                 })?;
             }
+            ("displayItemEnchant" | "displayItemEnchant2", Act::Click) => {
+                if self.has_item_popup() || self.class_popups_open() > 0 {
+                    return Err(format!("{NOT_PORTED}: a popup over another"));
+                }
+                self.enchant_display_item(if name.ends_with('2') { 2 } else { 1 })?;
+                self.refresh_item_popups();
+            }
+            (
+                "displayItemAnoint" | "displayItemAnoint2" | "displayItemAnoint3"
+                | "displayItemAnoint4",
+                Act::Click,
+            ) => {
+                if self.has_item_popup() || self.class_popups_open() > 0 {
+                    return Err(format!("{NOT_PORTED}: a popup over another"));
+                }
+                let slot = index_of(name, "displayItemAnoint").unwrap_or(1);
+                self.anoint_display_item(slot)?;
+                self.refresh_item_popups();
+            }
             ("displayItemAddSocket", Act::Click) => {
                 let item = self.display_item.as_ref().ok_or("no item in the editor")?;
                 let at = item.sockets.len() - item.abyssal_socket_count as usize;

@@ -1,6 +1,8 @@
 //! The item editor's popups: `ItemsTab:CraftItem` (Craft Item: rarity,
 //! title, type and base) and `ItemsTab:EditDisplayItemText` (Edit Item
-//! Text), as `lua/session.lua` shows them (`describePopups`) and drives them
+//! Text) and `ItemsTab:EnchantDisplayItem` (Enchant Item, in
+//! `item_enchant.rs`), `ItemsTab:AnointDisplayItem` (Anoint Item, saved
+//! without a node), as `lua/session.lua` shows them (`describePopups`) and drives them
 //! (`control` of `popup.*`, `popupButton`, `closePopup`).
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
@@ -45,6 +47,11 @@ pub enum ItemPopup {
         /// Whether an item was in the editor when it opened
         with_item: bool,
     },
+    Enchant(Box<super::item_enchant::EnchantPopup>),
+    Anoint {
+        /// `self.anointEnchantSlot`
+        slot: usize,
+    },
 }
 
 /// `DropDownControl:SetSel(sel)`: the new selection, clamped to the list,
@@ -63,7 +70,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// The other popups, behind the item popups
-    fn class_popups_open(&self) -> usize {
+    pub(super) fn class_popups_open(&self) -> usize {
         self.ui.popups.as_array().map_or(0, Vec::len) - self.editor.described
     }
 
@@ -125,6 +132,13 @@ impl<'d> TypedSession<'d> {
         if req["click"].as_bool() == Some(true) {
             return self.item_popup_button(name);
         }
+        if let Some(ItemPopup::Enchant(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            self.enchant_popup_control(&mut p, name, req)?;
+            self.editor.popups[0] = ItemPopup::Enchant(p);
+            self.refresh_item_popups();
+            return Ok(json!([]));
+        }
         let lists = self.data.game.item_base_lists.len();
         let popup = self.editor.popups.first_mut().ok_or("no popup")?;
         let sel = req["sel"].as_f64();
@@ -166,7 +180,17 @@ impl<'d> TypedSession<'d> {
     pub fn item_popup_button(&mut self, name: &str) -> Result<J> {
         let popup = self.editor.popups.first().cloned().ok_or("no popup")?;
         match (popup, name) {
-            (_, "cancel") => {
+            (ItemPopup::Enchant(p), name) => {
+                // `SetDisplayItem(...)`, then `main:ClosePopup()`
+                self.enchant_popup_button(&p, name)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::Anoint { slot }, "save") => {
+                let item = self.anoint_item(slot)?;
+                self.set_display_item_value(Some(item))?;
+                self.close_item_popup();
+            }
+            (ItemPopup::Anoint { .. }, "close") | (_, "cancel") => {
                 self.close_item_popup();
             }
             (
@@ -308,6 +332,8 @@ impl<'d> TypedSession<'d> {
 
     fn describe_item_popup(&self, popup: &ItemPopup) -> J {
         match popup {
+            ItemPopup::Enchant(p) => self.describe_enchant_popup(p),
+            ItemPopup::Anoint { slot } => self.describe_anoint_popup(*slot),
             ItemPopup::Craft {
                 rarity,
                 title,
