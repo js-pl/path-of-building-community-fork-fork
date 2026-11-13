@@ -455,7 +455,8 @@ impl<'d> TypedSession<'d> {
             {
                 // `MutateMod` of the line's mod, to Foulborn and back
                 let item = self.display_item.as_ref().ok_or("no item in the editor")?;
-                let j = index_of(n, "displayItemStackedMutatedCheckbox").unwrap_or(self.editor.range_sel);
+                let j = index_of(n, "displayItemStackedMutatedCheckbox")
+                    .unwrap_or(self.editor.range_sel);
                 let lines = self.range_line_list(item);
                 let Some(line) = lines.get(j.wrapping_sub(1)) else {
                     return Ok(json!([]));
