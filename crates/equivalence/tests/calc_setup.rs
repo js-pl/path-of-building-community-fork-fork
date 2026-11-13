@@ -273,6 +273,7 @@ fn base_dbs_match_upstream() {
             config_input: &input,
             config_mods: &config_mods,
             config_enemy_mods: &config_enemy_mods,
+            party_enemy_mods: &[],
             mode: BuffMode::new(Some("EFFECTIVE")),
         };
         compared += 1;
@@ -579,6 +580,7 @@ fn items_setup_matches_upstream() {
             config_input: &config,
             config_mods: &config_mods,
             config_enemy_mods: &config_enemy_mods,
+            party_enemy_mods: &[],
             mode: BuffMode::new(Some("EFFECTIVE")),
         };
         let (mut base, enemy_base) = calc_setup::base_dbs(&setup_data, &parser, &b).unwrap();
@@ -1288,6 +1290,7 @@ fn items_setup_matches_upstream() {
             one_hand: &one_hand,
             minions: &|m: &str| setup_data.minions.contains_key(m),
             timeless: None,
+            setup: &setup_data,
         };
         let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
             Ok(b) => b,
