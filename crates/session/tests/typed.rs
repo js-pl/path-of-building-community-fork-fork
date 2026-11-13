@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 12] = [
+const PHASES: [(&str, usize); 13] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -99,6 +99,7 @@ const PHASES: [(&str, usize); 12] = [
     ("party", 2),
     ("new", 1),
     ("overlays", 2),
+    ("power", 2),
 ];
 
 /// The typed engine's commands against the translated session's: the
@@ -159,10 +160,65 @@ fn typed_session_matches_translated() {
         "overlays" => overlays_match(data, &mut d),
         "party" => party_match(data, &mut d),
         "new" => new_build_matches(&mut d),
+        "power" => power_sorts_match(&mut d),
         _ => panic!("unknown phase {phase}"),
     }
     at_build(&mut d, "");
     report_fallbacks(phase);
+}
+
+/// The Skills tab's gem dropdown sorted by DPS (`gemList` of a group's
+/// gem slot: `GemSelectControl`'s list, each gem's DPS in the slot) gives
+/// the translation's, on every eighth corpus build: the main group's
+/// second slot, or the slot after its last gem
+fn power_sorts_match(d: &mut Dispatcher) {
+    let (mut failures, mut compared) = (Vec::new(), 0);
+    let (mut t_typed, mut t_tr) = (Duration::ZERO, Duration::ZERO);
+    let builds: Vec<_> = corpus().into_iter().step_by(8).collect();
+    for (n, (id, path)) in mine(builds).into_iter().enumerate() {
+        at_build(d, &id);
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let group = skills["ok"]["mainSocketGroup"].as_f64().unwrap_or(1.0);
+        let gems = skills["ok"]["groups"][group as usize - 1]["gems"]
+            .as_array()
+            .map_or(0, Vec::len);
+        let slot = if n % 2 == 0 && gems >= 2 { 2 } else { gems + 1 };
+        let req = json!({"cmd": "gemList", "group": group, "slot": slot}).to_string();
+        d.typed_error = None;
+        let t = Instant::now();
+        let typed = answer(d.request(&req), "typed gemList");
+        t_typed += t.elapsed();
+        if let Some(e) = d.typed_error.take() {
+            failures.push(format!("{id}: gemList fell back: {e}"));
+            continue;
+        }
+        let t = Instant::now();
+        let tr = answer(d.translated_request(&req), "translated gemList");
+        t_tr += t.elapsed();
+        if let Ok(dir) = std::env::var("SESSION_DUMP") {
+            for (k, v) in [("typed", &typed), ("translated", &tr)] {
+                std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
+            }
+        }
+        let mut out = Vec::new();
+        diff(&typed, &tr, &format!("gemList {group}/{slot}"), &mut out);
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(10);
+            failures.push(format!("{id}: {n} differences\n    {}", out.join("\n    ")));
+        }
+        compared += 1;
+    }
+    eprintln!("{compared} gem lists compared: typed {t_typed:.1?}, translated {t_tr:.1?}");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// Node tooltips of tattooed nodes and of the nodes timeless jewels

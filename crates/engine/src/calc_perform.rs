@@ -238,8 +238,8 @@ pub struct Perform<'a> {
     pub marks: Vec<SkillMarks>,
     /// `env.keystonesAdded`
     pub keystones_added: Vec<String>,
-    /// `actor.strDmgBonus` of the player
-    pub str_dmg_bonus: Option<f64>,
+    /// `actor.strDmgBonus` of each actor that has one, by actor
+    pub str_dmg_bonus: std::collections::HashMap<usize, f64>,
     /// `env.player.reserved_*`, `uncancellable_*`
     pub reserved: [(f64, f64); 2],
     pub uncancellable: [f64; 2],
@@ -733,7 +733,7 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         lists: Vec::with_capacity(n),
         marks: vec![SkillMarks::default(); n],
         keystones_added: Vec::new(),
-        str_dmg_bonus: None,
+        str_dmg_bonus: Default::default(),
         reserved: [(0.0, 0.0); 2],
         uncancellable: [0.0; 2],
         applied_enemy_modifiers: vec![Vec::new(), Vec::new(), Vec::new()],
@@ -2332,9 +2332,7 @@ impl<'a> Perform<'a> {
                 } else {
                     ((str_ + extra) / 5.0).floor()
                 };
-                if is_player {
-                    self.str_dmg_bonus = Some(bonus);
-                }
+                self.str_dmg_bonus.insert(actor, bonus);
                 let melee = self.mf("Melee");
                 self.c.add(
                     db,

@@ -262,7 +262,13 @@ impl<'d> Dispatcher<'d> {
             }
             "resetTree" => self.edit(json, |s| s.reset_tree()),
             "skills" => view(&mut self.typed_error, self.typed.as_ref()?.skills()),
-            "gemList" => Some(ok(self.typed.as_ref()?.gem_list())),
+            "gemList" => match (req["group"].as_f64(), req["slot"].as_f64()) {
+                (Some(g), Some(k)) => view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_select_list(g, k),
+                ),
+                _ => Some(ok(self.typed.as_ref()?.gem_list())),
+            },
             "setMainSocketGroup" => {
                 let i = req["index"].as_f64()?;
                 self.edit(json, |s| s.set_main_socket_group(i))

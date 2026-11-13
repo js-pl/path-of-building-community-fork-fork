@@ -826,7 +826,51 @@ function api.removeGem(req)
 end
 
 -- Gem names for the gem picker, as GemSelectControl lists them
-function api.gemList()
+-- A gem slot's dropdown (GemSelectControl) of a socket group: its gems in
+-- their order, each with its DPS in the slot (DPSBuilder) and whether it
+-- supports the group's skills
+local function gemSelectList(req)
+	local tab = build().skillsTab
+	local group = tab.socketGroupList[req.group]
+	if not group then
+		error("no socket group " .. tostring(req.group))
+	end
+	local prev = tab.displayGroup
+	tab:SetDisplayGroup(group)
+	local slot = tab.gemSlots[req.slot]
+	if not slot then
+		error("no gem slot " .. tostring(req.slot))
+	end
+	local control = slot.nameSpec
+	control.sortCache = nil
+	control:UpdateSortCache()
+	control:BuildList("")
+	control:DPSBuilder()
+	local cache = control.sortCache
+	local gems = { }
+	for _, gemId in ipairs(control.list) do
+		local gem = control.gems[gemId]
+		if gem then
+			t_insert(gems, {
+				id = gem.id,
+				name = gem.name,
+				dps = cache.dps[gemId],
+				canSupport = cache.canSupport[gemId] and true or false,
+			})
+		end
+	end
+	if prev then
+		tab:SetDisplayGroup(prev)
+	else
+		tab.displayGroup = nil
+	end
+	return { baseDps = cache.baseDPS, gems = setmetatable(gems, { __jsontype = "array" }) }
+end
+
+function api.gemList(req)
+	if req and req.group and req.slot then
+		return gemSelectList(req)
+	end
 	local out = { }
 	for _, gem in pairs(build().data.gems) do
 		if not gem.grantedEffect.unsupported then
