@@ -789,6 +789,7 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 /// outputs and tree after each step; then a new build does
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut popup_tooltips = 0;
     let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
@@ -835,6 +836,25 @@ fn config_edits_match(d: &mut Dispatcher) {
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            // An allocated mastery's tooltip with the class change popup
+            // open compares reallocating it
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if state["ok"]["popups"]
+                .as_array()
+                .is_some_and(|p| !p.is_empty())
+            {
+                let tree = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+                let mastery = tree["ok"]["masteries"]
+                    .as_object()
+                    .and_then(|m| m.keys().next()?.parse::<u32>().ok());
+                if let Some(m) = mastery {
+                    let q = json!({"cmd": "nodeTooltip", "id": m}).to_string();
+                    let t = answer(d.request(&q), "typed tooltip");
+                    let tr = answer(d.translated_request(&q), "translated tooltip");
+                    diff(&t, &tr, &format!("{label} {q}"), &mut out);
+                    popup_tooltips += 1;
+                }
+            }
             steps += 1;
         }
         if out.is_empty() && d.typed_active() {
@@ -880,7 +900,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
     }
     eprintln!(
-        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays), {popup_tooltips} mastery tooltips compared with a popup open\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
