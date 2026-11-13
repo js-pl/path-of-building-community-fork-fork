@@ -117,20 +117,11 @@ fn typed_session_matches_translated() {
     }
 }
 
-/// Comparisons whose misc calculator differs from the translation's: taking
-/// off Ashes of the Stars (+1 to the level of all gems) with a level 4
-/// Gluttony linked to the main skill leaves the translation's mana cost at
-/// 0 and the typed one at 19 (not investigated yet)
-const KNOWN_CALCULATOR: &[(&str, &str)] = &[
-    ("gen-0018", r#"{"cmd":"itemTooltip","id":6}"#),
-    ("gen-0018", r#"{"cmd":"itemTooltip","id":6,"#),
-];
-
 /// The notes, and the tooltips of every socket group and item and of
 /// nodes on and around the tree, give the translation's on every corpus
 /// build, also after a few edits; `SESSION_NODES` sets the nodes per build
 fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
-    let (mut failures, mut fell_back, mut known) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut failures, mut fell_back, mut aligned) = (Vec::new(), Vec::new(), Vec::new());
     let mut counts: std::collections::BTreeMap<&str, (usize, Duration, Duration)> =
         Default::default();
     let nodes_per_build: usize = std::env::var("SESSION_NODES")
@@ -149,7 +140,11 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
         let mut rng = Lcg(seed(&id) + 23);
         let mut out = Vec::new();
-        let mut compare = |d: &mut Dispatcher, req: J, out: &mut Vec<String>| {
+        // Requests that differ, rechecked on a fresh translation, with the
+        // edits made before them
+        let mut recheck: Vec<(String, J, Vec<String>, Vec<String>)> = Vec::new();
+        let edits = std::cell::RefCell::new(Vec::<String>::new());
+        let mut compare = |d: &mut Dispatcher, req: J| {
             let r = req.to_string();
             let cmd = req["cmd"].as_str().unwrap().to_string();
             if !d.typed_active() {
@@ -172,25 +167,25 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
                     c.0 += 1;
                     c.1 += tt;
                     c.2 += t.elapsed();
-                    diff(&typed, &tr, &format!("{r:.200}"), out);
+                    let mut lines = Vec::new();
+                    diff(&typed, &tr, &format!("{r:.200}"), &mut lines);
+                    if !lines.is_empty() {
+                        recheck.push((r, typed, lines, edits.borrow().clone()));
+                    }
                 }
             }
         };
-        compare(d, json!({"cmd": "notes"}), &mut out);
-        compare(d, json!({"cmd": "party"}), &mut out);
+        compare(d, json!({"cmd": "notes"}));
+        compare(d, json!({"cmd": "party"}));
         let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
             .as_array()
             .map_or(0, Vec::len);
         for g in 1..=groups {
-            compare(
-                d,
-                json!({"cmd": "socketGroupTooltip", "index": g}),
-                &mut out,
-            );
+            compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
         }
         let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
         for item in items["ok"]["items"].as_array().into_iter().flatten() {
-            compare(d, json!({"cmd": "itemTooltip", "id": item["id"]}), &mut out);
+            compare(d, json!({"cmd": "itemTooltip", "id": item["id"]}));
         }
         // Equipped items compared in their own slot, and the first item's
         // text as a preview
@@ -204,10 +199,10 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         for _ in 0..3.min(slots.len()) {
             let s = &slots[rng.below(slots.len())];
             let req = json!({"cmd": "itemTooltip", "id": s["item"], "slot": s["name"]});
-            compare(d, req, &mut out);
+            compare(d, req);
         }
         if let Some(raw) = items["ok"]["items"][0]["raw"].as_str() {
-            compare(d, json!({"cmd": "previewItem", "text": raw}), &mut out);
+            compare(d, json!({"cmd": "previewItem", "text": raw}));
         }
         // Allocated nodes, their neighbours, and the allocated sockets
         let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
@@ -237,39 +232,48 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
             }
         }
         for n in nodes {
-            compare(d, json!({"cmd": "nodeTooltip", "id": n}), &mut out);
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
         }
         // Notes edited, and tooltips after a tree edit
         let text = format!("Notes of {id}\n^_1colour ^_xFF0000and ^1codes");
         let req = json!({"cmd": "setNotes", "text": text}).to_string();
         answer(d.request(&req), "setNotes");
-        compare(d, json!({"cmd": "notes"}), &mut out);
+        edits.borrow_mut().push(req);
+        compare(d, json!({"cmd": "notes"}));
         if let Some(&n) = near.first() {
-            answer(
-                d.request(&json!({"cmd": "clickNode", "id": n}).to_string()),
-                "clickNode",
-            );
-            compare(d, json!({"cmd": "nodeTooltip", "id": n}), &mut out);
+            let req = json!({"cmd": "clickNode", "id": n}).to_string();
+            answer(d.request(&req), "clickNode");
+            edits.borrow_mut().push(req);
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
             for g in 1..=groups.min(2) {
-                compare(
-                    d,
-                    json!({"cmd": "socketGroupTooltip", "index": g}),
-                    &mut out,
-                );
+                compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
             }
         }
         if d.typed_active() {
             compare_saves(d, "after the notes", &mut out);
-            compare(d, json!({"cmd": "notes"}), &mut out);
+            compare(d, json!({"cmd": "notes"}));
         }
-        // Differences of the misc calculator, not of the tooltips: listed
-        let (calc, rest): (Vec<String>, Vec<String>) = out.into_iter().partition(|l| {
-            KNOWN_CALCULATOR
-                .iter()
-                .any(|(b, r)| *b == id && l.starts_with(r))
-        });
-        known.extend(calc.into_iter().map(|l| format!("{id}: {l}")));
-        let mut out = rest;
+        // Upstream changes shared skill data for good (`ProcessSocketGroup`
+        // clears a triggered granted skill's level cost), so a build loaded
+        // earlier in the session can change the translation's answer: a
+        // request that differs is asked again of a fresh translation, with
+        // the same edits before it, and aligned when that one agrees
+        for (r, typed, lines, done) in recheck {
+            let fresh = session();
+            let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+            answer(fresh.request(&load), "fresh load");
+            for e in &done {
+                answer(fresh.request(e), "fresh edit");
+            }
+            let tr = answer(fresh.request(&r), "fresh");
+            let mut again = Vec::new();
+            diff(&typed, &tr, &r, &mut again);
+            if again.is_empty() {
+                aligned.push(format!("{id}: {r:.120}"));
+            } else {
+                out.extend(lines);
+            }
+        }
         if !out.is_empty() {
             let n = out.len();
             out.truncate(8);
@@ -277,9 +281,9 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "known calculator differences {}:\n{}",
-        known.len(),
-        known.join("\n")
+        "aligned with a fresh translation {}:\n{}",
+        aligned.len(),
+        aligned.join("\n")
     );
     for (cmd, (n, t, tr)) in &counts {
         eprintln!("{cmd}: {n} compared, typed {t:.1?}, translated {tr:.1?}");

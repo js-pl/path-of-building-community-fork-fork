@@ -275,10 +275,18 @@ What remains for the full migration, in order:
    translation's: 1133 item tooltips (typed 19 s, translated 54 s), 695
    node tooltips (10 s, 44 s), 379 socket group tooltips, 59 previews,
    182 notes and 61 party views; 40 requests fell back (listed by the
-   test), and taking off Ashes of the Stars in gen-0018 (a level 4
-   Gluttony with the main skill) differs in the misc calculator's mana
-   cost (translated 0, typed 19; not investigated, listed as a known
-   calculator difference). Upstream keeps `displayEffect`,
+   test). Upstream's `ProcessSocketGroup` clears a triggered granted
+   skill's level cost on the shared skill data for the rest of the
+   process (gen-0010's Farrul's Chase triggers Intimidating Cry at level
+   20), so a build loaded later in the same session sees that level
+   without a cost: taking off Ashes of the Stars in gen-0018 drops its
+   level 21 Intimidating Cry to 20, which costs 20 mana in a fresh
+   translation and in the typed engine but 0 after gen-0010 was loaded.
+   The test asks a request that differs again of a fresh translation
+   with the same edits before it, and counts it as aligned when that one
+   agrees (2 requests, both gen-0018's amulet). `tests/calculator.rs`
+   now also takes off the amulet, and recalculates a build that differs
+   on a fresh translation the same way (gen-0018 again). Upstream keeps `displayEffect`,
    `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
    across calculations; the typed tooltips read the sidebar's last
    calculation. Falling back: tattooed and conquered nodes, sockets
