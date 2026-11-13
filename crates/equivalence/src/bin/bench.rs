@@ -2,7 +2,9 @@
 //! translation's, as a table: `cargo run --release -p equivalence --bin
 //! bench -- [--all] [--filter <id>] [--reps N] [--power-reps N]
 //! [--power-depth N (0: every node)] [--overrides N] [--typed-only] [--no-power]
-//! [--threads N]` (`--threads 0`: node power without its thread pool)
+//! [--threads N] [--sequential-full-dps]` (`--threads 0`: node power
+//! without its thread pool; `--sequential-full-dps`: the Full DPS skills
+//! one after the other)
 
 use equivalence::bench::{Options, run, table};
 
@@ -26,6 +28,7 @@ fn main() {
             "--typed-only" => opts.translation = false,
             "--no-power" => opts.power = false,
             "--threads" => opts.power_threads = Some(num(args.next())),
+            "--sequential-full-dps" => engine::parallel::set_full_dps_threads(false),
             _ => panic!("unknown argument {a}"),
         }
     }

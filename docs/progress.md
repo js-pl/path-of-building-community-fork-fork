@@ -153,8 +153,10 @@ What remains for the full migration, in order:
    results do not depend on the thread count; `tests/fast_path.rs`
    compares 1 and 4 threads with the sequential path).
    Item, gem and anoint comparisons are on the calculator
-   (`engine::compare`, see Done); still to do: wiring them into the typed
-   session, and the Full DPS skills of one calculation on threads.
+   (`engine::compare`, see Done), and the typed anoint popup sorts
+   through it; still to do: the item database and gem dropdown sorts in
+   the typed session. The Full DPS skills of one calculation run on
+   threads (see Performance).
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),
@@ -677,6 +679,23 @@ ms, on the shared 4-core machine with another job loading it by about
 load about 3.3): without the pool 17948 / 17538, 1 thread 18276, 2
 threads 9895, 4 threads 9716 / 9505 (the other job takes the other
 cores). The browser stays on one thread.
+
+The Full DPS skills of one calculation on threads (`calc_full_dps_with`,
+`parallel::full_dps_threads`): each skill is calculated ahead on the
+pool from the first setup and the calculator's cache; the pass in order
+takes a calculation only where the skills before it left what it
+started from (the base databases a `ReplaceMod` changes, the cached
+skills it looked up, tracked by `calc_cache::CacheAccess`), else
+calculates it again, so results are the sequential ones
+(`parallel_full_dps_equals_sequential`, the 15 corpus builds with several
+Full DPS skills, setups reused and afresh; `build_output` checks the
+threaded path against the oracle). Over the corpus 642 of 654
+calculations ahead were taken. A Full DPS pass takes 5 to 45 ms, so the
+gain is small and noisy on the shared 4-core machine: per build (median
+of 5) 0.85x to 1.7x, best with several Full DPS skills; summed over the
+61 builds (`bench --typed-only --no-power --all`, against
+`--sequential-full-dps`, alternating runs) build_outputs 684 / 806 ms
+threaded against 790 / 704 sequential.
 
 The mod parser (`cargo run --release -p equivalence --example
 parser_bench`): its typed data is made in about 2 s at build time and
