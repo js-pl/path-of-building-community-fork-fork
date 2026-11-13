@@ -121,13 +121,18 @@ fn typed_session_matches_translated() {
                 (0..n).map(move |k| format!("{p} {k}/{n}"))
             })
             .collect();
-        return testkit::run_shards(test, &shards, &[" builds", " edits", " trees", "skipped "]);
+        return testkit::run_shards(
+            test,
+            &shards,
+            &[" builds", " edits", " trees", "skipped ", "fallback"],
+        );
     };
     let (phase, part) = shard.split_once(' ').unwrap();
     let (k, n) = part.split_once('/').unwrap();
     SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    at_build(&mut d, "");
     match phase {
         "commands" => commands_match(data, &mut d),
         "geometry" => geometry_matches(&mut d),
@@ -139,6 +144,57 @@ fn typed_session_matches_translated() {
         "config" => config_edits_match(&mut d),
         _ => panic!("unknown phase {phase}"),
     }
+    at_build(&mut d, "");
+    report_fallbacks(phase);
+}
+
+/// The fallbacks the typed session still has, as substrings of their
+/// reasons: any other fails the test. Remove one once it is typed.
+const KNOWN_FALLBACKS: &[&str] = &[];
+
+/// The build the dispatcher's fallbacks are recorded for, and each
+/// fallback so far: build, command and why
+static FALLBACKS: std::sync::Mutex<(String, Vec<String>)> =
+    std::sync::Mutex::new((String::new(), Vec::new()));
+
+/// Records the dispatcher's fallbacks for the build so far, then starts
+/// recording for `id`
+fn at_build(d: &mut Dispatcher, id: &str) {
+    let mut f = FALLBACKS.lock().unwrap();
+    for (cmd, why) in d.fallbacks.drain(..) {
+        let line = format!("{}: {cmd}: {why}", f.0);
+        f.1.push(line);
+    }
+    f.0 = id.to_string();
+}
+
+/// A fallback outside the dispatcher, for the current build
+fn note_fallback(cmd: &str, why: &str) {
+    let mut f = FALLBACKS.lock().unwrap();
+    let line = format!("{}: {cmd}: {why}", f.0);
+    f.1.push(line);
+}
+
+/// Prints every fallback of the phase and fails on unknown ones
+fn report_fallbacks(phase: &str) {
+    let f = FALLBACKS.lock().unwrap();
+    for l in &f.1 {
+        eprintln!("fallback {phase} {l}");
+    }
+    eprintln!("{} fallbacks in phase {phase}", f.1.len());
+    let unknown: Vec<&String> =
+        f.1.iter()
+            .filter(|l| !KNOWN_FALLBACKS.iter().any(|k| l.contains(k)))
+            .collect();
+    assert!(
+        unknown.is_empty(),
+        "fallbacks not in KNOWN_FALLBACKS:\n{}",
+        unknown
+            .iter()
+            .map(|l| l.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
 
 /// The views compared after a config or class edit
@@ -224,6 +280,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -270,6 +327,7 @@ fn config_edits_match(d: &mut Dispatcher) {
     // A new build, a class change on it and its undo, in the first shard
     let mut out = Vec::new();
     if SHARD.get().is_none_or(|&(k, _)| k == 0) {
+        at_build(d, "newBuild");
         answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
         assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
         let views = [
@@ -341,6 +399,7 @@ fn items_edits_match(d: &mut Dispatcher) {
     // Item texts of the builds so far, for adding and editing items
     let mut pool: Vec<J> = Vec::new();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -537,6 +596,7 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
 fn saves_match(d: &mut Dispatcher) {
     let (mut failures, mut times, mut n) = (Vec::new(), [Duration::ZERO; 2], 0);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -657,8 +717,10 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     builds.extend(auto);
     let builds = mine(builds);
     for (id, xml) in builds {
+        at_build(d, &id);
         if let Err(e) = TypedSession::load(data, &xml, None) {
             skipped.push(format!("{id}: {e}"));
+            note_fallback("loadXml", &e);
             continue;
         }
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
@@ -750,6 +812,7 @@ fn geometry_matches(d: &mut Dispatcher) {
     let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
     let mut times = [Duration::ZERO; 2];
     for (id, xml) in builds {
+        at_build(d, &id);
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
@@ -958,6 +1021,7 @@ fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
         answer(d.request(&load), "load");
@@ -1016,6 +1080,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1194,6 +1259,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         .filter_map(|g| g["name"].as_str().map(String::from))
         .collect();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),

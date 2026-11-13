@@ -59,6 +59,9 @@ pub struct Dispatcher<'d> {
     pending: Vec<String>,
     /// Why the typed engine last gave a request to the translation
     pub typed_error: Option<String>,
+    /// Each request the typed engine preferred gave to the translation
+    /// while it held the build or loading one: the command and why
+    pub fallbacks: Vec<(String, String)>,
 }
 
 fn ok(v: J) -> String {
@@ -74,6 +77,7 @@ impl<'d> Dispatcher<'d> {
             typed: None,
             pending: Vec::new(),
             typed_error: None,
+            fallbacks: Vec::new(),
         }
     }
 
@@ -94,8 +98,24 @@ impl<'d> Dispatcher<'d> {
 
     /// Answers one JSON request, as [`Session::request`] does
     pub fn request(&mut self, json: &str) -> Result<String, String> {
+        let cmd = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|r| r["cmd"].as_str().map(String::from))
+            .unwrap_or_default();
+        let load = cmd == "loadXml" || cmd == "loadCode" || cmd == "newBuild";
+        let held = self.typed.is_some();
+        if held || load {
+            self.typed_error = None;
+        }
         if let Some(r) = self.typed_request(json) {
             return Ok(r);
+        }
+        if (held || load) && self.prefer == Prefer::Typed && self.data.is_some() {
+            let why = self
+                .typed_error
+                .clone()
+                .unwrap_or_else(|| format!("{cmd}: not typed"));
+            self.fallbacks.push((cmd, why));
         }
         self.sync()?.map_or_else(|| self.fallback(json), Ok)
     }
