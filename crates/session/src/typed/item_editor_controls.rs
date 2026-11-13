@@ -80,7 +80,10 @@ impl<'d> TypedSession<'d> {
         path.starts_with("items.displayItem")
             || matches!(
                 path,
-                "items.addDisplayItem" | "items.editDisplayItem" | "items.removeDisplayItem"
+                "items.addDisplayItem"
+                    | "items.editDisplayItem"
+                    | "items.removeDisplayItem"
+                    | "items.craftingSorting"
             )
     }
 
@@ -255,6 +258,17 @@ impl<'d> TypedSession<'d> {
                 let slot = index_of(name, "displayItemAnoint").unwrap_or(1);
                 self.anoint_display_item(slot)?;
                 self.refresh_item_popups();
+            }
+            ("craftingSorting", Act::Sel(s)) => {
+                let len = super::item_editor::crafting_sort_options().len();
+                if let Some(s) = new_sel(s, len, Some((self.editor.crafting_sort + 1) as f64)) {
+                    self.editor.crafting_sort = s - 1;
+                    // `selFunc`: `UpdateAffixControls()`
+                    if self.display_item.is_none() {
+                        return Err("attempt to index local 'item' (a nil value)".into());
+                    }
+                    self.update_affix_controls()?;
+                }
             }
             ("displayItemAddCrucible", Act::Click) => {
                 if self.has_item_popup() || self.class_popups_open() > 0 {
