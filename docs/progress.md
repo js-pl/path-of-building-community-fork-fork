@@ -459,7 +459,10 @@ What remains for the full migration, in order:
      popup (`session::typed::item_enchant`, with `data.enchantments` from
      `gamedata::enchantments` and `engine::item_enchant`: skill, all
      skills, source, sort by a power stat's calculation with the
-     enchanted item, enchantment; Enchant, Remove, Cancel) and Anoint Item
+     enchanted item, enchantment; Enchant, Remove, Cancel), Corrupt Item
+     (`session::typed::item_corrupt`: Corrupted, Scourge and Glimpse of
+     Chaos implicits in upstream's sort order, sorted by power, Scourge
+     pairs, and a unique's corrupted roll ranges) and Anoint Item
      (saved without a node: the session has no input for its notable
      list). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's

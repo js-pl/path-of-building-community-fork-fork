@@ -41,7 +41,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/ItemListControl.lua" = { status = "todo" }
 "Classes/ItemSetListControl.lua" = { status = "todo" }
 "Classes/ItemSlotControl.lua" = { status = "partial", port = "crates/session/src/typed/items.rs crates/engine/src/items_tab.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/ItemsTab.lua" = { status = "partial", port = "web/src/ui/ItemsTab.tsx crates/engine/src/items_tab.rs crates/engine/src/calc_items.rs crates/session/src/typed/save.rs crates/session/src/typed/items.rs crates/session/src/typed/item_editor.rs crates/session/src/typed/item_tooltip.rs crates/session/src/typed/item_db.rs crates/session/src/typed/item_popups.rs crates/session/src/typed/item_display.rs crates/session/src/typed/item_editor_controls.rs crates/session/src/typed/item_enchant.rs crates/engine/src/item_enchant.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/ItemsTab.lua" = { status = "partial", port = "web/src/ui/ItemsTab.tsx crates/engine/src/items_tab.rs crates/engine/src/calc_items.rs crates/session/src/typed/save.rs crates/session/src/typed/items.rs crates/session/src/typed/item_editor.rs crates/session/src/typed/item_tooltip.rs crates/session/src/typed/item_db.rs crates/session/src/typed/item_popups.rs crates/session/src/typed/item_display.rs crates/session/src/typed/item_editor_controls.rs crates/session/src/typed/item_enchant.rs crates/session/src/typed/item_corrupt.rs crates/engine/src/item_enchant.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/LabelControl.lua" = { status = "todo" }
 "Classes/ListControl.lua" = { status = "todo" }
 "Classes/MinionListControl.lua" = { status = "todo" }
