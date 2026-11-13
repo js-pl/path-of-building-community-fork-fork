@@ -41,7 +41,15 @@ State at the handoff:
   write breakdowns as the main skill of a corpus build, in each of their
   parts (61 variants, `skill_function_breakdowns_match_upstream`).
   Mirages calculate in `CALCULATOR` mode, without breakdowns, so the
-  player's stay. `calcs_inputs_match_upstream` compares the Calcs tab's
+  player's stay. Mirages of skills with minions are ported: the copy's
+  minion is made on the databases of the calculation the skill comes
+  from and is its calculation's `env.minion`, and its output goes with
+  the copy's as `output.Minion`. `mirages_match_upstream` and
+  `mirage_breakdowns_match_upstream` calculate The Saviour's and
+  Tawhoa's Felling's mirages of Dominating Blow in each template, from
+  the sidebar and the Calcs tab (8 builds each); the copy's gem level
+  and quality go to the breakdown of the output it replaced, so no build
+  falls back any more. `calcs_inputs_match_upstream` compares the Calcs tab's
   outputs and breakdowns for its other inputs: the buff modes `COMBAT`,
   `BUFFED` and `UNBUFFED` (whose Full DPS sets up on base databases with
   that mode's conditions, `calc_env::init_env_on`), another main socket
@@ -105,9 +113,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The Abyss timeless jewels, the party tab, mirages of skills with
-   minions. `CalcSections.lua` (which
-   breakdown each cell shows) belongs to the session API.
+1. The Abyss timeless jewels and the party tab. `CalcSections.lua`
+   (which breakdown each cell shows) belongs to the session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
@@ -211,13 +218,12 @@ What remains for the full migration, in order:
    3.13-dual-wield-cospris-coc: `round(1.19 * 1.2) * 1.24` against the
    main calculation's `round(1.19 * 1.2 * 1.24)`), and a `ReplaceMod` of
    a base mod (`Multiplier:ImpaleStacks`, `MomentumStacks` from the
-   config) changes them for the skills after. Edits that make Saviour's mirage the main skill
-   fall back (its gem level outputs are not ported).
+   config) changes them for the skills after.
 
    Saving is typed (`session::typed::save`): `saveXml` and `saveCode`
    are `buildMode:SaveDB` with every tab's `Save`, byte for byte the
-   translation's for 60 corpus builds (Saviour's mirage as the main skill
-   falls back), after the tree and skills edit sequences, and in both
+   translation's for 60 corpus builds, after the tree and skills edit
+   sequences, and in both
    round trips (a file saved by either loads in the other to the same
    file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
    saving re-parses each item from it as `BuildAndParseRaw` does. What
@@ -269,8 +275,8 @@ What remains for the full migration, in order:
    - Items and crafting: `addItem`, `editItem`, `displayItem`,
      `setDisplayItem`, `craftItem`, `saveDisplayItem`, `setNotes`,
      `popupButton`, `closePopup` (the item editor's controls, popups).
-   - Engine gaps that make a build fall back: Saviour's mirage as the
-     main skill, Combust's trigger (gen-0028), tree edits with Intuitive
+   - Engine gaps that make a build fall back: Combust's trigger
+     (gen-0028), tree edits with Intuitive
      Leap and the like, tattoos, specs in the URL format only, exported
      party buffs, the character level's auto mode.
 
@@ -328,7 +334,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
-| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
+| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
 | `calcs.getMiscCalculator`, `CalcOverride` in `initEnv` | `calculator.rs`, `calc_override.rs` (the override and the allocation it gives) |
 | `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs` |
@@ -457,7 +463,6 @@ a skip:
 
 - The party tab (`env.partyMembers`; the build's `<Party>` section is not
   read, so a build with party members calculates as without them)
-- Mirages of skills with minions
 - A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
@@ -538,8 +543,9 @@ the tests align these:
   costs before each build
 - a mirage's copy is cached under the copied skill's uuid, so a later
   calculation without a fresh `GlobalCache` finds the copy's results
-  (`TotalDPS`, `Speed`) for that skill: `tests/perform.rs` wipes the cache
-  before its translated perform, as a frame's calculation does
+  (`TotalDPS`, `Speed`) for that skill: `tests/perform.rs` and
+  `tests/breakdown.rs` wipe the cache before their translated
+  calculation, as a frame's does
 - after a mirage that replaces the main skill (the Saviour, Tawhoa's
   Chosen), `calcs.perform` writes the gem level and quality into the
   output table the copy's replaced, so they show only when no skill was

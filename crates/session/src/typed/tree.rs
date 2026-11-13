@@ -35,7 +35,6 @@ impl<'d> TypedSession<'d> {
             engine::calc_env::CalcMode::Main,
             None,
         )?;
-        self.check_main()?;
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;

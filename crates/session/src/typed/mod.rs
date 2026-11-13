@@ -243,17 +243,6 @@ impl<'d> TypedSession<'d> {
         Ok(s)
     }
 
-    /// The sidebar's calculation of a main skill the typed engine leaves
-    /// outputs out of
-    pub(super) fn check_main(&self) -> Result<()> {
-        match &self.main.sidebar {
-            Some(s) if s.main_copy => Err(format!(
-                "{NOT_PORTED}: the gem outputs of Saviour's mirage as the main skill"
-            )),
-            _ => Ok(()),
-        }
-    }
-
     /// `controls`: the sidebar's and the Calcs tab's controls, `None`
     /// when another is asked for
     pub fn controls(&self, paths: &[&str]) -> Option<J> {

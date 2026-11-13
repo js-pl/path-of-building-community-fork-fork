@@ -276,6 +276,12 @@ pub struct Perform<'a> {
     /// The Saviour's copy that replaces `env.player.mainSkill`, as its
     /// calculation left it
     pub main_copy: Option<Box<crate::calc_skill_mods::SkillMods>>,
+    /// A mirage's copy as the main skill: its index, the databases and
+    /// actor it stands on and whether the calculation it comes from is the
+    /// Calcs tab's, which its minion's skills are made with
+    pub(crate) external: Option<crate::calc_mirage::ExternalMain>,
+    /// The gem level and quality of the copy in `main_copy`
+    pub(crate) main_copy_gem: Option<crate::calc_mirage::GemSums>,
     /// `env.player.allyLifeList`: the allies in each life pool
     pub(crate) ally_life_list: Vec<(&'static str, Vec<AllyLife>)>,
 }
@@ -638,6 +644,8 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         debuffs: Vec::new(),
         mirage: None,
         main_copy: None,
+        external: None,
+        main_copy_gem: None,
         ally_life_list: Vec::new(),
     };
     p.run()?;

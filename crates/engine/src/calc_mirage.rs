@@ -7,7 +7,10 @@
 //! its enemy's are copied into the mirage's calculation, with stand-in
 //! actors, and the copy is its main skill, outside the player's skills.
 //!
-//! Not ported yet: mirages of skills with minions.
+//! A copy of a skill with a minion has a minion of its own, whose skills
+//! are made on the databases of the calculation the skill comes from
+//! (`calcs.createMinionSkills(env, newSkill)`) and which is the mirage's
+//! calculation's `env.minion`.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -32,6 +35,42 @@ pub struct External {
     pub kind: MirageKind,
     /// `env.player.mainSkill.skillData.storedUses` (`mirageUses`)
     pub mirage_uses: Option<f64>,
+    /// The calculation the copy comes from is the Calcs tab's
+    pub calcs: bool,
+}
+
+/// The copy as the main skill of the mirage's calculation
+#[derive(Clone, Copy, Debug)]
+pub struct ExternalMain {
+    /// Its index in the calculation's skills
+    pub skill: usize,
+    /// The copied skill's actor's database and its enemy's
+    pub player_store: crate::mods::StoreId,
+    pub enemy_store: crate::mods::StoreId,
+    /// The stand-in actor of the copied skill's actor
+    pub actor: usize,
+    pub calcs: bool,
+}
+
+/// A mirage's calculation's results
+pub struct MirageCalc {
+    /// The player's output
+    pub output: crate::mods::SymMap<OutVal>,
+    /// What the calculation set on the copy
+    pub copy: crate::calc_skill_mods::SkillMods,
+    /// The copy's gem level and quality, which a calculation whose main
+    /// skill the copy replaces writes to its breakdown
+    pub gem: Option<GemSums>,
+}
+
+/// A main skill's gem level and quality, and the sums of its mod list
+/// they come from: `GemLevel`, `GemItemLevel`, `GemGlobalLevel`,
+/// `GemSupportLevel`, then `GemQuality`, `GemItemQuality`,
+/// `GemGlobalQuality`, `GemSupportQuality` and `GemSocketQuality`
+#[derive(Clone, Debug)]
+pub struct GemSums {
+    pub level: Option<f64>,
+    pub sums: [f64; 9],
 }
 
 /// The mods each mirage adds to its copy (`preCalcFunc`)
@@ -126,9 +165,6 @@ impl<'a> Perform<'a> {
     /// The mirage's copy taken in, before the minions: the stand-in actors
     /// and their databases, then the copy as the main skill
     pub(crate) fn add_external(&mut self, ext: External) -> Result<()> {
-        if ext.skill.mods.as_ref().is_some_and(|m| m.minion.is_some()) {
-            return Err("not ported: a mirage of a skill with a minion".into());
-        }
         let op = self.c.push_store(ext.player_store, None);
         let oe = self.c.push_store(ext.enemy_store, None);
         let (pa, ea) = (self.c.actors.actors.len(), self.c.actors.actors.len() + 1);
@@ -174,6 +210,13 @@ impl<'a> Perform<'a> {
         self.lists.push(SkillLists { base, list });
         self.marks.push(SkillMarks::default());
         self.env.skills.main_skill = index;
+        self.external = Some(ExternalMain {
+            skill: index,
+            player_store: op,
+            enemy_store: oe,
+            actor: pa,
+            calcs: ext.calcs,
+        });
         if let Some(u) = ext.mirage_uses {
             self.sd_set(index, "mirageUses", u);
         } else {
@@ -193,6 +236,7 @@ impl<'a> Perform<'a> {
             list_mods: Vec::new(),
             kind,
             mirage_uses: self.sd_num(self.main(), "storedUses"),
+            calcs: self.calcs_mode(),
         }
     }
 
@@ -207,6 +251,7 @@ impl<'a> Perform<'a> {
             list_mods: Vec::new(),
             kind,
             mirage_uses: self.sd_num(self.main(), "storedUses"),
+            calcs: self.calcs_mode(),
         }
     }
 
@@ -231,7 +276,7 @@ impl<'a> Perform<'a> {
         if self.sd_truthy(main, "triggeredByMirageArcher") {
             let count = self.c.base(list, Some(&cfg), &["MirageArcherMaxCount"])?;
             let ext = self.external_from_here(main, MirageKind::Archer);
-            let (output, _) = recalc()?.mirage(ext, &self.input.limited)?;
+            let output = recalc()?.mirage(ext, &self.input.limited)?.output;
             let mods = self.mods_mut(main);
             if mods.info_message.is_none() {
                 let n = crate::pat::num(count);
@@ -301,7 +346,12 @@ impl<'a> Perform<'a> {
                     warriors,
                 },
             );
-            let (output, mut copy) = recalc()?.mirage(ext, &self.input.limited)?;
+            let MirageCalc {
+                output,
+                mut copy,
+                gem,
+            } = recalc()?.mirage(ext, &self.input.limited)?;
+            self.main_copy_gem = gem;
             // The player's output and main skill are the warriors'
             self.c.actors.actors[PLAYER].output = output;
             let n = crate::pat::num(warriors);
@@ -359,7 +409,12 @@ impl<'a> Perform<'a> {
                 source_rate: cached.out("Speed"),
             };
             let ext = self.external_from_cache(&cached, kind);
-            let (output, mut copy) = recalc()?.mirage(ext, &self.input.limited)?;
+            let MirageCalc {
+                output,
+                mut copy,
+                gem,
+            } = recalc()?.mirage(ext, &self.input.limited)?;
+            self.main_copy_gem = gem;
             self.c.actors.actors[PLAYER].output = output;
             copy.info_message = Some(format!(
                 "Tawhoa's Chosen using {}",
@@ -388,7 +443,7 @@ impl<'a> Perform<'a> {
                     cast_chance,
                 },
             );
-            let (output, _) = recalc()?.mirage(ext, &self.input.limited)?;
+            let output = recalc()?.mirage(ext, &self.input.limited)?.output;
             let mods = self.mods_mut(main);
             if mods.info_message.is_none() {
                 let n = count.map_or("nil".into(), crate::pat::num);
