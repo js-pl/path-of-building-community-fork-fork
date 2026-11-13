@@ -300,8 +300,10 @@ What remains for the full migration, in order:
    slot in `ItemsTab.items`' `pairs` order), `equipItem`, `deleteItem`
    (with upstream's `allocNodes[index]` quirk on other specs' jewel
    sockets), `selectItemSet`, `selectTreeSpec` (every spec loaded, the
-   sockets' jewels moved between them; a spec on another tree version
-   falls back), `selectConfigSet`, `copySocketGroup`,
+   sockets' jewels moved between them, also to a spec on another tree
+   version, which carries its own tree: phase `overlays` switches every
+   eighth build to copies of its spec on 3_15 and 3_25 and back),
+   `selectConfigSet`, `copySocketGroup`,
    `pasteSocketGroup` and the level box's `control`.
    `PopulateSlots` now empties abyssal sockets past their item's count.
    `items_edits_match`: random sequences of these (6 per build) give the
@@ -370,8 +372,11 @@ What remains for the full migration, in order:
    `overlays` (the tattoo and timeless jewel builds of
    `equivalence::variants`, which the corpus has none of) asks a
    tooltip that differs again of a fresh translation and aligns it when
-   that one agrees (11 of 218). Falling back: a mastery tooltip with a
-   popup open, the party view with imported data. A radius jewel's
+   that one agrees (11 of 218). An allocated mastery's tooltip with a
+   popup open compares reallocating it (`addNodes` of the node), as
+   upstream does for the mastery popup's options; `config_edits_match`
+   asks for one while a class change popup is open. Falling back: the
+   party view with imported data. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -463,8 +468,11 @@ What remains for the full migration, in order:
      (`session::typed::item_corrupt`: Corrupted, Scourge and Glimpse of
      Chaos implicits in upstream's sort order, sorted by power, Scourge
      pairs, and a unique's corrupted roll ranges) and Anoint Item
-     (saved without a node: the session has no input for its notable
-     list). All in `items_edits_match`, with
+     (`session::typed::item_anoint`: the notable list of
+     `NotableDBControl`, searched with `matchOrPattern`, sorted by name or
+     a power stat with the anointed item; the translated session's
+     `describePopups` builds and lists it, with its search and sort, and
+     `control` selects a row). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

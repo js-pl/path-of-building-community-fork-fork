@@ -293,6 +293,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
         }
     }
+    spec_versions_match(d, &mut failures);
     eprintln!(
         "{compared} overlay node tooltips compared, aligned with a fresh translation {}:\n{}",
         aligned.len(),
@@ -306,10 +307,98 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
     );
 }
 
+/// Corpus builds with a copy of their active spec on other tree versions,
+/// which the corpus has none of: switching to each and back gives the
+/// translation's sidebar, outputs, tree, items and file
+fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
+    let builds: Vec<(String, String)> = mine(corpus())
+        .into_iter()
+        .step_by(8)
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    for (id, xml) in builds {
+        // The active spec, copied on two other versions
+        let Some(start) = xml.find("<Spec ") else {
+            continue;
+        };
+        let tag_end = start + xml[start..].find('>').unwrap();
+        let end = if xml.as_bytes()[tag_end - 1] == b'/' {
+            tag_end + 1
+        } else {
+            start + xml[start..].find("</Spec>").unwrap() + "</Spec>".len()
+        };
+        let spec = &xml[start..end];
+        let copies: String = ["3_15", "3_25"]
+            .iter()
+            .map(|v| {
+                let mut c = spec.to_string();
+                if let Some(at) = c.find("treeVersion=\"") {
+                    let e = at + c[at + 13..].find('"').unwrap() + 14;
+                    c.replace_range(at..e, &format!("treeVersion=\"{v}\""));
+                }
+                c
+            })
+            .collect();
+        let xml = format!("{}{copies}{}", &xml[..end], &xml[end..]);
+        let id = format!("{id}-spec-versions");
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let specs = answer(d.request(r#"{"cmd":"treeSpecs"}"#), "treeSpecs");
+        let n = specs["ok"]["list"].as_array().map_or(1, Vec::len);
+        let active = specs["ok"]["active"].as_u64().unwrap_or(1) as usize;
+        let (mut out, mut broken) = (Vec::new(), false);
+        for to in [n - 1, n, active] {
+            let req = json!({"cmd": "selectTreeSpec", "index": to}).to_string();
+            answer(d.request(&req), "selectTreeSpec");
+            if !d.typed_active() {
+                break;
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            // A copy upstream cannot show (nodes its tree version lacks)
+            let probe = answer(d.translated_request(r#"{"cmd":"state"}"#), "state");
+            if probe.get("error").is_some() {
+                eprintln!(
+                    "{id}: spec {to} fails in the translation: {}",
+                    probe["error"]
+                );
+                broken = true;
+                break;
+            }
+            for c in ["state", "outputs", "treeState", "items", "treeSpecs"] {
+                let q = json!({ "cmd": c }).to_string();
+                let t = answer(d.request(&q), c);
+                let tr = answer(d.translated_request(&q), c);
+                diff(&t, &tr, &format!("spec {to}: {c}"), &mut out);
+            }
+        }
+        if broken {
+            continue;
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the spec switches", &mut out);
+        }
+        if !out.is_empty() {
+            let k = out.len();
+            out.truncate(4);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(600) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({k}):\n  {}", out.join("\n  ")));
+        }
+    }
+}
+
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
-    "specs on another tree version",
     // The tooltip's stat comparison, where the translation carries another
     // build's change of upstream's shared data (see `compare_display`)
     "aligned with a fresh translation",
@@ -700,6 +789,7 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 /// outputs and tree after each step; then a new build does
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut popup_tooltips = 0;
     let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
@@ -746,6 +836,25 @@ fn config_edits_match(d: &mut Dispatcher) {
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            // An allocated mastery's tooltip with the class change popup
+            // open compares reallocating it
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if state["ok"]["popups"]
+                .as_array()
+                .is_some_and(|p| !p.is_empty())
+            {
+                let tree = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+                let mastery = tree["ok"]["masteries"]
+                    .as_object()
+                    .and_then(|m| m.keys().next()?.parse::<u32>().ok());
+                if let Some(m) = mastery {
+                    let q = json!({"cmd": "nodeTooltip", "id": m}).to_string();
+                    let t = answer(d.request(&q), "typed tooltip");
+                    let tr = answer(d.translated_request(&q), "translated tooltip");
+                    diff(&t, &tr, &format!("{label} {q}"), &mut out);
+                    popup_tooltips += 1;
+                }
+            }
             steps += 1;
         }
         if out.is_empty() && d.typed_active() {
@@ -791,7 +900,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
     }
     eprintln!(
-        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays), {popup_tooltips} mastery tooltips compared with a popup open\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
