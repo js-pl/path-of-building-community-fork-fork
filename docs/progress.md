@@ -451,7 +451,9 @@ What remains for the full migration, in order:
      controls (`session::typed::item_editor_controls`: variants and
      version, sockets and links, influences, quality, catalysts, cluster
      jewel skill and node count, affixes and their rolls, range lines,
-     custom modifier removal, and the Save, Edit and Cancel buttons;
+     custom modifier removal, the Foulborn mutation checkboxes
+     (`Item:MutateMod` in `engine::item_craft`), and the Save, Edit and
+     Cancel buttons;
      upstream's state on the controls, such as the edits' text and the
      sliders' values, is kept in `item_editor::Editor`), the Enchant Item
      popup (`session::typed::item_enchant`, with `data.enchantments` from
