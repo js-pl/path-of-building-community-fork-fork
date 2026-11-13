@@ -82,6 +82,7 @@ impl TypedData {
             setup,
             config,
             option_defaults,
+            config_vars: _,
             jewel_radius,
             tree_versions,
         } = GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"));

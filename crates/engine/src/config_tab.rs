@@ -318,3 +318,143 @@ crate::codec_struct!(OptionDefault {
     placeholder,
     saved
 });
+
+/// An entry of `Modules/ConfigOptions.lua` as the Configuration tab's
+/// controls show it: a section, or an option with its control, label,
+/// tooltip and the rules that show it
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ConfigVar {
+    /// A section's label (`section`) and column
+    pub section: Option<String>,
+    pub col: Option<f64>,
+    pub var: Option<String>,
+    /// `type`: `check`, `count`, `list`, ...
+    pub kind: Option<String>,
+    pub label: Option<String>,
+    /// A text `tooltip`
+    pub tooltip: Option<String>,
+    /// Whether `tooltip` is a function, which the typed session ports by
+    /// the option's name
+    pub tooltip_fn: bool,
+    /// A list's entries: the label the drop-down shows and the value
+    pub list: Vec<(String, Option<Val>)>,
+    pub default_index: Option<f64>,
+    pub default_state: Option<Val>,
+    pub default_placeholder: Option<Val>,
+    /// The `ifCond`, `ifSkill`, ... rules in upstream's order, with their
+    /// names (one or a list)
+    pub rules: Vec<(String, Vec<String>)>,
+    pub imply_cond: Option<String>,
+    pub imply_cond_list: Vec<String>,
+    pub imply_minion_cond: Option<String>,
+    pub imply_enemy_cond: Option<String>,
+    pub hide_if_invalid: bool,
+    pub include_transfigured: bool,
+    pub resizable: bool,
+}
+
+/// The rules `ConfigTab` checks, in the order it adds them
+pub const CONFIG_RULES: [&str; 16] = [
+    "ifNode",
+    "ifOption",
+    "ifCond",
+    "ifMinionCond",
+    "ifEnemyCond",
+    "ifCondTrue",
+    "ifMult",
+    "ifEnemyMult",
+    "ifStat",
+    "ifEnemyStat",
+    "ifTagType",
+    "ifFlag",
+    "ifMod",
+    "ifSkill",
+    "ifSkillFlag",
+    "ifSkillData",
+];
+
+fn text(v: &Value) -> Option<String> {
+    match v {
+        Value::Str(s) => Some(s.to_str_lossy().into_owned()),
+        Value::Number(n) => Some(pat::num(*n)),
+        _ => None,
+    }
+}
+
+/// `Modules/ConfigOptions.lua` (`varList`) as the Configuration tab's
+/// controls read it
+pub fn config_vars(var_list: &Value) -> Vec<ConfigVar> {
+    let mut out = Vec::new();
+    for v in array(var_list) {
+        let g = |k: &str| get(&v, k);
+        let names = |x: &Value| -> Vec<String> {
+            match x {
+                Value::Table(_) => array(x).iter().filter_map(text).collect(),
+                x => text(x).into_iter().collect(),
+            }
+        };
+        let tooltip = g("tooltip");
+        let tooltip_fn = matches!(
+            &tooltip,
+            Value::Function(_) | Value::Func(_) | Value::Closure(_)
+        );
+        let list = array(&g("list"))
+            .iter()
+            .map(|e| match e {
+                Value::Table(_) => (
+                    text(&get(e, "label")).unwrap_or_default(),
+                    val(&get(e, "val")),
+                ),
+                e => (lua::to_string(e).to_str_lossy().into_owned(), val(e)),
+            })
+            .collect();
+        out.push(ConfigVar {
+            section: text(&g("section")),
+            col: g("col").as_number(),
+            var: text(&g("var")),
+            kind: text(&g("type")),
+            label: text(&g("label")),
+            tooltip: text(&tooltip),
+            tooltip_fn,
+            list,
+            default_index: g("defaultIndex").as_number(),
+            default_state: val(&g("defaultState")),
+            default_placeholder: val(&g("defaultPlaceholderState")),
+            rules: CONFIG_RULES
+                .iter()
+                .filter(|r| g(r).truthy())
+                .map(|r| (r.to_string(), names(&g(r))))
+                .collect(),
+            imply_cond: text(&g("implyCond")),
+            imply_cond_list: names(&g("implyCondList")),
+            imply_minion_cond: text(&g("implyMinionCond")),
+            imply_enemy_cond: text(&g("implyEnemyCond")),
+            hide_if_invalid: g("hideIfInvalid").truthy(),
+            include_transfigured: g("includeTransfigured").truthy(),
+            resizable: g("resizable").truthy(),
+        });
+    }
+    out
+}
+
+crate::codec_struct!(ConfigVar {
+    section,
+    col,
+    var,
+    kind,
+    label,
+    tooltip,
+    tooltip_fn,
+    list,
+    default_index,
+    default_state,
+    default_placeholder,
+    rules,
+    imply_cond,
+    imply_cond_list,
+    imply_minion_cond,
+    imply_enemy_cond,
+    hide_if_invalid,
+    include_transfigured,
+    resizable,
+});

@@ -4,6 +4,7 @@
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
 mod calcs;
+mod config;
 pub mod display_stats;
 mod items;
 mod save;
@@ -11,6 +12,7 @@ mod sets;
 mod sidebar;
 mod skills;
 mod tree;
+mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
 
@@ -201,6 +203,14 @@ pub struct TypedSession<'d> {
     item_keys: lua::ljtab::LjMap<()>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
+    /// The Configuration tab's option controls
+    config_controls: config::ConfigControls,
+    /// The class each open class change popup selects, front first
+    class_popups: Vec<i64>,
+    /// Each spec's undo states, newest first, by the spec's index
+    undo: HashMap<usize, Vec<undo::UndoState>>,
+    /// A new build's skills tab, whose default gem quality is nil
+    gem_quality_nil: bool,
 }
 
 impl<'d> TypedSession<'d> {
@@ -231,9 +241,23 @@ impl<'d> TypedSession<'d> {
             other_specs: Vec::new(),
             item_keys: Default::default(),
             socket_labels: HashMap::new(),
+            config_controls: config::ConfigControls::new(&data.game.config_vars),
+            class_popups: Vec::new(),
+            undo: HashMap::new(),
+            gem_quality_nil: false,
             root,
         };
+        // `ConfigTab:Load` shows the loaded set
+        if s.root
+            .child("PathOfBuilding")
+            .and_then(|p| p.child("Config"))
+            .is_some()
+        {
+            s.update_config_controls();
+        }
+        s.config_mods_built();
         s.load_specs()?;
+        s.reset_undo();
         for id in &s.build.items.item_order_list {
             s.item_keys.insert(*id as u32, ());
         }
@@ -263,6 +287,7 @@ impl<'d> TypedSession<'d> {
             let c = match p.split_once('.')? {
                 ("calcs", name) => self.calcs_control(name)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
+                ("config", var) => self.config_control_json(var)?,
                 _ => return None,
             };
             out.insert(p.to_string(), c);

@@ -31,6 +31,19 @@ pub fn process(src: &Source) -> Result<()> {
         .map_err(|e| e.to_string())?;
     let data = &src.data;
     boss_stats(data);
+    // The boss tooltip of the configuration, set after the boss stats
+    let tooltip = "data.enemyIsBossTooltip";
+    let stmt = statement(&text, tooltip).ok_or("no data.enemyIsBossTooltip")?;
+    im.env.set_native("m_floor", |a| {
+        Ok(vec![Value::Number(
+            lua::to_number(&a[0]).ok_or("m_floor")?.floor(),
+        )])
+    });
+    im.env
+        .set_native("tostring", |a| Ok(vec![Value::Str(lua::to_string(&a[0]))]));
+    im.env
+        .eval_assigns("Modules/Data.lua", stmt.as_bytes(), &[tooltip])
+        .map_err(|e| e.to_string())?;
     minions(data);
     item_mods(data);
     rare_like_uniques(data)?;
@@ -41,6 +54,15 @@ pub fn process(src: &Source) -> Result<()> {
         .map_err(|e| format!("Data/ModFoulbornMap.jsonc: {e}"))?;
     data.set_str("foulbornMap", map);
     Ok(())
+}
+
+/// The statement assigning `target` inside `Data.lua`'s code, up to the
+/// line `end` that closes its block
+fn statement(text: &[u8], target: &str) -> Option<String> {
+    let text = String::from_utf8_lossy(text).replace("\r\n", "\n");
+    let start = text.find(&format!("{target} ="))?;
+    let rest = &text[start..];
+    Some(rest[..rest.find("\nend\n")?].to_string())
 }
 
 fn table(v: &Value) -> TableRef {
