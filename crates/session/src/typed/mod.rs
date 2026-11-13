@@ -9,6 +9,7 @@ pub mod display_stats;
 mod geometry;
 mod item_db;
 mod item_editor;
+mod item_popups;
 mod items;
 mod save;
 mod sets;
@@ -303,6 +304,7 @@ impl<'d> TypedSession<'d> {
             s.update_config_controls();
         }
         s.config_mods_built();
+        s.clamp_main_socket_group();
         s.load_specs()?;
         s.reset_undo();
         for id in &s.build.items.item_order_list {

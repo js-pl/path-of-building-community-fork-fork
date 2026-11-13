@@ -305,6 +305,15 @@ impl<'d> Dispatcher<'d> {
                 let id = req["id"].as_f64();
                 self.edit(json, |s| s.select_skill_set(id))
             }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p.starts_with("popup."))
+                    && self.typed.as_ref()?.has_item_popup() =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_popup_control(&req))
+            }
             "control" => {
                 let req = req.clone();
                 self.edit(json, |s| s.control(&req))
@@ -381,6 +390,14 @@ impl<'d> Dispatcher<'d> {
             "config" => view(&mut self.typed_error, self.typed.as_ref()?.config()),
             "undo" => self.edit(json, |s| s.undo()),
             "newBuild" => self.open(TypedSession::new_build(data), json),
+            "popupButton" if self.typed.as_ref()?.has_item_popup() => {
+                let name = req["name"].as_str()?.to_string();
+                self.edit(json, |s| s.item_popup_button(&name))
+            }
+            "closePopup" if self.typed.as_ref()?.has_item_popup() => {
+                self.edit(json, |s| Ok(s.close_item_popup()))
+            }
+            "craftItem" => self.edit(json, |s| s.craft_item()),
             "popupButton" => {
                 let name = req["name"].as_str()?.to_string();
                 if !self.typed.as_ref()?.has_class_popup() {
@@ -448,6 +465,15 @@ impl<'d> Dispatcher<'d> {
         match session {
             Ok(mut s) => {
                 if let Some(prev) = &self.typed {
+                    if prev.has_item_popup() {
+                        // Its buttons act on the items tab it came from
+                        self.typed = None;
+                        self.typed_error = Some(format!(
+                            "{}: a load with an item popup open",
+                            crate::typed::NOT_PORTED
+                        ));
+                        return None;
+                    }
                     s.keep_popups(prev);
                 }
                 self.typed = Some(s);

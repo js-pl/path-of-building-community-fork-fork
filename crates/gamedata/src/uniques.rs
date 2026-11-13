@@ -74,6 +74,38 @@ impl Source {
             .collect()
     }
 
+    /// `data.itemBaseTypeList` with each type's `data.itemBaseLists`
+    /// entry: the names of its visible bases, in the list's order
+    pub fn item_base_lists(&self) -> Result<Vec<(String, Vec<String>)>> {
+        let mut types: Vec<String> = Vec::new();
+        for (_, b) in table(&self.data.get_str("itemBases"))?.entries() {
+            let b = table(&b)?;
+            if b.get_str("hidden").truthy() {
+                continue;
+            }
+            let mut t = text(&b.get_str("type"))?;
+            if let Some(sub) = b.get_str("subType").as_str() {
+                t = format!("{t}: {}", sub.to_str_lossy());
+            }
+            if !types.contains(&t) {
+                types.push(t);
+            }
+        }
+        types.sort();
+        types
+            .into_iter()
+            .map(|t| {
+                let list = crate::data_lua::item_base_list(&self.data, &t);
+                let names = list
+                    .array()
+                    .iter()
+                    .map(|e| text(&table(e)?.get_str("name")))
+                    .collect::<Result<_>>()?;
+                Ok((t, names))
+            })
+            .collect()
+    }
+
     /// `data.rares`
     pub fn rares(&self) -> Result<Vec<String>> {
         let mut im = self.importer();

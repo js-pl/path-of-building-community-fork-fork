@@ -28,6 +28,9 @@ pub struct GameData {
     pub uniques: Vec<(String, Vec<String>)>,
     /// `data.rares`
     pub rares: Vec<String>,
+    /// `data.itemBaseTypeList` and each type's `data.itemBaseLists` (the
+    /// bases' names)
+    pub item_base_lists: Vec<(String, Vec<String>)>,
 }
 
 crate::codec_struct!(GameData {
@@ -41,6 +44,7 @@ crate::codec_struct!(GameData {
     tree_versions,
     uniques,
     rares,
+    item_base_lists,
 });
 
 impl GameData {

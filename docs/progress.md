@@ -339,20 +339,31 @@ What remains for the full migration, in order:
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
      `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
      `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
-   - Items and crafting: `displayItem`, `craftItem`, `setNotes`,
-     `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
-     popups, the unique and rare databases:
-     `Data/Uniques/Special/Generated.lua` is not ported). `addItem`,
-     `editItem`, `setDisplayItem` and `saveDisplayItem` are typed
-     (`session::typed::item_editor`: `AddItem` with its auto-equip,
-     `CreateDisplayItemFromRaw`, `CopyAnointsAndEldritchImplicits`,
-     `AddDisplayItem`, `SetDisplayItem` with the affix drop-downs'
-     lists, `UpdateAffixControl` without the sort by power, and
-     `UpdateClusterJewelControls`/`CraftClusterJewel`, which craft a
-     crafted cluster jewel again) and in `items_edits_match`.
-     `Item:Craft` is `engine::item_craft`. A Forbidden jewel whose
-     counterpart is missing falls back. The display item is held typed,
-     so `displayItem` answers on the translation after its replays.
+   - Items and crafting: `displayItem` (its tooltip is
+     `ItemsTab:AddItemTooltip`), `setNotes`, the item editor's controls
+     and its enchant, anoint, corrupt and custom modifier popups.
+     Typed (`session::typed::item_editor`, `item_db`, `item_popups`):
+     `addItem`, `editItem`, `setDisplayItem` and `saveDisplayItem`
+     (`AddItem` with its auto-equip, `CreateDisplayItemFromRaw`,
+     `CopyAnointsAndEldritchImplicits`, `AddDisplayItem` with the
+     Forbidden jewels' counterparts, `SetDisplayItem` with the affix
+     drop-downs' lists, `UpdateAffixControl` without the sort by power,
+     and `UpdateClusterJewelControls`/`CraftClusterJewel`, which craft a
+     crafted cluster jewel again; `Item:Craft` is `engine::item_craft`),
+     `itemDb` (`main.uniqueDB` and `main.rareDB`: `data.uniques` and
+     `data.rares` with the uniques of `Generated.lua`, made in
+     `gamedata::uniques` from the importer's literals of the file, and
+     its tree-dependent ones from the typed tree; Pearl of Tsoatha's
+     lines come from a port of `describeStats` for its one stat
+     description), `craftItem` (Craft Item, and Edit Item Text for a
+     unique or relic) with `control` of their `popup.*` inputs,
+     `popupButton` and `closePopup`. All in `items_edits_match`, with
+     database items and Forbidden jewels in its pool. The display item
+     is held typed, so `displayItem` answers on the translation after
+     its replays. A load with an item popup open falls back (the
+     popup's buttons act on the tab it came from). Ported on the way:
+     `initEnv`'s write-back of the clamped `build.mainSocketGroup` (an
+     item granting the main socket group replaced).
    - Engine gaps that make a build fall back: Combust's trigger
      (gen-0028), tree edits with Intuitive
      Leap and the like, tattoos, specs in the URL format only, the character

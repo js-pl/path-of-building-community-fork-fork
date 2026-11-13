@@ -521,7 +521,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(12) {
+            let req = match rng.below(13) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -580,6 +580,55 @@ fn items_edits_match(d: &mut Dispatcher) {
                     };
                     compare(d, &open, &format!("step {step}"), &mut out);
                     json!({"cmd": "saveDisplayItem"})
+                }
+                12 => {
+                    // Craft Item: random choices, Create or Cancel, the
+                    // text editor of a unique, then the item saved
+                    let types = 70;
+                    let mut reqs = vec![json!({"cmd": "craftItem"})];
+                    for _ in 0..rng.below(4) {
+                        reqs.push(match rng.below(4) {
+                            0 => json!({"cmd": "control", "path": "popup.rarity", "sel": rng.below(5) + 1}),
+                            1 => json!({"cmd": "control", "path": "popup.type", "sel": rng.below(types) + 1}),
+                            2 => json!({"cmd": "control", "path": "popup.base", "sel": rng.below(12) + 1}),
+                            _ => {
+                                let text = ["", "Doom Crest", " "][rng.below(3)];
+                                json!({"cmd": "control", "path": "popup.title", "text": text})
+                            }
+                        });
+                    }
+                    let cancel = rng.below(6) == 0;
+                    reqs.push(json!({"cmd": "popupButton", "name": if cancel { "cancel" } else { "save" }}));
+                    let mut fell_back = false;
+                    for r in &reqs {
+                        let r = r.to_string();
+                        answer(d.request(&r), "craft step");
+                        if !d.typed_active() {
+                            fell_back = true;
+                            break;
+                        }
+                        compare(
+                            d,
+                            &json!({"cmd": "state"}),
+                            &format!("step {step} {r}"),
+                            &mut out,
+                        );
+                    }
+                    if fell_back || cancel {
+                        json!({"cmd": "state"})
+                    } else {
+                        // The text editor a unique opens, saved or closed
+                        let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                        if st["ok"]["popups"][0]["title"] == "Edit Item Text" {
+                            let r = if rng.below(4) == 0 {
+                                json!({"cmd": "closePopup"})
+                            } else {
+                                json!({"cmd": "popupButton", "name": "save"})
+                            };
+                            answer(d.request(&r.to_string()), "edit text");
+                        }
+                        json!({"cmd": "saveDisplayItem"})
+                    }
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];

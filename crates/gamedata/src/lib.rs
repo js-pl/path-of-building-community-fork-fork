@@ -235,6 +235,7 @@ impl Source {
             tree_versions: versions,
             uniques: self.uniques()?,
             rares: self.rares()?,
+            item_base_lists: self.item_base_lists()?,
         })
     }
 }

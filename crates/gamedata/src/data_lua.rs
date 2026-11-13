@@ -154,7 +154,7 @@ fn item_mods(data: &TableRef) {
 
 /// `data.itemBaseLists[type]`: the visible bases of a type (`Jewel: Abyss`)
 /// as `{ name, base }`, sorted as `Data.lua` sorts them
-fn item_base_list(data: &TableRef, typ: &str) -> TableRef {
+pub(crate) fn item_base_list(data: &TableRef, typ: &str) -> TableRef {
     let mut list: Vec<(String, Value)> = table(&data.get_str("itemBases"))
         .entries()
         .into_iter()
