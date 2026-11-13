@@ -52,7 +52,7 @@ jobs:
           compression-level: 0
 
   # The tests on runners of their own. The session test's shards split over
-  # three runners (TEST_SHARD_PARTITION), the perform tests take one, the
+  # three runners and the perform tests' over two (TEST_SHARD_PARTITION), the
   # other tests three, by binary, about 4 minutes of a single test at a time
   # each (equivalence tests side by side on one runner are about three times
   # slower each: the runner's CPU is the limit). Every test runs on one of
@@ -73,8 +73,12 @@ jobs:
           - name: session 3/3
             filter: 'test(=typed_session_matches_translated)'
             shards: 3/3
-          - name: perform
+          - name: perform 1/2
             filter: 'binary(=perform)'
+            shards: 1/2
+          - name: perform 2/2
+            filter: 'binary(=perform)'
+            shards: 2/2
           - name: setup and breakdowns
             filter: 'binary(=calculator) | binary(=calc_setup) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
           - name: items, config and skills
