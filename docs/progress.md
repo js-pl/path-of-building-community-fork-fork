@@ -431,8 +431,8 @@ What remains for the full migration, in order:
      (`session::typed::item_display`: the tooltip of `item_tooltip.rs`
      on a copy without an id, as upstream compares by identity, and the
      editor's controls as `layoutControls` lists them, placed by their
-     anchors as `Control:GetPos` does; a flask in the editor falls back
-     with the tooltip's flask toggle), with `control` of the editor's
+     anchors as `Control:GetPos` does; a flask in the editor is toggled
+     in a copy of the build under a generated id), with `control` of the editor's
      controls (`session::typed::item_editor_controls`: variants and
      version, sockets and links, influences, quality, catalysts, cluster
      jewel skill and node count, affixes and their rolls, range lines,
