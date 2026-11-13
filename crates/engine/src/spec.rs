@@ -175,6 +175,16 @@ impl SpecNode {
     }
 }
 
+/// A cluster jewel subgraph (`subGraphs[id]`)
+#[derive(Clone, Debug, Default)]
+pub struct SubGraph {
+    /// Its node ids
+    pub nodes: Vec<u32>,
+    /// The node pairs it builds connectors for (`nodeId1`, `nodeId2`), in
+    /// upstream's order
+    pub connectors: Vec<(u32, u32)>,
+}
+
 #[derive(Clone)]
 pub struct PassiveSpec<'t> {
     pub tree: &'t PassiveTree,
@@ -189,8 +199,8 @@ pub struct PassiveSpec<'t> {
     pub mastery_selections: LjMap<f64>,
     /// Allocated node ids the spec does not have (in cluster subgraphs)
     pub alloc_subgraph_nodes: Vec<u32>,
-    /// `subGraphs`: each cluster jewel subgraph's node ids, by its id
-    pub sub_graphs: LjMap<Vec<u32>>,
+    /// `subGraphs`: each cluster jewel subgraph, by its id
+    pub sub_graphs: LjMap<SubGraph>,
     pub cur_class_id: Option<i64>,
     pub cur_ascend_class_id: Option<i64>,
     pub cur_secondary_ascend_class_id: Option<i64>,
@@ -957,6 +967,21 @@ impl<'t> PassiveSpec<'t> {
         }
         for (i, c) in conquered {
             self.nodes[i].conquered = Some(c);
+        }
+        // `ReplaceNode(node, self.tree.nodes[id])`: where the data lists its
+        // nodes as an array, that is the node at the place of the id.
+        // Upstream skips unallocated masteries with all their options, which
+        // keep what the first pass replaced (their lines are the options')
+        for &(id, by) in &self.tree.keyed_as {
+            let (Some(&i), Some(n)) = (self.index.get(&id), self.tree.node(by)) else {
+                continue;
+            };
+            self.nodes[i].stats = Some(Arc::new(NodeStats {
+                sd: n.sd.clone(),
+                mods: n.mods.clone(),
+                mod_list: n.mod_list.clone(),
+            }));
+            self.nodes[i].overlay = Some(Arc::new(tree::Overlay::of_node(n)));
         }
         // Tattoos replace their nodes
         for (id, o) in &self.hash_overrides {
