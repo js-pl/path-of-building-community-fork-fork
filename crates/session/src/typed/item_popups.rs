@@ -5,7 +5,8 @@
 //! `item_anoint.rs`), `ItemsTab:CorruptDisplayItem` (Corrupt Item, in
 //! `item_corrupt.rs`), `AddImplicitPopup` (Add Implicit to Item, in
 //! `item_add_implicit.rs`), `ItemsTab:AddCustomModifierToDisplayItem`
-//! (Add Modifier to Item, in `item_add_modifier.rs`), as `lua/session.lua` shows them (`describePopups`) and drives them
+//! (Add Modifier to Item, in `item_add_modifier.rs`),
+//! `ItemsTab:AddCrucibleModifierToDisplayItem` (in `item_crucible.rs`), as `lua/session.lua` shows them (`describePopups`) and drives them
 //! (`control` of `popup.*`, `popupButton`, `closePopup`).
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
@@ -55,6 +56,7 @@ pub enum ItemPopup {
     Corrupt(Box<super::item_corrupt::CorruptPopup>),
     AddImplicit(Box<super::item_add_implicit::AddImplicitPopup>),
     AddModifier(Box<super::item_add_modifier::AddModifierPopup>),
+    Crucible(Box<super::item_crucible::CruciblePopup>),
 }
 
 /// `DropDownControl:SetSel(sel)`: the new selection, clamped to the list,
@@ -134,6 +136,13 @@ impl<'d> TypedSession<'d> {
         let name = path.strip_prefix("popup.").unwrap_or(path);
         if req["click"].as_bool() == Some(true) {
             return self.item_popup_button(name);
+        }
+        if let Some(ItemPopup::Crucible(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.crucible_popup_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::Crucible(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
         }
         if let Some(ItemPopup::AddModifier(p)) = self.editor.popups.first() {
             let mut p = p.clone();
@@ -223,6 +232,13 @@ impl<'d> TypedSession<'d> {
                 } else {
                     self.editor.popups[0] = ItemPopup::Corrupt(p);
                 }
+            }
+            (ItemPopup::Crucible(p), "save") => {
+                self.crucible_popup_save(&p)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::Crucible(_), "close") => {
+                self.close_item_popup();
             }
             (ItemPopup::AddModifier(p), "save") => {
                 self.add_modifier_popup_save(&p)?;
@@ -389,6 +405,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::Corrupt(p) => self.describe_corrupt_popup(p),
             ItemPopup::AddImplicit(p) => self.describe_add_implicit_popup(p),
             ItemPopup::AddModifier(p) => self.describe_add_modifier_popup(p),
+            ItemPopup::Crucible(p) => self.describe_crucible_popup(p),
             ItemPopup::Craft {
                 rarity,
                 title,

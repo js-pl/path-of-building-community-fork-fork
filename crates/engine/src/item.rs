@@ -954,7 +954,7 @@ impl Item {
     }
 
     /// `CanHaveMod(mod)`
-    fn can_have_mod(&self, data: &ItemData, m: &Affix) -> bool {
+    pub fn can_have_mod(&self, data: &ItemData, m: &Affix) -> bool {
         self.can_have_mod_with(data, m, &HashSet::new())
     }
 

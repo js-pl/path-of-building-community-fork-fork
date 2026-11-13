@@ -1106,6 +1106,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                                         || p.contains("Corrupt")
                                         || p.contains("AddImplicit")
                                         || p.contains("AddCustom")
+                                        || p.contains("AddCrucible")
                                         || p.contains("CustomModifierRemove"))
                             })
                             .collect();
@@ -1116,6 +1117,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 || p.contains("Corrupt")
                                 || p.contains("AddImplicit")
                                 || p.contains("AddCustom")
+                                || p.contains("AddCrucible")
                         };
                         let openers: Vec<J> = controls
                             .iter()
