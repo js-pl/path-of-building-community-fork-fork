@@ -311,6 +311,11 @@ What remains for the full migration, in order:
    the main skill and undo on specs with tattoos or cluster jewel
    subgraphs fall back.
 
+   The dispatcher records each request the typed engine gave to the
+   translation while it held the build (`Dispatcher::fallbacks`, with
+   the command and why); `typed_session_matches_translated` prints them
+   per phase and fails on any not in its `KNOWN_FALLBACKS`.
+
    Still on the translation, before it can be dropped:
    - Read-only views: `itemDb`, `party`, `notes`, `controls` of other
      tabs.
