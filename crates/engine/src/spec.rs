@@ -175,6 +175,16 @@ impl SpecNode {
     }
 }
 
+/// A cluster jewel subgraph (`subGraphs[id]`)
+#[derive(Clone, Debug, Default)]
+pub struct SubGraph {
+    /// Its node ids
+    pub nodes: Vec<u32>,
+    /// The node pairs it builds connectors for (`nodeId1`, `nodeId2`), in
+    /// upstream's order
+    pub connectors: Vec<(u32, u32)>,
+}
+
 #[derive(Clone)]
 pub struct PassiveSpec<'t> {
     pub tree: &'t PassiveTree,
@@ -189,11 +199,14 @@ pub struct PassiveSpec<'t> {
     pub mastery_selections: LjMap<f64>,
     /// Allocated node ids the spec does not have (in cluster subgraphs)
     pub alloc_subgraph_nodes: Vec<u32>,
-    /// `subGraphs`: each cluster jewel subgraph's node ids, by its id
-    pub sub_graphs: LjMap<Vec<u32>>,
+    /// `subGraphs`: each cluster jewel subgraph, by its id
+    pub sub_graphs: LjMap<SubGraph>,
     pub cur_class_id: Option<i64>,
     pub cur_ascend_class_id: Option<i64>,
     pub cur_secondary_ascend_class_id: Option<i64>,
+    /// `curSecondaryAscendClass`, by id: unlike the id, selecting nil
+    /// leaves it
+    pub cur_secondary_ascend_class: Option<i64>,
     pub allocated_mastery_count: u32,
     pub allocated_notable_count: u32,
     pub allocated_keystone_count: u32,
@@ -237,6 +250,7 @@ impl<'t> PassiveSpec<'t> {
             cur_class_id: None,
             cur_ascend_class_id: None,
             cur_secondary_ascend_class_id: None,
+            cur_secondary_ascend_class: None,
             allocated_mastery_count: 0,
             allocated_notable_count: 0,
             allocated_keystone_count: 0,
@@ -440,6 +454,11 @@ impl<'t> PassiveSpec<'t> {
             self.dealloc(i);
         }
         self.cur_secondary_ascend_class_id = ascend_class_id;
+        match ascend_class_id {
+            Some(0) => self.cur_secondary_ascend_class = None,
+            Some(id) if find(id).is_some() => self.cur_secondary_ascend_class = Some(id),
+            _ => {}
+        }
         if let Some(id) = ascend_class_id.filter(|id| *id != 0)
             && let Some(a) = find(id)
             && let Some(i) = self.start_index(a.start_node_id)
@@ -754,6 +773,32 @@ impl<'t> PassiveSpec<'t> {
         Ok(())
     }
 
+    /// `IsClassConnected(classId)`: whether an allocated node next to the
+    /// class's start node leads back to the current class's start
+    pub fn is_class_connected(&mut self, class_id: i64) -> Result<bool> {
+        let start = self.class(class_id)?.start_node_id;
+        let Some(start) = self.start_index(start) else {
+            return Ok(false);
+        };
+        for li in 0..self.nodes[start].linked.len() {
+            let other = self.nodes[start].linked[li];
+            if !self.nodes[other].alloc {
+                continue;
+            }
+            self.nodes[other].visited = true;
+            let mut visited = Vec::new();
+            let found = self.find_start(other, &mut visited, true);
+            for v in visited {
+                self.nodes[v].visited = false;
+            }
+            self.nodes[other].visited = false;
+            if found {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// `FindStartFromNode(node, visited, noAscend)`: whether an allocated
     /// path leads from the node to a start node
     fn find_start(&mut self, i: usize, visited: &mut Vec<usize>, no_ascend: bool) -> bool {
@@ -856,29 +901,63 @@ impl<'t> PassiveSpec<'t> {
                 .collect();
             radius_jewels.push((si, j, self.radius_ids(*socket, j.radius_index), keystones));
         }
+        // The Abyss jewels' changes, read before the nodes are reset (Zorath
+        // follows the allocated path from its socket to the class start)
+        let mut abyss: HashMap<u32, crate::timeless::Conquest> = HashMap::new();
         for (socket, j) in &self.tree_jewels {
-            if j.conquest
-                .as_ref()
-                .and_then(|c| c.jewel_type())
-                .is_some_and(|t| t >= 7)
-                && self.alloc_nodes.contains(*socket)
+            let Some(c) = &j.conquest else {
+                continue;
+            };
+            let Some(ty) = c.jewel_type().filter(|&t| t >= 7) else {
+                continue;
+            };
+            let Some(&si) = self.index.get(socket) else {
+                continue;
+            };
+            if !self.alloc_nodes.contains(*socket)
+                || self
+                    .tree_node(si)
+                    .expansion_jewel
+                    .as_ref()
+                    .is_some_and(|e| e.parent.is_some())
             {
-                return Err("not ported: Abyss timeless jewels".into());
+                continue;
+            }
+            let path = if ty == 11 {
+                self.shortest_path_to_class_start(si)
+            } else {
+                None
+            };
+            let timeless = self
+                .timeless
+                .clone()
+                .ok_or("not ported: no timeless jewel data")?;
+            for (node, m) in timeless.read_abyss(c.seed, *socket, ty, path.as_deref())? {
+                abyss.insert(
+                    node,
+                    crate::timeless::Conquest {
+                        modification: Some(m),
+                        ..c.clone()
+                    },
+                );
             }
         }
         let mut intuitive: Vec<(usize, Vec<usize>)> = Vec::new();
         let mut conquered: Vec<(usize, crate::timeless::Conquest)> = Vec::new();
         for i in 0..self.nodes.len() {
             let kind = self.kind(i);
+            let id = self.nodes[i].id;
             if radius_jewels.is_empty()
                 || matches!(kind, NodeType::ClassStart | NodeType::Socket)
                 || self.tree_node(i).ascendancy_name.is_some()
             {
+                if let Some(c) = abyss.remove(&id) {
+                    conquered.push((i, c));
+                }
                 continue;
             }
-            let id = self.nodes[i].id;
             let mut by = Vec::new();
-            let mut conquest = None;
+            let mut conquest = abyss.remove(&id);
             for (si, j, radius, keystones) in &radius_jewels {
                 if radius.contains(id)
                     && j.intuitive_leap_like
@@ -922,6 +1001,21 @@ impl<'t> PassiveSpec<'t> {
         }
         for (i, c) in conquered {
             self.nodes[i].conquered = Some(c);
+        }
+        // `ReplaceNode(node, self.tree.nodes[id])`: where the data lists its
+        // nodes as an array, that is the node at the place of the id.
+        // Upstream skips unallocated masteries with all their options, which
+        // keep what the first pass replaced (their lines are the options')
+        for &(id, by) in &self.tree.keyed_as {
+            let (Some(&i), Some(n)) = (self.index.get(&id), self.tree.node(by)) else {
+                continue;
+            };
+            self.nodes[i].stats = Some(Arc::new(NodeStats {
+                sd: n.sd.clone(),
+                mods: n.mods.clone(),
+                mod_list: n.mod_list.clone(),
+            }));
+            self.nodes[i].overlay = Some(Arc::new(tree::Overlay::of_node(n)));
         }
         // Tattoos replace their nodes
         for (id, o) in &self.hash_overrides {
@@ -1241,6 +1335,45 @@ impl<'t> PassiveSpec<'t> {
             cur = step.rest.clone();
         }
         Some(out)
+    }
+
+    /// `GetShortestPathToClassStart(rootId)`: the ids of the nodes on the
+    /// shortest allocated path from the node to the class start
+    pub fn shortest_path_to_class_start(&self, root: usize) -> Option<Vec<u32>> {
+        if !self.nodes[root].alloc {
+            return None;
+        }
+        let target = self.class(self.cur_class_id?).ok()?.start_node_id;
+        let mut parent: HashMap<usize, usize> = HashMap::new();
+        let mut queue = vec![root];
+        let mut o = 0;
+        while o < queue.len() {
+            let node = queue[o];
+            o += 1;
+            for &other in &self.nodes[node].linked {
+                if Some(self.nodes[other].id) == target {
+                    let mut path = vec![self.nodes[root].id, self.nodes[other].id];
+                    let mut cur = Some(node);
+                    while let Some(c) = cur {
+                        path.push(self.nodes[c].id);
+                        cur = parent.get(&c).copied();
+                    }
+                    path.sort_unstable();
+                    path.dedup();
+                    return Some(path);
+                }
+                if self.nodes[other].alloc
+                    && self.kind(node) != NodeType::Mastery
+                    && !self.is_start(other)
+                    && !parent.contains_key(&other)
+                    && other != root
+                {
+                    parent.insert(other, node);
+                    queue.push(other);
+                }
+            }
+        }
+        None
     }
 
     /// `SetNodeDistanceToClassStart(root)`

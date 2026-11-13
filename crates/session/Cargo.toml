@@ -20,3 +20,5 @@ importer.workspace = true
 lua.workspace = true
 serde_json.workspace = true
 
+[dev-dependencies]
+testkit.workspace = true

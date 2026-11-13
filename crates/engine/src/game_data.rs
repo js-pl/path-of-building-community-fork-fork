@@ -17,6 +17,8 @@ pub struct GameData {
     pub config: ConfigData,
     /// What a new config set gives each option
     pub option_defaults: Vec<OptionDefault>,
+    /// The Configuration tab's sections and options
+    pub config_vars: Vec<crate::config_tab::ConfigVar>,
     /// `data.jewelRadius` labels on the latest tree
     pub jewel_radius: Vec<String>,
     /// `treeVersionList`, oldest first; the last is the latest
@@ -29,6 +31,7 @@ crate::codec_struct!(GameData {
     setup,
     config,
     option_defaults,
+    config_vars,
     jewel_radius,
     tree_versions,
 });

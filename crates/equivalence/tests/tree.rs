@@ -159,6 +159,11 @@ fn trees_match_upstream() {
                 );
             }
             check(
+                "icon",
+                text(&get(&ln, "icon")).as_deref() == node.icon.as_deref(),
+                format!("{:?}", node.icon),
+            );
+            check(
                 "unknown",
                 get(&ln, "unknown").truthy() == node.unknown,
                 format!("{}", node.unknown),
@@ -306,6 +311,40 @@ fn trees_match_upstream() {
                     "{name}: translated only {missing:?}, typed only {extra:?}"
                 ));
             }
+        }
+        // Geometry: connectors (an arc split in two once), orbit radii, bounds
+        let mut lconn: Vec<(u32, u32)> = Vec::new();
+        for c in get(&lua_tree, "connectors")
+            .as_table()
+            .map(|t| t.array())
+            .unwrap_or_default()
+        {
+            let id = |k: &str| get(&c, k).as_number().unwrap() as u32;
+            let pair = (id("nodeId1"), id("nodeId2"));
+            if lconn.last() != Some(&pair) {
+                lconn.push(pair);
+            }
+        }
+        if lconn != typed.connectors {
+            fail(format!(
+                "connectors: {} typed, {} translated, or in another order",
+                typed.connectors.len(),
+                lconn.len()
+            ));
+        }
+        let lradii: Vec<f64> = get(&lua_tree, "orbitRadii")
+            .as_table()
+            .map(|t| t.array())
+            .unwrap_or_default()
+            .iter()
+            .filter_map(Value::as_number)
+            .collect();
+        if lradii != typed.orbit_radii {
+            fail(format!("orbitRadii {:?} != {lradii:?}", typed.orbit_radii));
+        }
+        let lbounds = ["min_x", "min_y", "max_x", "max_y"].map(|k| get(&lua_tree, k).as_number());
+        if lbounds != typed.bounds.map(Some) {
+            fail(format!("bounds {:?} != {lbounds:?}", typed.bounds));
         }
         let mut lsockets = ids(&get(&lua_tree, "sockets"));
         let mut tsockets = typed.sockets.clone();

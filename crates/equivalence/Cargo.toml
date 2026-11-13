@@ -19,3 +19,6 @@ miniz_oxide = "0.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 mimalloc.workspace = true
+
+[dev-dependencies]
+testkit.workspace = true

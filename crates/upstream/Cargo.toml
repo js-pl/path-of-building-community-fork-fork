@@ -7,6 +7,12 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+# No unit tests or doc tests: `cargo test` would compile the translated
+# program a second time, as a test harness, for nothing
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 lua.workspace = true
 importer.workspace = true
