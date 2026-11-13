@@ -284,6 +284,9 @@ pub struct TypedSession<'d> {
     gem_quality_nil: bool,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
+    /// Whether the Party tab was laid out since the build loaded: its
+    /// first layout wraps the notes label for good
+    party_laid_out: std::cell::Cell<bool>,
     /// The item editor's controls
     editor: item_editor::Editor,
 }
@@ -322,6 +325,7 @@ impl<'d> TypedSession<'d> {
             undo: HashMap::new(),
             gem_quality_nil: false,
             display_item: None,
+            party_laid_out: Default::default(),
             editor: Default::default(),
             root,
         };
