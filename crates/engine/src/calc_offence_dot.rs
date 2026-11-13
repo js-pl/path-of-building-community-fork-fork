@@ -559,6 +559,8 @@ impl<'a> Perform<'a> {
             .flag(self.pdb(), None, &[&format!("Enemy{t}ResistEqualToYours")])?
         {
             format!("Your {t} Resistance")
+        } else if self.party_flag(&format!("Enemy{t}ResistEqualToYours"))? {
+            format!("Party Member {t} Resistance")
         } else {
             t.to_string()
         };
