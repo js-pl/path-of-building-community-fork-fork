@@ -22,6 +22,8 @@ dependencies = [
 name = "cli"
 version = "0.0.0"
 dependencies = [
+ "engine",
+ "gamedata",
  "lua",
  "mimalloc",
  "serde_json",
@@ -278,7 +280,6 @@ name = "wasm"
 version = "0.0.0"
 dependencies = [
  "session",
- "upstream",
 ]
 
 [[package]]

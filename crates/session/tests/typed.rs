@@ -112,6 +112,58 @@ fn typed_session_matches_translated() {
     if run("items") {
         items_edits_match(&mut d);
     }
+    if run("new") {
+        new_build_matches(&mut d);
+    }
+}
+
+/// `newBuild` opens the translation's empty build: its views and file
+fn new_build_matches(d: &mut Dispatcher) {
+    answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+    assert!(
+        d.typed_active(),
+        "the typed engine did not open a new build"
+    );
+    let mut out = Vec::new();
+    for cmd in [
+        "state",
+        "outputs",
+        "skills",
+        "items",
+        "calcs",
+        "treeState",
+        "treeSpecs",
+    ] {
+        let req = json!({"cmd": cmd}).to_string();
+        let typed = answer(d.request(&req), cmd);
+        let tr = answer(d.translated_request(&req), cmd);
+        diff(&typed, &tr, cmd, &mut out);
+    }
+    compare_saves(d, "newBuild", &mut out);
+    // Then a skill
+    for req in [
+        json!({"cmd": "addSocketGroup"}),
+        json!({"cmd": "setGem", "group": 1, "gem": 1, "name": "Fireball"}),
+        json!({"cmd": "setGem", "group": 1, "gem": 2, "name": "Added Fire Damage"}),
+    ] {
+        let typed = answer(d.request(&req.to_string()), "typed edit");
+        assert!(d.typed_active(), "{req}: {:?}", d.typed_error);
+        let tr = answer(
+            d.translated_request(r#"{"cmd":"skills"}"#),
+            "translated edit",
+        );
+        assert!(tr.get("error").is_none(), "{req}: {tr}");
+        assert!(typed.get("error").is_none(), "{req}: {typed}");
+    }
+    for cmd in ["state", "outputs", "skills"] {
+        let req = json!({"cmd": cmd}).to_string();
+        let typed = answer(d.request(&req), cmd);
+        let tr = answer(d.translated_request(&req), cmd);
+        diff(&typed, &tr, &format!("after a skill: {cmd}"), &mut out);
+    }
+    compare_saves(d, "newBuild with a skill", &mut out);
+    out.truncate(20);
+    assert!(out.is_empty(), "newBuild differs:\n{}", out.join("\n"));
 }
 
 /// Random sequences of item, set, spec, config set, level and socket

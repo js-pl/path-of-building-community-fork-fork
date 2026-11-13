@@ -508,6 +508,8 @@ impl TypedSession<'_> {
 
     fn save_items(&mut self) -> Result<X> {
         let ctx = self.data.item_context();
+        let new_build = self.new_build;
+        let second_set = |v: bool| if new_build { "nil".to_string() } else { b(v) };
         let tab = &mut self.build.items;
         let active = tab
             .item_sets
@@ -522,7 +524,10 @@ impl TypedSession<'_> {
             .is_none_or(|v| v == "true");
         let mut x = X::new("Items")
             .a("activeItemSet", n(tab.active_item_set_id))
-            .a("useSecondWeaponSet", b(active.use_second_weapon_set))
+            .a(
+                "useSecondWeaponSet",
+                second_set(active.use_second_weapon_set),
+            )
             .a("showStatDifferences", b(show));
         for id in tab.item_order_list.clone() {
             let Some(item) = tab.items.get_mut(&(id as i64)) else {
@@ -588,7 +593,7 @@ impl TypedSession<'_> {
             let mut c = X::new("ItemSet")
                 .a("id", n(*set_id))
                 .a("title", set.title.clone())
-                .a("useSecondWeaponSet", b(set.use_second_weapon_set));
+                .a("useSecondWeaponSet", second_set(set.use_second_weapon_set));
             for slot in &tab.ordered_slots {
                 let name = &slot.slot_name;
                 match slot.node_id {
@@ -662,7 +667,9 @@ impl TypedSession<'_> {
                 );
             }
         }
-        x.push(weights);
+        if !self.new_build {
+            x.push(weights);
+        }
         Ok(x)
     }
 
@@ -748,7 +755,14 @@ impl TypedSession<'_> {
                 "defaultGemLevel",
                 skills.default_gem_level.name().to_string(),
             )
-            .a("defaultGemQuality", n(skills.default_gem_quality))
+            .a(
+                "defaultGemQuality",
+                if self.new_build {
+                    "nil".to_string()
+                } else {
+                    n(skills.default_gem_quality)
+                },
+            )
             .a(
                 "sortGemsByDPS",
                 b(attr("sortGemsByDPS").is_none_or(|v| v == "true")),

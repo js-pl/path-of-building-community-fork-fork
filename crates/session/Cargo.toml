@@ -1,17 +1,27 @@
 [package]
 name = "session"
-description = "Engine API: build sessions over upstream's translated program, see docs/design.md"
+description = "Engine API: build sessions on the typed engine, with upstream's translated program as the fallback, see docs/design.md"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+default = ["translation", "source"]
+# Commands the typed engine does not have yet answered by upstream's
+# translated program (`crates/upstream`, `lua/session.lua`); without it
+# they are "not ported" errors
+translation = ["dep:upstream"]
+# The typed data made from upstream's source directory
+# (`TypedData::from_source`), for native runs and tests
+source = ["dep:gamedata"]
+
 [dependencies]
 lua.workspace = true
 engine.workspace = true
-upstream.workspace = true
-gamedata.workspace = true
+upstream = { workspace = true, optional = true }
+gamedata = { workspace = true, optional = true }
 serde_json.workspace = true
 miniz_oxide = "0.9"
 
@@ -20,3 +30,10 @@ importer.workspace = true
 lua.workspace = true
 serde_json.workspace = true
 
+[[test]]
+name = "session"
+required-features = ["translation"]
+
+[[test]]
+name = "typed"
+required-features = ["translation", "source"]

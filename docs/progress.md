@@ -126,8 +126,9 @@ What remains for the full migration, in order:
    `ModCache.lua` at load took about 1.1 s), and parsing a line runs no Lua
    (closures compute on `mod_parser::val`, results are typed mods). Left:
    the `from_lua` constructors only run at build time now and can move
-   into `gamedata`; `pob bundle` should ship the binary once the engine
-   API uses the typed engine.
+   into `gamedata`. `pob bundle` ships the binary form (see "Shipping the
+   typed engine to the browser"); the wasm module built without the
+   translation reads it and runs no Lua at load.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -484,6 +485,67 @@ trigger, or a source skill the templates lack).
 ## Next
 
 See the handoff above.
+
+## Shipping the typed engine to the browser
+
+`crates/wasm` and `crates/session` have a `translation` cargo feature, on
+by default. Built with it, the module holds upstream's translated program
+(`crates/upstream`, the Lua runtime, `lua/session.lua`) as the fallback
+of commands the typed engine does not have yet. Built without it
+(`web/scripts/build-wasm.mjs --typed`, `cargo build -p wasm
+--no-default-features`), neither the translation nor the Lua interpreter
+is linked, and those commands are `not ported: <cmd>` errors
+(`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
+`loadXml`/`loadCode` opens a build on the typed engine, and the browser
+frontend works for everything the typed session answers (sidebar,
+outputs, Calcs tab and breakdowns, tree, skills, items, config set, save,
+node power). `newBuild` is typed (`TypedSession::new_build`, an empty
+build on the latest tree): its views and file match the translation's,
+also after a skill is added (`new_build_matches` in
+`crates/session/tests/typed.rs`).
+
+Data no longer goes through Lua at load. `pob bundle <out>` ships the
+typed engine's data in `engine::codec`'s binary form (`session::bundle`):
+`core.bin` holds the game data, the mod parser (with upstream's ModCache)
+and the current tree, each compressed; every tree version is a separate
+file under `files/`, fetched when a build needs an older one. With
+`pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
+data files the translation reads starting up and loading the given builds,
+and every tree version's Lua data, for an engine built with the
+translation (`build-data.mjs` without `--typed`).
+
+### Size and load time
+
+wasm module (release `web` profile, `strip = true`) and the `core.bin` it
+loads with:
+
+| build | wasm | wasm gzip | core.bin |
+|---|---|---|---|
+| with the translation | 87.7 MB | 17.1 MB | 33.7 MB |
+| typed engine only | 8.2 MB | 2.0 MB | 2.6 MB |
+
+(The 78 MB baseline in `docs/design.md` was before the typed session and
+the Calcs tab data were linked; the translation build is 80 MB without
+them.) The typed module's code is 7.5 MB unstripped: 5.8 MB engine, 0.5 MB
+core, 0.5 MB alloc, 0.3 MB session, 0.2 MB hashbrown, 0.06 MB of the Lua
+runtime (`ljtab` and `pattern`, which the typed engine uses for upstream's
+table layout and item patterns); no translated program, no Lua evaluator.
+
+Time to the first sidebar in headless Chromium (the frontend built with
+Vite, served by a plain static server that sends `application/wasm` so the
+module streams and compiles while it downloads, two engine workers each
+loading the module and the bundle), median of 3 runs:
+
+| build | localhost | 50 Mbit/s, 40 ms |
+|---|---|---|
+| with the translation | ~13.5 s | ~48 s |
+| typed engine only | ~0.85 s | ~4.0 s |
+
+Each worker logs `engine ready in <n> ms` with the module-compile and
+bundle-read splits (`web/src/engine/worker.ts`). The static server does
+not gzip; a real host serving the gzipped sizes above cuts the transfer
+further. The translated module takes about 14 s just to compile and
+instantiate per worker, so it dominates regardless of the link.
 
 ## Upstream quirks met so far
 
