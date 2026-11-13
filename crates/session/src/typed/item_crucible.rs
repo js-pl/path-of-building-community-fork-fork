@@ -64,12 +64,16 @@ impl<'d> TypedSession<'d> {
             if has(0) && (m.lines.len() < 2 || has(1)) {
                 let loc = |i: usize| c.node_location.get(i).map(|&n| n as usize);
                 match (loc(0), loc(1)) {
-                    (Some(a), Some(b)) if a >= 1 && a <= NODES && selections[a - 1].is_some() => {
-                        if b >= 1 && b <= NODES {
+                    (Some(a), Some(b))
+                        if (1..=NODES).contains(&a) && selections[a - 1].is_some() =>
+                    {
+                        if (1..=NODES).contains(&b) {
                             selections[b - 1] = Some(m.id.clone());
                         }
                     }
-                    (Some(a), _) if a >= 1 && a <= NODES => selections[a - 1] = Some(m.id.clone()),
+                    (Some(a), _) if (1..=NODES).contains(&a) => {
+                        selections[a - 1] = Some(m.id.clone())
+                    }
                     _ => return Err(format!("{NOT_PORTED}: a crucible mod off the tree")),
                 }
             }
