@@ -449,6 +449,34 @@ impl<'d> TypedSession<'d> {
                     self.reparse_display(|item| mod_lines_mut(item, k)[i].range = Some(v))?;
                 }
             }
+            (n, Act::State(_))
+                if n == "displayItemMutatedCheckbox"
+                    || index_of(n, "displayItemStackedMutatedCheckbox").is_some() =>
+            {
+                // `MutateMod` of the line's mod, to Foulborn and back
+                let item = self.display_item.as_ref().ok_or("no item in the editor")?;
+                let j = index_of(n, "displayItemStackedMutatedCheckbox").unwrap_or(self.editor.range_sel);
+                let lines = self.range_line_list(item);
+                let Some(line) = lines.get(j.wrapping_sub(1)) else {
+                    return Ok(json!([]));
+                };
+                if let (Some(id), Some(new)) = (line.mod_id.clone(), line.new_mod_id.clone()) {
+                    let mutated = !line.flags.mutated;
+                    let data = self.data;
+                    let mut item = self.display_item.take().ok_or("no item in the editor")?;
+                    let r = item.mutate_mod(&data.game.items, &id, &new, mutated);
+                    let r = match r {
+                        Ok(true) => self.build_and_parse_raw(&mut item),
+                        Ok(false) => Ok(()),
+                        Err(e) => Err(e),
+                    };
+                    self.display_item = Some(item);
+                    r?;
+                    if n == "displayItemMutatedCheckbox" {
+                        self.update_range_lines();
+                    }
+                }
+            }
             (n, Act::Click) if index_of(n, "displayItemCustomModifierRemove").is_some() => {
                 let j = index_of(n, "displayItemCustomModifierRemove").unwrap();
                 let item = self.display_item.as_ref().ok_or("no item in the editor")?;

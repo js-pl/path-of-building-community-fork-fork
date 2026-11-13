@@ -327,3 +327,59 @@ fn combine(first: &str, second: &str) -> Result<String> {
         None => Ok(out),
     }
 }
+
+impl Item {
+    /// `Item:MutateMod(modId, newModId, mutatedValue)` before its
+    /// `BuildAndParseRaw`: the lines of `mod_id` replaced, where the first
+    /// was, by those of `new_mod_id` (Foulborn when `mutated`); false when
+    /// the new mod is unknown and nothing changes
+    pub fn mutate_mod(
+        &mut self,
+        data: &ItemData,
+        mod_id: &str,
+        new_mod_id: &str,
+        mutated: bool,
+    ) -> Result<bool> {
+        let group = if mutated { "Foulborn" } else { "ItemExclusive" };
+        let Some(new) = data
+            .item_mods
+            .get(group)
+            .and_then(|g| g.get(new_mod_id))
+            .cloned()
+        else {
+            return Ok(false);
+        };
+        let mut at: Option<usize> = None;
+        let mut kept = (None, None, None);
+        let mut i = 0;
+        while i < self.explicit_mod_lines.len() {
+            let ml = &self.explicit_mod_lines[i];
+            if ml.mod_id.as_deref() == Some(mod_id) && self.check_mod_line_variant(ml) {
+                if at.is_none() {
+                    at = Some(i);
+                    kept = (
+                        ml.variant_list.clone(),
+                        ml.version_list.clone(),
+                        ml.variant_group_list.clone(),
+                    );
+                }
+                self.explicit_mod_lines.remove(i);
+            } else {
+                i += 1;
+            }
+        }
+        let at = at.ok_or("bad argument #2 to 'insert' (number expected, got nil)")?;
+        let mut line = ModLine {
+            line: new.lines.join("\n"),
+            mod_tags: new.mod_tags.clone(),
+            variant_list: kept.0,
+            version_list: kept.1,
+            variant_group_list: kept.2,
+            mod_group: Some(new_mod_id.to_string()),
+            ..ModLine::default()
+        };
+        line.flags.mutated = mutated;
+        self.explicit_mod_lines.insert(at, line);
+        Ok(true)
+    }
+}
