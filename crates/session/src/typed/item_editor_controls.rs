@@ -44,7 +44,7 @@ fn new_sel(sel: f64, len: usize, cur: Option<f64>) -> Option<usize> {
 
 /// `SliderControl:SetVal(val)`: the new value if it changed
 fn new_val(val: f64, cur: Option<f64>) -> Option<f64> {
-    let v = val.min(1.0).max(0.0);
+    let v = val.clamp(0.0, 1.0);
     (Some(v) != cur).then_some(v)
 }
 

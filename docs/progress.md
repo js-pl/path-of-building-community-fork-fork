@@ -345,15 +345,20 @@ What remains for the full migration, in order:
    earlier in the same shard of phase `tooltips`; with the default 3
    shards they run apart and none needs aligning). `tests/calculator.rs`
    now also takes off the amulet, and recalculates a build that differs
-   on a fresh translation the same way (gen-0018 again). Upstream keeps `displayEffect`,
+   on a fresh translation the same way (gen-0018 again). Comparing a jewel that changes the
+   tree (timeless, Intuitive Leap, Impossible Escape) is
+   `buildSpecForJewelComparison`: a copy of the spec with the jewel in
+   the socket and its paths built again, which the calculator's
+   calculation takes as `override.spec`
+   (`MiscCalculator::calculate_on_spec`). Upstream keeps `displayEffect`,
    `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
    across calculations; the typed tooltips read the sidebar's last
    calculation. Falling back: tattooed and conquered nodes, sockets
    whose radius has nodes the calculation did not build (upstream reads
    their stale `finalModList`, or fails), a radius jewel's "Attributes
    in Radius" (upstream's `jewelRadiusData` counts differently from the
-   typed radius data, e.g. 40 against 20 Str in gen-0029), comparing a
-   jewel that changes the tree, toggling a previewed flask, a mastery
+   typed radius data, e.g. 40 against 20 Str in gen-0029), toggling a
+   previewed flask, a mastery
    tooltip with a popup open, the party view with imported data.
    The translated runtime's `%d` of `-2^63` printed two
    minus signs; it now prints LuaJIT's.

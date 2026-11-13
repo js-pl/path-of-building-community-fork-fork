@@ -795,6 +795,50 @@ impl<'d> TypedSession<'d> {
         Ok(())
     }
 
+    /// `buildSpecForJewelComparison`: the spec with the jewel in the socket
+    /// (or none) and its paths built again, for jewels that replace
+    /// passives or disconnect allocated ones. Upstream's copy starts
+    /// without its subgraphs' pending allocations.
+    fn spec_for_jewel_comparison(
+        &self,
+        socket: u32,
+        rep: Option<&Item>,
+    ) -> Result<std::sync::Arc<engine::spec::PassiveSpec<'d>>> {
+        let mut spec = (*self.build.spec).clone();
+        spec.alloc_subgraph_nodes.clear();
+        spec.alloc_extended_nodes.clear();
+        match rep {
+            // An item not in the items tab takes a free negative id
+            Some(item) => {
+                let id = item
+                    .id
+                    .filter(|id| self.build.items.item(*id).is_some())
+                    .unwrap_or_else(|| {
+                        let mut id = -1.0;
+                        while self.build.items.item(id).is_some() {
+                            id -= 1.0;
+                        }
+                        id
+                    });
+                spec.jewels.insert(socket, id);
+            }
+            None => {
+                spec.jewels.remove(&socket);
+            }
+        }
+        spec.set_tree_jewels(&self.build.items);
+        match rep.and_then(engine::spec::TreeJewel::of) {
+            Some(j) => {
+                spec.tree_jewels.insert(socket, j);
+            }
+            None => {
+                spec.tree_jewels.remove(&socket);
+            }
+        }
+        spec.build_all_depends_and_paths()?;
+        Ok(std::sync::Arc::new(spec))
+    }
+
     /// `ItemsTab:AddItemStatDifferences`
     fn add_item_stat_differences(
         &self,
@@ -812,14 +856,22 @@ impl<'d> TypedSession<'d> {
         let calc_slot = |s: &'_ Slot| -> Result<(Option<&Item>, CalcOutput)> {
             let sel = tab.item(s.sel_item_id).filter(|_| s.sel_item_id != 0.0);
             let same = sel.is_some_and(|x| item.id.is_some() && x.id == item.id);
-            if s.node_id.is_some() && (sel.is_some_and(changes_tree) || changes_tree(item)) {
-                return Err(unported("comparing a jewel that changes the tree"));
-            }
+            let rep = (!same).then(|| item.clone());
+            let spec = match s.node_id {
+                Some(socket) if sel.is_some_and(changes_tree) || changes_tree(item) => {
+                    Some(self.spec_for_jewel_comparison(socket, rep.as_ref())?)
+                }
+                _ => None,
+            };
             let ovr = Override {
-                rep_item: Some((s.slot_name.clone(), (!same).then(|| item.clone()))),
+                rep_item: Some((s.slot_name.clone(), rep)),
                 ..Override::default()
             };
-            Ok((sel, calc.calculate(&ovr, true)?))
+            let out = match spec {
+                Some(spec) => calc.calculate_on_spec(spec, &ovr, true)?,
+                None => calc.calculate(&ovr, true)?,
+            };
+            Ok((sel, out))
         };
         let base_out = calc.base();
         let add = |tip: &mut Tooltip, label: &str, sel: Option<&Item>, out: &CalcOutput| {
