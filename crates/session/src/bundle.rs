@@ -28,6 +28,41 @@ pub fn tree_path(version: &str) -> String {
     format!("typed/trees/{version}.bin")
 }
 
+/// The timeless jewels' data but their look-up tables
+/// (`engine::timeless::Timeless::encode`), compressed
+pub const TIMELESS: &str = "typed/timeless.bin";
+
+/// A timeless jewel's look-up table by its name without spaces
+/// (`LethalPride`): upstream's zlib stream, its parts joined
+pub fn timeless_lut_path(name: &str) -> String {
+    format!("typed/timeless/{name}.bin")
+}
+
+/// The timeless jewels' data as stored in a bundle
+pub fn encode_timeless(timeless: &engine::timeless::Timeless) -> Vec<u8> {
+    miniz_oxide::deflate::compress_to_vec_zlib(&timeless.encode(), 9)
+}
+
+/// The timeless jewels' data from a bundle's files; each look-up table is
+/// read from them when a jewel first needs it, and dropped from `files`
+pub fn decode_timeless(files: &Files) -> Result<engine::timeless::Timeless, String> {
+    let bytes = files
+        .get(TIMELESS)
+        .ok_or_else(|| format!("missing data file {TIMELESS}"))?;
+    let raw = miniz_oxide::inflate::decompress_to_vec_zlib(&bytes)
+        .map_err(|e| format!("{TIMELESS}: not a zlib stream: {e:?}"))?;
+    let luts = files.clone();
+    let loader = move |name: &str| {
+        let path = timeless_lut_path(name);
+        let packed = luts.get(&path)?;
+        let lut = miniz_oxide::inflate::decompress_to_vec_zlib(&packed).ok();
+        luts.remove(&path);
+        lut
+    };
+    engine::timeless::Timeless::decode(&raw, Box::new(loader))
+        .map_err(|e| format!("{TIMELESS}: {e}"))
+}
+
 /// A passive tree as stored in a bundle: its binary form, compressed
 pub fn encode_tree(tree: &PassiveTree) -> Vec<u8> {
     miniz_oxide::deflate::compress_to_vec_zlib(&tree.encode(), 9)
@@ -74,4 +109,46 @@ pub fn unpack(bundle: &[u8], files: &Files) -> Result<usize, String> {
         files.insert(path, take(n)?.to_vec());
     }
     Ok(count)
+}
+
+/// Data files by bundle path, with their bytes
+pub type FileList = Vec<(String, Vec<u8>)>;
+
+/// The typed engine's data made from upstream's source directory, by
+/// bundle path: what starts the engine (game data, mod parser, the latest
+/// tree), and what builds need on demand (every tree version, the
+/// timeless jewels' data and look-up tables)
+#[cfg(feature = "source")]
+pub fn typed_files(src_dir: &std::path::Path) -> Result<(FileList, FileList), String> {
+    let src = gamedata::Source::load(src_dir)?;
+    let game = src.game_data()?;
+    let parser_bytes = src.mod_parser_data()?.encode();
+    let parser = engine::mod_parser::ModParser::decode(&parser_bytes)?;
+    let latest = game.latest_tree_version().to_string();
+    let mut core = vec![
+        (GAME_DATA.to_string(), game.encode()),
+        (MOD_PARSER.to_string(), parser_bytes),
+    ];
+    let mut lazy = Vec::new();
+    for v in &game.tree_versions {
+        let tree = src
+            .tree(v, &parser, *v == latest)
+            .map_err(|e| format!("tree {v}: {e}"))?;
+        let file = (tree_path(v), encode_tree(&tree));
+        if *v == latest {
+            core.push(file.clone());
+        }
+        lazy.push(file);
+    }
+    lazy.push((
+        TIMELESS.to_string(),
+        encode_timeless(&src.timeless(&parser)?),
+    ));
+    for ty in engine::timeless::TYPES {
+        let name = ty.replace(' ', "");
+        let packed = gamedata::timeless_lut_packed(src_dir, &name)
+            .ok_or_else(|| format!("no look-up table for {ty}"))?;
+        lazy.push((timeless_lut_path(&name), packed));
+    }
+    Ok((core, lazy))
 }

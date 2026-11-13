@@ -147,11 +147,12 @@ export function TreeTab({ act, rev }: TabProps) {
     const id = hover.node.id;
     const t = setTimeout(async () => {
       const [tt, p] = await Promise.all([
-        engine.call<{ lines: TooltipLine[] }>("nodeTooltip", { id }),
+        // No tooltip where the engine has none
+        engine.call<{ lines: TooltipLine[] }>("nodeTooltip", { id }).catch(() => null),
         engine.call<{ path: number[] }>("nodePath", { id }),
       ]);
       if (!stale) {
-        setTip(tt.lines);
+        setTip(tt?.lines ?? null);
         setPath(new Set(p.path));
       }
     }, 120);

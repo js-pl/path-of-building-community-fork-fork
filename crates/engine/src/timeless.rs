@@ -4,7 +4,9 @@
 //! `PassiveSpec:BuildAllDependsAndPaths` does to a conquered node.
 //!
 //! The look-up tables are large; the caller gives a loader of their
-//! decompressed bytes by jewel name, read when a jewel first needs them.
+//! decompressed bytes by jewel name, read when a jewel first needs them
+//! (and again later if the loader had none). The rest is stored in
+//! `crate::codec`'s binary form ([`Timeless::encode`]).
 //! The Abyss jewels (types 7 to 11) read theirs by socket, and Zorath's by
 //! node (`Modules/DataAbyssJewelLookUpTableHelper.lua`).
 //!
@@ -86,9 +88,40 @@ pub struct Timeless {
     /// `nodeIDList.localIdToGlobalId`, by type from 1
     local_to_global: HashMap<usize, HashMap<u32, u32>>,
     loader: Box<Loader>,
-    luts: Mutex<HashMap<usize, Option<Arc<Vec<u8>>>>>,
+    luts: Mutex<HashMap<usize, Arc<Vec<u8>>>>,
     abyss: Mutex<HashMap<usize, Arc<AbyssLut>>>,
 }
+
+crate::codec_struct!(StatRange {
+    fmt,
+    index,
+    min,
+    max
+});
+crate::codec_struct!(LegionNode {
+    node,
+    sorted_stats,
+    stats
+});
+
+/// What [`Timeless`] holds besides the look-up tables
+struct Parts {
+    nodes: Vec<LegionNode>,
+    additions: Vec<LegionNode>,
+    node_ids: HashMap<u32, (usize, usize)>,
+    size: usize,
+    size_notable: usize,
+    local_to_global: HashMap<usize, HashMap<u32, u32>>,
+}
+
+crate::codec_struct!(Parts {
+    nodes,
+    additions,
+    node_ids,
+    size,
+    size_notable,
+    local_to_global
+});
 
 impl std::fmt::Debug for Timeless {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -184,14 +217,46 @@ impl Timeless {
         })
     }
 
-    /// A jewel type's look-up table, loaded once
+    /// Everything but the look-up tables, in the binary form
+    pub fn encode(&self) -> Vec<u8> {
+        crate::codec::encode(&Parts {
+            nodes: self.nodes.clone(),
+            additions: self.additions.clone(),
+            node_ids: self.node_ids.clone(),
+            size: self.size,
+            size_notable: self.size_notable,
+            local_to_global: self.local_to_global.clone(),
+        })
+    }
+
+    /// Reads what [`Timeless::encode`] wrote, with a loader of the
+    /// look-up tables
+    pub fn decode(bytes: &[u8], loader: Box<Loader>) -> Result<Timeless> {
+        let p: Parts = crate::codec::decode(bytes)?;
+        Ok(Timeless {
+            nodes: p.nodes,
+            additions: p.additions,
+            node_ids: p.node_ids,
+            size: p.size,
+            size_notable: p.size_notable,
+            local_to_global: p.local_to_global,
+            loader,
+            luts: Mutex::new(HashMap::new()),
+            abyss: Mutex::new(HashMap::new()),
+        })
+    }
+
+    /// A jewel type's look-up table, loaded once it is there
     fn lut(&self, ty: usize) -> Result<Arc<Vec<u8>>> {
         let mut luts = self.luts.lock().map_err(|e| e.to_string())?;
-        let lut = luts
-            .entry(ty)
-            .or_insert_with(|| (self.loader)(&TYPES[ty - 1].replace(' ', "")).map(Arc::new));
-        lut.clone()
-            .ok_or_else(|| format!("not ported: no timeless jewel data for {}", TYPES[ty - 1]))
+        if let Some(lut) = luts.get(&ty) {
+            return Ok(lut.clone());
+        }
+        let lut = (self.loader)(&TYPES[ty - 1].replace(' ', ""))
+            .map(Arc::new)
+            .ok_or_else(|| format!("not ported: no timeless jewel data for {}", TYPES[ty - 1]))?;
+        luts.insert(ty, lut.clone());
+        Ok(lut)
     }
 
     fn global_id(&self, ty: usize, local: u32) -> u32 {

@@ -34,7 +34,7 @@ impl DataSource for Files {
                 "LoadModule() error loading '{rel}': missing data file"
             ))
         })?;
-        upstream::imported::load_data(env, rel, src, args)
+        upstream::imported::load_data(env, rel, Rc::new((*src).clone()), args)
     }
 
     fn read_file(&self, path: &str) -> Option<Vec<u8>> {
