@@ -8,7 +8,8 @@
 //! holds over every test process on the machine (`cargo test` runs a
 //! binary's tests on threads, nextest each test in a process of its own),
 //! through lock files in the temporary directory. `TEST_JOBS=<n>` sets the
-//! number of children at once.
+//! number of children at once. `TEST_SHARD_PARTITION=<k>/<n>` runs only
+//! the `k`-th of every `n` shards (from 1), to split a test over machines.
 
 use std::fs::{File, OpenOptions, TryLockError};
 use std::path::PathBuf;
@@ -84,6 +85,23 @@ pub fn slot() -> Slot {
 /// contain any of `report` are printed; panics with the output of every
 /// child that failed.
 pub fn run_shards(test: &str, shards: &[String], report: &[&str]) {
+    let shards: Vec<String> = match std::env::var("TEST_SHARD_PARTITION") {
+        Ok(p) if !p.is_empty() => {
+            let (k, n) = p
+                .split_once('/')
+                .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
+                .filter(|&(k, n)| k >= 1 && k <= n)
+                .unwrap_or_else(|| panic!("TEST_SHARD_PARTITION={p}: not <k>/<n>"));
+            shards
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| i % n == k - 1)
+                .map(|(_, s)| s.clone())
+                .collect()
+        }
+        _ => shards.to_vec(),
+    };
+    let shards = &shards[..];
     let exe = std::env::current_exe().unwrap();
     let start = Instant::now();
     let outputs: Vec<(String, Output, Duration)> = std::thread::scope(|scope| {

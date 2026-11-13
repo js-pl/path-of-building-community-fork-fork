@@ -265,8 +265,10 @@ written by hand. Details, the JSON format and the determinism checks are in
   12 GB besides the sharded tests' children).
 - CI builds the tests once (`cargo nextest archive`, sccache keeps the
   translated crate between runs when importer, lua and the submodule did
-  not change) and runs them on three runners: the session test, the
-  perform tests and the rest.
+  not change) and runs them on six runners: the session test's shards on
+  two (`TEST_SHARD_PARTITION`), the perform tests on one and the rest on
+  three (nextest's `--partition`). Equivalence tests side by side are
+  about three times slower each: they are bound by the runner's CPU.
 
 ### Comparison rules
 
