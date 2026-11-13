@@ -694,7 +694,7 @@ impl<'t> PassiveSpec<'t> {
         let mastery_start = cluster_end + 1;
         let mastery_end = mastery_start + byte(mastery_start) * 4;
         let effects = sub(mastery_start + 1, Some(mastery_end));
-        for c in effects.chunks_exact(4) {
+        for c in effects.as_chunks::<4>().0 {
             let effect = u32::from(c[0]) * 256 + u32::from(c[1]);
             let id = u32::from(c[2]) * 256 + u32::from(c[3]);
             if self
@@ -714,7 +714,7 @@ impl<'t> PassiveSpec<'t> {
 
     /// `AllocateDecodedNodes(nodes, isCluster, "big")`
     fn allocate_decoded_nodes(&mut self, nodes: &[u8], offset: u32) {
-        for c in nodes.chunks_exact(2) {
+        for c in nodes.as_chunks::<2>().0 {
             let id = u32::from(c[0]) * 256 + u32::from(c[1]) + offset;
             if let Some(&i) = self.index.get(&id) {
                 self.alloc(i);
