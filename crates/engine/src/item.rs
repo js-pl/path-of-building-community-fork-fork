@@ -442,6 +442,37 @@ fn has(set: &BTreeSet<i64>, n: Option<f64>) -> bool {
     n.is_some_and(|n| n.fract() == 0.0 && set.contains(&(n as i64)))
 }
 
+/// `sortCraftedModLines`: fractured lines first, crafted and custom last,
+/// the rest by stat order
+pub(crate) fn sort_crafted_mod_lines(lines: &mut Vec<ModLine>) {
+    let group = |m: &ModLine| {
+        if m.flags.crafted || m.flags.custom {
+            3
+        } else if m.flags.fractured {
+            1
+        } else {
+            2
+        }
+    };
+    let mut indexed: Vec<(usize, ModLine)> =
+        std::mem::take(lines).into_iter().enumerate().collect();
+    indexed.sort_by(|(ai, a), (bi, b)| {
+        let (ag, bg) = (group(a), group(b));
+        if ag != bg {
+            return ag.cmp(&bg);
+        }
+        if ag < 3 && a.order != b.order {
+            let (ao, bo) = (
+                a.order.unwrap_or(f64::INFINITY),
+                b.order.unwrap_or(f64::INFINITY),
+            );
+            return ao.partial_cmp(&bo).unwrap_or(std::cmp::Ordering::Equal);
+        }
+        ai.cmp(bi)
+    });
+    *lines = indexed.into_iter().map(|(_, m)| m).collect();
+}
+
 /// `escapeGGGString` of `Modules/Common.lua`
 fn escape_ggg(text: &str) -> String {
     let l = gsub(text, "<[^>]+>{([^}]+)}", "%1");
@@ -919,7 +950,12 @@ impl Item {
 
     /// `CanHaveMod(mod)`
     fn can_have_mod(&self, data: &ItemData, m: &Affix) -> bool {
-        let mut include = HashSet::new();
+        self.can_have_mod_with(data, m, &HashSet::new())
+    }
+
+    /// `CanHaveMod(mod, includeTags)`
+    pub fn can_have_mod_with(&self, data: &ItemData, m: &Affix, tags: &HashSet<String>) -> bool {
+        let mut include = tags.clone();
         let title = self.title.as_deref().unwrap_or("");
         if data.caster_tag_crucible_uniques.contains(title) {
             include.insert("caster_unique_weapon".to_string());
@@ -2235,35 +2271,7 @@ impl Item {
             self.apply_mod_magnitudes(ctx)?;
         }
         if self.has_modifier_headers && self.explicit_mod_lines.len() > 1 {
-            // sortCraftedModLines
-            let group = |m: &ModLine| {
-                if m.flags.crafted || m.flags.custom {
-                    3
-                } else if m.flags.fractured {
-                    1
-                } else {
-                    2
-                }
-            };
-            let mut lines: Vec<(usize, ModLine)> = std::mem::take(&mut self.explicit_mod_lines)
-                .into_iter()
-                .enumerate()
-                .collect();
-            lines.sort_by(|(ai, a), (bi, b)| {
-                let (ag, bg) = (group(a), group(b));
-                if ag != bg {
-                    return ag.cmp(&bg);
-                }
-                if ag < 3 && a.order != b.order {
-                    let (ao, bo) = (
-                        a.order.unwrap_or(f64::INFINITY),
-                        b.order.unwrap_or(f64::INFINITY),
-                    );
-                    return ao.partial_cmp(&bo).unwrap_or(std::cmp::Ordering::Equal);
-                }
-                ai.cmp(bi)
-            });
-            self.explicit_mod_lines = lines.into_iter().map(|(_, m)| m).collect();
+            sort_crafted_mod_lines(&mut self.explicit_mod_lines);
         }
         self.affix_limit = 0.0;
         if self.crafted {
