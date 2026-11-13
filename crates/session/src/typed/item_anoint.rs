@@ -10,7 +10,9 @@ use super::item_popups::ItemPopup;
 use super::{NOT_PORTED, Result, TypedSession};
 use engine::calc_override::Override;
 use engine::calculator::MiscCalculator;
+use engine::compare;
 use engine::item::{Item, ModLine};
+use engine::parallel::Threads;
 use engine::pat::{gsub, is_match, lower, match_or_pattern};
 use engine::power::{PowerStat, mod_key, power_stats};
 use engine::tree::Node;
@@ -147,27 +149,30 @@ impl<'d> TypedSession<'d> {
             let slot = display.base.as_ref().ok_or("no base")?.typ.clone();
             let data = self.data.calc_data();
             let calc = MiscCalculator::new(&self.build, &data)?;
-            let full_dps = false;
-            let out = |item: Item| -> Result<_> {
-                let ovr = Override {
-                    rep_item: Some((slot.clone(), Some(item))),
-                    ..Override::default()
-                };
-                calc.calculate(&ovr, full_dps)
+            let ovr = |item: Item| Override {
+                rep_item: Some((slot.clone(), Some(item))),
+                ..Override::default()
             };
-            let base = out(self.anoint_item(p.slot, None)?)?;
+            // The notables with mods; the others keep a power of 0
+            let mut measured = Vec::new();
+            let mut nodes = Vec::new();
+            for (i, (node, _)) in list.iter().enumerate() {
+                if !mod_key(&node.mods).is_empty() {
+                    measured.push(i);
+                    nodes.push(ovr(self.anoint_item(p.slot, Some(node))?));
+                }
+            }
+            let base = ovr(self.anoint_item(p.slot, None)?);
+            let powers = compare::anoint_power(&calc, base, nodes, stat, Threads::available())?;
             let mut max: f64 = 0.0;
             let mut infinites = Vec::new();
-            for (i, (node, power)) in list.iter_mut().enumerate() {
-                if mod_key(&node.mods).is_empty() {
-                    continue;
-                }
-                let o = out(self.anoint_item(p.slot, Some(node))?)?;
-                *power = stat.power(&o, &base);
-                if *power == f64::INFINITY {
+            for (i, power) in measured.into_iter().zip(powers) {
+                let power = power?;
+                list[i].1 = power;
+                if power == f64::INFINITY {
                     infinites.push(i);
                 } else {
-                    max = max.max(*power);
+                    max = max.max(power);
                 }
             }
             for i in infinites {
