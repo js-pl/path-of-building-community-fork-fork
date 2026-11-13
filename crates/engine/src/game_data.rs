@@ -31,6 +31,33 @@ pub struct GameData {
     /// `data.itemBaseTypeList` and each type's `data.itemBaseLists` (the
     /// bases' names)
     pub item_base_lists: Vec<(String, Vec<String>)>,
+    /// `data.enchantments` by key (a base type, a weapon type, `Flask` or
+    /// `UtilityFlask`)
+    pub enchantments: Vec<(String, Enchantments)>,
+}
+
+/// Enchantment lines by source
+pub type SourceLines = Vec<(String, Vec<String>)>;
+
+/// An entry of `data.enchantments`: the lines of each enchantment source
+/// (`HARVEST`, `ENDGAME`, ...), or of each skill's sources for helmets
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Enchantments {
+    /// Lines by source, in the file's order
+    pub sources: SourceLines,
+    /// Sources by skill name, sorted by name
+    pub skills: Vec<(String, SourceLines)>,
+}
+
+crate::codec_struct!(Enchantments { sources, skills });
+
+impl Enchantments {
+    /// The lines of a source in `list`
+    pub fn lines<'a>(list: &'a [(String, Vec<String>)], source: &str) -> Option<&'a [String]> {
+        list.iter()
+            .find(|(s, _)| s == source)
+            .map(|(_, l)| l.as_slice())
+    }
 }
 
 crate::codec_struct!(GameData {
@@ -45,6 +72,7 @@ crate::codec_struct!(GameData {
     uniques,
     rares,
     item_base_lists,
+    enchantments,
 });
 
 impl GameData {
@@ -55,6 +83,14 @@ impl GameData {
 
     pub fn encode(&self) -> Vec<u8> {
         codec::encode(self)
+    }
+
+    /// `data.enchantments[key]`
+    pub fn enchantments(&self, key: &str) -> Option<&Enchantments> {
+        self.enchantments
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, e)| e)
     }
 }
 
