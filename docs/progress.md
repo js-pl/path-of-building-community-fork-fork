@@ -99,12 +99,18 @@ State at the handoff:
   ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
   `timeless_specs_match_upstream` and `timeless_match_upstream` socket
   each jewel and conqueror with a seed of its own in generated corpus
-  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
-  replaced), against the translation with `Inflate` installed (headless
-  upstream has none, so the oracle cannot run them). The Abyss variants
-  run last: a conquered node's `setSource` rewrites the mod parser's
-  cached mods, which the legion keystones share, so a keystone conquered
-  later in the same translation names another node as its mods' source.
+  builds: every fifth build's socket with the most allocated nodes in
+  its radius (each jewel in all its variants, the legacy ones in every
+  third of those builds), and in every build each socket with allocated
+  keystones in its radius, with one legacy jewel in turn (113 specs,
+  3893 nodes replaced), against the translation with `Inflate` installed
+  (headless upstream has none, so the oracle cannot run them). A
+  conquered Necromantic Aegis no longer sends the shield's mods to the
+  minions (`env.allocNodes[45175].dn` is the spec's node). The Abyss
+  variants run last: a conquered node's `setSource` rewrites the mod
+  parser's cached mods, which the legion keystones share, so a keystone
+  conquered later in the same translation names another node as its
+  mods' source; `tests/spec.rs` aligns those sources.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -360,9 +366,15 @@ What remains for the full migration, in order:
    options' functions set, tooltips), `control` of the option controls
    with `BuildModList` and the recalculation, of the class, ascendancy
    and bloodline drop-downs (with `IsClassConnected` and the class change
-   popup, whose Continue `popupButton` and `closePopup` are typed),
-   `undo` (the active spec's `UndoHandler`; a spec with tattoos or
-   cluster jewel subgraphs falls back) and `newBuild`. The options'
+   popup, whose Continue `popupButton` and `closePopup` are typed; the
+   typed session's popups are these, so any other button gets the
+   translation's "no popup button" error without falling back),
+   `undo` (the active spec's `UndoHandler`, also with tattoos and
+   cluster jewel subgraphs: `RestoreUndoState` keeps the subgraphs, and
+   `ImportFromNodeList` allocates again every subgraph node
+   `BuildClusterJewelGraphs` ever allocated anew, `allocExtendedNodes`,
+   which upstream never empties; `tree_edits_match` undoes at random
+   too) and `newBuild`. The options'
    metadata comes from `Modules/ConfigOptions.lua` at build time
    (`engine::config_tab::ConfigVar` in the game data), with
    `data.enemyIsBossTooltip` evaluated from `Data.lua`.
@@ -375,8 +387,12 @@ What remains for the full migration, in order:
    opened keeps it, as upstream's popups belong to `main` (the
    dispatcher carries the typed popups over; a popup the translation
    opened while the build was on it is not carried). Saviour's mirage as
-   the main skill and undo on specs with tattoos or cluster jewel
-   subgraphs fall back.
+   the main skill falls back.
+
+   A typed error starting with `UPSTREAM_ERROR` is one the translation
+   answers the same request with (`no node <id>` of `clickNode`,
+   `nodePath` and `nodeTooltip`): the dispatcher answers it as the
+   request's error and keeps the typed build.
 
    The dispatcher records each request the typed engine gave to the
    translation while it held the build (`Dispatcher::fallbacks`, with
@@ -420,10 +436,11 @@ What remains for the full migration, in order:
      popup's buttons act on the tab it came from). Ported on the way:
      `initEnv`'s write-back of the clamped `build.mainSocketGroup` (an
      item granting the main socket group replaced).
-   - Engine gaps that make a build fall back: Combust's trigger
-     (gen-0028), tree edits with Intuitive
-     Leap and the like, tattoos, specs in the URL format only, the character
-     level's auto mode.
+   - Engine gaps that make a build fall back: none over the corpus.
+     Combust (gen-0028), the character level's auto mode, tattoos and
+     tree edits with Intuitive Leap no longer do; specs in the old URL
+     format (`PassiveSpec:DecodeURL`) are typed, and `commands_match`
+     loads every tenth build with its specs as tree links.
 
 ## Done
 

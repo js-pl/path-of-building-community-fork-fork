@@ -10,7 +10,7 @@
 
 #[cfg(feature = "translation")]
 use crate::Session;
-use crate::typed::{NOT_PORTED, TypedData, TypedSession};
+use crate::typed::{NOT_PORTED, TypedData, TypedSession, UPSTREAM_ERROR};
 use serde_json::{Value as J, json};
 
 /// Which implementation answers the commands both have
@@ -400,11 +400,14 @@ impl<'d> Dispatcher<'d> {
             "craftItem" => self.edit(json, |s| s.craft_item()),
             "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
             "popupButton" => {
-                let name = req["name"].as_str()?.to_string();
-                if !self.typed.as_ref()?.has_class_popup() {
-                    return None;
+                // The typed session's popups are the class change popups,
+                // whose only button with a name is Continue's
+                let name = req["name"].as_str().unwrap_or("nil").to_string();
+                if !self.typed.as_ref()?.has_class_popup() || name != "confirm" {
+                    let e = format!("no popup button {name}");
+                    return Some(json!({ "error": e }).to_string());
                 }
-                self.edit(json, |s| s.popup_button(&name))
+                self.edit(json, |s| s.popup_button())
             }
             "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {
@@ -452,6 +455,7 @@ impl<'d> Dispatcher<'d> {
     fn view(&mut self, r: crate::typed::Result<J>) -> Option<String> {
         match r {
             Ok(v) => Some(ok(v)),
+            Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Err(e) => {
                 self.typed_error = Some(e);
                 None
@@ -468,6 +472,8 @@ impl<'d> Dispatcher<'d> {
     ) -> Option<String> {
         let r = f(self.typed.as_mut()?);
         match r {
+            // The translation fails the same way, before changing the build
+            Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
                 #[cfg(feature = "translation")]
                 if self.translated.is_some() {
@@ -542,7 +548,15 @@ impl<'d> Dispatcher<'d> {
 
 /// A view's answer; why the typed engine has none
 fn view(error: &mut Option<String>, r: crate::typed::Result<J>) -> Option<String> {
-    r.map_err(|e| *error = Some(e)).ok().map(ok)
+    match r {
+        Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
+        r => r.map_err(|e| *error = Some(e)).ok().map(ok),
+    }
+}
+
+/// The error response the translation gives, of an [`UPSTREAM_ERROR`]
+fn upstream_error(e: &str) -> String {
+    json!({ "error": &e[UPSTREAM_ERROR.len()..] }).to_string()
 }
 
 /// A request's node id

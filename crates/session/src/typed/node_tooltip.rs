@@ -121,7 +121,7 @@ impl TypedSession<'_> {
 
     fn node_tooltip_lines(&self, id: u32) -> Result<J> {
         let spec = &self.build.spec;
-        let i = *spec.index.get(&id).ok_or_else(|| format!("no node {id}"))?;
+        let i = self.node_or_error(id)?;
         let node = &spec.nodes[i];
         let kind = spec.kind(i);
         if node.overlay.is_some() {
