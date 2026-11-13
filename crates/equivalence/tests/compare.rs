@@ -32,7 +32,11 @@ fn get(v: &Value, k: &str) -> Value {
 }
 
 fn describe(e: &LuaError) -> String {
-    format!("{}\n  {}", lua::to_string(e.value()), e.traceback().join("\n  "))
+    format!(
+        "{}\n  {}",
+        lua::to_string(e.value()),
+        e.traceback().join("\n  ")
+    )
 }
 
 /// A new `Item` from upstream's host (`new("Item"):Item(raw, rarity,
@@ -85,7 +89,7 @@ fn item_slots(
         .filter(|sl| sl.node_id.is_none())
         .filter(|sl| match sl.weapon_set {
             Some(1) => !second,
-            Some(2) => second,
+            Some(_) => second,
             None => true,
         })
         .filter(|sl| !matches!(sl.slot_name.as_str(), "Ring 3" | "Graft 1" | "Graft 2"))
@@ -136,8 +140,7 @@ fn item_power_matches_upstream() {
 
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
         data.load_tree(&root);
-        let one_hand =
-            |t: &str| data.setup.weapon_type_info.get(t).map(|w| w.one_hand);
+        let one_hand = |t: &str| data.setup.weapon_type_info.get(t).map(|w| w.one_hand);
         let mut build = match data.load_build(&root) {
             Ok(b) => b,
             Err(e) => {
@@ -155,7 +158,10 @@ fn item_power_matches_upstream() {
                 continue;
             }
         };
-        let stat: PowerStat = power_stats().into_iter().find(|s| s.label == label).unwrap();
+        let stat: PowerStat = power_stats()
+            .into_iter()
+            .find(|s| s.label == label)
+            .unwrap();
 
         // Sample unique items that fit at least one slot
         let ctx = engine::item::ItemContext {
@@ -229,10 +235,7 @@ fn item_power_matches_upstream() {
                 let ovr = TableRef::new();
                 ovr.set_str("repSlotName", s(sl));
                 ovr.set_str("repItem", li.clone());
-                let out = match rt::call(
-                    &calc_func,
-                    &[Value::Table(ovr), Value::Bool(full_dps)],
-                ) {
+                let out = match rt::call(&calc_func, &[Value::Table(ovr), Value::Bool(full_dps)]) {
                     Ok(r) => r.into_iter().next().unwrap_or_default(),
                     Err(e) => {
                         failures.push(format!("{id}: item {i} {sl}: translated: {}", describe(&e)));
@@ -380,7 +383,10 @@ fn gem_power_matches_upstream() {
         let group = rt::index(&lsg, &Value::Number(main)).unwrap_or_default();
         let gem_list = get(&group, "gemList");
         let gl = gem_list.as_table().unwrap();
-        let base_len = rt::len(&gem_list).unwrap_or_default().as_number().unwrap_or(0.0);
+        let base_len = rt::len(&gem_list)
+            .unwrap_or_default()
+            .as_number()
+            .unwrap_or(0.0);
         let idx = base_len + 1.0;
 
         let mut typed = BTreeMap::new();
@@ -425,7 +431,7 @@ fn gem_power_matches_upstream() {
 }
 
 /// Borrow the candidates for a run (each run consumes its vector)
-fn typed_slice(cands: &[GemCandidate]) -> Vec<GemCandidate> {
+fn typed_slice<'a>(cands: &[GemCandidate<'a>]) -> Vec<GemCandidate<'a>> {
     cands
         .iter()
         .map(|c| GemCandidate {
@@ -503,7 +509,10 @@ fn anoint_power_matches_upstream() {
                 continue;
             }
         };
-        let stat: PowerStat = power_stats().into_iter().find(|s| s.label == label).unwrap();
+        let stat: PowerStat = power_stats()
+            .into_iter()
+            .find(|s| s.label == label)
+            .unwrap();
         let ctx = engine::item::ItemContext {
             data: &data.items,
             parser: &data.parser,
@@ -565,12 +574,22 @@ fn anoint_power_matches_upstream() {
                 ..Override::default()
             })
             .collect();
-        let seq = compare::anoint_power(&calc, base_ovr.clone(), node_ovrs.clone(), &stat, Threads::Sequential);
+        let seq = compare::anoint_power(
+            &calc,
+            base_ovr.clone(),
+            node_ovrs.clone(),
+            &stat,
+            Threads::Sequential,
+        );
         let par = compare::anoint_power(&calc, base_ovr, node_ovrs, &stat, Threads::Pool(4));
         let (seq, par) = match (seq, par) {
             (Ok(s), Ok(p)) => (s, p),
             (s, p) => {
-                failures.push(format!("{id}: anoint base failed: {:?} / {:?}", s.err(), p.err()));
+                failures.push(format!(
+                    "{id}: anoint base failed: {:?} / {:?}",
+                    s.err(),
+                    p.err()
+                ));
                 continue;
             }
         };
@@ -586,7 +605,11 @@ fn anoint_power_matches_upstream() {
         let base_li = anoint(Value::Nil).map(|(li, _)| li).unwrap();
         let base_out = one_arg(amulet_ovr(&base_li));
         let base_val = match base_out {
-            Ok(r) => lua_value(&power_list, &stat_table, &r.into_iter().next().unwrap_or_default()),
+            Ok(r) => lua_value(
+                &power_list,
+                &stat_table,
+                &r.into_iter().next().unwrap_or_default(),
+            ),
             Err(e) => {
                 failures.push(format!("{id}: translated base: {}", describe(&e)));
                 continue;

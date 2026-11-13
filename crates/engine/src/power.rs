@@ -379,10 +379,14 @@ pub fn node_power_with(
     opts: &PowerOptions,
     threads: Option<usize>,
 ) -> Result<NodePowers> {
-    node_power_on(calc, opts, match threads {
-        Some(n) => crate::parallel::Threads::Pool(n),
-        None => crate::parallel::Threads::Sequential,
-    })
+    node_power_on(
+        calc,
+        opts,
+        match threads {
+            Some(n) => crate::parallel::Threads::Pool(n),
+            None => crate::parallel::Threads::Sequential,
+        },
+    )
 }
 
 /// [`node_power`] with the candidates' calculations made ahead on
