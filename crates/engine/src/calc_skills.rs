@@ -415,6 +415,27 @@ pub(crate) fn can_support(
     can_support_summoned(support, skill, None, from_item, groups, weapons, data)
 }
 
+/// `calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill)`
+/// of a support gem's granted effect and the player's active skill `i` of
+/// a setup, as the Skills tab's gem list asks it of a socket group's skills
+pub fn effect_supports(
+    effect: &Arc<GrantedEffect>,
+    skills: &SkillsSetup,
+    i: usize,
+    groups: &[SocketGroup],
+    data: &SkillData,
+) -> bool {
+    let weapons = ActorWeapons::new(&skills.weapon_data);
+    can_support(
+        &SkillEffect::new(effect.clone(), None, 0.0),
+        &skills.active_skills[i],
+        &skills.from_item,
+        groups,
+        &weapons,
+        data,
+    )
+}
+
 /// The same for a minion's skill: the summoning skill's types count
 /// (`activeSkill.summonSkill`), and triggers support no minion skills
 fn can_support_summoned(

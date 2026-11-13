@@ -6,6 +6,7 @@
 mod calcs;
 mod config;
 pub mod display_stats;
+mod gem_select;
 mod geometry;
 mod item_add_implicit;
 mod item_add_modifier;

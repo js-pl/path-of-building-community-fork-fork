@@ -66,6 +66,10 @@ pub struct GrantedEffect {
     pub cannot_be_supported: bool,
     pub support_gems_only: bool,
     pub has_global_effect: bool,
+    /// A gem of an older version of the game (`legacy`)
+    pub legacy: bool,
+    /// Left out of the Skills tab's gem lists (`hideFromGemList`)
+    pub hide_from_gem_list: bool,
     pub ignore_minion_types: bool,
     pub from_item: bool,
     /// The source of an effect an item or a node grants (`modSource`)
@@ -388,6 +392,8 @@ impl GrantedEffect {
             cannot_be_supported: get(v, "cannotBeSupported").truthy(),
             support_gems_only: get(v, "supportGemsOnly").truthy(),
             has_global_effect: get(v, "hasGlobalEffect").truthy(),
+            legacy: get(v, "legacy").truthy(),
+            hide_from_gem_list: get(v, "hideFromGemList").truthy(),
             ignore_minion_types: get(v, "ignoreMinionTypes").truthy(),
             from_item: get(v, "fromItem").truthy(),
             mod_source: opt_string(&get(v, "modSource"))?,
@@ -739,6 +745,8 @@ crate::codec_struct!(GrantedEffect {
     cannot_be_supported,
     support_gems_only,
     has_global_effect,
+    legacy,
+    hide_from_gem_list,
     ignore_minion_types,
     from_item,
     mod_source,

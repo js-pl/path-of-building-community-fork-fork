@@ -209,8 +209,20 @@ fn item_power_matches_upstream() {
                     .collect()
             })
             .collect();
-        let seq = compare::item_power(&calc, overrides.clone(), &stat, Threads::Sequential);
-        let par = compare::item_power(&calc, overrides, &stat, Threads::Pool(4));
+        let seq = compare::item_power(
+            &calc,
+            overrides.clone(),
+            &stat,
+            compare::uses_full_dps(&stat),
+            Threads::Sequential,
+        );
+        let par = compare::item_power(
+            &calc,
+            overrides,
+            &stat,
+            compare::uses_full_dps(&stat),
+            Threads::Pool(4),
+        );
 
         let mut typed = BTreeMap::new();
         let mut want = BTreeMap::new();
@@ -375,8 +387,20 @@ fn gem_power_matches_upstream() {
         }
         let full_dps = field == "FullDPS";
 
-        let seq = compare::gem_power(&calc, typed_slice(&typed_cands), field, Threads::Sequential);
-        let par = compare::gem_power(&calc, typed_slice(&typed_cands), field, Threads::Pool(4));
+        let seq = compare::gem_power(
+            &calc,
+            typed_slice(&typed_cands),
+            field,
+            full_dps,
+            Threads::Sequential,
+        );
+        let par = compare::gem_power(
+            &calc,
+            typed_slice(&typed_cands),
+            field,
+            full_dps,
+            Threads::Pool(4),
+        );
 
         // Lua: swap each gem into the main group and read the field
         let lsg = get(&lskills, "socketGroupList");
