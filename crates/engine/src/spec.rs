@@ -199,6 +199,10 @@ pub struct PassiveSpec<'t> {
     pub mastery_selections: LjMap<f64>,
     /// Allocated node ids the spec does not have (in cluster subgraphs)
     pub alloc_subgraph_nodes: Vec<u32>,
+    /// `allocExtendedNodes`: the subgraph nodes `BuildClusterJewelGraphs`
+    /// allocated again, which `ImportFromNodeList` (loads, undo) allocates
+    /// whatever its list says; upstream never empties it
+    pub alloc_extended_nodes: Vec<u32>,
     /// `subGraphs`: each cluster jewel subgraph, by its id
     pub sub_graphs: LjMap<SubGraph>,
     pub cur_class_id: Option<i64>,
@@ -246,6 +250,7 @@ impl<'t> PassiveSpec<'t> {
             alloc_nodes: LjMap::default(),
             mastery_selections: LjMap::default(),
             alloc_subgraph_nodes: Vec::new(),
+            alloc_extended_nodes: Vec::new(),
             sub_graphs: LjMap::default(),
             cur_class_id: None,
             cur_ascend_class_id: None,
@@ -608,6 +613,11 @@ impl<'t> PassiveSpec<'t> {
                 None => self.alloc_subgraph_nodes.push(*id),
             }
         }
+        for k in 0..self.alloc_extended_nodes.len() {
+            if let Some(&i) = self.index.get(&self.alloc_extended_nodes[k]) {
+                self.alloc(i);
+            }
+        }
         self.build_all_depends_and_paths()
     }
 
@@ -620,6 +630,9 @@ impl<'t> PassiveSpec<'t> {
                 self.nodes[i].alloc = true;
                 if !self.alloc_nodes.contains(id) {
                     self.alloc_nodes.insert(id, i);
+                    if !self.alloc_extended_nodes.contains(&id) {
+                        self.alloc_extended_nodes.push(id);
+                    }
                 }
             }
         }

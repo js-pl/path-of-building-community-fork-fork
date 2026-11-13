@@ -150,10 +150,7 @@ fn typed_session_matches_translated() {
 
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
-const KNOWN_FALLBACKS: &[&str] = &[
-    "undo with tattoos or cluster jewels",
-    "crafting a cluster jewel",
-];
+const KNOWN_FALLBACKS: &[&str] = &["crafting a cluster jewel"];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
 /// fallback so far: build, command and why
@@ -301,6 +298,9 @@ fn config_edits_match(d: &mut Dispatcher) {
             }
             let req = config_edit(d, &mut rng);
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -1155,6 +1155,8 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": s})
             } else if step == total {
                 json!({"cmd": "resetTree"})
+            } else if rng.below(5) == 0 {
+                json!({"cmd": "undo"})
             } else if rng.below(2) == 0 && alloc.len() > 2 {
                 json!({"cmd": "clickNode", "id": alloc[rng.below(alloc.len())]})
             } else {
@@ -1174,6 +1176,9 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": pick})
             };
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -1199,7 +1204,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
             if let Some(i) = req.get("id") {
                 follow.push(json!({"cmd": "nodePath", "id": i}));
             }
-            if step < socket_clicks.len() {
+            if step < socket_clicks.len() || req["cmd"] == "undo" {
                 // The subgraphs taken off and built again
                 follow.push(json!({"cmd": "tree"}));
             }
@@ -1461,7 +1466,7 @@ fn replay_sequence() {
             let r = req.to_string();
             eprintln!("{id} {r}: typed {}", answer(d.request(&r), "typed"));
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
-            for f in ["skills", "state", "outputs"] {
+            for f in ["skills", "state", "outputs", "treeState"] {
                 let q = json!({ "cmd": f }).to_string();
                 let (t, tr) = (
                     answer(d.request(&q), f),
