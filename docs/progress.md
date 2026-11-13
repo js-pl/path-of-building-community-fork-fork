@@ -436,8 +436,8 @@ What remains for the full migration, in order:
      (`session::typed::item_display`: the tooltip of `item_tooltip.rs`
      on a copy without an id, as upstream compares by identity, and the
      editor's controls as `layoutControls` lists them, placed by their
-     anchors as `Control:GetPos` does; a flask in the editor falls back
-     with the tooltip's flask toggle), with `control` of the editor's
+     anchors as `Control:GetPos` does; a flask in the editor is toggled
+     in a copy of the items tab under a free id), with `control` of the editor's
      controls (`session::typed::item_editor_controls`: variants and
      version, sockets and links, influences, quality, catalysts, cluster
      jewel skill and node count, affixes and their rolls, range lines,
@@ -447,8 +447,8 @@ What remains for the full migration, in order:
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
-     counts a `displayItem` whose lines differ only as `previewItem` of
-     its text does. The same gap shows in outputs: upstream clears a
+     asks a `displayItem` whose lines differ again of a fresh translation
+     with the edits since the load. The same gap shows in outputs: upstream clears a
      triggered granted skill's level cost on the shared skill data for
      the rest of the process, the typed engine for the build only
      (`calc_offence::cost_cleared`), so gen-0018 without its amulet
