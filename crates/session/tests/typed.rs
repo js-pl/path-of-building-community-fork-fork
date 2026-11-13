@@ -170,8 +170,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     // The tooltip's stat comparison, where the translation carries another
     // build's change of upstream's shared data (see `compare_display`)
     "aligned with a fresh translation",
-    // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
-    // radius data kept from earlier calculations, or errors on these
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
