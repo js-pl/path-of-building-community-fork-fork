@@ -8,6 +8,7 @@ mod config;
 pub mod display_stats;
 mod geometry;
 mod item_db;
+mod item_display;
 mod item_editor;
 mod item_popups;
 mod item_tooltip;

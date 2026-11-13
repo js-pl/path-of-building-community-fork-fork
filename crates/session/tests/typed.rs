@@ -168,6 +168,9 @@ fn typed_session_matches_translated() {
 const KNOWN_FALLBACKS: &[&str] = &[
     "undo with tattoos or cluster jewels",
     "specs on another tree version",
+    // The tooltip's stat comparison, where the translation carries another
+    // build's change of upstream's shared data (see `compare_display`)
+    "upstream's shared data changed by another build",
     // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
     // radius data kept from earlier calculations, or errors on these
     "comparing a jewel that changes the tree",
@@ -780,6 +783,8 @@ fn items_edits_match(d: &mut Dispatcher) {
                         _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
                     };
                     compare(d, &open, &format!("step {step}"), &mut out);
+                    let label = format!("step {step} {open}");
+                    compare_display(d, &label, &mut out);
                     json!({"cmd": "saveDisplayItem"})
                 }
                 12 => {
@@ -808,12 +813,9 @@ fn items_edits_match(d: &mut Dispatcher) {
                             fell_back = true;
                             break;
                         }
-                        compare(
-                            d,
-                            &json!({"cmd": "state"}),
-                            &format!("step {step} {r}"),
-                            &mut out,
-                        );
+                        let label = format!("step {step} {r}");
+                        compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                        compare_display(d, &label, &mut out);
                     }
                     if fell_back || cancel {
                         json!({"cmd": "state"})
@@ -893,6 +895,37 @@ fn items_edits_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// `displayItem` of both. The tooltip's stat comparison of the
+/// translation can carry another build's mutation of upstream's shared
+/// data (skill costs a calculation cleared); where `previewItem` of the
+/// item's text differs the same way on both, its lines are a known gap of
+/// the tooltip's comparison, counted as such
+fn compare_display(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    let r = json!({"cmd": "displayItem"}).to_string();
+    let mut typed = answer(d.request(&r), "typed");
+    let mut tr = answer(d.translated_request(&r), "translated");
+    if !typed["ok"].is_object() || !tr["ok"].is_object() {
+        diff(&typed, &tr, &format!("{label} {r}"), out);
+        return;
+    }
+    let (tl, rl) = (typed["ok"]["lines"].take(), tr["ok"]["lines"].take());
+    diff(&typed, &tr, &format!("{label} {r}"), out);
+    if tl != rl {
+        let raw = typed["ok"]["item"]["raw"].clone();
+        let p = json!({"cmd": "previewItem", "text": raw}).to_string();
+        let tp = answer(d.request(&p), "typed preview")["ok"]["lines"].take();
+        let rp = answer(d.translated_request(&p), "translated preview")["ok"]["lines"].take();
+        if tp == tl && rp == rl && tp != rp {
+            note_fallback(
+                "displayItem",
+                "upstream's shared data changed by another build",
+            );
+        } else {
+            diff(&tl, &rl, &format!("{label} {r}.lines"), out);
+        }
+    }
 }
 
 /// `saveXml` of both on the dispatcher's build: where they differ

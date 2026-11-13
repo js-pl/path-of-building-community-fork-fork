@@ -398,6 +398,7 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| Ok(s.close_item_popup()))
             }
             "craftItem" => self.edit(json, |s| s.craft_item()),
+            "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
             "popupButton" => {
                 let name = req["name"].as_str()?.to_string();
                 if !self.typed.as_ref()?.has_class_popup() {
