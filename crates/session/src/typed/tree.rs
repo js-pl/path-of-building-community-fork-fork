@@ -16,6 +16,12 @@ impl<'d> TypedSession<'d> {
         Arc::make_mut(&mut self.build.spec)
     }
 
+    /// The spec's index of a node id, or the session's `no node` error
+    pub(super) fn node_or_error(&self, id: u32) -> Result<usize> {
+        self.node(id)
+            .map_err(|e| format!("{}{e}", super::UPSTREAM_ERROR))
+    }
+
     /// The spec's index of a node id
     fn node(&self, id: u32) -> Result<usize> {
         self.build
@@ -72,7 +78,7 @@ impl<'d> TypedSession<'d> {
 
     /// `clickNode`: a left click on a node in the tree view
     pub fn click_node(&mut self, id: u32) -> Result<J> {
-        let i = self.node(id)?;
+        let i = self.node_or_error(id)?;
         let spec = &self.build.spec;
         if spec.nodes[i].alloc {
             let b = &mut self.build;
@@ -227,7 +233,7 @@ impl<'d> TypedSession<'d> {
 
     /// `nodePath`: the nodes allocating (or deallocating) a node changes
     pub fn node_path(&self, id: u32) -> Result<J> {
-        let i = self.node(id)?;
+        let i = self.node_or_error(id)?;
         let spec = &self.build.spec;
         let path = if spec.nodes[i].alloc {
             spec.nodes[i].depends.clone()

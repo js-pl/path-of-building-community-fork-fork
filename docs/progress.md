@@ -383,6 +383,11 @@ What remains for the full migration, in order:
    opened while the build was on it is not carried). Saviour's mirage as
    the main skill falls back.
 
+   A typed error starting with `UPSTREAM_ERROR` is one the translation
+   answers the same request with (`no node <id>` of `clickNode`,
+   `nodePath` and `nodeTooltip`): the dispatcher answers it as the
+   request's error and keeps the typed build.
+
    The dispatcher records each request the typed engine gave to the
    translation while it held the build (`Dispatcher::fallbacks`, with
    the command and why); `typed_session_matches_translated` prints them

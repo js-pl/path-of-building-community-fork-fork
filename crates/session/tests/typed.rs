@@ -173,8 +173,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "a jewel's attributes in radius",
     "a socket tooltip with nodes the calculation did not build",
     "toggling a flask that is not in the build",
-    // Node ids not in the build's tree: the translation errors too
-    ": no node ",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
@@ -287,6 +285,7 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         .unwrap_or(10);
     let tree = data.tree(data.game.latest_tree_version()).unwrap();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
