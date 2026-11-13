@@ -275,6 +275,48 @@ impl Recalc for Recalculator<'_, '_> {
             )
         };
         ext.list_mods = ext.kind.mods(&sum)?;
+        // Tawhoa's Chosen: the copy is triggered at the rate its cooldowns
+        // and the copied skill's rate give
+        let mut tawhoa = None;
+        if let crate::calc_mirage::MirageKind::Tawhoa {
+            trigger_cd,
+            source_rate,
+            ..
+        } = ext.kind
+        {
+            let q = db.query();
+            let cr = [Sym::new("CooldownRecovery")];
+            let icdr = (1.0
+                + q.sum(list, crate::mods::ModType::Inc, Some(&skill_cfg), &cr)? / 100.0)
+                * q.more(list, Some(&skill_cfg), &cr)?;
+            let triggered_cd = mods
+                .skill_data
+                .get("cooldown")
+                .and_then(crate::mods::ModValue::as_number)
+                .unwrap_or(0.0);
+            let rate = data.setup.misc("ServerTickRate");
+            let tick = |cd: f64| ((cd / icdr) * rate).ceil() / rate;
+            let action = crate::calc::m_max(tick(triggered_cd), tick(trigger_cd));
+            let cap = if action != 0.0 {
+                1.0 / action
+            } else {
+                f64::INFINITY
+            };
+            let source = source_rate.ok_or("attempt to compare nil with number")?;
+            let trigger_rate = if source != 0.0 {
+                let cd = crate::calc::m_max(triggered_cd / icdr, trigger_cd / icdr);
+                let (sim_time, count) = crate::calc_triggers::simulate_rotation(
+                    &[cd],
+                    source,
+                    data.setup.misc("ServerTickTime"),
+                );
+                let increment = 1.0 / source;
+                1.0 / (sim_time / count[0] + (increment / 100.0 * 100.0) - increment)
+            } else {
+                0.0
+            };
+            tawhoa = Some((source, cap, trigger_rate));
+        }
         // `usedByMirage`, no parts or minions shown, used by another thing
         let other = data.skills.skill_type("OtherThingUsesSkill").unwrap_or(-1);
         copy.skill_types.insert(other);
@@ -287,6 +329,11 @@ impl Recalc for Recalculator<'_, '_> {
         }
         mods.skill_flags.remove("multiPart");
         mods.skill_flags.remove("haveMinion");
+        if let Some((_, _, rate)) = tawhoa {
+            mods.skill_data.insert("triggerRate".into(), rate.into());
+            mods.skill_data.insert("triggered".into(), true.into());
+            mods.skill_flags.insert("triggered".into());
+        }
         let mut limited = limited.to_vec();
         limited.push(skill_uuid(&copy, &env.groups));
         ext.skill = copy;
@@ -297,7 +344,18 @@ impl Recalc for Recalculator<'_, '_> {
         let mut p = crate::calc_perform::perform(env, input)?;
         p.finish()?;
         let copy = p.mods(p.main()).clone();
-        Ok((p.c.actors.actors[crate::calc::PLAYER].output.clone(), copy))
+        let mut output = p.c.actors.actors[crate::calc::PLAYER].output.clone();
+        if let Some((source, cap, rate)) = tawhoa {
+            for (k, v) in [
+                ("Speed", rate),
+                ("TriggerRateCap", cap),
+                ("EffectiveSourceRate", source),
+                ("SkillTriggerRate", rate),
+            ] {
+                output.insert(Sym::new(k), OutVal::Num(v));
+            }
+        }
+        Ok((output, copy))
     }
 }
 

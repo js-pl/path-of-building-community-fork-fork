@@ -220,6 +220,7 @@ impl<'t> PassiveSpec<'t> {
     /// cluster jewels socketed in large sockets, their allocated nodes,
     /// then the dependencies and paths
     pub fn build_cluster_jewel_graphs(&mut self, tab: &ItemsTab, data: &ItemData) -> Result<()> {
+        self.set_tree_jewels(tab);
         let legacy = self.cluster_hash_format_version < 2.0;
         self.legacy_map = legacy.then(Vec::new);
         self.legacy_reverse = legacy.then(HashMap::new);

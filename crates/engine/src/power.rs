@@ -405,7 +405,6 @@ pub fn node_power_with(
     opts: &PowerOptions,
     threads: Option<usize>,
 ) -> Result<NodePowers> {
-    check_tree_jewels(calc.build())?;
     let full_dps = opts
         .stat
         .as_ref()
@@ -686,29 +685,4 @@ fn power_pass(
         cluster,
         max,
     })
-}
-
-/// Jewels that change the tree's paths (Intuitive Leap and the like) are
-/// not ported in the spec
-pub fn check_tree_jewels(b: &crate::build::Build) -> Result<()> {
-    for (&socket, &id) in &b.spec.jewels {
-        if !b.spec.alloc_nodes.contains(socket) {
-            continue;
-        }
-        let Some(item) = b.items.item(id) else {
-            continue;
-        };
-        let changes = item.jewel_data.as_ref().is_some_and(|j| {
-            j.get("intuitiveLeapLike")
-                .is_some_and(|v| !matches!(v, ModValue::Bool(false)))
-                || matches!(
-                    j.get("impossibleEscapeKeystones"),
-                    Some(ModValue::Record(r)) if !r.fields.is_empty()
-                )
-        });
-        if changes {
-            return Err("not ported: node power with Intuitive Leap and the like".into());
-        }
-    }
-    Ok(())
 }

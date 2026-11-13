@@ -1384,7 +1384,7 @@ pub fn build_mod_list_for_node(
     let node = spec.tree_node(i);
     let id = spec.nodes[i].id;
     let mut mods: Vec<Mod> = if node.kind == NodeType::Keystone {
-        node.keystone_mod.iter().cloned().collect()
+        spec.keystone_mod(i).into_iter().cloned().collect()
     } else {
         spec.mod_list(i).to_vec()
     };
@@ -1393,8 +1393,8 @@ pub fn build_mod_list_for_node(
         id,
         typ: node.kind,
         mod_list: &own,
-        is_tattoo: false,
-        conquered: false,
+        is_tattoo: spec.is_tattoo(i),
+        conquered: spec.nodes[i].conquered.is_some(),
     };
     // First pass: the jewels that change nodes
     for rad in rads.iter_mut() {

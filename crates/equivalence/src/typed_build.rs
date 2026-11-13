@@ -68,6 +68,8 @@ pub struct TypedData {
     /// The jewel sockets of the latest tree
     pub socket_ids: Vec<u32>,
     pub trees: Trees,
+    /// The timeless jewels' data, made when a build first needs it
+    timeless: std::sync::OnceLock<std::sync::Arc<engine::timeless::Timeless>>,
 }
 
 impl TypedData {
@@ -103,7 +105,19 @@ impl TypedData {
             radius: jewel_radius,
             socket_ids,
             trees,
+            timeless: Default::default(),
         }
+    }
+
+    /// The timeless jewels' data
+    pub fn timeless(&self) -> std::sync::Arc<engine::timeless::Timeless> {
+        self.timeless
+            .get_or_init(|| {
+                let src = gamedata::Source::load(&crate::upstream_src())
+                    .unwrap_or_else(|e| panic!("{e}"));
+                std::sync::Arc::new(src.timeless(&self.parser).unwrap_or_else(|e| panic!("{e}")))
+            })
+            .clone()
     }
 
     /// Loads the tree a build file needs
@@ -149,6 +163,7 @@ impl TypedData {
             socket_ids: &self.socket_ids,
             one_hand: &one_hand,
             minions: &minions,
+            timeless: engine::build::has_timeless_jewel(root).then(|| self.timeless()),
         };
         engine::build::Build::load(root, &ctx, tree, &self.parser)
     }

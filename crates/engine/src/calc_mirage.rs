@@ -7,7 +7,7 @@
 //! its enemy's are copied into the mirage's calculation, with stand-in
 //! actors, and the copy is its main skill, outside the player's skills.
 //!
-//! Not ported yet: Tawhoa's Chosen, mirages of skills with minions.
+//! Not ported yet: mirages of skills with minions.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -47,6 +47,13 @@ pub enum MirageKind {
         main_cfg: Box<Cfg>,
         cast_chance: f64,
     },
+    /// Tawhoa's Chosen: its cooldown and more damage, and the copied
+    /// skill's rate, from which the copy's trigger rate follows
+    Tawhoa {
+        trigger_cd: f64,
+        more_damage: f64,
+        source_rate: Option<f64>,
+    },
 }
 
 /// A mirage's results (`activeSkill.mirage`)
@@ -85,6 +92,15 @@ impl MirageKind {
                     Some("The Saviour Mirage Warriors"),
                 ),
                 flag("Used by mirage"),
+            ],
+            MirageKind::Tawhoa { more_damage, .. } => vec![
+                flag("Used by Tawhoa's Chosen"),
+                Mod::new(
+                    "Damage",
+                    ModType::More,
+                    *more_damage,
+                    Some("Tawhoa's Chosen"),
+                ),
             ],
             MirageKind::Wisps {
                 main_cfg,
@@ -297,7 +313,60 @@ impl<'a> Perform<'a> {
             return Ok(true);
         }
         if name == "Tawhoa's Chosen" {
-            return Err("not ported: the mirage of Tawhoa's Chosen".into());
+            let mut best: Option<(f64, std::sync::Arc<CachedCalc>)> = None;
+            for k in 0..self.n_player {
+                let mirage = self
+                    .cfg(k)
+                    .skill_cond
+                    .as_ref()
+                    .is_some_and(|c| c.contains(&Sym::new("usedByMirage")));
+                if mirage
+                    || k == main
+                    || self.is_triggered(k)
+                    || self.has_flag(k, "disable")
+                    || !(self.has_type(k, "Slam") || self.has_type(k, "Melee"))
+                    || !self.has_type(k, "Attack")
+                    || self.has_type(k, "Vaal")
+                    || self.has_type(k, "Totem")
+                    || self.has_type(k, "SummonsTotem")
+                {
+                    continue;
+                }
+                let c = self
+                    .cached_calc(k, false, true)?
+                    .ok_or("attempt to index a nil value (field '?')")?;
+                let dps = c.out("TotalDPS");
+                let better = match &best {
+                    None => true,
+                    Some((b, _)) => dps.ok_or("attempt to compare nil with number")? > *b,
+                };
+                if better {
+                    best = Some((dps.unwrap_or(f64::NAN), c));
+                }
+            }
+            let Some((_, cached)) = best else {
+                self.mods_mut(main).disable_reason =
+                    Some("No Tawhoa's Chosen active skill found".into());
+                self.set_flag(main, "disable", true);
+                return Ok(true);
+            };
+            let more_damage =
+                self.c
+                    .base(list, Some(&cfg), &["ChieftainMirageChieftainMoreDamage"])?;
+            let kind = MirageKind::Tawhoa {
+                trigger_cd: self.sd_num(main, "cooldown").unwrap_or(0.0),
+                more_damage,
+                source_rate: cached.out("Speed"),
+            };
+            let ext = self.external_from_cache(&cached, kind);
+            let (output, mut copy) = recalc()?.mirage(ext, &self.input.limited)?;
+            self.c.actors.actors[PLAYER].output = output;
+            copy.info_message = Some(format!(
+                "Tawhoa's Chosen using {}",
+                cached.skill.active_effect.granted_effect.name
+            ));
+            self.main_copy = Some(Box::new(copy));
+            return Ok(true);
         }
         if self.sd_truthy(main, "triggeredBySacredWisps") {
             let mut chance = None;

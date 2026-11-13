@@ -117,6 +117,8 @@ pub struct Allocation {
     pub mastery_type_count: i64,
     /// Allocated masteries by mastery name
     pub mastery_types: Vec<(Arc<str>, i64)>,
+    /// Allocated tattoos by type
+    pub tattoo_types: Vec<(Arc<str>, i64)>,
 }
 
 impl Allocation {
@@ -131,6 +133,11 @@ impl Allocation {
             mastery_type_count: spec.allocated_mastery_type_count as i64,
             mastery_types: spec
                 .allocated_mastery_types
+                .iter()
+                .map(|(n, c)| (n.clone(), *c as i64))
+                .collect(),
+            tattoo_types: spec
+                .allocated_tattoo_types
                 .iter()
                 .map(|(n, c)| (n.clone(), *c as i64))
                 .collect(),
@@ -154,11 +161,21 @@ impl Allocation {
     }
 
     fn count(&mut self, spec: &PassiveSpec, i: usize, d: i64) {
+        if spec.is_tattoo(i)
+            && let Some(t) = spec.override_type(i)
+        {
+            match self.tattoo_types.iter_mut().find(|(n, _)| n == t) {
+                Some((_, n)) => *n += d,
+                None if d > 0 => self.tattoo_types.push((t.clone(), 1)),
+                None => {}
+            }
+        }
         let node = spec.tree_node(i);
         match node.kind {
             NodeType::Mastery => {
                 self.mastery += d;
-                let name = &node.dn;
+                let name: Arc<str> = spec.dn(i).into();
+                let name = &name;
                 match self.mastery_types.iter_mut().find(|(n, _)| n == name) {
                     Some((_, n)) => {
                         let prev = *n;
@@ -205,6 +222,9 @@ impl Allocation {
                 *n as f64,
                 None,
             ));
+        }
+        for (t, n) in &self.tattoo_types {
+            db.multipliers.insert(crate::mods::Sym::new(t), *n as f64);
         }
     }
 }

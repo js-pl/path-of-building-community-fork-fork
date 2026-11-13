@@ -43,7 +43,12 @@ pub struct TypedData {
     socket_ids: Vec<u32>,
     trees: RefCell<HashMap<String, &'static PassiveTree>>,
     source: Box<TreeSource>,
+    /// Makes the timeless jewels' data, once a build needs it
+    timeless_source: Option<Box<TimelessSource>>,
+    timeless: std::cell::OnceCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
 }
+
+pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
 
 impl TypedData {
     pub fn new(game: GameData, parser: ModParser, source: Box<TreeSource>) -> Result<TypedData> {
@@ -53,6 +58,8 @@ impl TypedData {
             socket_ids: Vec::new(),
             trees: RefCell::default(),
             source,
+            timeless_source: None,
+            timeless: Default::default(),
         };
         let latest = data.tree(data.game.latest_tree_version())?;
         let socket_ids = latest
@@ -71,8 +78,12 @@ impl TypedData {
         let game = src.game_data()?;
         let parser = src.mod_parser()?;
         let latest = game.latest_tree_version().to_string();
-        let source = move |v: &str, p: &ModParser| src.tree(v, p, v == latest);
-        TypedData::new(game, parser, Box::new(source))
+        let src = std::rc::Rc::new(src);
+        let trees = src.clone();
+        let source = move |v: &str, p: &ModParser| trees.tree(v, p, v == latest);
+        let mut data = TypedData::new(game, parser, Box::new(source))?;
+        data.timeless_source = Some(Box::new(move |p: &ModParser| src.timeless(p)));
+        Ok(data)
     }
 
     /// A tree version's passive tree, loaded once. Trees live as long as
@@ -84,6 +95,16 @@ impl TypedData {
         let tree: &'static PassiveTree = Box::leak(Box::new((self.source)(version, &self.parser)?));
         self.trees.borrow_mut().insert(version.to_string(), tree);
         Ok(tree)
+    }
+
+    /// The timeless jewels' data, if the session has a source of it
+    fn timeless(&self) -> Option<std::sync::Arc<engine::timeless::Timeless>> {
+        self.timeless
+            .get_or_init(|| {
+                let f = self.timeless_source.as_ref()?;
+                f(&self.parser).ok().map(std::sync::Arc::new)
+            })
+            .clone()
     }
 
     pub fn calc_data(&self) -> CalcData<'_> {
@@ -123,6 +144,11 @@ impl TypedData {
             socket_ids: &self.socket_ids,
             one_hand: &one_hand,
             minions: &minions,
+            timeless: if engine::build::has_timeless_jewel(root) {
+                self.timeless()
+            } else {
+                None
+            },
         };
         Build::load(root, &ctx, tree, &self.parser)
     }
@@ -182,9 +208,6 @@ impl<'d> TypedSession<'d> {
     pub fn load(data: &'d TypedData, xml: &str, name: Option<&str>) -> Result<TypedSession<'d>> {
         let root = engine::xml::parse(xml)?;
         let mut build = data.load_build(&root)?;
-        if build.info.character_level_auto_mode {
-            return Err(format!("{NOT_PORTED}: the character level's auto mode"));
-        }
         let main =
             engine::calcs::build_output(&mut build, &data.calc_data(), CalcMode::Main, None)?;
         let mut s = TypedSession {
@@ -215,6 +238,7 @@ impl<'d> TypedSession<'d> {
             s.item_keys.insert(*id as u32, ());
         }
         s.update_display_labels(true);
+        s.estimate_progress()?;
         s.refresh_controls()?;
         Ok(s)
     }

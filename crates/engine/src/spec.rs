@@ -5,9 +5,11 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 //!
-//! Not ported yet: jewels that change the tree (Intuitive Leap and the like,
-//! timeless jewels, Impossible Escape, Split Personality), tattoos, cluster
-//! jewel subgraphs, tree conversion and URLs.
+//! Jewels that let nodes be allocated without a connection (Intuitive Leap
+//! and the like, Impossible Escape) and tattoos (`hashOverrides`) are
+//! ported, and so are timeless jewels' conquered nodes
+//! (`crate::timeless`) but the Abyss jewels'. Not ported yet: Split
+//! Personality's path, tree conversion and URLs.
 //!
 //! Upstream keeps the nodes, allocated nodes and mastery selections in
 //! tables keyed by node id and visits them with `pairs`; which paths win
@@ -63,6 +65,58 @@ pub struct NodeStats {
     pub mod_list: Vec<Mod>,
 }
 
+/// An allocated jewel socket that changes paths or conquers nodes: its
+/// index, jewel, the ids in its radius and in its keystones' radii
+type RadiusJewel<'j> = (usize, &'j TreeJewel, LjMap<()>, Vec<LjMap<()>>);
+
+/// What a socketed jewel changes in the tree's paths: Intuitive Leap and
+/// the like, Impossible Escape
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TreeJewel {
+    /// `jewelRadiusIndex`, from 1
+    pub radius_index: Option<usize>,
+    /// `jewelData.intuitiveLeapLike`
+    pub intuitive_leap_like: bool,
+    /// `jewelData.intuitiveLeapKeystoneOnly`
+    pub keystone_only: bool,
+    /// `jewelData.impossibleEscapeKeystone`
+    pub impossible_escape: bool,
+    /// `jewelData.impossibleEscapeKeystones`
+    pub keystones: Vec<Arc<str>>,
+    /// A timeless jewel's `jewelData.conqueredBy`
+    pub conquest: Option<crate::timeless::Conquest>,
+}
+
+impl TreeJewel {
+    /// The jewel's data, if it changes paths
+    pub fn of(item: &crate::item::Item) -> Option<TreeJewel> {
+        use crate::mods::ModValue;
+        let jd = item.jewel_data.as_ref()?;
+        let truthy = |k: &str| jd.get(k).is_some_and(ModValue::truthy);
+        let keystones: Vec<Arc<str>> = match jd.get("impossibleEscapeKeystones") {
+            Some(ModValue::Record(r)) => r
+                .fields
+                .iter()
+                .map(|(k, _)| Arc::from(k.as_str()))
+                .collect(),
+            _ => Vec::new(),
+        };
+        let j = TreeJewel {
+            radius_index: item.jewel_radius_index.map(|r| r as usize),
+            intuitive_leap_like: truthy("intuitiveLeapLike"),
+            keystone_only: truthy("intuitiveLeapKeystoneOnly"),
+            impossible_escape: truthy("impossibleEscapeKeystone"),
+            keystones,
+            conquest: crate::timeless::Conquest::of(jd),
+        };
+        (j.intuitive_leap_like
+            || j.impossible_escape
+            || !j.keystones.is_empty()
+            || j.conquest.is_some())
+        .then_some(j)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SpecNode {
     pub id: u32,
@@ -85,6 +139,14 @@ pub struct SpecNode {
     pub unknown: bool,
     /// A cluster jewel subgraph's node, which the tree does not have
     pub synth: Option<Arc<tree::Node>>,
+    /// `intuitiveLeapLikesAffecting`: the sockets whose jewels let the
+    /// node be allocated without a connection, by index
+    pub intuitive: Vec<usize>,
+    /// The tattoo or timeless passive that replaces the node
+    /// (`ReplaceNode`): its name, keystone mod and tattoo fields
+    pub overlay: Option<Arc<tree::Overlay>>,
+    /// The timeless jewel that conquers the node (`conqueredBy`)
+    pub conquered: Option<crate::timeless::Conquest>,
     visited: bool,
 }
 
@@ -105,6 +167,9 @@ impl SpecNode {
             all_mastery_options: None,
             unknown: false,
             synth: Some(Arc::new(node)),
+            intuitive: Vec::new(),
+            overlay: None,
+            conquered: None,
             visited: false,
         }
     }
@@ -137,6 +202,14 @@ pub struct PassiveSpec<'t> {
     pub allocated_mastery_type_count: u32,
     /// Jewel socket node id to the id of the item in it
     pub jewels: BTreeMap<u32, f64>,
+    /// The socketed jewels that change paths, by socket
+    pub tree_jewels: BTreeMap<u32, TreeJewel>,
+    /// `hashOverrides`: the tattoos, by node id
+    pub hash_overrides: BTreeMap<u32, Arc<tree::Overlay>>,
+    /// `allocatedTattooTypes`: allocated tattoos by type
+    pub allocated_tattoo_types: Vec<(Arc<str>, u32)>,
+    /// The timeless jewels' data, which conquered nodes need
+    pub timeless: Option<Arc<crate::timeless::Timeless>>,
     pub title: Option<String>,
     /// `clusterHashFormatVersion`: 1 for builds saved with legacy cluster
     /// node ids
@@ -170,6 +243,10 @@ impl<'t> PassiveSpec<'t> {
             allocated_mastery_types: Vec::new(),
             allocated_mastery_type_count: 0,
             jewels: BTreeMap::new(),
+            tree_jewels: BTreeMap::new(),
+            hash_overrides: BTreeMap::new(),
+            allocated_tattoo_types: Vec::new(),
+            timeless: None,
             title: None,
             cluster_hash_format_version: 2.0,
             legacy_map: None,
@@ -200,6 +277,9 @@ impl<'t> PassiveSpec<'t> {
                     all_mastery_options: None,
                     unknown: false,
                     synth: None,
+                    intuitive: Vec::new(),
+                    overlay: None,
+                    conquered: None,
                     visited: false,
                 });
             }
@@ -382,9 +462,19 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `PassiveSpecClass:Load(xml)`: the spec of a `<Spec>` element, its
-    /// jewel sockets and allocations. Tattoos (`<Overrides>`) and specs in
-    /// the old URL format only are not ported.
+    /// jewel sockets, tattoos (`<Overrides>`) and allocations. Specs in the
+    /// old URL format only are not ported.
     pub fn load(&mut self, xml: &crate::xml::Element) -> Result<()> {
+        self.load_with(xml, None)
+    }
+
+    /// [`PassiveSpec::load`] with the build's items loaded before, whose
+    /// jewels change the tree's paths
+    pub fn load_with(
+        &mut self,
+        xml: &crate::xml::Element,
+        tab: Option<&crate::items_tab::ItemsTab>,
+    ) -> Result<()> {
         self.title = xml.attr("title").map(String::from);
         self.cluster_hash_format_version = xml
             .attr("clusterHashFormatVersion")
@@ -415,17 +505,34 @@ impl<'t> PassiveSpec<'t> {
                 }
             }
         }
+        if let Some(tab) = tab {
+            self.set_tree_jewels(tab);
+        }
         let Some(nodes) = xml.attr("nodes") else {
             if url {
                 return Err("specs in the URL format are not ported".into());
             }
             return Ok(());
         };
-        if xml
-            .elements()
-            .any(|n| n.elem == "Overrides" && n.elements().next().is_some())
-        {
-            return Err("tattoos are not ported".into());
+        self.hash_overrides.clear();
+        for o in xml.elements().filter(|n| n.elem == "Overrides") {
+            for child in o.elements() {
+                let id = child
+                    .attr("nodeId")
+                    .and_then(crate::pat::to_number)
+                    .ok_or("'Override' element missing 'nodeId' attribute")?;
+                let dn = child.attr("dn").unwrap_or("");
+                // A tattoo replaced by another is found by its images
+                let tattoo = self.tree.tattoos.get(dn).or_else(|| {
+                    self.tree.tattoos.values().find(|t| {
+                        t.active_effect_image.as_deref() == child.attr("activeEffectImage")
+                            && t.icon.as_deref() == child.attr("icon")
+                    })
+                });
+                if let Some(t) = tattoo {
+                    self.hash_overrides.insert(id as u32, t.clone());
+                }
+            }
         }
         let num = |k: &str| xml.attr(k).and_then(crate::pat::to_number);
         let class_id = num("classId").ok_or("'Spec' element missing 'classId' attribute")?;
@@ -561,9 +668,9 @@ impl<'t> PassiveSpec<'t> {
         Ok(())
     }
 
-    /// `AllocNode(node)`: the node and the nodes on its path, then the
-    /// cluster jewel subgraphs or the paths rebuilt. Jewels that change
-    /// paths (Intuitive Leap and the like) are not ported.
+    /// `AllocNode(node)`: the node and the nodes on its path (the node
+    /// alone where a jewel lets it go unconnected), then the cluster jewel
+    /// subgraphs or the paths rebuilt.
     pub fn alloc_node(
         &mut self,
         i: usize,
@@ -573,7 +680,13 @@ impl<'t> PassiveSpec<'t> {
         let Some(path) = self.path(i) else {
             return Ok(());
         };
+        self.set_tree_jewels(tab);
         let mut rebuild = false;
+        let path = if self.nodes[i].intuitive.is_empty() {
+            path
+        } else {
+            vec![i]
+        };
         for p in path {
             rebuild |= !self.nodes[p].alloc && self.tree_node(p).expansion_jewel.is_some();
             self.alloc(p);
@@ -602,6 +715,7 @@ impl<'t> PassiveSpec<'t> {
         tab: &crate::items_tab::ItemsTab,
         data: &crate::item_data::ItemData,
     ) -> Result<()> {
+        self.set_tree_jewels(tab);
         let mut rebuild = false;
         for d in self.nodes[i].depends.clone() {
             rebuild |= self.nodes[d].alloc && self.tree_node(d).expansion_jewel.is_some();
@@ -670,17 +784,169 @@ impl<'t> PassiveSpec<'t> {
         false
     }
 
+    /// Reads the socketed jewels that change paths from the items
+    pub fn set_tree_jewels(&mut self, tab: &crate::items_tab::ItemsTab) {
+        self.tree_jewels = self
+            .jewels
+            .iter()
+            .filter(|(_, id)| **id > 0.0)
+            .filter_map(|(&s, &id)| Some((s, TreeJewel::of(tab.item(id)?)?)))
+            .collect();
+    }
+
+    /// The ids of the nodes in a radius of a tree node, in upstream's
+    /// `pairs` order over `nodesInRadius[radiusIndex]`
+    fn radius_ids(&self, id: u32, radius: Option<usize>) -> LjMap<()> {
+        let mut out = LjMap::default();
+        let list = radius
+            .and_then(|r| r.checked_sub(1))
+            .and_then(|r| self.tree.node(id)?.nodes_in_radius.as_ref()?.get(r));
+        for &n in list.into_iter().flatten() {
+            out.insert(n, ());
+        }
+        out
+    }
+
+    /// `NodesInIntuitiveLeapLikeRadius(node)`: the allocated nodes a jewel
+    /// in the socket lets go unconnected
+    fn nodes_in_intuitive_radius(&self, socket: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        let Some(j) = self.tree_jewels.get(&self.nodes[socket].id) else {
+            return out;
+        };
+        let mut add = |ids: LjMap<()>| {
+            for (id, _) in ids.iter() {
+                if let Some(&k) = self.index.get(&id)
+                    && self.nodes[k].alloc
+                {
+                    out.push(k);
+                }
+            }
+        };
+        if j.intuitive_leap_like {
+            add(self.radius_ids(self.nodes[socket].id, j.radius_index));
+        }
+        if j.impossible_escape {
+            for name in &j.keystones {
+                if let Some(&k) = self.tree.keystone_map.get(name) {
+                    add(self.radius_ids(k, j.radius_index));
+                }
+            }
+        }
+        out
+    }
+
     /// `BuildAllDependsAndPaths()`
     pub fn build_all_depends_and_paths(&mut self) -> Result<()> {
+        // The allocated jewels that change paths, and the nodes in their
+        // radius
+        let mut radius_jewels: Vec<RadiusJewel> = Vec::new();
+        for (socket, j) in &self.tree_jewels {
+            if j.radius_index.is_none() || !self.alloc_nodes.contains(*socket) {
+                continue;
+            }
+            let Some(&si) = self.index.get(socket) else {
+                continue;
+            };
+            let keystones = j
+                .keystones
+                .iter()
+                .filter_map(|n| self.tree.keystone_map.get(n))
+                .map(|&k| self.radius_ids(k, j.radius_index))
+                .collect();
+            radius_jewels.push((si, j, self.radius_ids(*socket, j.radius_index), keystones));
+        }
+        for (socket, j) in &self.tree_jewels {
+            if j.conquest
+                .as_ref()
+                .and_then(|c| c.jewel_type())
+                .is_some_and(|t| t >= 7)
+                && self.alloc_nodes.contains(*socket)
+            {
+                return Err("not ported: Abyss timeless jewels".into());
+            }
+        }
+        let mut intuitive: Vec<(usize, Vec<usize>)> = Vec::new();
+        let mut conquered: Vec<(usize, crate::timeless::Conquest)> = Vec::new();
+        for i in 0..self.nodes.len() {
+            let kind = self.kind(i);
+            if radius_jewels.is_empty()
+                || matches!(kind, NodeType::ClassStart | NodeType::Socket)
+                || self.tree_node(i).ascendancy_name.is_some()
+            {
+                continue;
+            }
+            let id = self.nodes[i].id;
+            let mut by = Vec::new();
+            let mut conquest = None;
+            for (si, j, radius, keystones) in &radius_jewels {
+                if radius.contains(id)
+                    && j.intuitive_leap_like
+                    && !(j.keystone_only && kind != NodeType::Keystone)
+                {
+                    by.push(*si);
+                }
+                if radius.contains(id)
+                    && let Some(c) = &j.conquest
+                    && c.jewel_type().is_none_or(|t| t < 7)
+                {
+                    conquest = Some(c.clone());
+                }
+                for k in keystones {
+                    if k.contains(id) {
+                        by.push(*si);
+                    }
+                }
+            }
+            if !by.is_empty() {
+                intuitive.push((i, by));
+            }
+            if let Some(c) = conquest {
+                conquered.push((i, c));
+            }
+        }
+        drop(radius_jewels);
         // Reset the nodes to the tree's
         for i in 0..self.nodes.len() {
             self.nodes[i].depends.clear();
+            self.nodes[i].intuitive.clear();
             self.nodes[i].stats = None;
+            self.nodes[i].overlay = None;
+            self.nodes[i].conquered = None;
             if self.nodes[i].alloc {
                 self.nodes[i].depends.push(i);
             }
         }
+        for (i, by) in intuitive {
+            self.nodes[i].intuitive = by;
+        }
+        for (i, c) in conquered {
+            self.nodes[i].conquered = Some(c);
+        }
+        // Tattoos replace their nodes
+        for (id, o) in &self.hash_overrides {
+            if let Some(&i) = self.index.get(id) {
+                self.nodes[i].stats = Some(Arc::new(NodeStats {
+                    sd: o.sd.clone(),
+                    mods: o.mods.clone(),
+                    mod_list: o.mod_list.clone(),
+                }));
+                if o.override_type.as_deref() == Some("AlternateMastery") {
+                    self.nodes[i].all_mastery_options = Some(false);
+                }
+                self.nodes[i].overlay = Some(o.clone());
+            }
+        }
+        // Timeless jewels replace their nodes or add to them
+        for i in 0..self.nodes.len() {
+            if let Some(c) = self.nodes[i].conquered.clone()
+                && self.kind(i) != NodeType::Socket
+            {
+                self.conquer(i, &c)?;
+            }
+        }
         // Selected mastery effects, and counts
+        self.allocated_tattoo_types.clear();
         self.allocated_mastery_count = 0;
         self.allocated_notable_count = 0;
         self.allocated_keystone_count = 0;
@@ -696,10 +962,14 @@ impl<'t> PassiveSpec<'t> {
             {
                 let effect = self.tree.mastery_effects.get(&sel.to_bits());
                 if let (Some(effect), true) = (effect, self.alloc_nodes.contains(id)) {
-                    self.set_stats(i, effect.sd.clone(), &[])?;
+                    let sd = match &self.nodes[i].overlay {
+                        Some(o) => o.sd.clone(),
+                        None => effect.sd.clone(),
+                    };
+                    self.set_stats(i, sd, &[])?;
                     self.nodes[i].all_mastery_options = Some(false);
                     self.allocated_mastery_count += 1;
-                    let name = self.tree_node(i).dn.clone();
+                    let name: Arc<str> = self.dn(i).into();
                     match self
                         .allocated_mastery_types
                         .iter_mut()
@@ -721,17 +991,36 @@ impl<'t> PassiveSpec<'t> {
                     self.mastery_selections.remove(id);
                 }
             } else if kind == NodeType::Mastery {
-                self.add_mastery_effect_options(i)?;
+                if self.override_type(i).map(|t| &**t) != Some("AlternateMastery") {
+                    self.add_mastery_effect_options(i)?;
+                }
             } else if kind == NodeType::Notable && self.nodes[i].alloc {
                 self.allocated_notable_count += 1;
             } else if kind == NodeType::Keystone && self.nodes[i].alloc {
                 self.allocated_keystone_count += 1;
+            }
+            if self.is_tattoo(i)
+                && self.nodes[i].alloc
+                && let Some(t) = self.override_type(i).cloned()
+            {
+                match self
+                    .allocated_tattoo_types
+                    .iter_mut()
+                    .find(|(n, _)| *n == t)
+                {
+                    Some((_, c)) => *c += 1,
+                    None => self.allocated_tattoo_types.push((t, 1)),
+                }
             }
         }
 
         // Dependencies: which allocated nodes reach a start only through
         // which others
         let mut visited: Vec<usize> = Vec::new();
+        // Nodes allocated through jewels, which may depend on others:
+        // `potentialDeps` by node id, `intuitiveLeaps` by node id
+        let mut potential: LjMap<Vec<usize>> = LjMap::default();
+        let mut leaps: LjMap<Vec<usize>> = LjMap::default();
         let mut place = 0;
         while place < self.alloc_nodes.places() {
             let Some((_, &i)) = self.alloc_nodes.at(place) else {
@@ -760,7 +1049,11 @@ impl<'t> PassiveSpec<'t> {
                 } else {
                     // Everything visited depends on this node, but masteries
                     // with another allocated neighbour
-                    let dep_ids: Vec<u32> = visited.iter().map(|&n| self.nodes[n].id).collect();
+                    let dep_ids: Vec<u32> = visited
+                        .iter()
+                        .filter(|&&n| self.nodes[n].intuitive.is_empty())
+                        .map(|&n| self.nodes[n].id)
+                        .collect();
                     for &n in &visited {
                         if self.kind(n) == NodeType::Mastery {
                             let alloc_links = self.nodes[n]
@@ -776,7 +1069,22 @@ impl<'t> PassiveSpec<'t> {
                                 self.nodes[i].depends.push(n);
                             }
                         } else {
-                            self.nodes[i].depends.push(n);
+                            if self.nodes[n].intuitive.is_empty() {
+                                self.nodes[i].depends.push(n);
+                            } else {
+                                let nid = self.nodes[n].id;
+                                if potential.get(nid).is_none() {
+                                    potential.insert(nid, Vec::new());
+                                }
+                                let mut v = potential.get(nid).cloned().unwrap_or_default();
+                                v.push(i);
+                                potential.insert(nid, v);
+                            }
+                            let more = self.nodes_in_intuitive_radius(n);
+                            let iid = self.nodes[i].id;
+                            let mut v = leaps.get(iid).cloned().unwrap_or_default();
+                            v.extend(more);
+                            leaps.insert(iid, v);
                         }
                         self.nodes[n].visited = false;
                     }
@@ -785,17 +1093,80 @@ impl<'t> PassiveSpec<'t> {
             }
             self.nodes[i].visited = false;
             if !any_start {
-                // An orphan: it and what depends on it are deallocated
+                // An orphan: it and what depends on it are deallocated,
+                // but for nodes a jewel may hold
                 let deps = self.nodes[i].depends.clone();
                 for d in deps {
-                    self.dealloc_single(d)?;
+                    let did = self.nodes[d].id;
+                    let holder = self.jewels.keys().copied().find(|s| {
+                        self.alloc_nodes.contains(*s)
+                            && self.tree_jewels.get(s).is_some_and(|j| {
+                                (j.intuitive_leap_like
+                                    && j.radius_index.is_some()
+                                    && self.radius_ids(*s, j.radius_index).contains(did))
+                                    || j.keystones.iter().any(|n| {
+                                        self.tree.keystone_map.get(n).is_some_and(|&k| {
+                                            self.radius_ids(k, j.radius_index).contains(did)
+                                        })
+                                    })
+                            })
+                    });
+                    match holder {
+                        Some(s) => {
+                            let mut v = leaps.get(s).cloned().unwrap_or_default();
+                            v.push(d);
+                            leaps.insert(s, v);
+                        }
+                        None => self.dealloc_single(d)?,
+                    }
+                }
+            }
+        }
+        // Nodes held by jewels depend on the nodes that connect them and
+        // their jewels' sockets to the start
+        for (id, deps) in potential.iter() {
+            let Some(&pi) = self.index.get(&id) else {
+                continue;
+            };
+            let mut seen = Vec::new();
+            for &n in deps {
+                let all = self.nodes[pi]
+                    .intuitive
+                    .iter()
+                    .all(|s| self.nodes[n].depends.contains(s));
+                if all && !seen.contains(&n) {
+                    self.nodes[n].depends.push(pi);
+                    seen.push(n);
+                }
+            }
+        }
+        for (id, deps) in leaps.iter() {
+            let Some(&ni) = self.index.get(&id) else {
+                continue;
+            };
+            let mut seen = Vec::new();
+            for &d in deps {
+                if self.nodes[d].connected_to_start {
+                    continue;
+                }
+                let all = self.nodes[d]
+                    .intuitive
+                    .iter()
+                    .all(|s| self.nodes[ni].depends.contains(s));
+                if all && !seen.contains(&d) {
+                    self.nodes[ni].depends.push(d);
+                    seen.push(d);
                 }
             }
         }
 
         // Paths from every allocated node
         for i in 0..self.nodes.len() {
-            self.nodes[i].path_dist = if self.nodes[i].alloc { 0.0 } else { 1000.0 };
+            self.nodes[i].path_dist = if self.nodes[i].alloc && self.nodes[i].intuitive.is_empty() {
+                0.0
+            } else {
+                1000.0
+            };
             self.nodes[i].path = None;
             if self.is_socket(i) {
                 self.nodes[i].distance_to_class_start = Some(0.0);
@@ -803,7 +1174,9 @@ impl<'t> PassiveSpec<'t> {
         }
         let mut roots = Vec::new();
         for place in 0..self.alloc_nodes.places() {
-            if let Some((_, &i)) = self.alloc_nodes.at(place) {
+            if let Some((_, &i)) = self.alloc_nodes.at(place)
+                && (self.nodes[i].intuitive.is_empty() || self.nodes[i].connected_to_start)
+            {
                 roots.push(i);
             }
         }
@@ -908,6 +1281,32 @@ impl<'t> PassiveSpec<'t> {
 
     /// The name of the node's mastery for counts
     pub fn mastery_name(&self, i: usize) -> Sym {
-        Sym::new(&self.tree_node(i).dn)
+        Sym::new(self.dn(i))
+    }
+
+    /// The node's name, a tattoo's where one replaces it
+    pub fn dn(&self, i: usize) -> &str {
+        match &self.nodes[i].overlay {
+            Some(o) => &o.dn,
+            None => &self.tree_node(i).dn,
+        }
+    }
+
+    /// `node.keystoneMod`
+    pub fn keystone_mod(&self, i: usize) -> Option<&Mod> {
+        match &self.nodes[i].overlay {
+            Some(o) => o.keystone_mod.as_ref(),
+            None => self.tree_node(i).keystone_mod.as_ref(),
+        }
+    }
+
+    /// `node.isTattoo`
+    pub fn is_tattoo(&self, i: usize) -> bool {
+        self.nodes[i].overlay.as_ref().is_some_and(|o| o.is_tattoo)
+    }
+
+    /// `node.overrideType`
+    pub fn override_type(&self, i: usize) -> Option<&Arc<str>> {
+        self.nodes[i].overlay.as_ref()?.override_type.as_ref()
     }
 }

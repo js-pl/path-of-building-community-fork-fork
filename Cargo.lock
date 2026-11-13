@@ -95,6 +95,7 @@ dependencies = [
  "engine",
  "importer",
  "lua",
+ "miniz_oxide",
 ]
 
 [[package]]

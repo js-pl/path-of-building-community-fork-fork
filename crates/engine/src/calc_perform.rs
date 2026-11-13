@@ -378,7 +378,7 @@ impl<'a> Perform<'a> {
         self.c.db(ENEMY)
     }
 
-    pub(crate) fn main(&self) -> usize {
+    pub fn main(&self) -> usize {
         self.env.skills.main_skill
     }
 
@@ -449,7 +449,7 @@ impl<'a> Perform<'a> {
         self.skill(i).skill_types.contains(&self.st(t))
     }
 
-    pub(crate) fn skill_name(&self, i: usize) -> &str {
+    pub fn skill_name(&self, i: usize) -> &str {
         &self.skill(i).active_effect.granted_effect.name
     }
 
@@ -2582,6 +2582,10 @@ impl<'a> Perform<'a> {
                 .and_then(|l| skill.active_effect.granted_effect.level(l))
                 .cloned()
                 .unwrap_or_default();
+            let mut level = level;
+            if self.cost_cleared(i) {
+                level.cost.clear();
+            }
             let has_cost = !level.cost.is_empty();
             let cost = |k: &str| level.cost.iter().find(|(n, _)| n == k).map(|(_, v)| *v);
             let sd = |p: &Self, k: &str| p.sd_num(i, k);
@@ -5457,25 +5461,22 @@ impl<'a> Perform<'a> {
                     (false, Some((_, _, mdb, _))) => mdb,
                     _ => pdb,
                 };
-                if db != pdb {
-                    return Err("not ported: a minion's curse on itself".into());
-                }
-                if self.c.base(pdb, None, &["AvoidCurse"])? < 100.0 {
-                    self.c.set_cond(pdb, "Cursed", true);
-                    let n = self.c.mult(pdb, "CurseOnSelf").unwrap_or(0.0);
-                    self.c.set_mult(pdb, "CurseOnSelf", n + 1.0);
+                if self.c.base(db, None, &["AvoidCurse"])? < 100.0 {
+                    self.c.set_cond(db, "Cursed", true);
+                    let n = self.c.mult(db, "CurseOnSelf").unwrap_or(0.0);
+                    self.c.set_mult(db, "CurseOnSelf", n + 1.0);
                     self.c
-                        .set_cond(pdb, &format!("AffectedBy{}", nospace(&ge.name)), true);
+                        .set_cond(db, &format!("AffectedBy{}", nospace(&ge.name)), true);
                     let cfg = Cfg {
                         skill_name: Some(ge.name.as_str().into()),
                         ..Cfg::default()
                     };
-                    let inc = self.c.inc(pdb, Some(&cfg), &["CurseEffectOnSelf"])?
+                    let inc = self.c.inc(db, Some(&cfg), &["CurseEffectOnSelf"])?
                         + crate::mods::list::sum(&gem_mods, Inc, "CurseEffectAgainstPlayer")?;
-                    let more = self.c.more(pdb, Some(&cfg), &["CurseEffectOnSelf"])?
+                    let more = self.c.more(db, Some(&cfg), &["CurseEffectOnSelf"])?
                         * crate::mods::list::more(&gem_mods, "CurseEffectAgainstPlayer")?;
                     self.c
-                        .scale_add_list(pdb, &curse_mods, m_max((1.0 + inc / 100.0) * more, 0.0));
+                        .scale_add_list(db, &curse_mods, m_max((1.0 + inc / 100.0) * more, 0.0));
                 }
             } else if !self.c.flag(edb, None, &["Hexproof"])?
                 || self.c.flag(pdb, None, &["CursesIgnoreHexproof"])?
@@ -5727,7 +5728,19 @@ impl<'a> Perform<'a> {
             .c
             .flag(pdb, None, &["ManaIncreasedByOvercappedLightningRes"])?
         {
-            return Err("not ported: ManaIncreasedByOvercappedLightningRes".into());
+            // The resistances on a database of its own over the player's,
+            // without breakdowns, then life and mana again
+            let mut db = Store::db();
+            db.parent = Some(pdb);
+            let temp = self.c.push_store(db, Some(PLAYER));
+            let bd = self.c.actors.actors[PLAYER].breakdown.take();
+            self.c.actors.actors[PLAYER].store = temp;
+            let r = self.resistances(PLAYER);
+            self.c.actors.actors[PLAYER].store = pdb;
+            self.c.actors.actors[PLAYER].breakdown = bd;
+            r?;
+            self.life_mana(PLAYER)?;
+            self.life_mana_reservation(PLAYER, true)?;
         }
 
         if self.c.flag(

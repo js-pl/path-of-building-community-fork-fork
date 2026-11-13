@@ -166,7 +166,7 @@ impl<'a> Perform<'a> {
     /// granted skill's level on the shared skill data
     /// (`grantedEffect.levels[level].cost = {}`), which every skill of that
     /// effect and level then has
-    fn cost_cleared(&self, i: usize) -> bool {
+    pub(crate) fn cost_cleared(&self, i: usize) -> bool {
         let e = &self.skill(i).active_effect;
         let Some(level) = e.level else {
             return false;
@@ -3357,7 +3357,7 @@ impl<'a> Perform<'a> {
 
 /// The keys of `configTable` in `CalcTriggers.lua`: skill ids and lower
 /// case names of skills, triggers and uniques
-pub(crate) const TRIGGER_CONFIGS: [&str; 82] = [
+pub const TRIGGER_CONFIGS: [&str; 82] = [
     "law of the wilds",
     "the rippling thoughts",
     "the surging thoughts",
@@ -3459,10 +3459,15 @@ impl<'a> Perform<'a> {
         if generals_cry && !self.is_limited(main) {
             self.generals_cry(main)?;
         }
-        if !generals_cry && self.mirages()? {
+        let mirage = !generals_cry && self.mirages()?;
+        // The gem level and quality below go to the output the copy's
+        // replaced
+        if mirage && self.main_copy.is_some() {
             return Ok(());
         }
-        self.offence(crate::calc::PLAYER, main)?;
+        if !mirage {
+            self.offence(crate::calc::PLAYER, main)?;
+        }
         // The main skill's gem level and quality
         let e = &self.skill(main).active_effect;
         if e.src.is_some() {
