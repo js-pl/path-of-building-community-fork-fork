@@ -326,7 +326,7 @@ What remains for the full migration, in order:
    text), `buildMode:CompareStatList` with `lowerIsBetter` and
    `compPercent` read from `BuildDisplayStats.lua` at build time,
    `notes`, `setNotes` (saving turns escaped colour codes back, as
-   `NotesTab:Save` does) and `party` without imported party data.
+   `NotesTab:Save` does) and `party`.
    `tooltips_match` (every corpus build: every socket group's and
    item's tooltip, three items in their own slot, the first item as a
    preview, 10 nodes on and around the tree and the allocated sockets,
@@ -375,8 +375,18 @@ What remains for the full migration, in order:
    that one agrees (11 of 218). An allocated mastery's tooltip with a
    popup open compares reallocating it (`addNodes` of the node), as
    upstream does for the mastery popup's options; `config_edits_match`
-   asks for one while a class change popup is open. Falling back: the
-   party view with imported data. A radius jewel's
+   asks for one while a class change popup is open (and checks that
+   the mastery's path is itself: masteries link to no node, so none
+   depends on one). The party view with imported data shows the labels
+   `ParseBuffs` gives (auras, warcries, links and curses with their
+   effect, sorted; extra auras and other effects with their mods; the
+   enemy modifiers by name, recorded as `Party::load` reads them), or
+   the texts in edit boxes with the advanced info shown, in the order of
+   their positions on a tab never drawn (width 0). Its first layout
+   positions the import header with the notes unwrapped, then the notes'
+   width wraps them at every space (no string has a width headless) for
+   every later control and layout; `party_match` asks for the view twice
+   on every party build. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
