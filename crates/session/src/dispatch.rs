@@ -362,7 +362,7 @@ impl<'d> Dispatcher<'d> {
             "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
             "itemDb" => {
                 let rare = req["kind"].as_str() == Some("rare");
-                self.typed.as_ref()?.item_db(rare).ok().map(ok)
+                view(&mut self.typed_error, self.typed.as_ref()?.item_db(rare))
             }
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
