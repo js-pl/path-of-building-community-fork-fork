@@ -16,6 +16,7 @@ importer = { path = "crates/importer" }
 engine = { path = "crates/engine" }
 gamedata = { path = "crates/gamedata" }
 upstream = { path = "crates/upstream" }
+testkit = { path = "crates/testkit" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # The native global allocator: glibc's malloc took a third of the

@@ -41,7 +41,15 @@ State at the handoff:
   write breakdowns as the main skill of a corpus build, in each of their
   parts (61 variants, `skill_function_breakdowns_match_upstream`).
   Mirages calculate in `CALCULATOR` mode, without breakdowns, so the
-  player's stay. `calcs_inputs_match_upstream` compares the Calcs tab's
+  player's stay. Mirages of skills with minions are ported: the copy's
+  minion is made on the databases of the calculation the skill comes
+  from and is its calculation's `env.minion`, and its output goes with
+  the copy's as `output.Minion`. `mirages_match_upstream` and
+  `mirage_breakdowns_match_upstream` calculate The Saviour's and
+  Tawhoa's Felling's mirages of Dominating Blow in each template, from
+  the sidebar and the Calcs tab (8 builds each); the copy's gem level
+  and quality go to the breakdown of the output it replaced, so no build
+  falls back any more. `calcs_inputs_match_upstream` compares the Calcs tab's
   outputs and breakdowns for its other inputs: the buff modes `COMBAT`,
   `BUFFED` and `UNBUFFED` (whose Full DPS sets up on base databases with
   that mode's conditions, `calc_env::init_env_on`), another main socket
@@ -74,19 +82,27 @@ State at the handoff:
   attribute nodes and a mastery (`tattoo_specs_match_upstream`, 10), and
   `tests/perform.rs` calculates the tattooed builds
   (`tattoos_match_upstream`).
-- Timeless jewels (types 1 to 6: Glorious Vanity, Lethal Pride, Brutal
-  Restraint, Militant Faith, Elegant Hubris, Heroic Tragedy): the legion
-  passives and `NodeIndexMapping` (`engine::timeless::Timeless`, made by
-  `gamedata::Source::timeless`), the look-up tables decompressed from the
-  submodule's `.zip` files when a build first needs them (a loader the
-  caller gives; without one a conquered node is `not ported`), and the
-  conquered nodes of `BuildAllDependsAndPaths` (replacements, additions,
-  rolled values, `ReconnectNodeToClassStart`). `timeless_specs_match_upstream`
-  and `timeless_match_upstream` socket each jewel and conqueror with a seed
-  of its own in generated corpus builds (39 specs, 1001 nodes replaced),
-  against the translation with `Inflate` installed (headless upstream has
-  none, so the oracle cannot run them). The Abyss jewels (types 7 to 11)
-  return `not ported`.
+- Timeless jewels: types 1 to 6 (Glorious Vanity, Lethal Pride, Brutal
+  Restraint, Militant Faith, Elegant Hubris, Heroic Tragedy) and the
+  Abyss jewels (types 7 to 11: Tecrod, Ulaman, Kurgal, Amanamu and
+  Zorath's eye jewels): the legion passives and `NodeIndexMapping`
+  (`engine::timeless::Timeless`, made by `gamedata::Source::timeless`),
+  the look-up tables decompressed from the submodule's `.zip` files when
+  a build first needs them (a loader the caller gives; without one a
+  conquered node is `not ported`), and the conquered nodes of
+  `BuildAllDependsAndPaths` (replacements, additions, rolled values,
+  `ReconnectNodeToClassStart`). The Abyss jewels' tables are read by
+  socket, Zorath's by the nodes of the allocated path from its socket to
+  the class start (`GetShortestPathToClassStart`) and one node of every
+  ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
+  `timeless_specs_match_upstream` and `timeless_match_upstream` socket
+  each jewel and conqueror with a seed of its own in generated corpus
+  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
+  replaced), against the translation with `Inflate` installed (headless
+  upstream has none, so the oracle cannot run them). The Abyss variants
+  run last: a conquered node's `setSource` rewrites the mod parser's
+  cached mods, which the legion keystones share, so a keystone conquered
+  later in the same translation names another node as its mods' source.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -105,9 +121,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The Abyss timeless jewels, the party tab, mirages of skills with
-   minions. `CalcSections.lua` (which
-   breakdown each cell shows) belongs to the session API.
+1. The party tab. `CalcSections.lua` (which breakdown each cell shows)
+   belongs to the session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
@@ -228,13 +243,12 @@ What remains for the full migration, in order:
    3.13-dual-wield-cospris-coc: `round(1.19 * 1.2) * 1.24` against the
    main calculation's `round(1.19 * 1.2 * 1.24)`), and a `ReplaceMod` of
    a base mod (`Multiplier:ImpaleStacks`, `MomentumStacks` from the
-   config) changes them for the skills after. Edits that make Saviour's mirage the main skill
-   fall back (its gem level outputs are not ported).
+   config) changes them for the skills after.
 
    Saving is typed (`session::typed::save`): `saveXml` and `saveCode`
    are `buildMode:SaveDB` with every tab's `Save`, byte for byte the
-   translation's for 60 corpus builds (Saviour's mirage as the main skill
-   falls back), after the tree and skills edit sequences, and in both
+   translation's for 60 corpus builds, after the tree and skills edit
+   sequences, and in both
    round trips (a file saved by either loads in the other to the same
    file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
    saving re-parses each item from it as `BuildAndParseRaw` does. What
@@ -295,8 +309,8 @@ What remains for the full migration, in order:
      and a Forbidden jewel whose counterpart is missing fall back. The
      display item is held typed, so `displayItem` answers on the
      translation after its replays.
-   - Engine gaps that make a build fall back: Saviour's mirage as the
-     main skill, Combust's trigger (gen-0028), tree edits with Intuitive
+   - Engine gaps that make a build fall back: Combust's trigger
+     (gen-0028), tree edits with Intuitive
      Leap and the like, tattoos, specs in the URL format only, exported
      party buffs, the character level's auto mode.
 
@@ -354,7 +368,7 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
-| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own (`Recalc::mirage`), its mod list on snapshots of the database it comes from; General's Cry in `calc_offence.rs` |
+| `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
 | `calcs.getMiscCalculator`, `CalcOverride` in `initEnv` | `calculator.rs`, `calc_override.rs` (the override and the allocation it gives) |
 | `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs` |
@@ -470,7 +484,7 @@ copying Lua tables).
 - `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
   given by the caller
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
-  skills, the Abyss timeless jewels, `limitDisabled` (a second
+  skills, `limitDisabled` (a second
   timeless jewel over the limit still conquers nodes typed; upstream
   marks it on the shared item during a calculation and leaves it out of
   the next `BuildAllDependsAndPaths`)
@@ -483,7 +497,6 @@ a skip:
 
 - The party tab (`env.partyMembers`; the build's `<Party>` section is not
   read, so a build with party members calculates as without them)
-- Mirages of skills with minions
 - A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
@@ -564,8 +577,9 @@ the tests align these:
   costs before each build
 - a mirage's copy is cached under the copied skill's uuid, so a later
   calculation without a fresh `GlobalCache` finds the copy's results
-  (`TotalDPS`, `Speed`) for that skill: `tests/perform.rs` wipes the cache
-  before its translated perform, as a frame's calculation does
+  (`TotalDPS`, `Speed`) for that skill: `tests/perform.rs` and
+  `tests/breakdown.rs` wipe the cache before their translated
+  calculation, as a frame's does
 - after a mirage that replaces the main skill (the Saviour, Tawhoa's
   Chosen), `calcs.perform` writes the gem level and quality into the
   output table the copy's replaced, so they show only when no skill was
