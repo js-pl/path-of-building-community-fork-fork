@@ -329,7 +329,7 @@ impl TypedSession<'_> {
         let mut notes = take("notesDesc");
         let original = notes["label"].as_str().unwrap_or("").to_string();
         let wrapped = original
-            .split(|c: char| matches!(c, ' ' | '\t' | '\n' | '\r' | '\u{b}' | '\u{c}'))
+            .split([' ', '\t', '\n', '\r', '\u{b}', '\u{c}'])
             .filter(|w| !w.is_empty())
             .collect::<Vec<_>>()
             .join("\n");
@@ -434,7 +434,7 @@ impl TypedSession<'_> {
             put(0, mods_y + 18, simple("simpleEnemyMods", &enemy_mods));
             put(0, curses_y + 18, simple("simpleCurses", &curses));
         }
-        rows.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        rows.sort_by_key(|r| (r.0, r.1));
         let controls: Vec<J> = rows.into_iter().map(|(_, _, c)| c).collect();
         Ok(json!({ "controls": controls }))
     }
