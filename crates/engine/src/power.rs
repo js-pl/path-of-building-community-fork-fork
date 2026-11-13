@@ -344,40 +344,18 @@ impl Candidates<'_, '_, '_> {
     }
 }
 
-/// The calculations of `jobs`, by key, on `threads` threads
-#[cfg(not(target_arch = "wasm32"))]
+/// The calculations of `jobs`, by key, on `threads`
 fn calculate_all(
     calc: &MiscCalculator,
     full_dps: bool,
     jobs: Vec<Job>,
-    threads: usize,
+    threads: crate::parallel::Threads,
 ) -> HashMap<String, Result<CalcOutput>> {
-    use rayon::prelude::*;
-    let reuse = crate::calc_env::reuse_setup();
-    let run = || {
-        jobs.into_par_iter()
-            .map(|(k, ovr)| {
-                crate::calc_env::set_reuse_setup(reuse);
-                (k, calc.calculate(&ovr, full_dps))
-            })
-            .collect()
-    };
-    match rayon::ThreadPoolBuilder::new().num_threads(threads).build() {
-        Ok(pool) => pool.install(run),
-        Err(_) => run(),
-    }
-}
-
-#[cfg(target_arch = "wasm32")]
-fn calculate_all(
-    calc: &MiscCalculator,
-    full_dps: bool,
-    jobs: Vec<Job>,
-    _threads: usize,
-) -> HashMap<String, Result<CalcOutput>> {
-    jobs.into_iter()
-        .map(|(k, ovr)| (k, calc.calculate(&ovr, full_dps)))
-        .collect()
+    crate::parallel::map(jobs, threads, |(k, ovr)| {
+        (k, calc.calculate(&ovr, full_dps))
+    })
+    .into_iter()
+    .collect()
 }
 
 /// How the power is measured
@@ -391,19 +369,28 @@ enum Mode<'s> {
 /// `CalcsTab:PowerBuilder()` on a calculator of the build: natively on as
 /// many threads as the machine has, in the browser on one
 pub fn node_power(calc: &MiscCalculator, opts: &PowerOptions) -> Result<NodePowers> {
-    #[cfg(not(target_arch = "wasm32"))]
-    let threads = Some(std::thread::available_parallelism().map_or(1, |n| n.get()));
-    #[cfg(target_arch = "wasm32")]
-    let threads = None;
-    node_power_with(calc, opts, threads)
+    node_power_on(calc, opts, crate::parallel::Threads::available())
 }
 
 /// [`node_power`] with the candidates' calculations made ahead on
-/// `threads` threads, or with none (`None`) each made when needed
+/// `threads`, or (`None`) each made when needed
 pub fn node_power_with(
     calc: &MiscCalculator,
     opts: &PowerOptions,
     threads: Option<usize>,
+) -> Result<NodePowers> {
+    node_power_on(calc, opts, match threads {
+        Some(n) => crate::parallel::Threads::Pool(n),
+        None => crate::parallel::Threads::Sequential,
+    })
+}
+
+/// [`node_power`] with the candidates' calculations made ahead on
+/// `threads`
+pub fn node_power_on(
+    calc: &MiscCalculator,
+    opts: &PowerOptions,
+    threads: crate::parallel::Threads,
 ) -> Result<NodePowers> {
     let full_dps = opts
         .stat
@@ -416,7 +403,7 @@ pub fn node_power_with(
         ready: HashMap::new(),
         record: None,
     };
-    if let Some(threads) = threads {
+    if threads != crate::parallel::Threads::Sequential {
         cands.record = Some((Arc::new(calc.base().clone()), Vec::new()));
         // A recording that stops at an error leaves the rest to the replay
         let _ = power_pass(calc, opts, &mut cands);

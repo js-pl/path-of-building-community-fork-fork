@@ -105,7 +105,7 @@ fn with_item(xml: &str, text: &str, slot: &str) -> Option<(String, u32)> {
 }
 
 /// Upstream's unique items (`Data/Uniques/*.lua`): each one's text
-fn uniques() -> Vec<String> {
+pub fn uniques() -> Vec<String> {
     let mut out = Vec::new();
     let dir = upstream_src().join("Data/Uniques");
     let mut files: Vec<_> = std::fs::read_dir(dir)

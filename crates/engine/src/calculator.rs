@@ -127,10 +127,24 @@ impl<'a, 't> MiscCalculator<'a, 't> {
     /// false or build.viewMode == "TREE"`), the Full DPS is calculated again
     /// when the build has Full DPS skills
     pub fn calculate(&self, ovr: &Override, full_dps: bool) -> Result<CalcOutput> {
-        let (mut out, cache, _) = calculate(&self.build, self.data, ovr, self.cache.clone())?;
+        self.calculate_on(&self.build, ovr, full_dps)
+    }
+
+    /// [`Self::calculate`] of a build of its own, which a comparison that
+    /// changes more than a `CalcOverride` can (a gem swapped into a socket
+    /// group) gives in place of the calculator's. The calculator's cache
+    /// and data are reused, as upstream's calcFunc reuses `GlobalCache`
+    /// and re-reads the (mutated) build each call.
+    pub fn calculate_on(
+        &self,
+        build: &Build<'t>,
+        ovr: &Override,
+        full_dps: bool,
+    ) -> Result<CalcOutput> {
+        let (mut out, cache, _) = calculate(build, self.data, ovr, self.cache.clone())?;
         if full_dps && self.used_full_dps {
-            let mode = CalcMode::Calculator.buff_mode(&self.build);
-            let (full, _) = calc_full_dps_with(&self.build, self.data, mode, ovr, cache)?;
+            let mode = CalcMode::Calculator.buff_mode(build);
+            let (full, _) = calc_full_dps_with(build, self.data, mode, ovr, cache)?;
             out.set_full_dps(&full);
         }
         Ok(out)
