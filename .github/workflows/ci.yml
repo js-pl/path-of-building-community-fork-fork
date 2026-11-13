@@ -5,14 +5,18 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
 jobs:
-  rust:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
-      - run: sync/check.py
+      - uses: Swatinem/rust-cache@v2
       - run: sync/check.py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
@@ -20,8 +24,61 @@ jobs:
       - run: cargo run --release -p importer --bin portgen
       - run: cargo run --release -p importer --bin synthlines
       - run: git diff --exit-code -- crates/engine/src/mod_parser/generated.rs corpus/synthetic_mod_lines.txt
-      # Equivalence tests are slow in debug builds
-      - run: cargo test --release
+
+  # The tests, built once in release (the equivalence tests are slow in
+  # debug builds); sccache keeps the crates whose sources did not change,
+  # the translated program above all, over runs and jobs
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: cargo nextest archive --release --workspace --archive-file tests.tar.zst
+      - run: cargo test --release --doc
+      - run: sccache --show-stats
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tests
+          path: tests.tar.zst
+          retention-days: 1
+          compression-level: 0
+
+  # The tests on runners of their own: the session tests, the perform tests
+  # and the others. Every test runs in one of them (the last takes what the
+  # others leave).
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: session
+            filter: 'test(=typed_session_matches_translated)'
+          - name: perform
+            filter: 'binary(=perform)'
+          - name: rest
+            filter: 'not (test(=typed_session_matches_translated) | binary(=perform))'
+    name: test (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: actions/download-artifact@v4
+        with:
+          name: tests
+      - run: cargo nextest run --profile ci --archive-file tests.tar.zst --workspace-remap . -E '${{ matrix.filter }}'
 
   web:
     runs-on: ubuntu-latest
@@ -39,6 +96,9 @@ jobs:
   # The browser engine gives the same results as the native one
   wasm:
     runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,11 +106,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo build --release -p cli
       - run: node web/scripts/build-wasm.mjs
       - run: node web/scripts/build-data.mjs
       - run: node --test web/tests/*.test.mjs
+      - run: sccache --show-stats
 
   # The generator reproduces corpus/generated, and upstream reproduces
   # tests/oracle exactly, in two runs with different hash seeds

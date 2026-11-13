@@ -1,0 +1,8 @@
+[package]
+name = "testkit"
+description = "Test harness helpers: running a test's work in child processes, bounded by cores and memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
