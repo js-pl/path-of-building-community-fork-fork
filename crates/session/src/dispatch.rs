@@ -143,6 +143,7 @@ impl<'d> Dispatcher<'d> {
             "state" => self.typed.as_ref()?.state().ok().map(ok),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
             "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
+            "tree" => self.typed.as_ref()?.tree().ok().map(ok),
             "treeState" => self.typed.as_ref()?.tree_state().ok().map(ok),
             "nodePath" => self.typed.as_ref()?.node_path(id(&req)?).ok().map(ok),
             "masteryOptions" => self.typed.as_ref()?.mastery_options(id(&req)?).ok().map(ok),
@@ -242,6 +243,20 @@ impl<'d> Dispatcher<'d> {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.delete_item(id))
             }
+            "addItem" => {
+                let text = req["text"].as_str()?.to_string();
+                let slot = req["slot"].as_str().map(String::from);
+                self.edit(json, |s| s.add_item_text(&text, slot.as_deref()))
+            }
+            "editItem" => {
+                let (id, text) = (req["id"].as_f64()?, req["text"].as_str()?.to_string());
+                self.edit(json, |s| s.edit_item(id, &text))
+            }
+            "setDisplayItem" => {
+                let (id, text) = (req["id"].as_f64(), req["text"].as_str().map(String::from));
+                self.edit(json, |s| s.set_display_item(id, text.as_deref()))
+            }
+            "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.select_item_set(id))
@@ -256,6 +271,31 @@ impl<'d> Dispatcher<'d> {
             }
             "saveXml" => self.edit(json, |s| Ok(json!({ "xml": s.save_xml()? }))),
             "saveCode" => self.edit(json, |s| Ok(json!({ "code": s.save_code()? }))),
+            "config" => self.typed.as_ref()?.config().ok().map(ok),
+            "undo" => self.edit(json, |s| s.undo()),
+            "newBuild" => match TypedSession::new_build(data) {
+                Ok(mut s) => {
+                    if let Some(prev) = &self.typed {
+                        s.keep_popups(prev);
+                    }
+                    self.typed = Some(s);
+                    self.pending = vec![json.to_string()];
+                    Some(ok(json!([])))
+                }
+                Err(e) => {
+                    self.typed = None;
+                    self.typed_error = Some(e);
+                    None
+                }
+            },
+            "popupButton" => {
+                let name = req["name"].as_str()?.to_string();
+                if !self.typed.as_ref()?.has_class_popup() {
+                    return None;
+                }
+                self.edit(json, |s| s.popup_button(&name))
+            }
+            "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
                 self.typed.as_ref()?.node_power(index).ok().map(ok)
@@ -334,7 +374,10 @@ impl<'d> Dispatcher<'d> {
         json: &str,
     ) -> Option<String> {
         match TypedSession::load(data, xml, name) {
-            Ok(s) => {
+            Ok(mut s) => {
+                if let Some(prev) = &self.typed {
+                    s.keep_popups(prev);
+                }
                 self.typed = Some(s);
                 // A load replaces whatever the queued requests did
                 self.pending = vec![json.to_string()];

@@ -98,6 +98,8 @@ pub struct Node {
     pub angle: Option<f64>,
     pub x: Option<f64>,
     pub y: Option<f64>,
+    /// The node's art (`icon`), which the tree view shows
+    pub icon: Option<Arc<str>>,
     /// Connected nodes: `out` then `in`, in the data's order
     pub linked_id: Vec<u32>,
     pub passive_points_granted: f64,
@@ -149,6 +151,23 @@ pub struct Overlay {
 }
 
 impl Overlay {
+    /// A tree node as what `ReplaceNode` copies from it
+    pub fn of_node(n: &Node) -> Overlay {
+        Overlay {
+            id: n.id.to_string().into(),
+            dn: n.dn.clone(),
+            kind: n.kind,
+            sd: n.sd.clone(),
+            mods: n.mods.clone(),
+            mod_list: n.mod_list.clone(),
+            keystone_mod: n.keystone_mod.clone(),
+            is_tattoo: false,
+            override_type: None,
+            icon: n.icon.clone(),
+            active_effect_image: None,
+        }
+    }
+
     /// A node of the data, its type and stats processed as
     /// `PassiveTree:ProcessStats` does
     pub fn from_lua(nt: &Value, parser: &ModParser) -> Result<Overlay> {
@@ -248,6 +267,18 @@ pub struct PassiveTree {
     /// `alternate_ascendancies` by index, without the legacy ones; `None`
     /// when the tree has none
     pub alternate_ascendancies: Option<Vec<(i64, Ascendancy)>>,
+    /// `orbitRadii`, by orbit from 0
+    pub orbit_radii: Vec<f64>,
+    /// `min_x`, `min_y`, `max_x`, `max_y`
+    pub bounds: [f64; 4],
+    /// The node pairs upstream builds connectors for (`self.connectors`:
+    /// `nodeId1`, `nodeId2`), in its order; a pair whose arc is split in two
+    /// is listed once
+    pub connectors: Vec<(u32, u32)>,
+    /// Node ids that are another node's key in the data (`self.nodes[id]`
+    /// is that node, where the data lists its nodes as an array: 2_6), with
+    /// that node's id
+    pub keyed_as: Vec<(u32, u32)>,
 }
 
 /// `(inner, outer)` of upstream's jewel radii for a tree version
@@ -273,6 +304,13 @@ pub fn version_num(version: &str) -> f64 {
     let mut nums = version.split('_').filter_map(|p| p.parse::<u32>().ok());
     let (major, minor) = (nums.next().unwrap_or(0), nums.next().unwrap_or(0));
     major as f64 + minor as f64 / 100.0
+}
+
+fn s_opt(v: &Value, k: &str) -> Result<Option<Arc<str>>> {
+    match get(v, k) {
+        Value::Nil => Ok(None),
+        x => text(&x).map(Some),
+    }
 }
 
 fn truthy(v: &Value, k: &str) -> bool {
@@ -339,7 +377,7 @@ fn set_source(m: &mut Mod, source: &str) {
 }
 
 /// `PassiveTreeClass:CalcOrbitAngles(nodesInOrbit)`, in radians
-fn orbit_angles(nodes_in_orbit: f64) -> Vec<f64> {
+pub(crate) fn orbit_angles(nodes_in_orbit: f64) -> Vec<f64> {
     let degrees: Vec<f64> = if nodes_in_orbit == 16.0 {
         vec![
             0.0, 30.0, 45.0, 60.0, 90.0, 120.0, 135.0, 150.0, 180.0, 210.0, 225.0, 240.0, 270.0,
@@ -679,6 +717,15 @@ impl PassiveTree {
             sockets: Vec::new(),
             mastery_effects: HashMap::new(),
             alternate_ascendancies: None,
+            orbit_radii: radii_of_orbit.clone(),
+            bounds: [
+                number(&get(data, "min_x"))?,
+                number(&get(data, "min_y"))?,
+                number(&get(data, "max_x"))?,
+                number(&get(data, "max_y"))?,
+            ],
+            connectors: Vec::new(),
+            keyed_as: Vec::new(),
         };
         if !alternates.is_empty() {
             let mut list = Vec::new();
@@ -710,8 +757,9 @@ impl PassiveTree {
                 }
                 continue;
             }
-            node_tables.push(node);
+            node_tables.push((k, node));
         }
+        let (keys, node_tables): (Vec<Key>, Vec<Value>) = node_tables.into_iter().unzip();
         for nt in &node_tables {
             let f = |a: &str, b: &str| get(nt, if new_format { a } else { b });
             let id = number(&f("skill", "id"))? as u32;
@@ -912,6 +960,7 @@ impl PassiveTree {
                 angle,
                 x,
                 y,
+                icon: s_opt(nt, "icon")?,
                 linked_id: Vec::new(),
                 passive_points_granted: points,
                 is_proxy: truthy(nt, "isProxy"),
@@ -964,6 +1013,41 @@ impl PassiveTree {
                 }
             }
             tree.nodes[ni].linked_id = linked;
+        }
+
+        for (k, node) in keys.iter().zip(&tree.nodes) {
+            if let Key::Int(k) = k
+                && *k != i64::from(node.id)
+                && let Ok(k) = u32::try_from(*k)
+            {
+                tree.keyed_as.push((k, node.id));
+            }
+        }
+        tree.keyed_as.sort();
+
+        // Connectors, for `out` links between nodes of one ascendancy (or
+        // none) that are no class starts, masteries or proxies
+        for (ni, nt) in node_tables.iter().enumerate() {
+            let node = &tree.nodes[ni];
+            for (_, other) in pairs(&get(nt, "out")) {
+                let other = match &other {
+                    Value::Str(s) => lua::str_to_number(s.as_bytes()).unwrap_or(f64::NAN),
+                    v => number(v)?,
+                } as u32;
+                let Some(o) = tree.node(other) else { continue };
+                let plain = |n: &Node| !matches!(n.kind, NodeType::ClassStart | NodeType::Mastery);
+                // Upstream checks the first node's group twice
+                let group_proxy = node.group.is_some_and(|g| tree.groups[&g].is_proxy);
+                if plain(node)
+                    && plain(o)
+                    && node.ascendancy_name == o.ascendancy_name
+                    && !node.is_proxy
+                    && !o.is_proxy
+                    && !group_proxy
+                {
+                    tree.connectors.push((node.id, other));
+                }
+            }
         }
 
         // Nodes within each jewel radius of each socket and keystone
@@ -1123,6 +1207,7 @@ crate::codec_struct!(Node {
     angle,
     x,
     y,
+    icon,
     linked_id,
     passive_points_granted,
     is_proxy,
@@ -1186,6 +1271,10 @@ crate::codec_struct!(PassiveTree {
     skills_per_orbit,
     mastery_effects,
     alternate_ascendancies,
+    orbit_radii,
+    bounds,
+    connectors,
+    keyed_as,
 });
 
 impl PassiveTree {

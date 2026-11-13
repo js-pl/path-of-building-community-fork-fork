@@ -105,6 +105,7 @@ struct Synth {
     orbit: i64,
     oidx: i64,
     linked: Vec<u32>,
+    icon: Option<Arc<str>>,
 }
 
 fn field<'a>(item: &'a Item, k: &str) -> Option<&'a ModValue> {
@@ -273,8 +274,8 @@ impl<'t> PassiveSpec<'t> {
     /// `BuildClusterJewelGraphs()` after an edit: the subgraphs removed,
     /// keeping their allocated nodes to allocate again, and built anew
     pub fn rebuild_cluster_jewel_graphs(&mut self, tab: &ItemsTab, data: &ItemData) -> Result<()> {
-        for (_, ids) in self.sub_graphs.iter() {
-            for &id in ids {
+        for (_, sg) in self.sub_graphs.iter() {
+            for &id in &sg.nodes {
                 if self.index.remove(&id).is_some() {
                     self.order.remove(id);
                     if self.alloc_nodes.contains(id) {
@@ -368,7 +369,7 @@ impl<'t> PassiveSpec<'t> {
         }
         let size_index = cj.size_index as i64;
         let node_id = id + ((size_index as u32) << 4);
-        self.sub_graphs.insert(node_id, Vec::new());
+        self.sub_graphs.insert(node_id, Default::default());
         let proxy_node = ej
             .proxy
             .as_deref()
@@ -378,10 +379,13 @@ impl<'t> PassiveSpec<'t> {
         let proxy_group = proxy_node.group.ok_or("a proxy without a group")?;
 
         let mut nodes: Vec<Synth> = Vec::new();
-        let link = |nodes: &mut Vec<Synth>, a: usize, c: usize| {
+        // `linkNodes`, which also builds a connector
+        let mut connectors = Vec::new();
+        let mut link = |nodes: &mut Vec<Synth>, a: usize, c: usize| {
             let (ia, ic) = (nodes[a].id, nodes[c].id);
             nodes[a].linked.push(ic);
             nodes[c].linked.push(ia);
+            connectors.push((ia, ic));
         };
         if let Some(name) = field(jewel, "clusterJewelKeystone").and_then(|v| match v {
             ModValue::Str(s) => Some(s.to_string()),
@@ -401,8 +405,20 @@ impl<'t> PassiveSpec<'t> {
                 orbit: 0,
                 oidx: 1,
                 linked: vec![],
+                icon: kn.icon.clone(),
             });
-            return self.add_subgraph(b, tab, data, jewel, parent, nodes, 0, (id, node_id));
+            let geometry = (proxy_group, Vec::new());
+            return self.add_subgraph(
+                b,
+                tab,
+                data,
+                jewel,
+                parent,
+                nodes,
+                0,
+                (id, node_id),
+                geometry,
+            );
         }
         let legacy_group = self
             .legacy_map
@@ -441,6 +457,8 @@ impl<'t> PassiveSpec<'t> {
                 name: "Nothingness".into(),
                 stats: vec![],
                 mastery: false,
+                icon: Some("Art/2DArt/SkillIcons/passives/MasteryBlank.png".into()),
+                mastery_icon: None,
             });
         let socket_count = field_num(jewel, "clusterJewelSocketCountOverride")
             .or(field_num(jewel, "clusterJewelSocketCount"))
@@ -465,6 +483,7 @@ impl<'t> PassiveSpec<'t> {
                 orbit: 0,
                 oidx: 0,
                 linked: vec![],
+                icon: skill.mastery_icon.as_deref().map(Into::into),
             });
         }
         let mut indicies: IntTable<usize> = IntTable::default();
@@ -483,6 +502,7 @@ impl<'t> PassiveSpec<'t> {
                     orbit: node_orbit,
                     oidx: index,
                     linked: vec![],
+                    icon: socket.icon.clone(),
                 });
                 indicies.set(index, nodes.len() - 1);
                 if let Some(g) = legacy_group
@@ -548,6 +568,7 @@ impl<'t> PassiveSpec<'t> {
                 orbit: node_orbit,
                 oidx: ni,
                 linked: vec![],
+                icon: base.icon.clone(),
             });
             indicies.set(ni, nodes.len() - 1);
         }
@@ -589,6 +610,7 @@ impl<'t> PassiveSpec<'t> {
                 orbit: node_orbit,
                 oidx: ni,
                 linked: vec![],
+                icon: skill.icon.as_deref().map(Into::into),
             });
             indicies.set(ni, nodes.len() - 1);
         }
@@ -655,7 +677,18 @@ impl<'t> PassiveSpec<'t> {
         {
             link(&mut nodes, f, l);
         }
-        self.add_subgraph(b, tab, data, jewel, parent, nodes, entrance, (id, node_id))
+        let geometry = (proxy_group, connectors);
+        self.add_subgraph(
+            b,
+            tab,
+            data,
+            jewel,
+            parent,
+            nodes,
+            entrance,
+            (id, node_id),
+            geometry,
+        )
     }
 
     /// The end of `BuildSubgraph`: the nodes processed and linked to the
@@ -671,17 +704,11 @@ impl<'t> PassiveSpec<'t> {
         mut nodes: Vec<Synth>,
         entrance: usize,
         (id, key): (u32, u32),
+        (group, mut connectors): (i64, Vec<(u32, u32)>),
     ) -> Result<()> {
         let inc_effect = field_num(jewel, "clusterJewelIncEffect");
         // `linkNodes(subGraph.entranceNode, parentSocket)`
         let entrance_id = nodes[entrance].id;
-        if let Some(ids) = self
-            .sub_graphs
-            .get(key)
-            .map(|_| nodes.iter().map(|n| n.id).collect())
-        {
-            self.sub_graphs.insert(key, ids);
-        }
         let parent_id = match parent {
             Parent::Spec(i) => {
                 b.spec_links.push((i, entrance_id));
@@ -694,8 +721,16 @@ impl<'t> PassiveSpec<'t> {
             }
         };
         nodes[entrance].linked.push(parent_id);
+        connectors.push((entrance_id, parent_id));
+        if self.sub_graphs.contains(key) {
+            let sg = crate::spec::SubGraph {
+                nodes: nodes.iter().map(|n| n.id).collect(),
+                connectors,
+            };
+            self.sub_graphs.insert(key, sg);
+        }
         for s in nodes {
-            let node = self.synthetic_node(&s, inc_effect)?;
+            let node = self.synthetic_node(&s, inc_effect, group)?;
             let is_socket = s.kind == NodeType::Socket;
             b.by_id.insert(s.id, b.pending.len());
             b.pending.push(Pending {
@@ -714,7 +749,7 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// A subgraph node with its stats processed (`tree:ProcessNode(node)`)
-    fn synthetic_node(&self, s: &Synth, inc_effect: Option<f64>) -> Result<Node> {
+    fn synthetic_node(&self, s: &Synth, inc_effect: Option<f64>, group: i64) -> Result<Node> {
         let mut sd = s.sd.clone();
         let source = format!("Tree:{}", s.id);
         let (mods, mut mod_list, unknown, extra) =
@@ -724,6 +759,28 @@ impl<'t> PassiveSpec<'t> {
         {
             mod_list.push(Mod::new("PassiveSkillEffect", ModType::Inc, e, None));
         }
+        // The position, as `ProcessNode` derives it
+        let tree = self.tree;
+        let angle = crate::tree::orbit_angles(
+            *tree
+                .skills_per_orbit
+                .get(s.orbit as usize)
+                .ok_or("no such orbit")?,
+        )
+        .get(s.oidx as usize)
+        .copied()
+        .ok_or_else(|| {
+            format!(
+                "node {}: no angle for orbit {} index {}",
+                s.id, s.orbit, s.oidx
+            )
+        })?;
+        let r = tree.orbit_radii[s.orbit as usize];
+        let (gx, gy) = tree
+            .groups
+            .get(&group)
+            .map(|g| (g.x, g.y))
+            .ok_or("no proxy group")?;
         let keystone_mod = (s.kind == NodeType::Keystone).then(|| {
             Mod::new(
                 "Keystone",
@@ -739,12 +796,14 @@ impl<'t> PassiveSpec<'t> {
             kind: s.kind,
             ascendancy_name: None,
             class_start_index: None,
-            group: None,
+            // The proxy's group, where upstream's has its position
+            group: Some(group),
             orbit: Some(s.orbit),
             orbit_index: Some(s.oidx),
-            angle: None,
-            x: None,
-            y: None,
+            angle: Some(angle),
+            x: Some(gx + angle.sin() * r),
+            y: Some(gy - angle.cos() * r),
+            icon: s.icon.clone(),
             linked_id: vec![],
             passive_points_granted: 0.0,
             is_proxy: false,

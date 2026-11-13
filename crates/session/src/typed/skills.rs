@@ -399,6 +399,16 @@ impl TypedSession<'_> {
             return Ok(json!([]));
         }
         let (host, name) = path.split_once('.').ok_or("no control")?;
+        match (host, name) {
+            ("config", var) => return self.config_control(var, req),
+            ("build", "classDrop" | "ascendDrop" | "secondaryAscendDrop") => {
+                return match req.get("sel").and_then(J::as_f64) {
+                    Some(sel) => self.class_control(name, sel),
+                    None => Err(format!("{}: control {path}", super::NOT_PORTED)),
+                };
+            }
+            _ => {}
+        }
         let which = match host {
             "build" => Select::Sidebar,
             "calcs" => Select::Calcs,

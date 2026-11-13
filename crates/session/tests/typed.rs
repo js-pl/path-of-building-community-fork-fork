@@ -84,36 +84,74 @@ fn session() -> Session {
     Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The typed engine's commands on one session (one data and one translated
-/// session keep the memory down): the sidebar and outputs, the Calcs tab
-/// and tree edits, each over the corpus
+/// The phases of `typed_session_matches_translated`, with the number of
+/// shards each splits the corpus into
+const PHASES: [(&str, usize); 9] = [
+    ("commands", 2),
+    ("geometry", 3),
+    ("calcs", 3),
+    ("tree", 3),
+    ("skills", 3),
+    ("save", 3),
+    ("items", 3),
+    ("config", 3),
+    ("tooltips", 3),
+];
+
+/// The typed engine's commands against the translated session's: the
+/// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
+/// and item edits, the saved files and the tooltips, each over the corpus. Each phase runs on shards of the
+/// corpus, each in a process of its own with one data and one translated
+/// session (`testkit::run_shards`): the translation keeps about 12 MB of
+/// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
+/// `SESSION_SHARDS=<n>` splits each phase in `n` shards.
 #[test]
 fn typed_session_matches_translated() {
+    let test = "typed_session_matches_translated";
+    let Some(shard) = testkit::shard() else {
+        let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
+        let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
+        let count: Option<usize> = std::env::var("SESSION_SHARDS")
+            .ok()
+            .and_then(|s| s.parse().ok());
+        let shards: Vec<String> = PHASES
+            .iter()
+            .filter(|(p, _)| run(p))
+            .flat_map(|&(p, n)| {
+                let n = count.unwrap_or(n);
+                (0..n).map(move |k| format!("{p} {k}/{n}"))
+            })
+            .collect();
+        return testkit::run_shards(
+            test,
+            &shards,
+            &[
+                " builds",
+                " edits",
+                " trees",
+                "skipped ",
+                " compared",
+                "aligned ",
+                "fell back ",
+            ],
+        );
+    };
+    let (phase, part) = shard.split_once(' ').unwrap();
+    let (k, n) = part.split_once('/').unwrap();
+    SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    // `SESSION_PHASES=calcs,tree` runs only these
-    let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
-    let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
-    if run("commands") {
-        commands_match(data, &mut d);
-    }
-    if run("calcs") {
-        calcs_match(data, &mut d);
-    }
-    if run("tree") {
-        tree_edits_match(&mut d);
-    }
-    if run("skills") {
-        skills_edits_match(&mut d);
-    }
-    if run("save") {
-        saves_match(&mut d);
-    }
-    if run("items") {
-        items_edits_match(&mut d);
-    }
-    if run("tooltips") {
-        tooltips_match(data, &mut d);
+    match phase {
+        "commands" => commands_match(data, &mut d),
+        "geometry" => geometry_matches(&mut d),
+        "calcs" => calcs_match(data, &mut d),
+        "tree" => tree_edits_match(&mut d),
+        "skills" => skills_edits_match(&mut d),
+        "save" => saves_match(&mut d),
+        "items" => items_edits_match(&mut d),
+        "config" => config_edits_match(&mut d),
+        "tooltips" => tooltips_match(data, &mut d),
+        _ => panic!("unknown phase {phase}"),
     }
 }
 
@@ -129,7 +167,7 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
     let tree = data.tree(data.game.latest_tree_version()).unwrap();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -297,9 +335,196 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
     );
 }
 
+/// The views compared after a config or class edit
+const CONFIG_VIEWS: [&str; 4] = ["config", "state", "outputs", "treeState"];
+
+/// Compares read-only commands of the typed engine and the translation
+fn compare_views(d: &mut Dispatcher, cmds: &[&str], label: &str, out: &mut Vec<String>) {
+    for cmd in cmds {
+        let q = json!({ "cmd": cmd }).to_string();
+        let typed = answer(d.request(&q), cmd);
+        assert!(d.typed_active(), "{label} {cmd}: {:?}", d.typed_error);
+        let tr = answer(d.translated_request(&q), cmd);
+        diff(&typed, &tr, &format!("{label} {cmd}"), out);
+    }
+}
+
+/// A random edit of the Configuration tab's shown options, the class,
+/// ascendancy and bloodline drop-downs (with the class change popup),
+/// config sets and the tree's undo
+fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
+    let config = answer(d.request(r#"{"cmd":"config"}"#), "config");
+    let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+    if let Some(p) = state["ok"]["popups"].as_array().and_then(|p| p.first()) {
+        let _ = p;
+        return if rng.below(2) == 0 {
+            json!({"cmd": "popupButton", "name": "confirm"})
+        } else {
+            json!({"cmd": "closePopup"})
+        };
+    }
+    let vars: Vec<&J> = config["ok"]["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|s| s["vars"].as_array().unwrap())
+        .collect();
+    match rng.below(10) {
+        0 | 1 => {
+            let path = [
+                "build.classDrop",
+                "build.ascendDrop",
+                "build.secondaryAscendDrop",
+            ][rng.below(3)];
+            let n = state["ok"]["controls"][path]["list"]
+                .as_array()
+                .map_or(1, Vec::len);
+            json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+        }
+        2 => json!({"cmd": "undo"}),
+        3 => {
+            let sets = config["ok"]["configSets"].as_array().unwrap();
+            let id = &sets[rng.below(sets.len())]["id"];
+            json!({"cmd": "selectConfigSet", "id": id})
+        }
+        _ => {
+            let v = vars[rng.below(vars.len())];
+            let path = format!("config.{}", v["var"].as_str().unwrap());
+            match v["class"].as_str().unwrap() {
+                "CheckBoxControl" => {
+                    json!({"cmd": "control", "path": path, "state": v["state"] != J::Bool(true)})
+                }
+                "DropDownControl" => {
+                    let n = v["list"].as_array().unwrap().len();
+                    json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+                }
+                _ => {
+                    let texts = ["", "0", "1", "5", "50", "100", "-10", "3.5", "1000"];
+                    json!({"cmd": "control", "path": path, "text": texts[rng.below(texts.len())]})
+                }
+            }
+        }
+    }
+}
+
+/// Random sequences of Configuration tab edits, class changes and undo
+/// give the translation's options (shown, values, tooltips), sidebar,
+/// outputs and tree after each step; then a new build does
+fn config_edits_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    for (id, path) in mine(corpus()) {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 3);
+        let mut out = Vec::new();
+        compare_views(d, &CONFIG_VIEWS, "load", &mut out);
+        for step in 0..steps_per_build {
+            if !out.is_empty() {
+                break;
+            }
+            let req = config_edit(d, &mut rng);
+            let label = format!("step {step} {req}");
+            let r = req.to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            times[1] += t.elapsed();
+            let _ = typed;
+            compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            steps += 1;
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the config edits", &mut out);
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    // A new build, a class change on it and its undo, in the first shard
+    let mut out = Vec::new();
+    if SHARD.get().is_none_or(|&(k, _)| k == 0) {
+        answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+        assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
+        let views = [
+            "config",
+            "state",
+            "outputs",
+            "treeState",
+            "skills",
+            "items",
+            "treeSpecs",
+        ];
+        compare_views(d, &views, "newBuild", &mut out);
+        compare_saves(d, "new build", &mut out);
+        for req in [
+            json!({"cmd": "control", "path": "build.classDrop", "sel": 3}),
+            json!({"cmd": "control", "path": "build.ascendDrop", "sel": 2}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+        ] {
+            answer(d.request(&req.to_string()), "new build edit");
+            compare_views(d, &CONFIG_VIEWS, &format!("new build {req}"), &mut out);
+        }
+    }
+    if !out.is_empty() {
+        let n = out.len();
+        out.truncate(8);
+        failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
+    }
+    eprintln!(
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// This process's shard of the corpus: the `k`-th of every `n` builds
+static SHARD: std::sync::OnceLock<(usize, usize)> = std::sync::OnceLock::new();
+
+/// The builds of this process's shard
+fn mine<T>(builds: Vec<T>) -> Vec<T> {
+    let (k, n) = SHARD.get().copied().unwrap_or((0, 1));
+    builds
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % n == k)
+        .map(|(_, b)| b)
+        .collect()
+}
+
 /// Random sequences of item, set, spec, config set, level and socket
-/// group copy edits give the translation's items, skills, sidebar,
-/// outputs and specs after each step, and its file at the end
+/// group copy edits, items added, edited and saved from the editor give
+/// the translation's items, skills, sidebar, outputs and specs after each
+/// step, and its file at the end
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
@@ -307,7 +532,9 @@ fn items_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in corpus() {
+    // Item texts of the builds so far, for adding and editing items
+    let mut pool: Vec<J> = Vec::new();
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -326,6 +553,9 @@ fn items_edits_match(d: &mut Dispatcher) {
             typed
         };
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
+        if let Some(a) = items["ok"]["items"].as_array() {
+            pool.extend(a.iter().map(|i| i["raw"].clone()));
+        }
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -346,7 +576,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(8) {
+            let req = match rng.below(12) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -375,6 +605,30 @@ fn items_edits_match(d: &mut Dispatcher) {
                         Some(t) => json!({"cmd": "pasteSocketGroup", "text": t}),
                         None => continue,
                     }
+                }
+                8 => {
+                    let text = &pool[rng.below(pool.len())];
+                    match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
+                        Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
+                        None => json!({"cmd": "addItem", "text": text}),
+                    }
+                }
+                9 => match pick(&mut rng, &items["ok"]["items"]) {
+                    Some(i) => {
+                        let text = &pool[rng.below(pool.len())];
+                        json!({"cmd": "editItem", "id": i["id"], "text": text})
+                    }
+                    None => continue,
+                },
+                10 | 11 => {
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    compare(d, &open, &format!("step {step}"), &mut out);
+                    json!({"cmd": "saveDisplayItem"})
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
@@ -448,6 +702,13 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
         "translated save",
     );
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
+    if a != b && std::env::var("DUMP_SAVES").is_ok() {
+        eprintln!(
+            "TYPED\n{}\nTRANSLATED\n{}",
+            a.unwrap_or(""),
+            b.unwrap_or("")
+        );
+    }
     if a != b {
         let (a, b) = (a.unwrap_or(""), b.unwrap_or(""));
         let line = a.lines().zip(b.lines()).position(|(x, y)| x != y);
@@ -469,7 +730,7 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
 /// and outputs (design layer 8)
 fn saves_match(d: &mut Dispatcher) {
     let (mut failures, mut times, mut n) = (Vec::new(), [Duration::ZERO; 2], 0);
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -588,6 +849,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         })
         .collect();
     builds.extend(auto);
+    let builds = mine(builds);
     for (id, xml) in builds {
         if let Err(e) = TypedSession::load(data, &xml, None) {
             skipped.push(format!("{id}: {e}"));
@@ -652,6 +914,81 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     );
 }
 
+/// `tree` (the geometry: nodes, cluster jewel subgraphs, connectors,
+/// classes) gives the translation's for every corpus build, and for an
+/// empty build on each tree version
+fn geometry_matches(d: &mut Dispatcher) {
+    let mut builds: Vec<(String, String)> = corpus()
+        .into_iter()
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    let src = gamedata::Source::load(&src()).unwrap_or_else(|e| panic!("{e}"));
+    if std::env::var("SESSION_FILTER").is_err() {
+        for v in src.tree_versions().unwrap_or_else(|e| panic!("{e}")) {
+            let xml = format!(
+                r#"<?xml version="1.0" encoding="UTF-8"?>
+<PathOfBuilding>
+	<Build level="1" targetVersion="3_0" className="Scion" ascendClassName="None" mainSocketGroup="1" viewMode="TREE" characterLevelAutoMode="false" bandit="None" pantheonMajorGod="None" pantheonMinorGod="None"/>
+	<Tree activeSpec="1">
+		<Spec treeVersion="{v}" classId="0" ascendClassId="0" nodes=""/>
+	</Tree>
+	<Skills activeSkillSet="1"><SkillSet id="1"/></Skills>
+	<Items activeItemSet="1"><ItemSet id="1"/></Items>
+	<Config/>
+</PathOfBuilding>"#
+            );
+            builds.push((format!("empty {v}"), xml));
+        }
+    }
+    let builds = mine(builds);
+    let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
+    let mut times = [Duration::ZERO; 2];
+    for (id, xml) in builds {
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            skipped.push(format!("{id}: {:?}", d.typed_error));
+            continue;
+        }
+        let t = Instant::now();
+        let typed = answer(d.request(r#"{"cmd":"tree"}"#), "typed tree");
+        times[0] += t.elapsed();
+        assert!(d.typed_active(), "{id}: {:?}", d.typed_error);
+        let t = Instant::now();
+        let tr = answer(d.translated_request(r#"{"cmd":"tree"}"#), "translated tree");
+        times[1] += t.elapsed();
+        assert!(tr.get("ok").is_some(), "{id}: {tr}");
+        let mut out = Vec::new();
+        diff(&typed, &tr, "tree", &mut out);
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(400) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+        compared += 1;
+    }
+    eprintln!(
+        "{compared} trees: typed {:.1?}, translated {:.1?} (with its loads)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        skipped.is_empty() && failures.is_empty(),
+        "{} skipped, {} differ:\n{}",
+        skipped.len(),
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
 /// The colour codes the sidebar uses are upstream's
 #[test]
 fn color_codes_match_upstream() {
@@ -700,7 +1037,7 @@ fn node_power_matches_translated() {
     let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
     let filter = std::env::var("SESSION_POWER").ok();
     let mut failures = Vec::new();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let sample = id == "gen-0001";
         if !filter.as_deref().map_or(sample, |f| id.contains(f)) {
             continue;
@@ -815,7 +1152,7 @@ fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTre
 fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
         answer(d.request(&load), "load");
@@ -873,7 +1210,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -989,6 +1326,10 @@ fn tree_edits_match(d: &mut Dispatcher) {
             if let Some(i) = req.get("id") {
                 follow.push(json!({"cmd": "nodePath", "id": i}));
             }
+            if step < socket_clicks.len() {
+                // The subgraphs taken off and built again
+                follow.push(json!({"cmd": "tree"}));
+            }
             if let Some(opts) = typed["ok"]["mastery"].as_array() {
                 follow.push(json!({"cmd": "masteryOptions", "id": req["id"]}));
                 if !opts.is_empty() {
@@ -1047,7 +1388,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         .iter()
         .filter_map(|g| g["name"].as_str().map(String::from))
         .collect();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1236,7 +1577,7 @@ fn replay_sequence() {
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
     let seq: Vec<J> = serde_json::from_str(&std::env::var("SESSION_SEQ").unwrap()).unwrap();
-    for (id, path) in corpus() {
+    for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),

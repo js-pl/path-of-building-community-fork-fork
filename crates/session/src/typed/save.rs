@@ -167,7 +167,6 @@ impl TypedSession<'_> {
 
     /// `saveXml`: `buildMode:SaveDB("code")`
     pub fn save_xml(&mut self) -> Result<String> {
-        self.check_main()?;
         // Upstream's frame made the Calcs tab's calculation, which writes
         // its selections back to the gems
         self.calcs_output()?;
@@ -520,9 +519,14 @@ impl TypedSession<'_> {
         let show = xml
             .and_then(|i| i.attr("showStatDifferences"))
             .is_none_or(|v| v == "true");
+        // Without an `Items` section `ItemsTab:Load` leaves it nil
+        let second = match xml {
+            Some(_) => b(active.use_second_weapon_set),
+            None => "nil".to_string(),
+        };
         let mut x = X::new("Items")
             .a("activeItemSet", n(tab.active_item_set_id))
-            .a("useSecondWeaponSet", b(active.use_second_weapon_set))
+            .a("useSecondWeaponSet", second)
             .a("showStatDifferences", b(show));
         for id in tab.item_order_list.clone() {
             let Some(item) = tab.items.get_mut(&(id as i64)) else {
@@ -588,7 +592,13 @@ impl TypedSession<'_> {
             let mut c = X::new("ItemSet")
                 .a("id", n(*set_id))
                 .a("title", set.title.clone())
-                .a("useSecondWeaponSet", b(set.use_second_weapon_set));
+                .a(
+                    "useSecondWeaponSet",
+                    match xml {
+                        Some(_) => b(set.use_second_weapon_set),
+                        None => "nil".to_string(),
+                    },
+                );
             for slot in &tab.ordered_slots {
                 let name = &slot.slot_name;
                 match slot.node_id {
@@ -662,7 +672,10 @@ impl TypedSession<'_> {
                 );
             }
         }
-        x.push(weights);
+        // `ItemsTab:Load` makes the trade weights' list
+        if xml.is_some() {
+            x.push(weights);
+        }
         Ok(x)
     }
 
@@ -747,7 +760,14 @@ impl TypedSession<'_> {
                 "defaultGemLevel",
                 skills.default_gem_level.name().to_string(),
             )
-            .a("defaultGemQuality", n(skills.default_gem_quality))
+            .a(
+                "defaultGemQuality",
+                if self.gem_quality_nil {
+                    "nil".to_string()
+                } else {
+                    n(skills.default_gem_quality)
+                },
+            )
             .a(
                 "sortGemsByDPS",
                 b(attr("sortGemsByDPS").is_none_or(|v| v == "true")),

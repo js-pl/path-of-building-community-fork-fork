@@ -809,7 +809,6 @@ impl<'d> TypedSession<'d> {
         let data = self.data.calc_data();
         let calc = MiscCalculator::new(&self.build, &data)?;
         let tab = &self.build.items;
-        let second = tab.active_item_set().use_second_weapon_set;
         let calc_slot = |s: &'_ Slot| -> Result<(Option<&Item>, CalcOutput)> {
             let sel = tab.item(s.sel_item_id).filter(|_| s.sel_item_id != 0.0);
             let same = sel.is_some_and(|x| item.id.is_some() && x.id == item.id);
@@ -857,16 +856,11 @@ impl<'d> TypedSession<'d> {
         let unique = item.rarity == "UNIQUE" || item.rarity == "RELIC";
         let mut same_count = 0.0;
         let mut slots: Vec<Compare> = Vec::new();
-        for s in &tab.ordered_slots {
-            let inactive = self.slot_inactive(s);
-            let weapon_ok = s.weapon_set.is_none_or(|w| w == if second { 2 } else { 1 });
-            // `slot.shown()` of the graft slots and the third ring
-            let shown = match s.slot_name.as_str() {
-                "Graft 1" | "Graft 2" => self.build.spec.tree.version.contains("3_27"),
-                "Ring 3" => self.sidebar()?.additional_ring_slot,
-                _ => true,
-            };
-            if !self.valid_for_slot(item, &s.slot_name) || inactive || !weapon_ok || !shown {
+        let ring3 = self.sidebar()?.additional_ring_slot;
+        for (i, s) in tab.ordered_slots.iter().enumerate() {
+            // `slot.shown()`: active, of the weapon set in use, the graft
+            // slots on 3.27 trees, the third ring with its flag
+            if !self.valid_for_slot(item, &s.slot_name) || !self.slot_shown(i, ring3) {
                 continue;
             }
             let (sel, out) = calc_slot(s)?;

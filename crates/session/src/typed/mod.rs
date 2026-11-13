@@ -4,7 +4,10 @@
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
 mod calcs;
+mod config;
 pub mod display_stats;
+mod geometry;
+mod item_editor;
 mod item_tooltip;
 mod items;
 mod node_tooltip;
@@ -16,6 +19,7 @@ mod sidebar;
 mod skills;
 pub mod tooltip;
 mod tree;
+mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
 
@@ -208,6 +212,16 @@ pub struct TypedSession<'d> {
     socket_labels: HashMap<u32, String>,
     /// The Notes tab's text
     notes: String,
+    /// The Configuration tab's option controls
+    config_controls: config::ConfigControls,
+    /// The class each open class change popup selects, front first
+    class_popups: Vec<i64>,
+    /// Each spec's undo states, newest first, by the spec's index
+    undo: HashMap<usize, Vec<undo::UndoState>>,
+    /// A new build's skills tab, whose default gem quality is nil
+    gem_quality_nil: bool,
+    /// `ItemsTab.displayItem`: the item in the editor
+    display_item: Option<engine::item::Item>,
 }
 
 impl<'d> TypedSession<'d> {
@@ -239,9 +253,24 @@ impl<'d> TypedSession<'d> {
             item_keys: Default::default(),
             socket_labels: HashMap::new(),
             notes: notes::load_notes(&root),
+            config_controls: config::ConfigControls::new(&data.game.config_vars),
+            class_popups: Vec::new(),
+            undo: HashMap::new(),
+            gem_quality_nil: false,
+            display_item: None,
             root,
         };
+        // `ConfigTab:Load` shows the loaded set
+        if s.root
+            .child("PathOfBuilding")
+            .and_then(|p| p.child("Config"))
+            .is_some()
+        {
+            s.update_config_controls();
+        }
+        s.config_mods_built();
         s.load_specs()?;
+        s.reset_undo();
         for id in &s.build.items.item_order_list {
             s.item_keys.insert(*id as u32, ());
         }
@@ -249,17 +278,6 @@ impl<'d> TypedSession<'d> {
         s.estimate_progress()?;
         s.refresh_controls()?;
         Ok(s)
-    }
-
-    /// The sidebar's calculation of a main skill the typed engine leaves
-    /// outputs out of
-    pub(super) fn check_main(&self) -> Result<()> {
-        match &self.main.sidebar {
-            Some(s) if s.main_copy => Err(format!(
-                "{NOT_PORTED}: the gem outputs of Saviour's mirage as the main skill"
-            )),
-            _ => Ok(()),
-        }
     }
 
     /// `controls`: the sidebar's and the Calcs tab's controls, `None`
@@ -271,6 +289,7 @@ impl<'d> TypedSession<'d> {
             let c = match p.split_once('.')? {
                 ("calcs", name) => self.calcs_control(name)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
+                ("config", var) => self.config_control_json(var)?,
                 _ => return None,
             };
             out.insert(p.to_string(), c);

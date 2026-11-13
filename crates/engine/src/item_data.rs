@@ -171,6 +171,9 @@ pub struct ClusterSkill {
     pub stats: Vec<String>,
     /// Whether it has a mastery (`masteryIcon`)
     pub mastery: bool,
+    /// `icon` and `masteryIcon`, art paths the tree view shows
+    pub icon: Option<String>,
+    pub mastery_icon: Option<String>,
 }
 
 /// One value of a line in `data.modScalability`
@@ -465,6 +468,8 @@ impl ItemData {
                                         .map(string)
                                         .collect::<Result<_>>()?,
                                     mastery: !get(sk, "masteryIcon").is_nil(),
+                                    icon: opt_string(&get(sk, "icon"))?,
+                                    mastery_icon: opt_string(&get(sk, "masteryIcon"))?,
                                 },
                             ))
                         })
@@ -618,7 +623,9 @@ crate::codec_struct!(Affix {
 crate::codec_struct!(ClusterSkill {
     name,
     stats,
-    mastery
+    mastery,
+    icon,
+    mastery_icon
 });
 crate::codec_struct!(ClusterJewel {
     size,

@@ -79,6 +79,16 @@ impl Source {
     /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
     /// data: its functions are ported by name in `engine::config`
     pub fn option_defaults(&self) -> Result<Vec<OptionDefault>> {
+        Ok(engine::config_tab::option_defaults(&self.config_options()?))
+    }
+
+    /// The options of the Configuration tab as its controls show them
+    pub fn config_vars(&self) -> Result<Vec<engine::config_tab::ConfigVar>> {
+        Ok(engine::config_tab::config_vars(&self.config_options()?))
+    }
+
+    /// `Modules/ConfigOptions.lua`'s `varList`
+    fn config_options(&self) -> Result<Value> {
         let mut im = self.importer();
         for g in ["string", "table"] {
             im.env
@@ -86,10 +96,8 @@ impl Source {
                 .entry(g.into())
                 .or_insert_with(|| Value::Table(TableRef::new()));
         }
-        let list = im
-            .load1("Modules/ConfigOptions", vec![])
-            .map_err(|e| e.to_string())?;
-        Ok(engine::config_tab::option_defaults(&list))
+        im.load1("Modules/ConfigOptions", vec![])
+            .map_err(|e| e.to_string())
     }
 
     /// The labels of `data.jewelRadius` for a tree version
@@ -221,6 +229,7 @@ impl Source {
             setup: self.setup()?,
             config: self.config()?,
             option_defaults: self.option_defaults()?,
+            config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_versions: versions,
         })

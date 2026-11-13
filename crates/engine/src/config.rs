@@ -289,6 +289,9 @@ impl ConfigData {
 pub struct ConfigState {
     pub enemy_level: Option<f64>,
     pub damage_type_locked: bool,
+    /// The options whose placeholder the options' functions set, in
+    /// order (their controls show it)
+    pub placeholders_set: Vec<String>,
 }
 
 /// A block of custom modifier lines
@@ -303,6 +306,7 @@ impl Out<'_> {
     /// `SetPlaceholder(value, true)` of an option's edit control: the
     /// placeholder becomes `tonumber(tostring(value))`
     fn set_placeholder(&mut self, var: &str, value: Option<f64>) {
+        self.state.placeholders_set.push(var.to_string());
         match value.and_then(|v| pat::to_number(&pat::num(v))) {
             Some(v) => self.placeholder.insert(var.to_string(), Val::Number(v)),
             None => self.placeholder.remove(var),
