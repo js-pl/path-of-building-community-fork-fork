@@ -40,6 +40,14 @@ button {
 button:hover {
   border-color: var(--accent);
 }
+button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+button:disabled:hover {
+  border-color: var(--border);
+}
 button.small {
   font-size: 12px;
   padding: 1px 4px;
@@ -63,6 +71,16 @@ textarea {
   padding: 6px 10px;
   background: #3a1d1d;
   cursor: pointer;
+}
+.notice-bar {
+  padding: 6px 10px;
+  background: var(--panel2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.not-ported {
+  color: var(--muted);
+  font-style: italic;
 }
 .dismiss {
   color: var(--muted);

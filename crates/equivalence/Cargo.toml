@@ -22,3 +22,4 @@ mimalloc.workspace = true
 
 [dev-dependencies]
 testkit.workspace = true
+session = { path = "../session" }

@@ -88,8 +88,10 @@ State at the handoff:
   Zorath's eye jewels): the legion passives and `NodeIndexMapping`
   (`engine::timeless::Timeless`, made by `gamedata::Source::timeless`),
   the look-up tables decompressed from the submodule's `.zip` files when
-  a build first needs them (a loader the caller gives; without one a
-  conquered node is `not ported`), and the conquered nodes of
+  a build first needs them (a loader the caller gives; without the table
+  a conquered node is `not ported`, and the loader is asked again next
+  time), the rest in `engine::codec`'s binary form (`Timeless::encode`,
+  shipped in the bundle), and the conquered nodes of
   `BuildAllDependsAndPaths` (replacements, additions, rolled values,
   `ReconnectNodeToClassStart`). The Abyss jewels' tables are read by
   socket, Zorath's by the nodes of the allocated path from its socket to
@@ -121,8 +123,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The party tab. `CalcSections.lua` (which breakdown each cell shows)
-   belongs to the session API.
+1. `CalcSections.lua` (which breakdown each cell shows) belongs to the
+   session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
@@ -253,7 +255,7 @@ What remains for the full migration, in order:
    round trips (a file saved by either loads in the other to the same
    file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
    saving re-parses each item from it as `BuildAndParseRaw` does. What
-   the typed build does not hold (notes, party buffers, import, tree
+   the typed build does not hold (notes, the Party tab's settings, import, tree
    view and timeless jewel settings, item set links, trade weights)
    comes from the loaded file as the tabs' `Load` keeps it. Ported on
    the way, as upstream leaves them nil: `includeInFullDPS` of a group
@@ -263,12 +265,29 @@ What remains for the full migration, in order:
    go back to the gems, the Calcs tab's from the sidebar's calculation,
    which has the same minion skills),
    `enableGlobal2` of the gems the calculations make,
-   `secondaryAscendClassId="nil"`. A build with exported party buffs
-   falls back. Typed saves take 0.2 to 1.5 s over the corpus (the first save
+   `secondaryAscendClassId="nil"`. A build that exports its buffs for its
+   party (`exportParty`) saves the `ExportedBuffs` of its Calcs tab's
+   calculation (`engine::party::BuffExports::texts`, upstream's
+   `exportBuffs`). Typed saves take 0.2 to 1.5 s over the corpus (the first save
    re-parses every item), the translation's 2.2 s; the browser's
    background node power, which saves the build first, no longer
    replays the typed edits on the translation (its load alone took
    about 1.2 s per corpus build).
+
+   The Party tab is typed in the engine (`engine::party`, the session's
+   `party` view command is not): the `party` phase of
+   `typed_session_matches_translated` gives every other corpus build
+   socket groups with a link, an aura, a curse or warcry, makes it
+   export its buffs and compares sidebar, outputs, Calcs tab and file;
+   then each such build takes another's exported buffs as its party
+   members' (and every fourth hand-written party stats and every link's
+   mods) and is compared again (`PARTY_STEP=1` for all builds). Where
+   the typed engine fails on a party build (upstream exports no
+   `MaxLifeLeechRatePercent` for Vampiric Link, and a `varList` read
+   back from text, also in what `buildOutput` collects for the
+   Configuration tab), the translation fails too. Exported mods whose
+   keystone source upstream's `mergeKeystones` changed on the tree's
+   shared mods are aligned, as `align_keystone_sources` does.
 
    Items, sets and specs are typed (`session::typed::items`, `sets`):
    `items` (`UpdateSockets`' labels, which slots show, what fits each
@@ -336,8 +355,8 @@ What remains for the full migration, in order:
      translation after its replays.
    - Engine gaps that make a build fall back: Combust's trigger
      (gen-0028), tree edits with Intuitive
-     Leap and the like, tattoos, specs in the URL format only, exported
-     party buffs, the character level's auto mode.
+     Leap and the like, tattoos, specs in the URL format only, the character
+     level's auto mode.
 
 ## Done
 
@@ -391,6 +410,8 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id: all of them, the minions' tested only through the corpus |
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
+| `PartyTab:Load`, `ParseBuffs`, `exportBuffs`, `modLib.parseFormattedSourceMod`, `formatSourceMod` | `party.rs`: the build's `<Party>` section and `exportParty` (`Build::party`) |
+| `env.partyMembers` in `initEnv` and `perform`: the party's enemy mods, its actor (`PARTY`, the player's `partyMembers`), auras, aura debuffs, warcries, links, curses, extra auras and other effects, the `...EqualToPartyMember` stats; `buffExports` | `calc_setup.rs`, `calc_perform.rs` (`party_buffs`), `calc_defence.rs`, `calc_ehp.rs`, `calc_offence*.rs`; `calc_party.rs` (the end of perform's exports) |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
@@ -520,8 +541,6 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The party tab (`env.partyMembers`; the build's `<Party>` section is not
-  read, so a build with party members calculates as without them)
 - A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
@@ -572,11 +591,25 @@ Data no longer goes through Lua at load. `pob bundle <out>` ships the
 typed engine's data in `engine::codec`'s binary form (`session::bundle`):
 `core.bin` holds the game data, the mod parser (with upstream's ModCache)
 and the current tree, each compressed; every tree version is a separate
-file under `files/`, fetched when a build needs an older one. With
+file under `files/`, fetched when a build needs an older one. So are
+the timeless jewels' data (`typed/timeless.bin`, 47 kB) and each jewel's
+look-up table (`typed/timeless/<Name>.bin`, upstream's zlib stream, 0.9 to
+30 MB): a build with a timeless jewel asks for them, the worker fetches
+them and retries (`session::bundle::decode_timeless`). `tests/bundle.rs`
+in `equivalence` loads a build with each of the 11 jewels on the data
+read from a bundle, adding the files each asks for, and gets the same
+sidebar, outputs and tree as on the data made from source. With
 `pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
 data files the translation reads starting up and loading the given builds,
 and every tree version's Lua data, for an engine built with the
 translation (`build-data.mjs` without `--typed`).
+
+The frontend takes `not ported` answers as such
+(`isNotPorted` in `web/src/engine/client.ts`, `web/src/ui/NotPorted.tsx`): an edit the engine
+does not have shows a notice instead of an error, a view it does not have
+(notes, party, the item database) a note in its place, the controls of
+commands that answered `not ported` are disabled, and tooltips it does
+not have are left out.
 
 ### Size and load time
 
