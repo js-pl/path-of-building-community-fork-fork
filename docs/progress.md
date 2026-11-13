@@ -356,10 +356,12 @@ What remains for the full migration, in order:
    (`MiscCalculator::calculate_on`). Upstream keeps `displayEffect`,
    `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
    across calculations; the typed tooltips read the sidebar's last
-   calculation. Falling back: tattooed and conquered nodes, sockets
-   whose radius has nodes the calculation did not build (upstream reads
-   their stale `finalModList`, or fails), a mastery tooltip with a
-   popup open, the party view with imported data. A radius jewel's
+   calculation. A socket's threshold lines sum each radius node's
+   `finalModList`: the calculation's for allocated nodes and those near
+   a radius jewel (`extraRadiusNodeList`, now kept as well), else the
+   node's own `modList`, which `CalcsTab:BuildOutput` sets on every
+   node first. Falling back: tattooed and conquered nodes, a mastery
+   tooltip with a popup open, the party view with imported data. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).

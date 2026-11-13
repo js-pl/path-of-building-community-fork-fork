@@ -169,7 +169,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "crafting a cluster jewel",
     // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
     // radius data kept from earlier calculations, or errors on these
-    "a socket tooltip with nodes the calculation did not build",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
