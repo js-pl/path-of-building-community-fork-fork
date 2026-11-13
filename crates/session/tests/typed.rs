@@ -1102,21 +1102,20 @@ fn items_edits_match(d: &mut Dispatcher) {
                                         || p.contains("AddSocket")
                                         || p.contains("Enchant")
                                         || p.contains("Anoint")
+                                        || p.contains("Corrupt")
                                         || p.contains("CustomModifierRemove"))
                             })
                             .collect();
-                        // The Enchant popup more often than the others
-                        let enchant = controls
+                        // The popups more often than the other controls
+                        let opens = |p: &str| {
+                            p.contains("Enchant") || p.contains("Anoint") || p.contains("Corrupt")
+                        };
+                        let popup = controls
                             .iter()
-                            .find(|c| {
-                                c["path"]
-                                    .as_str()
-                                    .is_some_and(|p| p.contains("Enchant") || p.contains("Anoint"))
-                            })
+                            .find(|c| c["path"].as_str().is_some_and(opens))
                             .cloned()
                             .filter(|_| rng.below(3) == 0);
-                        let Some(c) = enchant.or_else(|| pick(&mut rng, &J::Array(controls)))
-                        else {
+                        let Some(c) = popup.or_else(|| pick(&mut rng, &J::Array(controls))) else {
                             break;
                         };
                         let path = c["path"].clone();
@@ -1146,28 +1145,16 @@ fn items_edits_match(d: &mut Dispatcher) {
                             break;
                         }
                         let label = format!("step {step} {r}");
-                        if r.contains("displayItemAnoint") || r.contains("displayItemEnchant") {
+                        if r.contains("click") && opens(&r) {
+                            // The popup: random choices, then one of the
+                            // buttons that close it
                             popups += 1;
-                        }
-                        if r.contains("displayItemAnoint") {
-                            compare(d, &json!({"cmd": "state"}), &label, &mut out);
-                            let button = ["save", "save", "close"][rng.below(3)];
-                            let r = json!({"cmd": "popupButton", "name": button}).to_string();
-                            answer(d.request(&r), "anoint button");
-                            log.push(r.clone());
-                            if !d.typed_active() {
-                                fell_back = true;
-                                break;
-                            }
-                        }
-                        if r.contains("displayItemEnchant") {
-                            // Enchant Item: random choices, then Enchant,
-                            // Remove or Cancel
                             compare(d, &json!({"cmd": "state"}), &label, &mut out);
                             let mut closed = false;
-                            for _ in 0..rng.below(5) + 1 {
+                            for _ in 0..rng.below(6) {
                                 let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
-                                let inputs: Vec<J> = st["ok"]["popups"][0]["controls"]
+                                let popup = &st["ok"]["popups"][0];
+                                let mut inputs: Vec<J> = popup["controls"]
                                     .as_array()
                                     .cloned()
                                     .unwrap_or_default()
@@ -1175,17 +1162,32 @@ fn items_edits_match(d: &mut Dispatcher) {
                                     // Sorting by power only now and then
                                     .filter(|c| c["path"] != "popup.sort" || rng.below(4) == 0)
                                     .collect();
+                                for b in popup["buttons"].as_array().into_iter().flatten() {
+                                    if b["name"] == "implicits" || b["name"] == "rolls" {
+                                        inputs.push(json!({"class": "ButtonControl", "path": format!("popup.{}", b["name"].as_str().unwrap_or(""))}));
+                                    }
+                                }
                                 let Some(c) = pick(&mut rng, &J::Array(inputs)) else {
                                     break;
                                 };
-                                let r = if c["class"] == "CheckBoxControl" {
-                                    json!({"cmd": "control", "path": c["path"], "state": c["state"] != true})
-                                } else {
-                                    let n = c["list"].as_array().map_or(1, Vec::len);
-                                    json!({"cmd": "control", "path": c["path"], "sel": rng.below(n) + 1})
+                                let r = match c["class"].as_str().unwrap_or("") {
+                                    "CheckBoxControl" => {
+                                        json!({"cmd": "control", "path": c["path"], "state": c["state"] != true})
+                                    }
+                                    "SliderControl" => {
+                                        let val = rng.below(11) as f64 / 10.0;
+                                        json!({"cmd": "control", "path": c["path"], "val": val})
+                                    }
+                                    "ButtonControl" => {
+                                        json!({"cmd": "control", "path": c["path"], "click": true})
+                                    }
+                                    _ => {
+                                        let n = c["list"].as_array().map_or(1, Vec::len);
+                                        json!({"cmd": "control", "path": c["path"], "sel": rng.below(n) + 1})
+                                    }
                                 }
                                 .to_string();
-                                answer(d.request(&r), "enchant control");
+                                answer(d.request(&r), "popup control");
                                 log.push(r.clone());
                                 if !d.typed_active() {
                                     closed = true;
@@ -1202,9 +1204,18 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 fell_back = true;
                                 break;
                             }
-                            let button = ["save", "save", "remove", "close"][rng.below(4)];
+                            let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                            let mut closing: Vec<String> = st["ok"]["popups"][0]["buttons"]
+                                .as_array()
+                                .into_iter()
+                                .flatten()
+                                .filter_map(|b| b["name"].as_str().map(String::from))
+                                .filter(|n| n == "save" || n == "remove" || n == "close")
+                                .collect();
+                            closing.push("save".into());
+                            let button = &closing[rng.below(closing.len())];
                             let r = json!({"cmd": "popupButton", "name": button}).to_string();
-                            answer(d.request(&r), "enchant button");
+                            answer(d.request(&r), "popup button");
                             log.push(r.clone());
                             if !d.typed_active() {
                                 fell_back = true;
@@ -1320,7 +1331,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits ({popups} enchant and anoint popups): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} enchant, anoint and corrupt popups): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")

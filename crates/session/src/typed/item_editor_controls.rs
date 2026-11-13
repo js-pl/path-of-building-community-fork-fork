@@ -256,6 +256,13 @@ impl<'d> TypedSession<'d> {
                 self.anoint_display_item(slot)?;
                 self.refresh_item_popups();
             }
+            ("displayItemCorrupt", Act::Click) => {
+                if self.has_item_popup() || self.class_popups_open() > 0 {
+                    return Err(format!("{NOT_PORTED}: a popup over another"));
+                }
+                self.corrupt_display_item()?;
+                self.refresh_item_popups();
+            }
             ("displayItemAddSocket", Act::Click) => {
                 let item = self.display_item.as_ref().ok_or("no item in the editor")?;
                 let at = item.sockets.len() - item.abyssal_socket_count as usize;
