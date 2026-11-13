@@ -249,7 +249,8 @@ What remains for the full migration, in order:
    mods) and is compared again (`PARTY_STEP=1` for all builds). Where
    the typed engine fails on a party build (upstream exports no
    `MaxLifeLeechRatePercent` for Vampiric Link, and a `varList` read
-   back from text), the translation fails too. Exported mods whose
+   back from text, also in what `buildOutput` collects for the
+   Configuration tab), the translation fails too. Exported mods whose
    keystone source upstream's `mergeKeystones` changed on the tree's
    shared mods are aligned, as `align_keystone_sources` does.
 

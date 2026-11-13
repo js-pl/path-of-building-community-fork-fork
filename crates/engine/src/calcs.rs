@@ -718,6 +718,7 @@ fn output_of(
     match mode {
         CalcMode::Main => {
             main_extras(&mut p, &recalc)?;
+            text_lists_used(&p)?;
             multipliers_used = used_multipliers(&p);
             sidebar = Some(crate::sidebar::collect(&p)?);
         }
@@ -817,6 +818,47 @@ fn used_multipliers(p: &Perform) -> HashSet<Sym> {
         }
     }
     used
+}
+
+/// What `buildOutput` collects for the Configuration tab fails on a tag
+/// whose list is text (the Party tab's mods read back from text,
+/// `addVarTag`'s `ipairs`): the actors', the skills' base lists' and the
+/// enemy's mods
+fn text_lists_used(p: &Perform) -> Result<()> {
+    let check = |m: &Mod| -> Result<()> {
+        for t in &m.tags {
+            let TagKind::Other { kind, fields } = &t.kind else {
+                continue;
+            };
+            match kind.as_str() {
+                "IgnoreCond" => break,
+                "Condition"
+                | "Multiplier"
+                | "MultiplierThreshold"
+                | "PerStat"
+                | "StatThreshold"
+                    if fields.get("varList").is_some() =>
+                {
+                    return Err("bad argument #1 to 'ipairs' (table expected, got string)".into());
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    };
+    let mut stores = vec![p.c.db(PLAYER), p.c.db(crate::calc::ENEMY)];
+    stores.extend(p.minion_actor().map(|a| p.c.db(a)));
+    stores.extend(p.lists.iter().map(|l| l.base));
+    for id in stores {
+        let s = p.c.store(id);
+        for st in std::iter::once(s).chain(s.base.as_deref()) {
+            match &st.mods {
+                Mods::Db(by_name) => by_name.values().flatten().try_for_each(check)?,
+                Mods::List(list) => list.iter().try_for_each(check)?,
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The charges, buffs and curses the Calcs tab lists (`BuffList`,
