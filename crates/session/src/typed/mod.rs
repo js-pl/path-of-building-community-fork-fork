@@ -8,6 +8,7 @@ mod config;
 pub mod display_stats;
 mod geometry;
 mod item_add_implicit;
+mod item_add_modifier;
 mod item_anoint;
 mod item_corrupt;
 mod item_db;
