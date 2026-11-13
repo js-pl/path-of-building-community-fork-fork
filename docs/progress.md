@@ -304,6 +304,54 @@ What remains for the full migration, in order:
    translated 71 s with its replays). Saving first makes the Calcs
    tab's calculation, as a frame does, for its write-backs to the gems.
 
+   Tooltips, notes and the party view are typed
+   (`session::typed::tooltip`, `node_tooltip`, `item_tooltip`, `notes`,
+   `party`): `socketGroupTooltip` (`SkillsTab:AddSocketGroupTooltip`;
+   the setup now keeps each gem's `displayEffect`, whether supports are
+   superseded and whom they support, and `displayGemList`),
+   `nodeTooltip` (`PassiveTreeView:AddNodeTooltip` with its stat
+   comparisons on the misc calculator; the tree keeps the nodes'
+   `reminderText` and `flavourText`), `itemTooltip` and `previewItem`
+   (`ItemsTab:AddItemTooltip` and `AddItemStatDifferences`: every slot
+   the item fits, or the named slot, flasks' and tinctures' effective
+   stats; the item data keeps `data.flavourText` and the bases' flavour
+   text), `buildMode:CompareStatList` with `lowerIsBetter` and
+   `compPercent` read from `BuildDisplayStats.lua` at build time,
+   `notes`, `setNotes` (saving turns escaped colour codes back, as
+   `NotesTab:Save` does) and `party` without imported party data.
+   `tooltips_match` (every corpus build: every socket group's and
+   item's tooltip, three items in their own slot, the first item as a
+   preview, 10 nodes on and around the tree and the allocated sockets,
+   notes and party, then notes set and a node clicked) gives the
+   translation's: 1133 item tooltips (typed 19 s, translated 54 s), 695
+   node tooltips (10 s, 44 s), 379 socket group tooltips, 59 previews,
+   182 notes and 61 party views; 40 requests fell back (listed by the
+   test). Upstream's `ProcessSocketGroup` clears a triggered granted
+   skill's level cost on the shared skill data for the rest of the
+   process (gen-0010's Farrul's Chase triggers Intimidating Cry at level
+   20), so a build loaded later in the same session sees that level
+   without a cost: taking off Ashes of the Stars in gen-0018 drops its
+   level 21 Intimidating Cry to 20, which costs 20 mana in a fresh
+   translation and in the typed engine but 0 after gen-0010 was loaded.
+   The test asks a request that differs again of a fresh translation
+   with the same edits before it, and counts it as aligned when that one
+   agrees (2 requests, both gen-0018's amulet, when gen-0010 runs
+   earlier in the same shard of phase `tooltips`; with the default 3
+   shards they run apart and none needs aligning). `tests/calculator.rs`
+   now also takes off the amulet, and recalculates a build that differs
+   on a fresh translation the same way (gen-0018 again). Upstream keeps `displayEffect`,
+   `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
+   across calculations; the typed tooltips read the sidebar's last
+   calculation. Falling back: tattooed and conquered nodes, sockets
+   whose radius has nodes the calculation did not build (upstream reads
+   their stale `finalModList`, or fails), a radius jewel's "Attributes
+   in Radius" (upstream's `jewelRadiusData` counts differently from the
+   typed radius data, e.g. 40 against 20 Str in gen-0029), comparing a
+   jewel that changes the tree, toggling a previewed flask, a mastery
+   tooltip with a popup open, the party view with imported data.
+   The translated runtime's `%d` of `-2^63` printed two
+   minus signs; it now prints LuaJIT's.
+
    The Configuration tab, class changes, undo and new builds are typed
    (`session::typed::config`, `undo`): `config` (each option control's
    visibility from its `ifCond`, `ifSkill`, ... rules on the sidebar's
@@ -336,12 +384,10 @@ What remains for the full migration, in order:
    per phase and fails on any not in its `KNOWN_FALLBACKS`.
 
    Still on the translation, before it can be dropped:
-   - Read-only views: `itemDb`, `party`, `notes`, `controls` of other
-     tabs.
-   - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
-     `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
-     `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
-   - Items and crafting: `displayItem`, `craftItem`, `setNotes`,
+   - Read-only views: `itemDb`, `party` with imported party data,
+     `controls` of other tabs.
+   - Tooltips in the cases above that fall back.
+   - Items and crafting: `displayItem`, `craftItem`,
      `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
      popups, the unique and rare databases: `Data/Uniques/Special/Generated.lua`
      and `Item:Craft` are not ported). `addItem`, `editItem`,

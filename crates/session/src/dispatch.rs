@@ -381,7 +381,48 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_ref()?.node_power(index),
                 )
             }
+            // Notes, party and tooltips
+            "notes" => Some(ok(self.typed.as_ref()?.notes())),
+            "party" => {
+                let r = self.typed.as_ref()?.party();
+                self.view(r)
+            }
+            "setNotes" => {
+                let text = req["text"].as_str()?.to_string();
+                self.edit(json, |s| s.set_notes(&text))
+            }
+            "socketGroupTooltip" => {
+                let i = req["index"].as_f64()?;
+                let r = self.typed.as_ref()?.socket_group_tooltip(i);
+                self.view(r)
+            }
+            "nodeTooltip" => {
+                let r = self.typed.as_mut()?.node_tooltip(id(&req)?);
+                self.view(r)
+            }
+            "itemTooltip" => {
+                let (i, slot) = (req["id"].as_f64()?, req["slot"].as_str());
+                let r = self.typed.as_mut()?.item_tooltip(i, slot);
+                self.view(r)
+            }
+            "previewItem" => {
+                let text = req["text"].as_str()?;
+                let r = self.typed.as_mut()?.preview_item(text);
+                self.view(r)
+            }
             _ => None,
+        }
+    }
+
+    /// A view of the typed build; one it cannot give comes from the
+    /// translation, with the reason kept
+    fn view(&mut self, r: crate::typed::Result<J>) -> Option<String> {
+        match r {
+            Ok(v) => Some(ok(v)),
+            Err(e) => {
+                self.typed_error = Some(e);
+                None
+            }
         }
     }
 
