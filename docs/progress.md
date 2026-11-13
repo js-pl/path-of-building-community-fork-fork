@@ -522,7 +522,7 @@ is linked, and those commands are `not ported: <cmd>` errors
 (`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
 `loadXml`/`loadCode` opens a build on the typed engine, and the browser
 frontend works for everything the typed session answers (sidebar,
-outputs, Calcs tab and breakdowns, tree, skills, items, config set, save,
+outputs, Calcs tab and breakdowns, tree edits and geometry, skills, items, config set, save,
 node power). `newBuild` is typed (`TypedSession::new_build`, an empty
 build on the latest tree): its views and file match the translation's,
 also after a skill is added (`new_build_matches` in

@@ -68,10 +68,11 @@ for (const rel of ["corpus/generated/gen-0001.xml", "upstream/PathOfBuilding/spe
     const xml = readFileSync(join(root, rel), "utf8");
     const reqs = [{ cmd: "loadXml", xml }, { cmd: "state" }, { cmd: "saveCode" }];
     const got = reqs.map(call);
-    // A command only the translation has
-    const tree = call({ cmd: "tree" });
-    if (translation) assert.equal(tree.error, undefined, tree.error);
-    else assert.match(tree.error, /^not ported: tree$/);
+    // A command the typed engine does not have goes to the translation,
+    // or is "not ported" without it
+    const other = call({ cmd: "noSuchCommand" });
+    if (translation) assert.equal(other.error, "unknown command noSuchCommand");
+    else assert.equal(other.error, "not ported: noSuchCommand");
     for (const r of got) assert.equal(r.error, undefined, r.error);
     const want = native(reqs);
     assert.deepEqual(got[1].ok.stats, want[1].ok.stats);
