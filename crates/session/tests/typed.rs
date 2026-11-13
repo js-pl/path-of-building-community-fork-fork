@@ -926,10 +926,9 @@ fn items_edits_match(d: &mut Dispatcher) {
     for (id, path) in mine(corpus()) {
         at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
-        answer(
-            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
-            "load",
-        );
+        // The edits since the load, for a fresh translation's recheck
+        let mut log = vec![json!({"cmd": "loadXml", "xml": xml}).to_string()];
+        answer(d.request(&log[0]), "load");
         if !d.typed_active() {
             continue;
         }
@@ -1044,8 +1043,9 @@ fn items_edits_match(d: &mut Dispatcher) {
                         _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
                     };
                     compare(d, &open, &format!("step {step}"), &mut out);
+                    log.push(open.to_string());
                     let label = format!("step {step} {open}");
-                    compare_display(d, &label, &mut out);
+                    compare_display(d, &label, &log, &mut out);
                     json!({"cmd": "saveDisplayItem"})
                 }
                 13 => {
@@ -1058,6 +1058,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                         _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
                     };
                     answer(d.request(&open.to_string()), "open");
+                    log.push(open.to_string());
                     let mut fell_back = !d.typed_active();
                     for _ in 0..rng.below(4) + 1 {
                         if fell_back {
@@ -1065,7 +1066,8 @@ fn items_edits_match(d: &mut Dispatcher) {
                         }
                         // Shown on both, as the editor is drawn before a click:
                         // upstream's sliders take their values when drawn
-                        let shown = compare_display(d, &format!("step {step} {open}"), &mut out);
+                        let shown =
+                            compare_display(d, &format!("step {step} {open}"), &log, &mut out);
                         let controls: Vec<J> = shown["ok"]["controls"]
                             .as_array()
                             .cloned()
@@ -1104,12 +1106,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                         }
                         .to_string();
                         answer(d.request(&r), "editor control");
+                        log.push(r.clone());
                         if !d.typed_active() {
                             fell_back = true;
                             break;
                         }
                         let label = format!("step {step} {r}");
-                        compare_display(d, &label, &mut out);
+                        compare_display(d, &label, &log, &mut out);
                         compare(d, &json!({"cmd": "state"}), &label, &mut out);
                     }
                     if fell_back {
@@ -1140,13 +1143,14 @@ fn items_edits_match(d: &mut Dispatcher) {
                     for r in &reqs {
                         let r = r.to_string();
                         answer(d.request(&r), "craft step");
+                        log.push(r.clone());
                         if !d.typed_active() {
                             fell_back = true;
                             break;
                         }
                         let label = format!("step {step} {r}");
                         compare(d, &json!({"cmd": "state"}), &label, &mut out);
-                        compare_display(d, &label, &mut out);
+                        compare_display(d, &label, &log, &mut out);
                     }
                     if fell_back || cancel {
                         json!({"cmd": "state"})
@@ -1160,6 +1164,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 json!({"cmd": "popupButton", "name": "save"})
                             };
                             answer(d.request(&r.to_string()), "edit text");
+                            log.push(r.to_string());
                         }
                         json!({"cmd": "saveDisplayItem"})
                     }
@@ -1173,6 +1178,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let r = req.to_string();
             let t = Instant::now();
             answer(d.request(&r), "typed edit");
+            log.push(r.clone());
             times[0] += t.elapsed();
             if !d.typed_active() {
                 let e = d.typed_error.clone().unwrap_or_default();
@@ -1230,10 +1236,10 @@ fn items_edits_match(d: &mut Dispatcher) {
 
 /// `displayItem` of both. The tooltip's stat comparison of the
 /// translation can carry another build's mutation of upstream's shared
-/// data (skill costs a calculation cleared); where `previewItem` of the
-/// item's text differs the same way on both, its lines are a known gap of
-/// the tooltip's comparison, counted as such
-fn compare_display(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) -> J {
+/// data (`ProcessSocketGroup` clears a triggered granted skill's level
+/// cost): lines that differ are asked again of a fresh translation, with
+/// the edits of `log` since the load, and aligned when that one agrees
+fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Vec<String>) -> J {
     let r = json!({"cmd": "displayItem"}).to_string();
     let mut typed = answer(d.request(&r), "typed");
     let answer_typed = typed.clone();
@@ -1245,15 +1251,13 @@ fn compare_display(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) -> J 
     let (tl, rl) = (typed["ok"]["lines"].take(), tr["ok"]["lines"].take());
     diff(&typed, &tr, &format!("{label} {r}"), out);
     if tl != rl {
-        let raw = typed["ok"]["item"]["raw"].clone();
-        let p = json!({"cmd": "previewItem", "text": raw}).to_string();
-        let tp = answer(d.request(&p), "typed preview")["ok"]["lines"].take();
-        let rp = answer(d.translated_request(&p), "translated preview")["ok"]["lines"].take();
-        if tp == tl && rp == rl && tp != rp {
-            note_fallback(
-                "displayItem",
-                "upstream's shared data changed by another build",
-            );
+        let fresh = session();
+        for e in log {
+            answer(fresh.request(e), "fresh edit");
+        }
+        let fl = answer(fresh.request(&r), "fresh")["ok"]["lines"].take();
+        if fl == tl {
+            note_fallback("displayItem", "aligned with a fresh translation");
         } else {
             diff(&tl, &rl, &format!("{label} {r}.lines"), out);
         }
