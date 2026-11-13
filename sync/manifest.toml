@@ -37,7 +37,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/GemTooltip.lua" = { status = "todo" }
 "Classes/ImportTab.lua" = { status = "partial", port = "web/src/ui/ImportTab.tsx crates/engine/src/build.rs crates/session/src/typed/save.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/Item.lua" = { status = "partial", port = "crates/engine/src/item.rs crates/engine/src/item_data.rs crates/engine/src/item_raw.rs crates/engine/src/item_craft.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/ItemDBControl.lua" = { status = "partial", port = "crates/engine/src/compare.rs", note = "the stat sort (ListBuilder); filters and the UI stay on the translation", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/ItemDBControl.lua" = { status = "partial", port = "crates/engine/src/compare.rs crates/session/src/typed/item_db_list.rs crates/session/lua/session.lua", note = "the lists before they are drawn (no league or item type lists from LoadLeaguesAndTypes); dragging, tooltips and the drawn UI stay on the translation", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/ItemListControl.lua" = { status = "todo" }
 "Classes/ItemSetListControl.lua" = { status = "todo" }
 "Classes/ItemSlotControl.lua" = { status = "partial", port = "crates/session/src/typed/items.rs crates/engine/src/items_tab.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
