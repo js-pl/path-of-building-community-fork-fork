@@ -825,6 +825,7 @@ impl<'t> PassiveSpec<'t> {
             nodes_in_radius: None,
             reminder_text: None,
             flavour_text: None,
+            recipe: Vec::new(),
         })
     }
 }

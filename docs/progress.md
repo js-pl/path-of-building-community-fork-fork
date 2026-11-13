@@ -468,8 +468,11 @@ What remains for the full migration, in order:
      (`session::typed::item_corrupt`: Corrupted, Scourge and Glimpse of
      Chaos implicits in upstream's sort order, sorted by power, Scourge
      pairs, and a unique's corrupted roll ranges) and Anoint Item
-     (saved without a node: the session has no input for its notable
-     list). All in `items_edits_match`, with
+     (`session::typed::item_anoint`: the notable list of
+     `NotableDBControl`, searched with `matchOrPattern`, sorted by name or
+     a power stat with the anointed item; the translated session's
+     `describePopups` builds and lists it, with its search and sort, and
+     `control` selects a row). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

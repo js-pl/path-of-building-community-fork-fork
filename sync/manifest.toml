@@ -49,7 +49,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/ModDB.lua" = { status = "partial", port = "crates/engine/src/mods/store.rs crates/engine/src/mod_store.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/ModList.lua" = { status = "partial", port = "crates/engine/src/mods/store.rs crates/engine/src/mods/list.rs crates/engine/src/mod_store.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/ModStore.lua" = { status = "partial", port = "crates/engine/src/mods/store.rs crates/engine/src/mods/list.rs crates/engine/src/actor.rs crates/engine/src/mod_store.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/NotableDBControl.lua" = { status = "todo" }
+"Classes/NotableDBControl.lua" = { status = "partial", port = "crates/session/src/typed/item_anoint.rs crates/session/lua/session.lua", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/NotesTab.lua" = { status = "partial", port = "web/src/ui/NotesTab.tsx crates/session/src/typed/save.rs crates/session/src/typed/notes.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PartyTab.lua" = { status = "partial", port = "crates/engine/src/party.rs crates/engine/src/build.rs crates/session/src/typed/save.rs crates/session/src/typed/party.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveMasteryControl.lua" = { status = "todo" }
