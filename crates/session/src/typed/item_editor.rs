@@ -20,6 +20,24 @@ const DEFAULT_AFFIX_QUALITY: f64 = 0.5;
 pub struct Editor {
     /// `displayItemAffix1` to `displayItemAffix9`
     pub affix: [AffixControl; 9],
+    /// The item editor's popups, front first
+    pub popups: Vec<super::item_popups::ItemPopup>,
+    /// How many of `ui.popups` describe them (at the front)
+    pub described: usize,
+    /// `lastCraftRaritySel`, `lastCraftTypeSel`, `lastCraftBaseSel`
+    pub last_craft: Option<(usize, usize, usize)>,
+    /// The influence drop-downs' selections
+    pub influence: [f64; 2],
+    /// The quality and catalyst quality edits' text
+    pub quality_buf: String,
+    pub catalyst_quality_buf: String,
+    /// `displayItemClusterJewelNodeCount.val`
+    pub cluster_count_val: f64,
+    /// `displayItemRangeLine`'s list and selection, and the range
+    /// slider's value
+    pub range_list: Vec<String>,
+    pub range_sel: usize,
+    pub range_val: Option<f64>,
 }
 
 /// An affix drop-down and its roll slider
@@ -51,7 +69,7 @@ impl Default for AffixControl {
 }
 
 /// `SliderControl:GetDivVal(val)`
-fn div_val(val: f64, div: Option<f64>) -> (usize, f64) {
+pub(super) fn div_val(val: f64, div: Option<f64>) -> (usize, f64) {
     match div {
         Some(d) if d > 1.0 => {
             let i = (val * d).ceil().max(1.0);
@@ -63,7 +81,7 @@ fn div_val(val: f64, div: Option<f64>) -> (usize, f64) {
 
 /// The affix drop-downs' `verifyRange`: flips the roll where the tiers'
 /// ranges run the other way
-fn verify_range(range: f64, index: usize, mods: &[String], affixes: &AffixSet) -> f64 {
+pub(super) fn verify_range(range: f64, index: usize, mods: &[String], affixes: &AffixSet) -> f64 {
     let min_max = |id: &str| -> Option<(f64, f64)> {
         let m = affixes.get(id)?;
         m.lines.iter().find_map(|l| {
@@ -127,7 +145,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `BuildAndParseRaw()`
-    fn build_and_parse_raw(&self, item: &mut Item) -> Result<()> {
+    pub(super) fn build_and_parse_raw(&self, item: &mut Item) -> Result<()> {
         let raw = item.build_raw();
         item.parse_raw(&self.data.item_context(), &raw, None, false)
     }
@@ -186,14 +204,41 @@ impl<'d> TypedSession<'d> {
     /// `CreateDisplayItemFromRaw(raw, true)`: leaves the display item as
     /// it is when the base is not recognised
     fn create_display_item_from_raw(&mut self, raw: &str) -> Result<()> {
+        self.display_item_from_raw(raw, true)
+    }
+
+    /// `CreateDisplayItemFromRaw(raw, normalise)`
+    pub(super) fn display_item_from_raw(&mut self, raw: &str, normalise: bool) -> Result<()> {
         let Some(mut item) = self.new_item(raw)? else {
             return Ok(());
         };
-        // `main.migrateEldritchImplicits`, true by default
-        self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
-        item.normalise_quality();
-        item.build_mod_list(&self.data.item_context())?;
+        if normalise {
+            // `main.migrateEldritchImplicits`, true by default
+            self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
+            item.normalise_quality();
+            item.build_mod_list(&self.data.item_context())?;
+        }
         self.set_display(Some(item))
+    }
+
+    /// `SetDisplayItem(item)`
+    pub(super) fn set_display_item_value(&mut self, item: Option<Item>) -> Result<()> {
+        self.set_display(item)
+    }
+
+    pub(super) fn has_display_item(&self) -> bool {
+        self.display_item.is_some()
+    }
+
+    pub(super) fn display_item_id(&self) -> Option<f64> {
+        self.display_item.as_ref().and_then(|i| i.id)
+    }
+
+    /// `self.displayItem.id = id`
+    pub(super) fn set_display_item_id(&mut self, id: Option<f64>) {
+        if let Some(item) = &mut self.display_item {
+            item.id = id;
+        }
     }
 
     /// `SetDisplayItem(item)`, the item's side of it: the affix controls
@@ -211,15 +256,16 @@ impl<'d> TypedSession<'d> {
         let (crafted, cluster) = (item.crafted, item.cluster_jewel_size_index.is_some());
         if crafted {
             self.update_affix_controls()?;
-            if cluster {
-                self.update_cluster_jewel_controls()?;
-            }
+        }
+        self.set_display_controls();
+        if crafted && cluster {
+            self.update_cluster_jewel_controls()?;
         }
         Ok(())
     }
 
     /// `UpdateAffixControls()`
-    fn update_affix_controls(&mut self) -> Result<()> {
+    pub(super) fn update_affix_controls(&mut self) -> Result<()> {
         let item = self.display_item.as_ref().ok_or("no item in the editor")?;
         let data = &self.data.game.items;
         let prefix_limit = item.affix_table_limit(AffixTable::Prefixes);
@@ -311,13 +357,15 @@ impl<'d> TypedSession<'d> {
             item.cluster_jewel_skill = Some(skills.first().ok_or("no cluster skill")?.1.clone());
         }
         let count = item.cluster_jewel_node_count.unwrap_or(cj.min_nodes);
-        item.cluster_jewel_node_count = Some(count.max(cj.min_nodes).min(cj.max_nodes));
+        let count = count.max(cj.min_nodes).min(cj.max_nodes);
+        item.cluster_jewel_node_count = Some(count);
+        self.editor.cluster_count_val = (count - cj.min_nodes) / (cj.max_nodes - cj.min_nodes);
         self.craft_cluster_jewel()
     }
 
     /// `CraftClusterJewel()`: the enchant lines of the jewel's size, node
     /// count and skill, then every affix selected again
-    fn craft_cluster_jewel(&mut self) -> Result<()> {
+    pub(super) fn craft_cluster_jewel(&mut self) -> Result<()> {
         let data = &self.data.game.items;
         let ctx = self.data.item_context();
         let item = self.display_item.as_mut().ok_or("no item in the editor")?;
@@ -367,7 +415,7 @@ impl<'d> TypedSession<'d> {
 
     /// The affix drop-down's `selFunc` with its selected entry: the affix
     /// of that tier and roll, crafted
-    fn select_affix(&mut self, i: usize) -> Result<()> {
+    pub(super) fn select_affix(&mut self, i: usize) -> Result<()> {
         let ctx = self.data.item_context();
         let c = &self.editor.affix[i];
         let item = self.display_item.as_mut().ok_or("no item in the editor")?;
@@ -396,7 +444,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `AddItem(item, noAutoEquip)`: the item's id
-    fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
+    pub(super) fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
         let new = item.id.is_none();
         if new {
             let mut id = 1.0;
@@ -441,32 +489,19 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `AddDisplayItem()`
-    fn add_display_item(&mut self) -> Result<()> {
+    pub(super) fn add_display_item(&mut self) -> Result<()> {
         let item = self.display_item.take().ok_or("no item in the editor")?;
-        if let Some((_, other)) = FORBIDDEN
+        let old = item.id.and_then(|id| self.build.items.item(id)).cloned();
+        let other = FORBIDDEN
             .iter()
-            .find(|(t, _)| item.title.as_deref() == Some(t))
-        {
-            // `UpdateForbiddenJewelCounterpart` and
-            // `AddForbiddenJewelCounterpart` read the unique database
-            let variant = |i: &Item| {
-                let v = i.variant.filter(|v| *v >= 1.0)? as usize;
-                i.variant_list.as_ref()?.get(v - 1).cloned()
-            };
-            let name = variant(&item);
-            let old = item.id.and_then(|id| self.build.items.item(id));
-            let changed = old.is_some_and(|o| o.title == item.title && variant(o) != name);
-            let paired = self
-                .build
-                .items
-                .items
-                .values()
-                .any(|i| i.title.as_deref() == Some(other) && variant(i) == name);
-            if name.is_some() && (changed || !paired) {
-                return Err(format!("{NOT_PORTED}: the Forbidden jewels' counterparts"));
-            }
+            .find(|(t, _)| item.title.as_deref() == Some(*t))
+            .map(|(_, o)| *o);
+        let id = self.add_item(item, false)?;
+        if let Some(other) = other {
+            let item = self.build.items.item(id).unwrap().clone();
+            self.update_forbidden_counterpart(old.as_ref(), &item, other)?;
+            self.add_forbidden_counterpart(&item, other)?;
         }
-        self.add_item(item, false)?;
         self.items_changed()
     }
 
