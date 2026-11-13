@@ -263,6 +263,8 @@ pub struct Perform<'a> {
     pub minion_skills: Vec<crate::calc_skills::ActiveSkill>,
     /// The minion of each of the player's skills that has one
     pub minions: Vec<crate::calc_minion::MinionActor>,
+    /// The flasks in use (`env.flasks`), by item id
+    pub active_flasks: Vec<i64>,
     /// `env.minion`, by place in `minions`
     pub env_minion: Option<usize>,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies` and
@@ -744,6 +746,7 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         n_player: n,
         minion_skills: Vec::new(),
         minions: Vec::new(),
+        active_flasks: Vec::new(),
         env_minion: None,
         flasks_to_minion: [false; 3],
         merged_buffs: (Vec::new(), Vec::new()),
@@ -1081,6 +1084,7 @@ impl<'a> Perform<'a> {
             self.c.set_out(PLAYER, "TinctureEffect", effect);
             self.c.set_out(PLAYER, "TinctureLimit", limit);
         }
+        self.active_flasks = flasks.clone();
         let mode = self.env.mode;
         if mode.combat {
             self.merge_flasks(&flasks, false, true)?;

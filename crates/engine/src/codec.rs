@@ -16,7 +16,7 @@ pub type Result<T> = std::result::Result<T, String>;
 
 const MAGIC: &[u8; 4] = b"PBTD";
 /// Bumped with every change of the format
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 
 #[derive(Default)]
 pub struct Writer {
