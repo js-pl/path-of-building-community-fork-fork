@@ -140,11 +140,6 @@ impl TypedSession<'_> {
         let i = self.node_or_error(id)?;
         let node = &spec.nodes[i];
         let kind = spec.kind(i);
-        if node.overlay.is_some() {
-            return Err(format!(
-                "{NOT_PORTED}: the tooltip of a tattooed or conquered node"
-            ));
-        }
         let mut tip = Tooltip::default();
         let tip_line = |tip: &mut Tooltip, text: &str| {
             tip.add_line(14.0, &format!("{}{text}", cc("TIP")));
@@ -205,6 +200,16 @@ impl TypedSession<'_> {
         let reminder = if kind == NodeType::Mastery {
             (node.alloc && spec.mastery_selections.get(id).is_some())
                 .then_some(&mastery_reminder[..])
+        } else if let Some(o) = &node.overlay {
+            // `ReplaceNode` leaves the replacement's reminder text, else
+            // empties the node's. `BuildAllDependsAndPaths` puts the tree
+            // node back before each tattoo: without a reminder of its own,
+            // that empties the tattoo's table, which the tattoo then brings
+            if o.is_tattoo && tn.reminder_text.is_none() {
+                None
+            } else {
+                o.reminder_text.as_deref()
+            }
         } else {
             tn.reminder_text.as_deref()
         };
