@@ -671,7 +671,7 @@ impl<'d> TypedSession<'d> {
         if p.rolls_shown {
             for r in &p.rolls {
                 controls.push(json!({
-                    "class": "SliderControl", "enabled": true, "shown": true, "val": r.val,
+                    "class": "SliderControl", "enabled": true, "shown": true, "val": super::num(r.val),
                     "path": format!("popup.rollRangeSlider{}", r.index),
                 }));
             }
