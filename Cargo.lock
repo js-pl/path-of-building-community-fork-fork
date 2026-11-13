@@ -22,8 +22,6 @@ dependencies = [
 name = "cli"
 version = "0.0.0"
 dependencies = [
- "engine",
- "gamedata",
  "lua",
  "mimalloc",
  "serde_json",
@@ -81,6 +79,7 @@ dependencies = [
  "mimalloc",
  "miniz_oxide",
  "serde_json",
+ "session",
  "testkit",
  "upstream",
 ]

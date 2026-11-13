@@ -28,7 +28,10 @@ export function SkillsTab({ act, rev }: TabProps) {
   }, []);
   useEffect(() => {
     if (!skills?.groups[sel - 1]) return setTip(null);
-    engine.call<{ lines: TooltipLine[] }>("socketGroupTooltip", { index: sel }).then((t) => setTip(t.lines));
+    engine
+      .call<{ lines: TooltipLine[] }>("socketGroupTooltip", { index: sel })
+      .then((t) => setTip(t.lines))
+      .catch(() => setTip(null));
   }, [skills, sel]);
 
   const gemNames = useMemo(() => gems.map((g) => g.name), [gems]);
