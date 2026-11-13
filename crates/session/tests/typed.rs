@@ -537,7 +537,6 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
-    let mut popups = 0;
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -662,6 +661,7 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
+    let mut popups = 0;
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
