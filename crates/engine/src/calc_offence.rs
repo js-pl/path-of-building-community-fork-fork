@@ -297,7 +297,7 @@ impl<'a> Perform<'a> {
                 } else if self.party_flag(&format!("Enemy{t}ResistEqualToYours"))? {
                     self.c
                         .out(crate::calc::PARTY, &resist_name)
-                        .ok_or("bad argument #1 to 'min' (the party's resistance is nil)")?
+                        .ok_or("upstream fails too: the party members' resistance is nil (bad argument #1 to 'min')")?
                 } else {
                     let mut names = vec![resist_name.as_str()];
                     if is_elemental(t) {

@@ -51,7 +51,9 @@ pub struct TypedData {
     source: Box<TreeSource>,
     /// Makes the timeless jewels' data, once a build needs it
     timeless_source: Option<Box<TimelessSource>>,
-    timeless: std::cell::OnceCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    /// The timeless jewels' data, once made (a source that fails, as on
+    /// a missing data file, is asked again next time)
+    timeless: RefCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
     /// The unique and rare item databases, once asked for
     item_dbs: (
         std::cell::OnceCell<item_db::ItemDb>,
@@ -85,9 +87,9 @@ impl TypedData {
 
     /// Reads the data from its binary form in a data bundle
     /// ([`crate::bundle`]): the game data, the mod parser and the latest
-    /// tree must be there; other tree versions are read when a build
-    /// first needs them, and a missing one is recorded in `files` so the
-    /// caller can add it and retry.
+    /// tree must be there; other tree versions and the timeless jewels'
+    /// data are read when a build first needs them, and a missing one is
+    /// recorded in `files` so the caller can add it and retry.
     pub fn from_files(files: std::rc::Rc<crate::Files>) -> Result<TypedData> {
         use crate::bundle::{GAME_DATA, MOD_PARSER};
         let read = |path: &str| {
@@ -107,9 +109,13 @@ impl TypedData {
             trees.remove(&path);
             Ok(tree)
         };
-        let data = TypedData::new(game, parser, Box::new(source))?;
+        let mut data = TypedData::new(game, parser, Box::new(source))?;
         files.remove(GAME_DATA);
         files.remove(MOD_PARSER);
+        let timeless = (*files).clone();
+        data.timeless_source = Some(Box::new(move |_: &ModParser| {
+            crate::bundle::decode_timeless(&timeless)
+        }));
         Ok(data)
     }
 
@@ -142,12 +148,13 @@ impl TypedData {
 
     /// The timeless jewels' data, if the session has a source of it
     fn timeless(&self) -> Option<std::sync::Arc<engine::timeless::Timeless>> {
-        self.timeless
-            .get_or_init(|| {
-                let f = self.timeless_source.as_ref()?;
-                f(&self.parser).ok().map(std::sync::Arc::new)
-            })
-            .clone()
+        if let Some(t) = &*self.timeless.borrow() {
+            return Some(t.clone());
+        }
+        let f = self.timeless_source.as_ref()?;
+        let t = std::sync::Arc::new(f(&self.parser).ok()?);
+        *self.timeless.borrow_mut() = Some(t.clone());
+        Some(t)
     }
 
     pub fn calc_data(&self) -> CalcData<'_> {

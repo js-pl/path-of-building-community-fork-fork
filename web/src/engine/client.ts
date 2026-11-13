@@ -7,6 +7,13 @@ import type { WorkerRequest, WorkerResponse } from "./worker";
 
 export class EngineError extends Error {}
 
+// A command the typed engine does not have yet, in an engine built
+// without the translation: the answer is "not ported: <cmd>" or names
+// what is not ported
+export function isNotPorted(e: unknown): boolean {
+  return e instanceof EngineError && /\bnot ported\b/.test(e.message);
+}
+
 class EngineWorker {
   private worker: Worker;
   private next = 1;
@@ -38,9 +45,19 @@ export class Engine {
   readonly main = new EngineWorker();
   private background = new EngineWorker();
   private backgroundXml: string | null = null;
+  // Commands the engine answered with "not ported: <cmd>"
+  private unported = new Set<string>();
 
   call<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-    return this.main.call<T>(cmd, args);
+    return this.main.call<T>(cmd, args).catch((e) => {
+      if (e instanceof EngineError && e.message === `not ported: ${cmd}`) this.unported.add(cmd);
+      throw e;
+    });
+  }
+
+  // False once the engine said it does not have the command
+  ported(cmd: string): boolean {
+    return !this.unported.has(cmd);
   }
 
   // Runs a command on the background worker, on the build as it is now
