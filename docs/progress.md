@@ -408,8 +408,10 @@ What remains for the full migration, in order:
    - Read-only views: `party` with imported party data,
      `controls` of other tabs.
    - Tooltips in the cases above that fall back.
-   - Items and crafting: `displayItem`, the item editor's controls and
-     its enchant, anoint, corrupt and custom modifier popups.
+   - Items and crafting: the item editor's enchant, anoint, corrupt,
+     add implicit, custom and crucible modifier popups, its modifier
+     sorting by power (`craftingSorting`), the Foulborn mutation
+     checkboxes.
      Typed (`session::typed::item_editor`, `item_db`, `item_popups`):
      `addItem`, `editItem`, `setDisplayItem` and `saveDisplayItem`
      (`AddItem` with its auto-equip, `CreateDisplayItemFromRaw`,
@@ -425,8 +427,28 @@ What remains for the full migration, in order:
      lines come from a port of `describeStats` for its one stat
      description), `craftItem` (Craft Item, and Edit Item Text for a
      unique or relic) with `control` of their `popup.*` inputs,
-     `popupButton` and `closePopup`. All in `items_edits_match`, with
-     database items and Forbidden jewels in its pool. The display item
+     `popupButton` and `closePopup`, and `displayItem`
+     (`session::typed::item_display`: the tooltip of `item_tooltip.rs`
+     on a copy without an id, as upstream compares by identity, and the
+     editor's controls as `layoutControls` lists them, placed by their
+     anchors as `Control:GetPos` does; a flask in the editor falls back
+     with the tooltip's flask toggle), with `control` of the editor's
+     controls (`session::typed::item_editor_controls`: variants and
+     version, sockets and links, influences, quality, catalysts, cluster
+     jewel skill and node count, affixes and their rolls, range lines,
+     custom modifier removal, and the Save, Edit and Cancel buttons;
+     upstream's state on the controls, such as the edits' text and the
+     sliders' values, is kept in `item_editor::Editor`). All in `items_edits_match`, with
+     database items and Forbidden jewels in its pool. The translation's
+     tooltip comparison can carry another build's change of upstream's
+     shared data (gen-0010's before gen-0018's: a mana cost); the test
+     counts a `displayItem` whose lines differ only as `previewItem` of
+     its text does. The same gap shows in outputs: upstream clears a
+     triggered granted skill's level cost on the shared skill data for
+     the rest of the process, the typed engine for the build only
+     (`calc_offence::cost_cleared`), so gen-0018 without its amulet
+     differs after gen-0010 in one translated session (CI's shards keep
+     them apart). The display item
      is held typed, so `displayItem` answers on the translation after
      its replays. A load with an item popup open falls back (the
      popup's buttons act on the tab it came from). Ported on the way:

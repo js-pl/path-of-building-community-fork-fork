@@ -167,6 +167,9 @@ fn typed_session_matches_translated() {
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
     "specs on another tree version",
+    // The tooltip's stat comparison, where the translation carries another
+    // build's change of upstream's shared data (see `compare_display`)
+    "upstream's shared data changed by another build",
     // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
     // radius data kept from earlier calculations, or errors on these
     "a jewel's attributes in radius",
@@ -731,7 +734,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(13) {
+            let req = match rng.below(14) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -789,7 +792,79 @@ fn items_edits_match(d: &mut Dispatcher) {
                         _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
                     };
                     compare(d, &open, &format!("step {step}"), &mut out);
+                    let label = format!("step {step} {open}");
+                    compare_display(d, &label, &mut out);
                     json!({"cmd": "saveDisplayItem"})
+                }
+                13 => {
+                    // The item editor: an item opened, random changes to
+                    // its controls, then saved
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    answer(d.request(&open.to_string()), "open");
+                    let mut fell_back = !d.typed_active();
+                    for _ in 0..rng.below(4) + 1 {
+                        if fell_back {
+                            break;
+                        }
+                        // Shown on both, as the editor is drawn before a click:
+                        // upstream's sliders take their values when drawn
+                        let shown = compare_display(d, &format!("step {step} {open}"), &mut out);
+                        let controls: Vec<J> = shown["ok"]["controls"]
+                            .as_array()
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|c| {
+                                let p = c["path"].as_str().unwrap_or("");
+                                c["enabled"] == true
+                                    && c["class"] != "LabelControl"
+                                    && (c["class"] != "ButtonControl"
+                                        || p.contains("AddSocket")
+                                        || p.contains("CustomModifierRemove"))
+                            })
+                            .collect();
+                        let Some(c) = pick(&mut rng, &J::Array(controls)) else {
+                            break;
+                        };
+                        let path = c["path"].clone();
+                        let r = match c["class"].as_str().unwrap_or("") {
+                            "DropDownControl" => {
+                                let n = c["list"].as_array().map_or(1, Vec::len);
+                                json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+                            }
+                            "EditControl" => {
+                                let text = ["0", "20", "7", "", "28"][rng.below(5)];
+                                json!({"cmd": "control", "path": path, "text": text})
+                            }
+                            "CheckBoxControl" => {
+                                json!({"cmd": "control", "path": path, "state": c["state"] != true})
+                            }
+                            "SliderControl" => {
+                                let val = rng.below(11) as f64 / 10.0;
+                                json!({"cmd": "control", "path": path, "val": val})
+                            }
+                            _ => json!({"cmd": "control", "path": path, "click": true}),
+                        }
+                        .to_string();
+                        answer(d.request(&r), "editor control");
+                        if !d.typed_active() {
+                            fell_back = true;
+                            break;
+                        }
+                        let label = format!("step {step} {r}");
+                        compare_display(d, &label, &mut out);
+                        compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                    }
+                    if fell_back {
+                        json!({"cmd": "state"})
+                    } else {
+                        json!({"cmd": "saveDisplayItem"})
+                    }
                 }
                 12 => {
                     // Craft Item: random choices, Create or Cancel, the
@@ -817,12 +892,9 @@ fn items_edits_match(d: &mut Dispatcher) {
                             fell_back = true;
                             break;
                         }
-                        compare(
-                            d,
-                            &json!({"cmd": "state"}),
-                            &format!("step {step} {r}"),
-                            &mut out,
-                        );
+                        let label = format!("step {step} {r}");
+                        compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                        compare_display(d, &label, &mut out);
                     }
                     if fell_back || cancel {
                         json!({"cmd": "state"})
@@ -902,6 +974,39 @@ fn items_edits_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// `displayItem` of both. The tooltip's stat comparison of the
+/// translation can carry another build's mutation of upstream's shared
+/// data (skill costs a calculation cleared); where `previewItem` of the
+/// item's text differs the same way on both, its lines are a known gap of
+/// the tooltip's comparison, counted as such
+fn compare_display(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) -> J {
+    let r = json!({"cmd": "displayItem"}).to_string();
+    let mut typed = answer(d.request(&r), "typed");
+    let answer_typed = typed.clone();
+    let mut tr = answer(d.translated_request(&r), "translated");
+    if !typed["ok"].is_object() || !tr["ok"].is_object() {
+        diff(&typed, &tr, &format!("{label} {r}"), out);
+        return answer_typed;
+    }
+    let (tl, rl) = (typed["ok"]["lines"].take(), tr["ok"]["lines"].take());
+    diff(&typed, &tr, &format!("{label} {r}"), out);
+    if tl != rl {
+        let raw = typed["ok"]["item"]["raw"].clone();
+        let p = json!({"cmd": "previewItem", "text": raw}).to_string();
+        let tp = answer(d.request(&p), "typed preview")["ok"]["lines"].take();
+        let rp = answer(d.translated_request(&p), "translated preview")["ok"]["lines"].take();
+        if tp == tl && rp == rl && tp != rp {
+            note_fallback(
+                "displayItem",
+                "upstream's shared data changed by another build",
+            );
+        } else {
+            diff(&tl, &rl, &format!("{label} {r}.lines"), out);
+        }
+    }
+    answer_typed
 }
 
 /// `saveXml` of both on the dispatcher's build: where they differ

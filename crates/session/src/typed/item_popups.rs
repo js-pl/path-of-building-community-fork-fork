@@ -268,7 +268,7 @@ impl<'d> TypedSession<'d> {
 
     /// `ItemsTab:EditDisplayItemText()`: opens Edit Item Text on the
     /// display item
-    fn edit_display_item_text(&mut self) -> Result<()> {
+    pub(super) fn edit_display_item_text(&mut self) -> Result<()> {
         let item = self.display_item.as_ref().ok_or("no item in the editor")?;
         let edit = engine::pat::gsub(&item.build_raw(), "Rarity: %w+\n", "");
         let rarity = RARITIES

@@ -314,6 +314,14 @@ impl<'d> Dispatcher<'d> {
                 let req = req.clone();
                 self.edit(json, |s| s.item_popup_control(&req))
             }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_editor_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_editor_control(&req))
+            }
             "control" => {
                 let req = req.clone();
                 self.edit(json, |s| s.control(&req))
@@ -398,6 +406,7 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| Ok(s.close_item_popup()))
             }
             "craftItem" => self.edit(json, |s| s.craft_item()),
+            "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
             "popupButton" => {
                 // The typed session's popups are the class change popups,
                 // whose only button with a name is Continue's

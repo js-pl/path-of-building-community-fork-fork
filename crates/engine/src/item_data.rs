@@ -158,6 +158,8 @@ pub struct RareLikeUnique {
     pub suffix_limit: f64,
     pub ignore_mod_type: bool,
     pub allow_duplicate_groups: bool,
+    /// Whether it takes custom modifiers (`supportsCustomModifiers`)
+    pub supports_custom_modifiers: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -451,6 +453,7 @@ impl ItemData {
                     suffix_limit: number(&get(&v, "suffixLimit"))?,
                     ignore_mod_type: get(&v, "ignoreModType").truthy(),
                     allow_duplicate_groups: get(&v, "allowDuplicateGroups").truthy(),
+                    supports_custom_modifiers: get(&v, "supportsCustomModifiers").truthy(),
                 },
             );
         }
@@ -731,6 +734,7 @@ impl Codec for ItemData {
             u.suffix_limit.put(w);
             u.ignore_mod_type.put(w);
             u.allow_duplicate_groups.put(w);
+            u.supports_custom_modifiers.put(w);
         }
         self.bases.put(w);
         self.foulborn_map.put(w);
@@ -795,6 +799,7 @@ impl Codec for ItemData {
                     suffix_limit: Codec::get(r)?,
                     ignore_mod_type: Codec::get(r)?,
                     allow_duplicate_groups: Codec::get(r)?,
+                    supports_custom_modifiers: Codec::get(r)?,
                 },
             );
         }
