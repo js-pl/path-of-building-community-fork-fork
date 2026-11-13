@@ -252,6 +252,25 @@ written by hand. Details, the JSON format and the determinism checks are in
   grows until the list is empty or every remaining line is justified.
 - Every mod parser rule must be hit at least once.
 
+### Running the tests
+
+- The translated program keeps about 12 MB of every build it loads, so
+  tests that load the corpus many times split it into shards, each run by
+  a child process of the test binary (`crates/testkit`): `perform.rs` and
+  `typed_session_matches_translated`. The children run in parallel, one
+  per core and as many as fit in memory at 3 GB each (`TEST_JOBS`,
+  `TEST_SLOT_GB`), over every test process on the machine.
+- `cargo test --release` runs a binary at a time. `cargo nextest run
+  --release` runs every test in a process of its own, four at once (about
+  12 GB besides the sharded tests' children).
+- CI builds the tests once (`cargo nextest archive`, sccache keeps the
+  translated crate between runs when importer, lua and the submodule did
+  not change) and runs them on eight runners: the session test's shards
+  on three and the perform tests' on two (`TEST_SHARD_PARTITION`), the
+  others on three, split by binary in `.github/workflows/ci.yml`.
+  Equivalence tests side by side are about three times slower each: they
+  are bound by the runner's CPU.
+
 ### Comparison rules
 
 - Integers, strings and flags compare exactly.
