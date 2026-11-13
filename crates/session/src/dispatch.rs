@@ -126,9 +126,20 @@ impl<'d> Dispatcher<'d> {
         false
     }
 
-    /// Answers a request on the translation, whatever is preferred
+    /// Answers a request on the translation, whatever is preferred. A save
+    /// the typed engine answered just before a save asked of the
+    /// translation is the same save: it is not replayed, so both have
+    /// saved (and re-parsed their items) as often.
     #[cfg(feature = "translation")]
     pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
+        let is_save = |r: &str| {
+            serde_json::from_str::<J>(r)
+                .ok()
+                .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
+        };
+        if is_save(json) && self.pending.last().is_some_and(|p| is_save(p)) {
+            self.pending.pop();
+        }
         self.sync()?
             .map_or_else(|| self.translated().request(json), Ok)
     }
@@ -294,6 +305,23 @@ impl<'d> Dispatcher<'d> {
                 let id = req["id"].as_f64();
                 self.edit(json, |s| s.select_skill_set(id))
             }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p.starts_with("popup."))
+                    && self.typed.as_ref()?.has_item_popup() =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_popup_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_editor_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_editor_control(&req))
+            }
             "control" => {
                 let req = req.clone();
                 self.edit(json, |s| s.control(&req))
@@ -349,6 +377,10 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.set_display_item(id, text.as_deref()))
             }
             "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
+            "itemDb" => {
+                let rare = req["kind"].as_str() == Some("rare");
+                view(&mut self.typed_error, self.typed.as_ref()?.item_db(rare))
+            }
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.select_item_set(id))
@@ -366,6 +398,15 @@ impl<'d> Dispatcher<'d> {
             "config" => view(&mut self.typed_error, self.typed.as_ref()?.config()),
             "undo" => self.edit(json, |s| s.undo()),
             "newBuild" => self.open(TypedSession::new_build(data), json),
+            "popupButton" if self.typed.as_ref()?.has_item_popup() => {
+                let name = req["name"].as_str()?.to_string();
+                self.edit(json, |s| s.item_popup_button(&name))
+            }
+            "closePopup" if self.typed.as_ref()?.has_item_popup() => {
+                self.edit(json, |s| Ok(s.close_item_popup()))
+            }
+            "craftItem" => self.edit(json, |s| s.craft_item()),
+            "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
             "popupButton" => {
                 // The typed session's popups are the class change popups,
                 // whose only button with a name is Continue's
@@ -480,6 +521,15 @@ impl<'d> Dispatcher<'d> {
         match session {
             Ok(mut s) => {
                 if let Some(prev) = &self.typed {
+                    if prev.has_item_popup() {
+                        // Its buttons act on the items tab it came from
+                        self.typed = None;
+                        self.typed_error = Some(format!(
+                            "{}: a load with an item popup open",
+                            crate::typed::NOT_PORTED
+                        ));
+                        return None;
+                    }
                     s.keep_popups(prev);
                 }
                 self.typed = Some(s);

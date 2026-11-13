@@ -7,6 +7,7 @@
 pub mod data_lua;
 mod jsonc;
 pub mod mod_parser;
+mod uniques;
 
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
@@ -221,6 +222,9 @@ impl Source {
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_versions: versions,
+            uniques: self.uniques()?,
+            rares: self.rares()?,
+            item_base_lists: self.item_base_lists()?,
         })
     }
 }

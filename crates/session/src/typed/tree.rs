@@ -32,6 +32,15 @@ impl<'d> TypedSession<'d> {
             .ok_or_else(|| format!("no node {id}"))
     }
 
+    /// `build.mainSocketGroup = m_min(m_max(#socketGroupList, 1),
+    /// build.mainSocketGroup or 1)` of `calcs.initEnv`, which the sidebar's
+    /// calculation did on its copy
+    pub(super) fn clamp_main_socket_group(&mut self) {
+        if let Some(sb) = &self.main.sidebar {
+            self.build.info.main_socket_group = sb.main_socket_group as f64;
+        }
+    }
+
     /// What a frame does after `buildFlag` is set: both calculations again
     pub(super) fn rebuild(&mut self) -> Result<()> {
         let data = self.data.calc_data();
@@ -41,6 +50,7 @@ impl<'d> TypedSession<'d> {
             engine::calc_env::CalcMode::Main,
             None,
         )?;
+        self.clamp_main_socket_group();
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
