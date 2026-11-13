@@ -180,9 +180,11 @@ pub fn has_timeless_jewel(root: &Element) -> bool {
     pob(root)
         .and_then(|p| p.child("Items"))
         .is_some_and(|items| {
-            items
-                .elements()
-                .any(|i| i.text().is_some_and(|t| t.contains("Timeless Jewel")))
+            items.elements().any(|i| {
+                i.text().is_some_and(|t| {
+                    t.contains("Timeless Jewel") || t.contains("Conquered by the Abyssal")
+                })
+            })
         })
 }
 

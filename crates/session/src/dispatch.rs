@@ -209,6 +209,7 @@ impl<'d> Dispatcher<'d> {
             "state" => self.typed.as_ref()?.state().ok().map(ok),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
             "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
+            "tree" => self.typed.as_ref()?.tree().ok().map(ok),
             "treeState" => self.typed.as_ref()?.tree_state().ok().map(ok),
             "nodePath" => self.typed.as_ref()?.node_path(id(&req)?).ok().map(ok),
             "masteryOptions" => self.typed.as_ref()?.mastery_options(id(&req)?).ok().map(ok),
