@@ -5,6 +5,7 @@
 //! (`engine::codec`). No Lua runs when the engine loads it.
 
 pub mod data_lua;
+mod enchantments;
 mod jsonc;
 pub mod mod_parser;
 mod uniques;
@@ -225,6 +226,7 @@ impl Source {
             uniques: self.uniques()?,
             rares: self.rares()?,
             item_base_lists: self.item_base_lists()?,
+            enchantments: self.enchantments()?,
         })
     }
 }

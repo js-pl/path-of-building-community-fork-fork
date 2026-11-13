@@ -196,19 +196,6 @@ fn anointable(item: &Item) -> bool {
 }
 
 impl<'d> TypedSession<'d> {
-    /// `item.enchantments`: the base's enchantment table, if it has one
-    fn has_enchantments(&self, item: &Item) -> bool {
-        let Some(base) = &item.base else { return false };
-        base.flask.is_some()
-            || ["Helmet", "Boots", "Gloves", "Belt", "Body Armour"].contains(&base.typ.as_str())
-            || self
-                .data
-                .game
-                .setup
-                .weapon_type_info
-                .contains_key(&base.typ)
-    }
-
     /// `displayItem`: the display item, whether the build has it, its
     /// tooltip and the editor's controls
     pub fn display_item(&mut self) -> Result<J> {
