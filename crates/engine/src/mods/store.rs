@@ -1177,7 +1177,7 @@ impl<'a> Query<'a> {
                 // iterating it
                 if EVALUATED_TAGS.contains(&kind.as_str()) {
                     return Err(format!(
-                        "bad argument #1 to 'ipairs' (table expected, got string) ({kind} tag)"
+                        "upstream fails too: a party mod's {kind} tag list read back from text (bad argument #1 to 'ipairs' (table expected, got string))"
                     ));
                 }
             }

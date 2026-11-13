@@ -413,7 +413,7 @@ impl<'a> Perform<'a> {
             let v = self
                 .c
                 .out(party, "BlockChanceMax")
-                .ok_or("attempt to compare nil with number (the party's BlockChanceMax)")?;
+                .ok_or("upstream fails too: the party members' BlockChanceMax is nil (attempt to compare nil with number)")?;
             self.c.set_out(actor, "BlockChanceMax", v);
         }
         let block_max = o(self, "BlockChanceMax");
@@ -457,7 +457,7 @@ impl<'a> Perform<'a> {
             let v = self
                 .c
                 .out(party, "BlockChance")
-                .ok_or("bad argument #1 to 'min' (the party's BlockChance is nil)")?;
+                .ok_or("upstream fails too: the party members' BlockChance is nil (bad argument #1 to 'min')")?;
             self.c.set_out(actor, "BlockChance", m_min(v, block_max));
         } else if self.c.flag(db, None, &["MaxBlockIfNotBlockedRecently"])? {
             self.c.set_out(actor, "BlockChance", block_max);
@@ -823,7 +823,7 @@ impl<'a> Perform<'a> {
             let v = self
                 .c
                 .out(party, "MaxLifeLeechRatePercent")
-                .ok_or("attempt to perform arithmetic on a nil value (mul)")?;
+                .ok_or("upstream fails too: the party members' MaxLifeLeechRatePercent is nil, upstream exports none for Vampiric Link (attempt to perform arithmetic on a nil value)")?;
             self.c.set_out(actor, "MaxLifeLeechRatePercent", v);
         }
         let pct = o(self, "MaxLifeLeechRatePercent");
