@@ -169,6 +169,41 @@ impl TypedData {
         Ok(self.item_dbs.0.get_or_init(|| db))
     }
 
+    /// `main.uniqueDB.byTitle[title]`: the last unique with the
+    /// (lowercase) title in load order
+    pub fn unique_by_title(&self, title: &str) -> Result<Option<Arc<Item>>> {
+        if let Some(t) = self.unique_titles.get() {
+            return Ok(t.get(title).cloned());
+        }
+        let db = self.unique_db()?;
+        let tree = self.tree(self.game.latest_tree_version())?;
+        let mut tree_dependent = forbidden(tree);
+        tree_dependent.extend(keystone_items(tree));
+        let ctx = self.item_context();
+        let mut titles = ItemDb::new();
+        for (typ, raws) in &self.game.uniques {
+            let extra = if typ == "generated" {
+                &tree_dependent[..]
+            } else {
+                &[]
+            };
+            for raw in raws.iter().chain(extra) {
+                let item = Item::new(&ctx, raw, Some("UNIQUE"), true)?;
+                if item.base.is_some()
+                    && let Some(t) = &item.title
+                    && let Some(i) = db.get(&item.name)
+                {
+                    titles.insert(engine::pat::lower(t), i.clone());
+                }
+            }
+        }
+        Ok(self
+            .unique_titles
+            .get_or_init(|| titles)
+            .get(title)
+            .cloned())
+    }
+
     /// `main.rareDB.list`: crafted templates with their base's implicits
     pub fn rare_db(&self) -> Result<&ItemDb> {
         if let Some(db) = self.item_dbs.1.get() {

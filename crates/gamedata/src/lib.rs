@@ -227,6 +227,7 @@ impl Source {
             rares: self.rares()?,
             item_base_lists: self.item_base_lists()?,
             enchantments: self.enchantments()?,
+            vestigial_mod_mappings: self.vestigial_mod_mappings()?,
         })
     }
 }

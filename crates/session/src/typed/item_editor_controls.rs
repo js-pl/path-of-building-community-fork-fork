@@ -256,6 +256,13 @@ impl<'d> TypedSession<'d> {
                 self.anoint_display_item(slot)?;
                 self.refresh_item_popups();
             }
+            ("displayItemAddImplicit", Act::Click) => {
+                if self.has_item_popup() || self.class_popups_open() > 0 {
+                    return Err(format!("{NOT_PORTED}: a popup over another"));
+                }
+                self.add_implicit_to_display_item()?;
+                self.refresh_item_popups();
+            }
             ("displayItemCorrupt", Act::Click) => {
                 if self.has_item_popup() || self.class_popups_open() > 0 {
                     return Err(format!("{NOT_PORTED}: a popup over another"));
