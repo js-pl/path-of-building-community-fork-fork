@@ -826,6 +826,7 @@ fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
     let mut popups = 0;
+    let mut popup_inputs: std::collections::BTreeMap<String, usize> = Default::default();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -1082,6 +1083,9 @@ fn items_edits_match(d: &mut Dispatcher) {
                                     }
                                 }
                                 .to_string();
+                                *popup_inputs
+                                    .entry(c["path"].as_str().unwrap_or("").to_string())
+                                    .or_default() += 1;
                                 answer(d.request(&r), "popup control");
                                 log.push(r.clone());
                                 if !d.typed_active() {
@@ -1226,7 +1230,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits ({popups} enchant, anoint and corrupt popups): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} enchant, anoint and corrupt popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
