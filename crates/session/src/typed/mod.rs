@@ -7,7 +7,9 @@ mod calcs;
 mod config;
 pub mod display_stats;
 mod geometry;
+mod item_db;
 mod item_editor;
+mod item_popups;
 mod item_tooltip;
 mod items;
 mod node_tooltip;
@@ -61,6 +63,11 @@ pub struct TypedData {
     /// The timeless jewels' data, once made (a source that fails, as on
     /// a missing data file, is asked again next time)
     timeless: RefCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    /// The unique and rare item databases, once asked for
+    item_dbs: (
+        std::cell::OnceCell<item_db::ItemDb>,
+        std::cell::OnceCell<item_db::ItemDb>,
+    ),
 }
 
 pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
@@ -75,6 +82,7 @@ impl TypedData {
             source,
             timeless_source: None,
             timeless: Default::default(),
+            item_dbs: Default::default(),
         };
         let latest = data.tree(data.game.latest_tree_version())?;
         let socket_ids = latest
@@ -315,6 +323,7 @@ impl<'d> TypedSession<'d> {
             s.update_config_controls();
         }
         s.config_mods_built();
+        s.clamp_main_socket_group();
         s.load_specs()?;
         s.reset_undo();
         for id in &s.build.items.item_order_list {

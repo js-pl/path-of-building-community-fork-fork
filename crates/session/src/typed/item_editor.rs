@@ -20,6 +20,12 @@ const DEFAULT_AFFIX_QUALITY: f64 = 0.5;
 pub struct Editor {
     /// `displayItemAffix1` to `displayItemAffix9`
     pub affix: [AffixControl; 9],
+    /// The item editor's popups, front first
+    pub popups: Vec<super::item_popups::ItemPopup>,
+    /// How many of `ui.popups` describe them (at the front)
+    pub described: usize,
+    /// `lastCraftRaritySel`, `lastCraftTypeSel`, `lastCraftBaseSel`
+    pub last_craft: Option<(usize, usize, usize)>,
 }
 
 /// An affix drop-down and its roll slider
@@ -186,14 +192,41 @@ impl<'d> TypedSession<'d> {
     /// `CreateDisplayItemFromRaw(raw, true)`: leaves the display item as
     /// it is when the base is not recognised
     fn create_display_item_from_raw(&mut self, raw: &str) -> Result<()> {
+        self.display_item_from_raw(raw, true)
+    }
+
+    /// `CreateDisplayItemFromRaw(raw, normalise)`
+    pub(super) fn display_item_from_raw(&mut self, raw: &str, normalise: bool) -> Result<()> {
         let Some(mut item) = self.new_item(raw)? else {
             return Ok(());
         };
-        // `main.migrateEldritchImplicits`, true by default
-        self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
-        item.normalise_quality();
-        item.build_mod_list(&self.data.item_context())?;
+        if normalise {
+            // `main.migrateEldritchImplicits`, true by default
+            self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
+            item.normalise_quality();
+            item.build_mod_list(&self.data.item_context())?;
+        }
         self.set_display(Some(item))
+    }
+
+    /// `SetDisplayItem(item)`
+    pub(super) fn set_display_item_value(&mut self, item: Option<Item>) -> Result<()> {
+        self.set_display(item)
+    }
+
+    pub(super) fn has_display_item(&self) -> bool {
+        self.display_item.is_some()
+    }
+
+    pub(super) fn display_item_id(&self) -> Option<f64> {
+        self.display_item.as_ref().and_then(|i| i.id)
+    }
+
+    /// `self.displayItem.id = id`
+    pub(super) fn set_display_item_id(&mut self, id: Option<f64>) {
+        if let Some(item) = &mut self.display_item {
+            item.id = id;
+        }
     }
 
     /// `SetDisplayItem(item)`, the item's side of it: the affix controls
@@ -396,7 +429,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `AddItem(item, noAutoEquip)`: the item's id
-    fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
+    pub(super) fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
         let new = item.id.is_none();
         if new {
             let mut id = 1.0;
@@ -443,30 +476,17 @@ impl<'d> TypedSession<'d> {
     /// `AddDisplayItem()`
     fn add_display_item(&mut self) -> Result<()> {
         let item = self.display_item.take().ok_or("no item in the editor")?;
-        if let Some((_, other)) = FORBIDDEN
+        let old = item.id.and_then(|id| self.build.items.item(id)).cloned();
+        let other = FORBIDDEN
             .iter()
-            .find(|(t, _)| item.title.as_deref() == Some(t))
-        {
-            // `UpdateForbiddenJewelCounterpart` and
-            // `AddForbiddenJewelCounterpart` read the unique database
-            let variant = |i: &Item| {
-                let v = i.variant.filter(|v| *v >= 1.0)? as usize;
-                i.variant_list.as_ref()?.get(v - 1).cloned()
-            };
-            let name = variant(&item);
-            let old = item.id.and_then(|id| self.build.items.item(id));
-            let changed = old.is_some_and(|o| o.title == item.title && variant(o) != name);
-            let paired = self
-                .build
-                .items
-                .items
-                .values()
-                .any(|i| i.title.as_deref() == Some(other) && variant(i) == name);
-            if name.is_some() && (changed || !paired) {
-                return Err(format!("{NOT_PORTED}: the Forbidden jewels' counterparts"));
-            }
+            .find(|(t, _)| item.title.as_deref() == Some(*t))
+            .map(|(_, o)| *o);
+        let id = self.add_item(item, false)?;
+        if let Some(other) = other {
+            let item = self.build.items.item(id).unwrap().clone();
+            self.update_forbidden_counterpart(old.as_ref(), &item, other)?;
+            self.add_forbidden_counterpart(&item, other)?;
         }
-        self.add_item(item, false)?;
         self.items_changed()
     }
 
