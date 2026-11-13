@@ -142,7 +142,24 @@ pub struct CraftData {
     pub incursion_drop_only: Vec<(String, Vec<String>)>,
     /// `supportsCustomModifiers` of the rare-like uniques: title and source ids
     pub custom_modifier_sources: Vec<(String, Vec<String>)>,
+    /// `data.crucible`
+    pub crucible: Vec<CrucibleMod>,
 }
+
+/// A mod of `data.crucible`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CrucibleMod {
+    pub m: Arc<Affix>,
+    pub tier: f64,
+    /// The tree nodes it can be on (1 to 5)
+    pub node_location: Vec<f64>,
+}
+
+crate::codec_struct!(CrucibleMod {
+    m,
+    tier,
+    node_location
+});
 
 /// An essence of `data.essences`
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -169,6 +186,7 @@ crate::codec_struct!(CraftData {
     delve_drop_only,
     incursion_drop_only,
     custom_modifier_sources,
+    crucible,
 });
 
 impl CraftData {
@@ -216,6 +234,16 @@ impl CraftData {
         d.veiled_mods = set(&get(data, "veiledMods"))?;
         d.beast_craft = set(&get(data, "beastCraft"))?;
         d.necropolis_mods = set(&get(data, "necropolisMods"))?;
+        for (k, v) in pairs(&get(data, "crucible")) {
+            d.crucible.push(CrucibleMod {
+                m: Arc::new(Affix::from_lua(&key_string(&k)?, &v)?),
+                tier: number(&get(&v, "tier"))?,
+                node_location: array(&get(&v, "nodeLocation"))
+                    .iter()
+                    .map(number)
+                    .collect::<Result<_>>()?,
+            });
+        }
         d.delve_drop_only = drop_only(delve)?;
         d.incursion_drop_only = drop_only(incursion)?;
         for (k, v) in pairs(&get(data, "rareLikeUniques")) {

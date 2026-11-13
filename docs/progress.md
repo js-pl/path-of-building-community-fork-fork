@@ -506,7 +506,9 @@ What remains for the full migration, in order:
      Modifier to Item (`session::typed::item_add_modifier`: bench,
      essence, veiled, beastcraft, Necropolis, fossil, drop-restricted,
      prefix and suffix mods from `item_data::CraftData`, or a custom
-     line; sorted by power). All in `items_edits_match`, with
+     line; sorted by power) and Add Crucible Modifier
+     (`session::typed::item_crucible`: each crucible node's mods of
+     `data.crucible`, the item's own selected). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
