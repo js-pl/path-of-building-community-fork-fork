@@ -338,11 +338,18 @@ impl TypedSession<'_> {
         };
         let path_len = path.len();
         let granted = self.sidebar()?.granted_passives.contains(&node.id);
-        if node.alloc && kind == NodeType::Mastery && self.ui.popups != J::Array(vec![]) {
-            return Err(format!("{NOT_PORTED}: a mastery tooltip with a popup open"));
+        // An allocated mastery with a popup open (the mastery popup's
+        // options, upstream) compares with the node added again
+        let realloc = node.alloc && kind == NodeType::Mastery && self.ui.popups != J::Array(vec![]);
+        if realloc && path_len > 1 {
+            return Err(format!(
+                "{NOT_PORTED}: a mastery tooltip with a popup open and dependent nodes"
+            ));
         }
         let mut path_out = None;
-        let node_out = if node.alloc {
+        let node_out = if realloc {
+            calc.calculate(&Override::default().add_node(i), true)?
+        } else if node.alloc {
             if path_len > 1 {
                 let ovr = Override {
                     remove_nodes: path.clone(),
@@ -383,7 +390,9 @@ impl TypedSession<'_> {
             minion: bm.as_ref(),
         };
         let (np, nm) = outputs(&node_out);
-        let header = if node.alloc {
+        let header = if realloc {
+            "^7Reallocating this node will give you:"
+        } else if node.alloc {
             "^7Unallocating this node will give you:"
         } else if granted {
             "^7This node is granted by an item. Removing it will give you:"

@@ -372,8 +372,11 @@ What remains for the full migration, in order:
    `overlays` (the tattoo and timeless jewel builds of
    `equivalence::variants`, which the corpus has none of) asks a
    tooltip that differs again of a fresh translation and aligns it when
-   that one agrees (11 of 218). Falling back: a mastery tooltip with a
-   popup open, the party view with imported data. A radius jewel's
+   that one agrees (11 of 218). An allocated mastery's tooltip with a
+   popup open compares reallocating it (`addNodes` of the node), as
+   upstream does for the mastery popup's options; `config_edits_match`
+   asks for one while a class change popup is open. Falling back: the
+   party view with imported data. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
