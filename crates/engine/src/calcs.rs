@@ -839,7 +839,7 @@ fn text_lists_used(p: &Perform) -> Result<()> {
                 | "StatThreshold"
                     if fields.get("varList").is_some() =>
                 {
-                    return Err("bad argument #1 to 'ipairs' (table expected, got string)".into());
+                    return Err("upstream fails too: a party mod's tag list read back from text, in what buildOutput collects for the Configuration tab (bad argument #1 to 'ipairs' (table expected, got string))".into());
                 }
                 _ => {}
             }

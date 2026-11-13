@@ -84,51 +84,29 @@ fn mb(n: usize) -> String {
     format!("{:.1} MB", n as f64 / 1e6)
 }
 
-/// Data files by path, with their bytes
-type Files = Vec<(String, Vec<u8>)>;
+use session::bundle::FileList as Files;
 
 /// The typed engine's data, by bundle path: what starts the engine, and
-/// the tree versions
+/// what builds need on demand (the tree versions, the timeless jewels')
 fn typed_files() -> (Files, Files) {
     let t = Instant::now();
-    let src = gamedata::Source::load(&src_dir()).unwrap_or_else(|e| die(e));
-    let game = src.game_data().unwrap_or_else(|e| die(e));
-    let parser_data = src.mod_parser_data().unwrap_or_else(|e| die(e));
-    let parser_bytes = parser_data.encode();
-    let parser = engine_parser(&parser_bytes);
-    let versions = game.tree_versions.clone();
-    let latest = versions.last().cloned().unwrap_or_default();
-    let mut core = vec![
-        (session::bundle::GAME_DATA.to_string(), game.encode()),
-        (session::bundle::MOD_PARSER.to_string(), parser_bytes),
-    ];
-    let mut trees = Vec::new();
-    for v in &versions {
-        let tree = src
-            .tree(v, &parser, *v == latest)
-            .unwrap_or_else(|e| die(format!("tree {v}: {e}")));
-        let file = (
-            session::bundle::tree_path(v),
-            session::bundle::encode_tree(&tree),
-        );
-        if *v == latest {
-            core.push(file.clone());
-        }
-        trees.push(file);
-    }
+    let (core, lazy) = session::bundle::typed_files(&src_dir()).unwrap_or_else(|e| die(e));
+    let size = |prefix: &str| {
+        mb(lazy
+            .iter()
+            .filter(|(p, _)| p.starts_with(prefix))
+            .map(|(_, d)| d.len())
+            .sum())
+    };
     eprintln!(
-        "typed data made in {:.1} s: game data {}, mod parser {}, {} trees {}",
+        "typed data made in {:.1} s: game data {}, mod parser {}; trees {}, timeless jewels {}",
         t.elapsed().as_secs_f64(),
         mb(core[0].1.len()),
         mb(core[1].1.len()),
-        trees.len(),
-        mb(trees.iter().map(|(_, d)| d.len()).sum())
+        size("typed/trees/"),
+        size("typed/timeless"),
     );
-    (core, trees)
-}
-
-fn engine_parser(bytes: &[u8]) -> engine::mod_parser::ModParser {
-    engine::mod_parser::ModParser::decode(bytes).unwrap_or_else(|e| die(e))
+    (core, lazy)
 }
 
 /// The Lua data files the translation reads starting up and loading the
