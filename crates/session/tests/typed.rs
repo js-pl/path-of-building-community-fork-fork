@@ -399,6 +399,9 @@ fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
+    // Upstream fails the rebuild after two cluster subgraphs shared an id
+    // (`Entrance for subGraph not linked to parent socket???`)
+    "rebuilding cluster subgraphs that shared an id",
     // The tooltip's stat comparison, where the translation carries another
     // build's change of upstream's shared data (see `compare_display`)
     "aligned with a fresh translation",
