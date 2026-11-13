@@ -157,6 +157,9 @@ fn typed_session_matches_translated() {
 const KNOWN_FALLBACKS: &[&str] = &[
     "undo with tattoos or cluster jewels",
     "crafting a cluster jewel",
+    // Party builds upstream fails on as well (`party_match` checks that
+    // the translation fails on them too)
+    "upstream fails too",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
@@ -1120,6 +1123,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
     let mut aligned = 0;
     let mut check = |d: &mut Dispatcher, id: &str, xml: &str, failures: &mut Vec<String>| {
+        at_build(d, id);
         // `PARTY_DUMP=<dir>` writes the builds there
         if let Ok(dir) = std::env::var("PARTY_DUMP") {
             std::fs::write(Path::new(&dir).join(format!("{id}.xml")), xml).unwrap();
