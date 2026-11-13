@@ -41,6 +41,10 @@ pub use sidebar::Controls;
 /// to the translation
 pub const NOT_PORTED: &str = "not ported";
 
+/// Starts an error the translation answers the same request with: the
+/// dispatcher answers it as the request's error, keeping the typed build
+pub const UPSTREAM_ERROR: &str = "upstream error: ";
+
 pub type Result<T> = std::result::Result<T, String>;
 
 /// Loads a tree version's passive tree

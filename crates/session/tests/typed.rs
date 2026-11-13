@@ -166,7 +166,6 @@ fn typed_session_matches_translated() {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
-    "undo with tattoos or cluster jewels",
     "specs on another tree version",
     // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
     // radius data kept from earlier calculations, or errors on these
@@ -174,8 +173,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "a jewel's attributes in radius",
     "a socket tooltip with nodes the calculation did not build",
     "toggling a flask that is not in the build",
-    // Node ids not in the build's tree: the translation errors too
-    ": no node ",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
@@ -288,6 +285,7 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         .unwrap_or(10);
     let tree = data.tree(data.game.latest_tree_version()).unwrap();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -477,11 +475,16 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
     let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
     if let Some(p) = state["ok"]["popups"].as_array().and_then(|p| p.first()) {
         let _ = p;
-        return if rng.below(2) == 0 {
-            json!({"cmd": "popupButton", "name": "confirm"})
-        } else {
-            json!({"cmd": "closePopup"})
+        return match rng.below(3) {
+            0 => json!({"cmd": "popupButton", "name": "confirm"}),
+            1 => json!({"cmd": "closePopup"}),
+            // A button the class change popup has without a name
+            _ => json!({"cmd": "popupButton", "name": "cancel"}),
         };
+    }
+    if rng.below(12) == 0 {
+        // No popup to press
+        return json!({"cmd": "popupButton", "name": "confirm"});
     }
     let vars: Vec<&J> = config["ok"]["sections"]
         .as_array()
@@ -556,6 +559,9 @@ fn config_edits_match(d: &mut Dispatcher) {
             }
             let req = config_edit(d, &mut rng);
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -566,10 +572,14 @@ fn config_edits_match(d: &mut Dispatcher) {
                 skipped.push(format!("{id}: {e}"));
                 break;
             }
+            if typed.get("error").is_some() {
+                // An error changes nothing: the translation's own answer
+                let tr = answer(d.translated_request(&r), "translated edit");
+                diff(&typed, &tr, &label, &mut out);
+            }
             let t = Instant::now();
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
-            let _ = typed;
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
             steps += 1;
         }
@@ -1023,7 +1033,103 @@ fn saves_match(d: &mut Dispatcher) {
     );
 }
 
-/// `loadXml`, `loadCode`, `state` and `outputs`
+/// A build file with each `<Spec>`'s nodes and masteries as a tree link,
+/// as `PassiveSpec:EncodeURL` writes it
+fn specs_as_urls(xml: &str) -> String {
+    let mut out = String::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<Spec ") {
+        out.push_str(&rest[..at]);
+        let end = at + rest[at..].find('>').unwrap();
+        let closed = rest[..end].ends_with('/');
+        let tag = &rest[at + 6..if closed { end - 1 } else { end }];
+        let mut attrs = Vec::new();
+        let mut a = std::collections::HashMap::new();
+        for part in tag.split('"').collect::<Vec<_>>().chunks(2) {
+            if let [k, v] = part {
+                let k = k.trim().trim_end_matches('=').to_string();
+                a.insert(k.clone(), v.to_string());
+                attrs.push((k, v.to_string()));
+            }
+        }
+        let num = |k: &str| a.get(k).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        let mut ids: Vec<u32> = a["nodes"]
+            .split(',')
+            .filter_map(|n| n.parse().ok())
+            .collect();
+        ids.sort();
+        let masteries: std::collections::HashMap<u32, u32> = a
+            .get("masteryEffects")
+            .map(|m| {
+                m.split('}')
+                    .filter_map(|e| {
+                        let (n, e) = e.trim_start_matches([',', '{']).split_once(',')?;
+                        Some((n.parse().ok()?, e.parse().ok()?))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut b: Vec<u8> = vec![0, 0, 0, 6, num("classId") as u8];
+        b.push((num("secondaryAscendClassId") << 2 | num("ascendClassId")) as u8);
+        let (mut nodes, mut clusters, mut mastery) = (Vec::new(), Vec::new(), Vec::new());
+        for id in ids {
+            if id < 65536 && nodes.len() < 255 * 2 {
+                nodes.extend([(id / 256) as u8, (id % 256) as u8]);
+                if let Some(e) = masteries.get(&id) {
+                    mastery.extend([(e / 256) as u8, (e % 256) as u8]);
+                    mastery.extend([(id / 256) as u8, (id % 256) as u8]);
+                }
+            } else if id >= 65536 {
+                let c = id - 65536;
+                clusters.extend([(c / 256) as u8, (c % 256) as u8]);
+            }
+        }
+        b.push((nodes.len() / 2) as u8);
+        b.extend(nodes);
+        b.push((clusters.len() / 2) as u8);
+        b.extend(clusters);
+        b.push((mastery.len() / 4) as u8);
+        b.extend(mastery);
+        let url = base64(&b).replace('+', "-").replace('/', "_");
+        out.push_str("<Spec");
+        for (k, v) in attrs {
+            if k != "nodes" && k != "masteryEffects" {
+                out.push_str(&format!(" {k}=\"{v}\""));
+            }
+        }
+        out.push_str(&format!(
+            "><URL>https://www.pathofexile.com/passive-skill-tree/{url}</URL>"
+        ));
+        if closed {
+            out.push_str("</Spec>");
+        }
+        rest = &rest[end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Standard base64 with padding
+fn base64(b: &[u8]) -> String {
+    const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::new();
+    for c in b.chunks(3) {
+        let n = c
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &x)| n | u32::from(x) << (16 - 8 * i));
+        for i in 0..4 {
+            if i <= c.len() {
+                s.push(A[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                s.push('=');
+            }
+        }
+    }
+    s
+}
+
+/// `loadXml`, `loadCode`, `state`, `outputs` and `treeState`
 fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut skipped, mut compared) = (Vec::new(), Vec::new(), 0);
     let mut times = [Duration::ZERO; 4];
@@ -1051,6 +1157,15 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         })
         .collect();
     builds.extend(auto);
+    // The specs as tree links (`<URL>`, the old format), on every tenth
+    // build from the fifth
+    let urls: Vec<(String, String)> = builds
+        .iter()
+        .skip(4)
+        .step_by(10)
+        .map(|(id, xml)| (format!("{id}-url"), specs_as_urls(xml)))
+        .collect();
+    builds.extend(urls);
     let builds = mine(builds);
     for (id, xml) in builds {
         at_build(d, &id);
@@ -1068,7 +1183,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             "{id}: the typed engine did not load the build"
         );
         let mut typed = Vec::new();
-        for cmd in ["state", "outputs"] {
+        for cmd in ["state", "outputs", "treeState"] {
             let t = Instant::now();
             typed.push(answer(d.request(&json!({"cmd": cmd}).to_string()), cmd));
             times[1] += t.elapsed();
@@ -1079,7 +1194,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             "translated load",
         );
         times[2] += t.elapsed();
-        for (cmd, typed) in ["state", "outputs"].iter().zip(typed) {
+        for (cmd, typed) in ["state", "outputs", "treeState"].iter().zip(typed) {
             let t = Instant::now();
             let tr = answer(d.translated_request(&json!({"cmd": cmd}).to_string()), cmd);
             times[3] += t.elapsed();
@@ -1405,7 +1520,6 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         if let Ok(dir) = std::env::var("PARTY_DUMP") {
             std::fs::write(Path::new(&dir).join(format!("{id}.xml")), xml).unwrap();
         }
-        at_build(d, id);
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
@@ -1798,6 +1912,8 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": s})
             } else if step == total {
                 json!({"cmd": "resetTree"})
+            } else if rng.below(5) == 0 {
+                json!({"cmd": "undo"})
             } else if rng.below(2) == 0 && alloc.len() > 2 {
                 json!({"cmd": "clickNode", "id": alloc[rng.below(alloc.len())]})
             } else {
@@ -1817,6 +1933,9 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": pick})
             };
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -1842,7 +1961,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
             if let Some(i) = req.get("id") {
                 follow.push(json!({"cmd": "nodePath", "id": i}));
             }
-            if step < socket_clicks.len() {
+            if step < socket_clicks.len() || req["cmd"] == "undo" {
                 // The subgraphs taken off and built again
                 follow.push(json!({"cmd": "tree"}));
             }
@@ -2104,7 +2223,7 @@ fn replay_sequence() {
             let r = req.to_string();
             eprintln!("{id} {r}: typed {}", answer(d.request(&r), "typed"));
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
-            for f in ["skills", "state", "outputs"] {
+            for f in ["skills", "state", "outputs", "treeState"] {
                 let q = json!({ "cmd": f }).to_string();
                 let (t, tr) = (
                     answer(d.request(&q), f),
