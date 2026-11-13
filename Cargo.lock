@@ -79,6 +79,7 @@ dependencies = [
  "mimalloc",
  "miniz_oxide",
  "serde_json",
+ "session",
  "testkit",
  "upstream",
 ]
@@ -235,6 +236,7 @@ name = "session"
 version = "0.0.0"
 dependencies = [
  "engine",
+ "equivalence",
  "gamedata",
  "importer",
  "lua",
@@ -284,7 +286,6 @@ name = "wasm"
 version = "0.0.0"
 dependencies = [
  "session",
- "upstream",
 ]
 
 [[package]]

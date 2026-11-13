@@ -75,6 +75,8 @@ pub struct Actor {
     pub player: Option<usize>,
     pub enemy: Option<usize>,
     pub parent: Option<usize>,
+    /// `actor.partyMembers`, the Party tab's actor (the player's only)
+    pub party_members: Option<usize>,
     /// `actor.breakdown`, in the sidebar's and the Calcs tab's calculations
     pub breakdown: Option<Box<crate::breakdown::Breakdowns>>,
 }
@@ -109,6 +111,7 @@ impl EnvActors<'_> {
                 .or_else(|| a.enemy.and_then(player_of)),
             "enemy" => a.enemy,
             "parent" => a.parent,
+            "partyMembers" => a.party_members,
             _ => None,
         }
     }

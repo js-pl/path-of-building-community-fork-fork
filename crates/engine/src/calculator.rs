@@ -130,11 +130,21 @@ impl<'a, 't> MiscCalculator<'a, 't> {
         self.calculate_on(&self.build, ovr, full_dps)
     }
 
-    /// [`Self::calculate`] of a build of its own, which a comparison that
-    /// changes more than a `CalcOverride` can (a gem swapped into a socket
-    /// group) gives in place of the calculator's. The calculator's cache
-    /// and data are reused, as upstream's calcFunc reuses `GlobalCache`
-    /// and re-reads the (mutated) build each call.
+    /// `calcFunc` with `override.spec`: the calculation on another spec
+    /// of the build, from the calculator's cache
+    pub fn calculate_on_spec(
+        &self,
+        spec: std::sync::Arc<crate::spec::PassiveSpec<'t>>,
+        ovr: &Override,
+        full_dps: bool,
+    ) -> Result<CalcOutput> {
+        let mut build = self.build.clone();
+        build.spec = spec;
+        self.calculate_on(&build, ovr, full_dps)
+    }
+
+    /// `calcFunc` on a copy of the build changed in ways [`Override`] does
+    /// not hold (an item outside the items tab), from the calculator's cache
     pub fn calculate_on(
         &self,
         build: &Build<'t>,

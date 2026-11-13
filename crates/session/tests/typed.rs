@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 8] = [
+const PHASES: [(&str, usize); 12] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -95,11 +95,15 @@ const PHASES: [(&str, usize); 8] = [
     ("save", 3),
     ("items", 3),
     ("config", 3),
+    ("tooltips", 3),
+    ("party", 2),
+    ("new", 1),
+    ("overlays", 2),
 ];
 
 /// The typed engine's commands against the translated session's: the
 /// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
-/// and item edits and the saved files, each over the corpus. Each phase runs on shards of the
+/// and item edits, the saved files and the tooltips, each over the corpus. Each phase runs on shards of the
 /// corpus, each in a process of its own with one data and one translated
 /// session (`testkit::run_shards`): the translation keeps about 12 MB of
 /// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
@@ -121,13 +125,27 @@ fn typed_session_matches_translated() {
                 (0..n).map(move |k| format!("{p} {k}/{n}"))
             })
             .collect();
-        return testkit::run_shards(test, &shards, &[" builds", " edits", " trees", "skipped "]);
+        return testkit::run_shards(
+            test,
+            &shards,
+            &[
+                " builds",
+                " edits",
+                " trees",
+                "skipped ",
+                " compared",
+                "aligned ",
+                "fell back ",
+                "fallback",
+            ],
+        );
     };
     let (phase, part) = shard.split_once(' ').unwrap();
     let (k, n) = part.split_once('/').unwrap();
     SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    at_build(&mut d, "");
     match phase {
         "commands" => commands_match(data, &mut d),
         "geometry" => geometry_matches(&mut d),
@@ -137,8 +155,556 @@ fn typed_session_matches_translated() {
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
         "config" => config_edits_match(&mut d),
+        "tooltips" => tooltips_match(data, &mut d),
+        "overlays" => overlays_match(data, &mut d),
+        "party" => party_match(data, &mut d),
+        "new" => new_build_matches(&mut d),
         _ => panic!("unknown phase {phase}"),
     }
+    at_build(&mut d, "");
+    report_fallbacks(phase);
+}
+
+/// Node tooltips of tattooed nodes and of the nodes timeless jewels
+/// conquer, which the corpus has none of: the builds of
+/// `equivalence::variants` (tattoos; a build with each timeless jewel)
+fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
+    const JEWELS: [&str; 11] = [
+        "Glorious Vanity",
+        "Lethal Pride",
+        "Brutal Restraint",
+        "Militant Faith",
+        "Elegant Hubris",
+        "Heroic Tragedy",
+        "Festering Vengeance",
+        "Extinguishing Grasp",
+        "Baleful Dominion",
+        "Destructive Aspiration",
+        "Reclaimed Malevolence",
+    ];
+    let mut eq = equivalence::typed_build::TypedData::load();
+    let mut seen = std::collections::HashSet::new();
+    let mut builds = equivalence::variants::tattoo_variants(&mut eq);
+    builds.extend(
+        equivalence::variants::timeless_variants(&mut eq)
+            .into_iter()
+            .filter(|(id, _)| seen.insert(id.split('-').nth(1).unwrap_or("").to_string())),
+    );
+    let tree = data.tree(data.game.latest_tree_version()).unwrap();
+    let (mut failures, mut compared, mut aligned) = (Vec::new(), 0, Vec::new());
+    for (id, xml) in mine(builds) {
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+        let alloc: Vec<u32> = state["ok"]["alloc"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_u64().map(|v| v as u32))
+            .collect();
+        // The tattooed nodes
+        let attr = |e: &str, k: &str| -> Option<String> {
+            Some(
+                e.split(&format!("{k}=\""))
+                    .nth(1)?
+                    .split('"')
+                    .next()?
+                    .to_string(),
+            )
+        };
+        let mut nodes: Vec<u32> = xml
+            .split("<Override ")
+            .skip(1)
+            .filter_map(|o| attr(o, "nodeId")?.parse().ok())
+            .collect();
+        // The nodes in the radius of the sockets with timeless jewels
+        let timeless: Vec<String> = xml
+            .split("<Item ")
+            .skip(1)
+            .filter(|i| {
+                JEWELS
+                    .iter()
+                    .any(|j| i.split("</Item>").next().unwrap_or("").contains(j))
+            })
+            .filter_map(|i| attr(i, "id"))
+            .collect();
+        for sock in xml.split("<Socket ").skip(1) {
+            if !attr(sock, "itemId").is_some_and(|i| timeless.contains(&i)) {
+                continue;
+            }
+            let Some(radius) = attr(sock, "nodeId")
+                .and_then(|n| n.parse::<u32>().ok())
+                .and_then(|n| tree.node(n)?.nodes_in_radius.as_ref()?.last())
+            else {
+                continue;
+            };
+            let (on, off): (Vec<u32>, Vec<u32>) = radius.iter().partition(|n| alloc.contains(n));
+            nodes.extend(on);
+            nodes.extend(off.into_iter().step_by(8));
+        }
+        nodes.sort_unstable();
+        nodes.dedup();
+        let mut out = Vec::new();
+        let mut recheck = Vec::new();
+        for n in nodes {
+            let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
+            let typed = answer(d.request(&req), "typed");
+            let tr = answer(d.translated_request(&req), "translated");
+            let mut lines = Vec::new();
+            diff(&typed, &tr, &req, &mut lines);
+            if !lines.is_empty() {
+                recheck.push((req, typed, lines));
+            }
+            compared += 1;
+        }
+        // `ReplaceNode` wipes the reminder text a node reads from the
+        // shared tree node (`wipeTable(old.reminderText)`), for every later
+        // build of the process: a tooltip that differs is asked again of a
+        // fresh translation, and aligned when that one agrees
+        if !recheck.is_empty() {
+            let fresh = session();
+            let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+            answer(fresh.request(&load), "fresh load");
+            for (req, typed, lines) in recheck {
+                let tr = answer(fresh.request(&req), "fresh");
+                let mut again = Vec::new();
+                diff(&typed, &tr, &req, &mut again);
+                if again.is_empty() {
+                    aligned.push(format!("{id}: {req}"));
+                } else {
+                    out.extend(lines);
+                }
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(4);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(600) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    spec_versions_match(d, &mut failures);
+    eprintln!(
+        "{compared} overlay node tooltips compared, aligned with a fresh translation {}:\n{}",
+        aligned.len(),
+        aligned.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// Corpus builds with a copy of their active spec on other tree versions,
+/// which the corpus has none of: switching to each and back gives the
+/// translation's sidebar, outputs, tree, items and file
+fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
+    let builds: Vec<(String, String)> = mine(corpus())
+        .into_iter()
+        .step_by(8)
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    for (id, xml) in builds {
+        // The active spec, copied on two other versions
+        let Some(start) = xml.find("<Spec ") else {
+            continue;
+        };
+        let tag_end = start + xml[start..].find('>').unwrap();
+        let end = if xml.as_bytes()[tag_end - 1] == b'/' {
+            tag_end + 1
+        } else {
+            start + xml[start..].find("</Spec>").unwrap() + "</Spec>".len()
+        };
+        let spec = &xml[start..end];
+        let copies: String = ["3_15", "3_25"]
+            .iter()
+            .map(|v| {
+                let mut c = spec.to_string();
+                if let Some(at) = c.find("treeVersion=\"") {
+                    let e = at + c[at + 13..].find('"').unwrap() + 14;
+                    c.replace_range(at..e, &format!("treeVersion=\"{v}\""));
+                }
+                c
+            })
+            .collect();
+        let xml = format!("{}{copies}{}", &xml[..end], &xml[end..]);
+        let id = format!("{id}-spec-versions");
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let specs = answer(d.request(r#"{"cmd":"treeSpecs"}"#), "treeSpecs");
+        let n = specs["ok"]["list"].as_array().map_or(1, Vec::len);
+        let active = specs["ok"]["active"].as_u64().unwrap_or(1) as usize;
+        let (mut out, mut broken) = (Vec::new(), false);
+        for to in [n - 1, n, active] {
+            let req = json!({"cmd": "selectTreeSpec", "index": to}).to_string();
+            answer(d.request(&req), "selectTreeSpec");
+            if !d.typed_active() {
+                break;
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            // A copy upstream cannot show (nodes its tree version lacks)
+            let probe = answer(d.translated_request(r#"{"cmd":"state"}"#), "state");
+            if probe.get("error").is_some() {
+                eprintln!(
+                    "{id}: spec {to} fails in the translation: {}",
+                    probe["error"]
+                );
+                broken = true;
+                break;
+            }
+            for c in ["state", "outputs", "treeState", "items", "treeSpecs"] {
+                let q = json!({ "cmd": c }).to_string();
+                let t = answer(d.request(&q), c);
+                let tr = answer(d.translated_request(&q), c);
+                diff(&t, &tr, &format!("spec {to}: {c}"), &mut out);
+            }
+        }
+        if broken {
+            continue;
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the spec switches", &mut out);
+        }
+        if !out.is_empty() {
+            let k = out.len();
+            out.truncate(4);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(600) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({k}):\n  {}", out.join("\n  ")));
+        }
+    }
+}
+
+/// The fallbacks the typed session still has, as substrings of their
+/// reasons: any other fails the test. Remove one once it is typed.
+const KNOWN_FALLBACKS: &[&str] = &[
+    // The tooltip's stat comparison, where the translation carries another
+    // build's change of upstream's shared data (see `compare_display`)
+    "aligned with a fresh translation",
+    // Party builds upstream fails on as well (`party_match` checks that
+    // the translation fails on them too)
+    "upstream fails too",
+];
+
+/// The build the dispatcher's fallbacks are recorded for, and each
+/// fallback so far: build, command and why
+static FALLBACKS: std::sync::Mutex<(String, Vec<String>)> =
+    std::sync::Mutex::new((String::new(), Vec::new()));
+
+/// Records the dispatcher's fallbacks for the build so far, then starts
+/// recording for `id`
+fn at_build(d: &mut Dispatcher, id: &str) {
+    let mut f = FALLBACKS.lock().unwrap();
+    for (cmd, why) in d.fallbacks.drain(..) {
+        let line = format!("{}: {cmd}: {why}", f.0);
+        f.1.push(line);
+    }
+    f.0 = id.to_string();
+}
+
+/// A fallback outside the dispatcher, for the current build
+fn note_fallback(cmd: &str, why: &str) {
+    let mut f = FALLBACKS.lock().unwrap();
+    let line = format!("{}: {cmd}: {why}", f.0);
+    f.1.push(line);
+}
+
+/// Prints every fallback of the phase and fails on unknown ones
+fn report_fallbacks(phase: &str) {
+    let f = FALLBACKS.lock().unwrap();
+    for l in &f.1 {
+        eprintln!("fallback {phase} {l}");
+    }
+    eprintln!("{} fallbacks in phase {phase}", f.1.len());
+    let unknown: Vec<&String> =
+        f.1.iter()
+            .filter(|l| !KNOWN_FALLBACKS.iter().any(|k| l.contains(k)))
+            .collect();
+    assert!(
+        unknown.is_empty(),
+        "fallbacks not in KNOWN_FALLBACKS:\n{}",
+        unknown
+            .iter()
+            .map(|l| l.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+/// `newBuild` opens the translation's empty build: its views and file
+fn new_build_matches(d: &mut Dispatcher) {
+    answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+    assert!(
+        d.typed_active(),
+        "the typed engine did not open a new build"
+    );
+    let mut out = Vec::new();
+    for cmd in [
+        "state",
+        "outputs",
+        "skills",
+        "items",
+        "calcs",
+        "treeState",
+        "treeSpecs",
+    ] {
+        let req = json!({"cmd": cmd}).to_string();
+        let typed = answer(d.request(&req), cmd);
+        let tr = answer(d.translated_request(&req), cmd);
+        diff(&typed, &tr, cmd, &mut out);
+    }
+    compare_saves(d, "newBuild", &mut out);
+    // Then a skill
+    for req in [
+        json!({"cmd": "addSocketGroup"}),
+        json!({"cmd": "setGem", "group": 1, "gem": 1, "name": "Fireball"}),
+        json!({"cmd": "setGem", "group": 1, "gem": 2, "name": "Added Fire Damage"}),
+    ] {
+        let typed = answer(d.request(&req.to_string()), "typed edit");
+        assert!(d.typed_active(), "{req}: {:?}", d.typed_error);
+        let tr = answer(
+            d.translated_request(r#"{"cmd":"skills"}"#),
+            "translated edit",
+        );
+        assert!(tr.get("error").is_none(), "{req}: {tr}");
+        assert!(typed.get("error").is_none(), "{req}: {typed}");
+    }
+    for cmd in ["state", "outputs", "skills"] {
+        let req = json!({"cmd": cmd}).to_string();
+        let typed = answer(d.request(&req), cmd);
+        let tr = answer(d.translated_request(&req), cmd);
+        diff(&typed, &tr, &format!("after a skill: {cmd}"), &mut out);
+    }
+    compare_saves(d, "newBuild with a skill", &mut out);
+    out.truncate(20);
+    assert!(out.is_empty(), "newBuild differs:\n{}", out.join("\n"));
+}
+
+/// The notes, and the tooltips of every socket group and item and of
+/// nodes on and around the tree, give the translation's on every corpus
+/// build, also after a few edits; `SESSION_NODES` sets the nodes per build
+fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let (mut failures, mut fell_back, mut aligned) = (Vec::new(), Vec::new(), Vec::new());
+    let mut counts: std::collections::BTreeMap<&str, (usize, Duration, Duration)> =
+        Default::default();
+    let nodes_per_build: usize = std::env::var("SESSION_NODES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let tree = data.tree(data.game.latest_tree_version()).unwrap();
+    for (id, path) in mine(corpus()) {
+        at_build(d, &id);
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 23);
+        let mut out = Vec::new();
+        // Requests that differ, rechecked on a fresh translation, with the
+        // edits made before them
+        let mut recheck: Vec<(String, J, Vec<String>, Vec<String>)> = Vec::new();
+        let edits = std::cell::RefCell::new(Vec::<String>::new());
+        let mut compare = |d: &mut Dispatcher, req: J| {
+            let r = req.to_string();
+            let cmd = req["cmd"].as_str().unwrap().to_string();
+            if !d.typed_active() {
+                return;
+            }
+            d.typed_error = None;
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed");
+            let tt = t.elapsed();
+            let fell = d.typed_error.take();
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&r), "translated");
+            let c = counts.entry(Box::leak(cmd.into_boxed_str())).or_default();
+            match fell {
+                Some(e) => {
+                    let e = e.lines().next().unwrap_or("").to_string();
+                    fell_back.push(format!("{id}: {r:.120}: {e:.160}"));
+                }
+                None => {
+                    c.0 += 1;
+                    c.1 += tt;
+                    c.2 += t.elapsed();
+                    let mut lines = Vec::new();
+                    diff(&typed, &tr, &format!("{r:.200}"), &mut lines);
+                    if !lines.is_empty() {
+                        recheck.push((r, typed, lines, edits.borrow().clone()));
+                    }
+                }
+            }
+        };
+        compare(d, json!({"cmd": "notes"}));
+        compare(d, json!({"cmd": "party"}));
+        let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+            .as_array()
+            .map_or(0, Vec::len);
+        for g in 1..=groups {
+            compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
+        }
+        let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+        for item in items["ok"]["items"].as_array().into_iter().flatten() {
+            compare(d, json!({"cmd": "itemTooltip", "id": item["id"]}));
+        }
+        // Equipped items compared in their own slot, and the first item's
+        // text as a preview
+        let slots: Vec<J> = items["ok"]["slots"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|s| s["item"].is_number())
+            .cloned()
+            .collect();
+        for _ in 0..3.min(slots.len()) {
+            let s = &slots[rng.below(slots.len())];
+            let req = json!({"cmd": "itemTooltip", "id": s["item"], "slot": s["name"]});
+            compare(d, req);
+        }
+        if let Some(raw) = items["ok"]["items"][0]["raw"].as_str() {
+            compare(d, json!({"cmd": "previewItem", "text": raw}));
+        }
+        // Allocated nodes, their neighbours, and the allocated sockets
+        let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+        let alloc: Vec<u32> = state["ok"]["alloc"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_u64().map(|v| v as u32))
+            .collect();
+        let mut near: Vec<u32> = alloc
+            .iter()
+            .filter_map(|n| tree.node_index.get(n))
+            .flat_map(|&i| tree.nodes[i].linked_id.iter().copied())
+            .filter(|n| !alloc.contains(n))
+            .collect();
+        near.sort_unstable();
+        near.dedup();
+        let mut nodes: Vec<u32> = slots
+            .iter()
+            .filter_map(|s| s["nodeId"].as_u64().map(|n| n as u32))
+            .take(2)
+            .collect();
+        for k in 0..nodes_per_build {
+            let pool = if k % 2 == 0 { &alloc } else { &near };
+            if !pool.is_empty() {
+                nodes.push(pool[rng.below(pool.len())]);
+            }
+        }
+        // Tattooed nodes, and nodes in the radius of socketed jewels,
+        // which timeless jewels conquer
+        for o in xml.split("<Override ").skip(1) {
+            let id = o
+                .split("nodeId=\"")
+                .nth(1)
+                .and_then(|v| v.split('"').next()?.parse::<u32>().ok());
+            nodes.extend(id);
+        }
+        for s in &slots {
+            let Some(radius) = s["nodeId"]
+                .as_u64()
+                .and_then(|n| tree.node(n as u32)?.nodes_in_radius.as_ref()?.last())
+            else {
+                continue;
+            };
+            let (on, off): (Vec<u32>, Vec<u32>) = radius.iter().partition(|n| alloc.contains(n));
+            for pool in [&on, &on, &off] {
+                if !pool.is_empty() {
+                    nodes.push(pool[rng.below(pool.len())]);
+                }
+            }
+        }
+        nodes.sort_unstable();
+        nodes.dedup();
+        for n in nodes {
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
+        }
+        // Notes edited, and tooltips after a tree edit
+        let text = format!("Notes of {id}\n^_1colour ^_xFF0000and ^1codes");
+        let req = json!({"cmd": "setNotes", "text": text}).to_string();
+        answer(d.request(&req), "setNotes");
+        edits.borrow_mut().push(req);
+        compare(d, json!({"cmd": "notes"}));
+        if let Some(&n) = near.first() {
+            let req = json!({"cmd": "clickNode", "id": n}).to_string();
+            answer(d.request(&req), "clickNode");
+            edits.borrow_mut().push(req);
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
+            for g in 1..=groups.min(2) {
+                compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
+            }
+        }
+        if d.typed_active() {
+            compare_saves(d, "after the notes", &mut out);
+            compare(d, json!({"cmd": "notes"}));
+        }
+        // Upstream changes shared skill data for good (`ProcessSocketGroup`
+        // clears a triggered granted skill's level cost), so a build loaded
+        // earlier in the session can change the translation's answer: a
+        // request that differs is asked again of a fresh translation, with
+        // the same edits before it, and aligned when that one agrees
+        for (r, typed, lines, done) in recheck {
+            let fresh = session();
+            let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+            answer(fresh.request(&load), "fresh load");
+            for e in &done {
+                answer(fresh.request(e), "fresh edit");
+            }
+            let tr = answer(fresh.request(&r), "fresh");
+            let mut again = Vec::new();
+            diff(&typed, &tr, &r, &mut again);
+            if again.is_empty() {
+                aligned.push(format!("{id}: {r:.120}"));
+            } else {
+                out.extend(lines);
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "aligned with a fresh translation {}:\n{}",
+        aligned.len(),
+        aligned.join("\n")
+    );
+    for (cmd, (n, t, tr)) in &counts {
+        eprintln!("{cmd}: {n} compared, typed {t:.1?}, translated {tr:.1?}");
+    }
+    eprintln!("fell back {}:\n{}", fell_back.len(), fell_back.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// The views compared after a config or class edit
@@ -163,11 +729,16 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
     let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
     if let Some(p) = state["ok"]["popups"].as_array().and_then(|p| p.first()) {
         let _ = p;
-        return if rng.below(2) == 0 {
-            json!({"cmd": "popupButton", "name": "confirm"})
-        } else {
-            json!({"cmd": "closePopup"})
+        return match rng.below(3) {
+            0 => json!({"cmd": "popupButton", "name": "confirm"}),
+            1 => json!({"cmd": "closePopup"}),
+            // A button the class change popup has without a name
+            _ => json!({"cmd": "popupButton", "name": "cancel"}),
         };
+    }
+    if rng.below(12) == 0 {
+        // No popup to press
+        return json!({"cmd": "popupButton", "name": "confirm"});
     }
     let vars: Vec<&J> = config["ok"]["sections"]
         .as_array()
@@ -218,12 +789,14 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 /// outputs and tree after each step; then a new build does
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut popup_tooltips = 0;
     let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -241,6 +814,9 @@ fn config_edits_match(d: &mut Dispatcher) {
             }
             let req = config_edit(d, &mut rng);
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -251,11 +827,34 @@ fn config_edits_match(d: &mut Dispatcher) {
                 skipped.push(format!("{id}: {e}"));
                 break;
             }
+            if typed.get("error").is_some() {
+                // An error changes nothing: the translation's own answer
+                let tr = answer(d.translated_request(&r), "translated edit");
+                diff(&typed, &tr, &label, &mut out);
+            }
             let t = Instant::now();
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
-            let _ = typed;
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            // An allocated mastery's tooltip with the class change popup
+            // open compares reallocating it
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if state["ok"]["popups"]
+                .as_array()
+                .is_some_and(|p| !p.is_empty())
+            {
+                let tree = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+                let mastery = tree["ok"]["masteries"]
+                    .as_object()
+                    .and_then(|m| m.keys().next()?.parse::<u32>().ok());
+                if let Some(m) = mastery {
+                    let q = json!({"cmd": "nodeTooltip", "id": m}).to_string();
+                    let t = answer(d.request(&q), "typed tooltip");
+                    let tr = answer(d.translated_request(&q), "translated tooltip");
+                    diff(&t, &tr, &format!("{label} {q}"), &mut out);
+                    popup_tooltips += 1;
+                }
+            }
             steps += 1;
         }
         if out.is_empty() && d.typed_active() {
@@ -270,6 +869,7 @@ fn config_edits_match(d: &mut Dispatcher) {
     // A new build, a class change on it and its undo, in the first shard
     let mut out = Vec::new();
     if SHARD.get().is_none_or(|&(k, _)| k == 0) {
+        at_build(d, "newBuild");
         answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
         assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
         let views = [
@@ -300,7 +900,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
     }
     eprintln!(
-        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays), {popup_tooltips} mastery tooltips compared with a popup open\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -334,18 +934,23 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
+    let mut popups = 0;
+    let mut popup_inputs: std::collections::BTreeMap<String, usize> = Default::default();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
     // Item texts of the builds so far, for adding and editing items
     let mut pool: Vec<J> = Vec::new();
+    let mut db_pool: Vec<J> = Vec::new();
+    // Forbidden Flame and Flesh, which bring their counterpart along
+    let mut forbidden: Vec<J> = Vec::new();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
-        answer(
-            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
-            "load",
-        );
+        // The edits since the load, for a fresh translation's recheck
+        let mut log = vec![json!({"cmd": "loadXml", "xml": xml}).to_string()];
+        answer(d.request(&log[0]), "load");
         if !d.typed_active() {
             continue;
         }
@@ -358,6 +963,26 @@ fn items_edits_match(d: &mut Dispatcher) {
             diff(&typed, &tr, &format!("{label} {r}"), out);
             typed
         };
+        if db_pool.is_empty() {
+            // The item databases, once: their uniques and templates also
+            // go in the pool, the Forbidden jewels always
+            for kind in ["unique", "rare"] {
+                let db = compare(
+                    d,
+                    &json!({"cmd": "itemDb", "kind": kind}),
+                    "itemDb",
+                    &mut out,
+                );
+                for (i, item) in db["ok"].as_array().into_iter().flatten().enumerate() {
+                    let name = item["name"].as_str().unwrap_or("");
+                    if name.starts_with("Forbidden Fl") {
+                        forbidden.push(item["raw"].clone());
+                    } else if i % 37 == 0 {
+                        db_pool.push(item["raw"].clone());
+                    }
+                }
+            }
+        }
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
         if let Some(a) = items["ok"]["items"].as_array() {
             pool.extend(a.iter().map(|i| i["raw"].clone()));
@@ -382,7 +1007,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(12) {
+            let req = match rng.below(14) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -413,7 +1038,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                     }
                 }
                 8 => {
-                    let text = &pool[rng.below(pool.len())];
+                    let text = if rng.below(3) == 0 && !db_pool.is_empty() {
+                        &db_pool[rng.below(db_pool.len())]
+                    } else if rng.below(4) == 0 && !forbidden.is_empty() {
+                        &forbidden[rng.below(forbidden.len())]
+                    } else {
+                        &pool[rng.below(pool.len())]
+                    };
                     match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
                         Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
                         None => json!({"cmd": "addItem", "text": text}),
@@ -434,7 +1065,229 @@ fn items_edits_match(d: &mut Dispatcher) {
                         _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
                     };
                     compare(d, &open, &format!("step {step}"), &mut out);
+                    log.push(open.to_string());
+                    let label = format!("step {step} {open}");
+                    compare_display(d, &label, &log, &mut out);
                     json!({"cmd": "saveDisplayItem"})
+                }
+                13 => {
+                    // The item editor: an item opened, random changes to
+                    // its controls, then saved
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    answer(d.request(&open.to_string()), "open");
+                    log.push(open.to_string());
+                    let mut fell_back = !d.typed_active();
+                    for _ in 0..rng.below(4) + 1 {
+                        if fell_back {
+                            break;
+                        }
+                        // Shown on both, as the editor is drawn before a click:
+                        // upstream's sliders take their values when drawn
+                        let shown =
+                            compare_display(d, &format!("step {step} {open}"), &log, &mut out);
+                        let controls: Vec<J> = shown["ok"]["controls"]
+                            .as_array()
+                            .cloned()
+                            .unwrap_or_default()
+                            .into_iter()
+                            .filter(|c| {
+                                let p = c["path"].as_str().unwrap_or("");
+                                c["enabled"] == true
+                                    && c["class"] != "LabelControl"
+                                    && (c["class"] != "ButtonControl"
+                                        || p.contains("AddSocket")
+                                        || p.contains("Enchant")
+                                        || p.contains("Anoint")
+                                        || p.contains("Corrupt")
+                                        || p.contains("CustomModifierRemove"))
+                            })
+                            .collect();
+                        // The popups more often than the other controls
+                        let opens = |p: &str| {
+                            p.contains("Enchant") || p.contains("Anoint") || p.contains("Corrupt")
+                        };
+                        let openers: Vec<J> = controls
+                            .iter()
+                            .filter(|c| c["path"].as_str().is_some_and(opens))
+                            .cloned()
+                            .collect();
+                        let popup =
+                            pick(&mut rng, &J::Array(openers)).filter(|_| rng.below(3) == 0);
+                        let Some(c) = popup.or_else(|| pick(&mut rng, &J::Array(controls))) else {
+                            break;
+                        };
+                        let path = c["path"].clone();
+                        let r = match c["class"].as_str().unwrap_or("") {
+                            "DropDownControl" => {
+                                let n = c["list"].as_array().map_or(1, Vec::len);
+                                json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+                            }
+                            "EditControl" => {
+                                let text = ["0", "20", "7", "", "28"][rng.below(5)];
+                                json!({"cmd": "control", "path": path, "text": text})
+                            }
+                            "CheckBoxControl" => {
+                                json!({"cmd": "control", "path": path, "state": c["state"] != true})
+                            }
+                            "SliderControl" => {
+                                let val = rng.below(11) as f64 / 10.0;
+                                json!({"cmd": "control", "path": path, "val": val})
+                            }
+                            _ => json!({"cmd": "control", "path": path, "click": true}),
+                        }
+                        .to_string();
+                        answer(d.request(&r), "editor control");
+                        log.push(r.clone());
+                        if !d.typed_active() {
+                            fell_back = true;
+                            break;
+                        }
+                        let label = format!("step {step} {r}");
+                        if r.contains("click") && opens(&r) {
+                            // The popup: random choices, then one of the
+                            // buttons that close it
+                            popups += 1;
+                            compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                            let mut closed = false;
+                            for _ in 0..rng.below(6) {
+                                let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                                let popup = &st["ok"]["popups"][0];
+                                let mut inputs: Vec<J> = popup["controls"]
+                                    .as_array()
+                                    .cloned()
+                                    .unwrap_or_default()
+                                    .into_iter()
+                                    // Sorting by power only now and then
+                                    .filter(|c| c["path"] != "popup.sort" || rng.below(4) == 0)
+                                    .collect();
+                                for b in popup["buttons"].as_array().into_iter().flatten() {
+                                    if b["name"] == "implicits" || b["name"] == "rolls" {
+                                        inputs.push(json!({"class": "ButtonControl", "path": format!("popup.{}", b["name"].as_str().unwrap_or(""))}));
+                                    }
+                                }
+                                let Some(c) = pick(&mut rng, &J::Array(inputs)) else {
+                                    break;
+                                };
+                                let r = match c["class"].as_str().unwrap_or("") {
+                                    "CheckBoxControl" => {
+                                        json!({"cmd": "control", "path": c["path"], "state": c["state"] != true})
+                                    }
+                                    "SliderControl" => {
+                                        let val = rng.below(11) as f64 / 10.0;
+                                        json!({"cmd": "control", "path": c["path"], "val": val})
+                                    }
+                                    "ButtonControl" => {
+                                        json!({"cmd": "control", "path": c["path"], "click": true})
+                                    }
+                                    "EditControl" => {
+                                        let text = ["", "life", "(fire|cold) damage", "energy", "z"][rng.below(5)];
+                                        json!({"cmd": "control", "path": c["path"], "text": text})
+                                    }
+                                    _ => {
+                                        let n = c["list"].as_array().map_or(1, Vec::len);
+                                        json!({"cmd": "control", "path": c["path"], "sel": rng.below(n) + 1})
+                                    }
+                                }
+                                .to_string();
+                                *popup_inputs
+                                    .entry(c["path"].as_str().unwrap_or("").to_string())
+                                    .or_default() += 1;
+                                answer(d.request(&r), "popup control");
+                                log.push(r.clone());
+                                if !d.typed_active() {
+                                    closed = true;
+                                    break;
+                                }
+                                compare(
+                                    d,
+                                    &json!({"cmd": "state"}),
+                                    &format!("step {step} {r}"),
+                                    &mut out,
+                                );
+                            }
+                            if closed {
+                                fell_back = true;
+                                break;
+                            }
+                            let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                            let mut closing: Vec<String> = st["ok"]["popups"][0]["buttons"]
+                                .as_array()
+                                .into_iter()
+                                .flatten()
+                                .filter_map(|b| b["name"].as_str().map(String::from))
+                                .filter(|n| n == "save" || n == "remove" || n == "close")
+                                .collect();
+                            closing.push("save".into());
+                            let button = &closing[rng.below(closing.len())];
+                            let r = json!({"cmd": "popupButton", "name": button}).to_string();
+                            answer(d.request(&r), "popup button");
+                            log.push(r.clone());
+                            if !d.typed_active() {
+                                fell_back = true;
+                                break;
+                            }
+                        }
+                        compare_display(d, &label, &log, &mut out);
+                        compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                    }
+                    if fell_back {
+                        json!({"cmd": "state"})
+                    } else {
+                        json!({"cmd": "saveDisplayItem"})
+                    }
+                }
+                12 => {
+                    // Craft Item: random choices, Create or Cancel, the
+                    // text editor of a unique, then the item saved
+                    let types = 70;
+                    let mut reqs = vec![json!({"cmd": "craftItem"})];
+                    for _ in 0..rng.below(4) {
+                        reqs.push(match rng.below(4) {
+                            0 => json!({"cmd": "control", "path": "popup.rarity", "sel": rng.below(5) + 1}),
+                            1 => json!({"cmd": "control", "path": "popup.type", "sel": rng.below(types) + 1}),
+                            2 => json!({"cmd": "control", "path": "popup.base", "sel": rng.below(12) + 1}),
+                            _ => {
+                                let text = ["", "Doom Crest", " "][rng.below(3)];
+                                json!({"cmd": "control", "path": "popup.title", "text": text})
+                            }
+                        });
+                    }
+                    let cancel = rng.below(6) == 0;
+                    reqs.push(json!({"cmd": "popupButton", "name": if cancel { "cancel" } else { "save" }}));
+                    let mut fell_back = false;
+                    for r in &reqs {
+                        let r = r.to_string();
+                        answer(d.request(&r), "craft step");
+                        log.push(r.clone());
+                        if !d.typed_active() {
+                            fell_back = true;
+                            break;
+                        }
+                        let label = format!("step {step} {r}");
+                        compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                        compare_display(d, &label, &log, &mut out);
+                    }
+                    if fell_back || cancel {
+                        json!({"cmd": "state"})
+                    } else {
+                        // The text editor a unique opens, saved or closed
+                        let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                        if st["ok"]["popups"][0]["title"] == "Edit Item Text" {
+                            let r = if rng.below(4) == 0 {
+                                json!({"cmd": "closePopup"})
+                            } else {
+                                json!({"cmd": "popupButton", "name": "save"})
+                            };
+                            answer(d.request(&r.to_string()), "edit text");
+                            log.push(r.to_string());
+                        }
+                        json!({"cmd": "saveDisplayItem"})
+                    }
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
@@ -445,6 +1298,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let r = req.to_string();
             let t = Instant::now();
             answer(d.request(&r), "typed edit");
+            log.push(r.clone());
             times[0] += t.elapsed();
             if !d.typed_active() {
                 let e = d.typed_error.clone().unwrap_or_default();
@@ -487,7 +1341,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} enchant, anoint and corrupt popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -498,6 +1352,37 @@ fn items_edits_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// `displayItem` of both. The tooltip's stat comparison of the
+/// translation can carry another build's mutation of upstream's shared
+/// data (`ProcessSocketGroup` clears a triggered granted skill's level
+/// cost): lines that differ are asked again of a fresh translation, with
+/// the edits of `log` since the load, and aligned when that one agrees
+fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Vec<String>) -> J {
+    let r = json!({"cmd": "displayItem"}).to_string();
+    let mut typed = answer(d.request(&r), "typed");
+    let answer_typed = typed.clone();
+    let mut tr = answer(d.translated_request(&r), "translated");
+    if !typed["ok"].is_object() || !tr["ok"].is_object() {
+        diff(&typed, &tr, &format!("{label} {r}"), out);
+        return answer_typed;
+    }
+    let (tl, rl) = (typed["ok"]["lines"].take(), tr["ok"]["lines"].take());
+    diff(&typed, &tr, &format!("{label} {r}"), out);
+    if tl != rl {
+        let fresh = session();
+        for e in log {
+            answer(fresh.request(e), "fresh edit");
+        }
+        let fl = answer(fresh.request(&r), "fresh")["ok"]["lines"].take();
+        if fl == tl {
+            note_fallback("displayItem", "aligned with a fresh translation");
+        } else {
+            diff(&tl, &rl, &format!("{label} {r}.lines"), out);
+        }
+    }
+    answer_typed
 }
 
 /// `saveXml` of both on the dispatcher's build: where they differ
@@ -537,6 +1422,7 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
 fn saves_match(d: &mut Dispatcher) {
     let (mut failures, mut times, mut n) = (Vec::new(), [Duration::ZERO; 2], 0);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -627,7 +1513,103 @@ fn saves_match(d: &mut Dispatcher) {
     );
 }
 
-/// `loadXml`, `loadCode`, `state` and `outputs`
+/// A build file with each `<Spec>`'s nodes and masteries as a tree link,
+/// as `PassiveSpec:EncodeURL` writes it
+fn specs_as_urls(xml: &str) -> String {
+    let mut out = String::new();
+    let mut rest = xml;
+    while let Some(at) = rest.find("<Spec ") {
+        out.push_str(&rest[..at]);
+        let end = at + rest[at..].find('>').unwrap();
+        let closed = rest[..end].ends_with('/');
+        let tag = &rest[at + 6..if closed { end - 1 } else { end }];
+        let mut attrs = Vec::new();
+        let mut a = std::collections::HashMap::new();
+        for part in tag.split('"').collect::<Vec<_>>().chunks(2) {
+            if let [k, v] = part {
+                let k = k.trim().trim_end_matches('=').to_string();
+                a.insert(k.clone(), v.to_string());
+                attrs.push((k, v.to_string()));
+            }
+        }
+        let num = |k: &str| a.get(k).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        let mut ids: Vec<u32> = a["nodes"]
+            .split(',')
+            .filter_map(|n| n.parse().ok())
+            .collect();
+        ids.sort();
+        let masteries: std::collections::HashMap<u32, u32> = a
+            .get("masteryEffects")
+            .map(|m| {
+                m.split('}')
+                    .filter_map(|e| {
+                        let (n, e) = e.trim_start_matches([',', '{']).split_once(',')?;
+                        Some((n.parse().ok()?, e.parse().ok()?))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut b: Vec<u8> = vec![0, 0, 0, 6, num("classId") as u8];
+        b.push((num("secondaryAscendClassId") << 2 | num("ascendClassId")) as u8);
+        let (mut nodes, mut clusters, mut mastery) = (Vec::new(), Vec::new(), Vec::new());
+        for id in ids {
+            if id < 65536 && nodes.len() < 255 * 2 {
+                nodes.extend([(id / 256) as u8, (id % 256) as u8]);
+                if let Some(e) = masteries.get(&id) {
+                    mastery.extend([(e / 256) as u8, (e % 256) as u8]);
+                    mastery.extend([(id / 256) as u8, (id % 256) as u8]);
+                }
+            } else if id >= 65536 {
+                let c = id - 65536;
+                clusters.extend([(c / 256) as u8, (c % 256) as u8]);
+            }
+        }
+        b.push((nodes.len() / 2) as u8);
+        b.extend(nodes);
+        b.push((clusters.len() / 2) as u8);
+        b.extend(clusters);
+        b.push((mastery.len() / 4) as u8);
+        b.extend(mastery);
+        let url = base64(&b).replace('+', "-").replace('/', "_");
+        out.push_str("<Spec");
+        for (k, v) in attrs {
+            if k != "nodes" && k != "masteryEffects" {
+                out.push_str(&format!(" {k}=\"{v}\""));
+            }
+        }
+        out.push_str(&format!(
+            "><URL>https://www.pathofexile.com/passive-skill-tree/{url}</URL>"
+        ));
+        if closed {
+            out.push_str("</Spec>");
+        }
+        rest = &rest[end + 1..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Standard base64 with padding
+fn base64(b: &[u8]) -> String {
+    const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut s = String::new();
+    for c in b.chunks(3) {
+        let n = c
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &x)| n | u32::from(x) << (16 - 8 * i));
+        for i in 0..4 {
+            if i <= c.len() {
+                s.push(A[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                s.push('=');
+            }
+        }
+    }
+    s
+}
+
+/// `loadXml`, `loadCode`, `state`, `outputs` and `treeState`
 fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut skipped, mut compared) = (Vec::new(), Vec::new(), 0);
     let mut times = [Duration::ZERO; 4];
@@ -655,10 +1637,21 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         })
         .collect();
     builds.extend(auto);
+    // The specs as tree links (`<URL>`, the old format), on every tenth
+    // build from the fifth
+    let urls: Vec<(String, String)> = builds
+        .iter()
+        .skip(4)
+        .step_by(10)
+        .map(|(id, xml)| (format!("{id}-url"), specs_as_urls(xml)))
+        .collect();
+    builds.extend(urls);
     let builds = mine(builds);
     for (id, xml) in builds {
+        at_build(d, &id);
         if let Err(e) = TypedSession::load(data, &xml, None) {
             skipped.push(format!("{id}: {e}"));
+            note_fallback("loadXml", &e);
             continue;
         }
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
@@ -670,7 +1663,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             "{id}: the typed engine did not load the build"
         );
         let mut typed = Vec::new();
-        for cmd in ["state", "outputs"] {
+        for cmd in ["state", "outputs", "treeState"] {
             let t = Instant::now();
             typed.push(answer(d.request(&json!({"cmd": cmd}).to_string()), cmd));
             times[1] += t.elapsed();
@@ -681,7 +1674,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             "translated load",
         );
         times[2] += t.elapsed();
-        for (cmd, typed) in ["state", "outputs"].iter().zip(typed) {
+        for (cmd, typed) in ["state", "outputs", "treeState"].iter().zip(typed) {
             let t = Instant::now();
             let tr = answer(d.translated_request(&json!({"cmd": cmd}).to_string()), cmd);
             times[3] += t.elapsed();
@@ -750,6 +1743,7 @@ fn geometry_matches(d: &mut Dispatcher) {
     let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
     let mut times = [Duration::ZERO; 2];
     for (id, xml) in builds {
+        at_build(d, &id);
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
@@ -795,12 +1789,321 @@ fn geometry_matches(d: &mut Dispatcher) {
     );
 }
 
+/// `<Import exportParty="true"/>`: the build exports its buffs
+fn with_export(xml: &str) -> String {
+    match xml.find("exportParty=\"false\"") {
+        Some(at) => format!(
+            "{}exportParty=\"true\"{}",
+            &xml[..at],
+            &xml[at + "exportParty=\"false\"".len()..]
+        ),
+        None if xml.contains("<Import/>") => {
+            xml.replace("<Import/>", "<Import exportParty=\"true\"/>")
+        }
+        None if xml.contains("<Import ") => {
+            xml.replacen("<Import ", "<Import exportParty=\"true\" ", 1)
+        }
+        None => xml.replace(
+            "</PathOfBuilding>",
+            "<Import exportParty=\"true\"/>\n</PathOfBuilding>",
+        ),
+    }
+}
+
+/// The build with these socket groups added after its others, each gem
+/// of a group at its natural maximum level and 20% quality
+fn with_groups(data: &TypedData, xml: &str, groups: &[&[&str]]) -> Option<String> {
+    let mut add = String::new();
+    for names in groups {
+        add.push_str("<Skill enabled=\"true\" label=\"Party\" includeInFullDPS=\"false\">\n");
+        for name in *names {
+            let gem = data
+                .game
+                .skills
+                .gems()
+                .iter()
+                .find(|g| g.name == *name)
+                .unwrap_or_else(|| panic!("no gem {name}"));
+            add.push_str(&format!(
+                "<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\"/>\n",
+                gem.game_id, gem.natural_max_level, gem.name, gem.id, gem.variant_id
+            ));
+        }
+        add.push_str("</Skill>\n");
+    }
+    let at = xml.find("</SkillSet>")?;
+    Some(format!("{}{add}{}", &xml[..at], &xml[at..]))
+}
+
+/// XML text content
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// The `ExportedBuffs` of a saved build, by name
+fn exported(xml: &str) -> Vec<(String, String)> {
+    let root = engine::xml::parse(xml).unwrap();
+    let party = root.child("PathOfBuilding").and_then(|p| p.child("Party"));
+    party
+        .iter()
+        .flat_map(|p| p.elements())
+        .filter(|e| e.elem == "ExportedBuffs")
+        .filter_map(|e| {
+            let text = e.children.iter().find_map(|c| match c {
+                engine::xml::Node::Text(t) => Some(t.clone()),
+                _ => None,
+            })?;
+            Some((e.attr("name")?.to_string(), text))
+        })
+        .collect()
+}
+
+/// The build with these party buffs imported (its Party tab replaced)
+fn with_party(xml: &str, buffs: &[(String, String)]) -> String {
+    let mut party =
+        String::from("<Party ShowAdvanceTools=\"false\" append=\"false\" destination=\"All\">\n");
+    for (name, text) in buffs {
+        party.push_str(&format!(
+            "<ImportedBuffs name=\"{name}\">{}</ImportedBuffs>\n",
+            escape(text)
+        ));
+    }
+    party.push_str("</Party>");
+    let start = xml.find("<Party ");
+    let end = start.and_then(|s| {
+        let rest = &xml[s..];
+        let close = rest.find('>')?;
+        if rest[..close].ends_with('/') {
+            Some(s + close + 1)
+        } else {
+            rest.find("</Party>").map(|e| s + e + "</Party>".len())
+        }
+    });
+    match (start, end) {
+        (Some(s), Some(e)) => format!("{}{party}{}", &xml[..s], &xml[e..]),
+        _ => xml.replace("</PathOfBuilding>", &format!("{party}\n</PathOfBuilding>")),
+    }
+}
+
+/// Compares saved files line by line. Upstream's `modLib.mergeKeystones`
+/// gives a keystone's shared mods the source of whatever else grants it,
+/// also the copies the tree added (see `align_keystone_sources`): an
+/// exported mod line that differs only by the typed source being the
+/// tree's is aligned. The number of lines so aligned.
+fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
+    let mut aligned = 0;
+    if typed.lines().count() != tr.lines().count() {
+        out.push("saveXml differs in its number of lines".into());
+        return 0;
+    }
+    for (a, b) in typed.lines().zip(tr.lines()) {
+        if a == b {
+            continue;
+        }
+        let (x, y): (Vec<&str>, Vec<&str>) = (a.split('|').collect(), b.split('|').collect());
+        let keystone = x.len() == y.len()
+            && x.len() > 2
+            && x[1].starts_with("Tree:")
+            && x.iter()
+                .zip(&y)
+                .enumerate()
+                .all(|(i, (u, v))| i == 1 || u == v);
+        if keystone {
+            aligned += 1;
+        } else {
+            out.push(format!(
+                "saveXml differs:\n  typed {a:?}\n  translated {b:?}"
+            ));
+            return aligned;
+        }
+    }
+    aligned
+}
+
+/// Party members' stats as a support build exports them, with every flag
+/// the calculations read of party members
+const PARTY_STATS: &str = "EnemyFireResistEqualToYours
+FireResist=40
+EnemyChaosResistEqualToYours
+ChaosResist=-30
+PartyMemberMaximumEnduranceChargesEqualToYours
+EnduranceChargesMax=6
+PartyMemberFortifyEqualToYours
+FortificationStacks=20
+MovementSpeedMod|percent|max=150
+Life=5000
+BlockChanceMax=80
+BlockChance=55
+MaxLifeLeechRatePercent=25
+EnergyShieldRecoveryCap=3000
+MainHand.CritChance=12.5";
+
+/// Every link skill's mods as a support build exports them
+const PARTY_LINKS: &str = "Destructive Link
+130
+1|Skill:DestructiveLink|MainHandCritIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Protective Link
+100
+1|Skill:ProtectiveLink|MaximumBlockAttackChanceIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+1|Skill:ProtectiveLink|BlockAttackChanceIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Soul Link
+110
+30|Skill:SoulLink|TakenFromParentESBeforeYou|BASE|-|-|type=GlobalEffect/effectType=Link
+---
+Vampiric Link
+100
+1|Skill:VampiricLink|MaximumLifeLeechIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Flame Link
+100
+20|Skill:FlameLink|PhysicalDamageGainAsFire|BASE|-|-|type=GlobalEffect/effectType=Link,type=PerStat/actor=parent/div=100/stat=Life
+---";
+
+/// Socket groups that give a supporting build buffs to export: a link,
+/// an aura, a curse or mark, a warcry, by build
+const PARTY_GROUPS: [&[&[&str]]; 8] = [
+    &[&["Destructive Link"], &["Determination"], &["Despair"]],
+    &[&["Flame Link"], &["Pride"], &["Rallying Cry"]],
+    &[&["Protective Link"], &["Vaal Grace"], &["Assassin's Mark"]],
+    &[&["Intuitive Link"], &["Wrath"], &["Intimidating Cry"]],
+    &[&["Vampiric Link"], &["Malevolence"], &["Punishment"]],
+    &[&["Soul Link"], &["Purity of Elements"], &["Ancestral Cry"]],
+    &[&["Vaal Haste"], &["Haste"], &["Enfeeble"]],
+    &[],
+];
+
+/// The Party tab: corpus builds that export their buffs, some with
+/// socket groups added that give them buffs to export, and each corpus
+/// build with another's exported buffs imported as party members' give
+/// the translation's sidebar, outputs, Calcs tab and file.
+/// `PARTY_STEP=<n>` takes every nth build (default 2)
+fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let step: usize = std::env::var("PARTY_STEP")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+    let builds: Vec<(String, String)> = mine(corpus())
+        .into_iter()
+        .step_by(step)
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
+    let mut aligned = 0;
+    let mut check = |d: &mut Dispatcher, id: &str, xml: &str, failures: &mut Vec<String>| {
+        at_build(d, id);
+        // `PARTY_DUMP=<dir>` writes the builds there
+        if let Ok(dir) = std::env::var("PARTY_DUMP") {
+            std::fs::write(Path::new(&dir).join(format!("{id}.xml")), xml).unwrap();
+        }
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            let e = d.typed_error.clone().unwrap_or_default();
+            // Where the typed engine fails, upstream does
+            let tr = answer(d.translated_request(r#"{"cmd":"outputs"}"#), "translated");
+            if !e.starts_with("not ported") && tr.get("error").is_none() {
+                failures.push(format!("{id}: typed fails ({e}), the translation does not"));
+            }
+            if tr.get("error").is_some() {
+                // A build neither loads is not a fallback
+                d.fallbacks.clear();
+            }
+            skipped.push(format!("{id}: {e}"));
+            return None;
+        }
+        let mut out = Vec::new();
+        let typed: Vec<J> = ["state", "outputs"]
+            .iter()
+            .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
+            .collect();
+        answer(
+            d.translated_request(r#"{"cmd":"state"}"#),
+            "translated load",
+        );
+        for (c, t) in ["state", "outputs"].iter().zip(&typed) {
+            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
+            diff(t, &tr, c, &mut out);
+        }
+        if out.is_empty() {
+            let (_, o, _) = compare_calcs(data, d, id, &mut [Duration::ZERO; 2]);
+            out.extend(o);
+        }
+        let typed_save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+        let tr = answer(
+            d.translated_request(r#"{"cmd":"saveXml"}"#),
+            "translated save",
+        );
+        if out.is_empty() {
+            let a = typed_save["ok"]["xml"].as_str().unwrap_or("");
+            let b = tr["ok"]["xml"].as_str().unwrap_or("");
+            aligned += compare_party_saves(a, b, &mut out);
+        }
+        compared += 1;
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+        tr["ok"]["xml"].as_str().map(String::from)
+    };
+    let mut exports: Vec<Vec<(String, String)>> = Vec::new();
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let groups = PARTY_GROUPS[k % PARTY_GROUPS.len()];
+        let xml = with_groups(data, &with_export(xml), groups).unwrap_or_else(|| with_export(xml));
+        let saved = check(d, &format!("{id}-export"), &xml, &mut failures);
+        exports.push(saved.map(|x| exported(&x)).unwrap_or_default());
+    }
+    let n = builds.len();
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let from = (k + 1) % n;
+        let buffs = &exports[from];
+        if buffs.is_empty() {
+            continue;
+        }
+        let xml = with_party(xml, buffs);
+        check(
+            d,
+            &format!("{id}-party-{}", builds[from].0),
+            &xml,
+            &mut failures,
+        );
+    }
+    // Party members' stats and every link's mods, written by hand
+    for (k, (id, xml)) in builds.iter().enumerate().step_by(4) {
+        let mut buffs = exports[(k + 2) % n].clone();
+        buffs.retain(|(name, _)| name != "PartyMemberStats" && name != "Link Skills");
+        buffs.push(("PartyMemberStats".into(), PARTY_STATS.into()));
+        buffs.push(("Link Skills".into(), PARTY_LINKS.into()));
+        let xml = with_party(xml, &buffs);
+        check(d, &format!("{id}-party-stats"), &xml, &mut failures);
+    }
+    eprintln!(
+        "{compared} party builds compared, {aligned} keystone sources aligned; skipped {}:\n{}",
+        skipped.len(),
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
 /// The colour codes the sidebar uses are upstream's
 #[test]
 fn color_codes_match_upstream() {
     let src = gamedata::Source::load(Path::new(&src())).unwrap();
     let codes = src.global("colorCodes");
-    for (name, code) in session::typed::display_stats::COLOR_CODES {
+    let all = session::typed::display_stats::COLOR_CODES.iter();
+    for (name, code) in all.chain(session::typed::tooltip::COLORS) {
         let v = codes.as_table().unwrap().get_str(name);
         assert_eq!(
             v.as_str().map(|s| s.to_str_lossy().into_owned()).as_deref(),
@@ -958,6 +2261,7 @@ fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
         answer(d.request(&load), "load");
@@ -1016,6 +2320,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1087,6 +2392,8 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": s})
             } else if step == total {
                 json!({"cmd": "resetTree"})
+            } else if rng.below(5) == 0 {
+                json!({"cmd": "undo"})
             } else if rng.below(2) == 0 && alloc.len() > 2 {
                 json!({"cmd": "clickNode", "id": alloc[rng.below(alloc.len())]})
             } else {
@@ -1106,6 +2413,9 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "clickNode", "id": pick})
             };
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
             let r = req.to_string();
             let t = Instant::now();
             let typed = answer(d.request(&r), "typed edit");
@@ -1131,7 +2441,7 @@ fn tree_edits_match(d: &mut Dispatcher) {
             if let Some(i) = req.get("id") {
                 follow.push(json!({"cmd": "nodePath", "id": i}));
             }
-            if step < socket_clicks.len() {
+            if step < socket_clicks.len() || req["cmd"] == "undo" {
                 // The subgraphs taken off and built again
                 follow.push(json!({"cmd": "tree"}));
             }
@@ -1194,6 +2504,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         .filter_map(|g| g["name"].as_str().map(String::from))
         .collect();
     for (id, path) in mine(corpus()) {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
@@ -1392,7 +2703,7 @@ fn replay_sequence() {
             let r = req.to_string();
             eprintln!("{id} {r}: typed {}", answer(d.request(&r), "typed"));
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
-            for f in ["skills", "state", "outputs"] {
+            for f in ["skills", "state", "outputs", "treeState"] {
                 let q = json!({ "cmd": f }).to_string();
                 let (t, tr) = (
                     answer(d.request(&q), f),

@@ -14,6 +14,8 @@ pub type Result<T> = std::result::Result<T, String>;
 /// The actors' places in [`EnvActors::actors`]
 pub const PLAYER: usize = 0;
 pub const ENEMY: usize = 1;
+/// The Party tab's actor (`env.partyMembers`)
+pub const PARTY: usize = 2;
 
 /// Mod names as symbols
 pub fn syms(names: &[&str]) -> Vec<Sym> {

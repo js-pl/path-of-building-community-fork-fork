@@ -278,7 +278,7 @@ fn mod_key_part(m: &Mod, out: &mut String) {
 }
 
 /// `node.modKey`: the mods of the lines the parser fully understood
-fn mod_key(lines: &[StatLine]) -> String {
+pub fn mod_key(lines: &[StatLine]) -> String {
     let mut k = String::new();
     for l in lines.iter().filter(|l| l.extra.is_none()) {
         for m in l.list.iter().flatten() {

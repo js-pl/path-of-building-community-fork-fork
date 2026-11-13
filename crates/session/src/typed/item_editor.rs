@@ -7,8 +7,120 @@
 
 use super::{NOT_PORTED, Result, TypedSession};
 use engine::item::{INFLUENCES, Item};
+use engine::item_craft::{AffixSeries, AffixTable};
+use engine::item_data::AffixSet;
 use serde_json::{Value as J, json};
 use std::sync::Arc;
+
+/// `main.defaultItemAffixQuality`
+const DEFAULT_AFFIX_QUALITY: f64 = 0.5;
+
+/// The item editor's controls (`ItemsTab.controls.displayItem*`)
+#[derive(Clone, Debug, Default)]
+pub struct Editor {
+    /// `displayItemAffix1` to `displayItemAffix9`
+    pub affix: [AffixControl; 9],
+    /// The item editor's popups, front first
+    pub popups: Vec<super::item_popups::ItemPopup>,
+    /// How many of `ui.popups` describe them (at the front)
+    pub described: usize,
+    /// `lastCraftRaritySel`, `lastCraftTypeSel`, `lastCraftBaseSel`
+    pub last_craft: Option<(usize, usize, usize)>,
+    /// The influence drop-downs' selections
+    pub influence: [f64; 2],
+    /// The quality and catalyst quality edits' text
+    pub quality_buf: String,
+    pub catalyst_quality_buf: String,
+    /// `displayItemClusterJewelNodeCount.val`
+    pub cluster_count_val: f64,
+    /// `displayItemRangeLine`'s list and selection, and the range
+    /// slider's value
+    pub range_list: Vec<String>,
+    pub range_sel: usize,
+    pub range_val: Option<f64>,
+}
+
+/// An affix drop-down and its roll slider
+#[derive(Clone, Debug)]
+pub struct AffixControl {
+    pub list: Vec<Option<AffixSeries>>,
+    /// 0-based
+    pub sel: usize,
+    pub table: AffixTable,
+    /// 1-based
+    pub index: usize,
+    pub slider_val: f64,
+    pub slider_div: Option<f64>,
+    pub slider_shown: bool,
+}
+
+impl Default for AffixControl {
+    fn default() -> AffixControl {
+        AffixControl {
+            list: vec![None],
+            sel: 0,
+            table: AffixTable::Prefixes,
+            index: 1,
+            slider_val: 0.0,
+            slider_div: None,
+            slider_shown: false,
+        }
+    }
+}
+
+/// `SliderControl:GetDivVal(val)`
+pub(super) fn div_val(val: f64, div: Option<f64>) -> (usize, f64) {
+    match div {
+        Some(d) if d > 1.0 => {
+            let i = (val * d).ceil().max(1.0);
+            (i as usize, val * d - i + 1.0)
+        }
+        _ => (1, val),
+    }
+}
+
+/// The affix drop-downs' `verifyRange`: flips the roll where the tiers'
+/// ranges run the other way
+pub(super) fn verify_range(range: f64, index: usize, mods: &[String], affixes: &AffixSet) -> f64 {
+    let min_max = |id: &str| -> Option<(f64, f64)> {
+        let m = affixes.get(id)?;
+        m.lines.iter().find_map(|l| {
+            let c = engine::pat::captures(l, "%((%d[%d%.]*)%-(%d[%d%.]*)%)")?;
+            Some((
+                engine::pat::to_number(&c[0])?,
+                engine::pat::to_number(&c[1])?,
+            ))
+        })
+    };
+    let flip = |a: &str, b: &str| -> bool {
+        let (Some((min_a, max_a)), Some((min_b, max_b))) = (min_max(a), min_max(b)) else {
+            return false;
+        };
+        let ints = [min_a, max_a, min_b, max_b]
+            .iter()
+            .all(|v| v.fract() == 0.0);
+        if !ints {
+            return false;
+        }
+        if min_a < min_b {
+            min_a + 1.0 == max_b
+        } else {
+            min_a - 1.0 == max_b
+        }
+    };
+    let cur = &mods[index - 1];
+    if index > 1 && affixes.get(&mods[index - 2]).is_some() {
+        if flip(&mods[index - 2], cur) {
+            return 1.0 - range;
+        }
+    } else if index + 1 < mods.len()
+        && affixes.get(&mods[index]).is_some()
+        && flip(cur, &mods[index])
+    {
+        return 1.0 - range;
+    }
+    range
+}
 
 /// `forbiddenJewelCounterpart`
 const FORBIDDEN: [(&str, &str); 2] = [
@@ -33,7 +145,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `BuildAndParseRaw()`
-    fn build_and_parse_raw(&self, item: &mut Item) -> Result<()> {
+    pub(super) fn build_and_parse_raw(&self, item: &mut Item) -> Result<()> {
         let raw = item.build_raw();
         item.parse_raw(&self.data.item_context(), &raw, None, false)
     }
@@ -92,36 +204,247 @@ impl<'d> TypedSession<'d> {
     /// `CreateDisplayItemFromRaw(raw, true)`: leaves the display item as
     /// it is when the base is not recognised
     fn create_display_item_from_raw(&mut self, raw: &str) -> Result<()> {
+        self.display_item_from_raw(raw, true)
+    }
+
+    /// `CreateDisplayItemFromRaw(raw, normalise)`
+    pub(super) fn display_item_from_raw(&mut self, raw: &str, normalise: bool) -> Result<()> {
         let Some(mut item) = self.new_item(raw)? else {
             return Ok(());
         };
-        // `main.migrateEldritchImplicits`, true by default
-        self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
-        item.normalise_quality();
-        item.build_mod_list(&self.data.item_context())?;
+        if normalise {
+            // `main.migrateEldritchImplicits`, true by default
+            self.copy_anoints_and_eldritch_implicits(&mut item, true)?;
+            item.normalise_quality();
+            item.build_mod_list(&self.data.item_context())?;
+        }
         self.set_display(Some(item))
     }
 
-    /// `SetDisplayItem(item)`, the item's side of it
-    fn set_display(&mut self, item: Option<Item>) -> Result<()> {
-        if let Some(item) = &item
-            && item.crafted
-            && item.cluster_jewel_size_index.is_some()
-        {
-            // `UpdateClusterJewelControls` crafts it again (`Item:Craft`)
-            return Err(format!("{NOT_PORTED}: crafting a cluster jewel"));
+    /// `SetDisplayItem(item)`
+    pub(super) fn set_display_item_value(&mut self, item: Option<Item>) -> Result<()> {
+        self.set_display(item)
+    }
+
+    pub(super) fn has_display_item(&self) -> bool {
+        self.display_item.is_some()
+    }
+
+    pub(super) fn display_item_id(&self) -> Option<f64> {
+        self.display_item.as_ref().and_then(|i| i.id)
+    }
+
+    /// `self.displayItem.id = id`
+    pub(super) fn set_display_item_id(&mut self, id: Option<f64>) {
+        if let Some(item) = &mut self.display_item {
+            item.id = id;
         }
+    }
+
+    /// `SetDisplayItem(item)`, the item's side of it: the affix controls
+    /// of a crafted item, and a crafted cluster jewel crafted again
+    fn set_display(&mut self, item: Option<Item>) -> Result<()> {
         self.display_item = item.map(|mut item| {
             if item.catalyst.is_none_or(|c| c == 0) {
                 item.catalyst_quality = None;
             }
             item
         });
+        let Some(item) = &self.display_item else {
+            return Ok(());
+        };
+        let (crafted, cluster) = (item.crafted, item.cluster_jewel_size_index.is_some());
+        if crafted {
+            self.update_affix_controls()?;
+        }
+        self.set_display_controls();
+        if crafted && cluster {
+            self.update_cluster_jewel_controls()?;
+        }
         Ok(())
     }
 
+    /// `UpdateAffixControls()`
+    pub(super) fn update_affix_controls(&mut self) -> Result<()> {
+        let item = self.display_item.as_ref().ok_or("no item in the editor")?;
+        let data = &self.data.game.items;
+        let prefix_limit = item.affix_table_limit(AffixTable::Prefixes);
+        let ignore_mod_type = item
+            .rare_like_unique
+            .as_ref()
+            .and_then(|r| data.rare_like_uniques.get(r))
+            .is_some_and(|r| r.ignore_mod_type);
+        let mut i = 1.0;
+        while i <= item.affix_limit {
+            let n = i as usize;
+            let (typ, table, index) = if i <= prefix_limit {
+                let typ = (!ignore_mod_type).then_some("Prefix");
+                (typ, AffixTable::Prefixes, n)
+            } else {
+                (
+                    Some("Suffix"),
+                    AffixTable::Suffixes,
+                    (i - prefix_limit) as usize,
+                )
+            };
+            i += 1.0;
+            let (list, sel) = item.affix_options(data, typ, table, index)?;
+            let c = self.editor.affix.get_mut(n - 1).ok_or("no affix control")?;
+            c.table = table;
+            c.index = index;
+            c.slider_shown = false;
+            c.slider_val = DEFAULT_AFFIX_QUALITY;
+            if let Some(Some(series)) = list.get(sel)
+                && series.have_range
+            {
+                let div = series.mod_list.len() as f64;
+                let slot = &item.affix_slots(table)[index - 1];
+                let at = series
+                    .mod_list
+                    .iter()
+                    .position(|m| *m == slot.mod_id)
+                    .unwrap()
+                    + 1;
+                let range = match &slot.range {
+                    Some(engine::item_tools::Range::One(r)) => *r,
+                    Some(engine::item_tools::Range::Each(v)) => v.first().copied().unwrap_or(0.5),
+                    None => 0.5,
+                };
+                let mut range = range.clamp(0.0, 1.0);
+                if range == 0.0 && at > 1 {
+                    range = 1e-4;
+                }
+                c.slider_div = Some(div);
+                c.slider_val = (at as f64 - 1.0 + range) / div;
+                if div == 1.0 {
+                    c.slider_div = None;
+                }
+                c.slider_shown = true;
+            }
+            c.list = list;
+            c.sel = sel;
+        }
+        Ok(())
+    }
+
+    /// `UpdateClusterJewelControls()`: the skill and node count in their
+    /// bounds, then `CraftClusterJewel()`
+    fn update_cluster_jewel_controls(&mut self) -> Result<()> {
+        let data = &self.data.game.items;
+        let item = self.display_item.as_mut().ok_or("no item in the editor")?;
+        let cj = item
+            .base_name
+            .as_ref()
+            .and_then(|b| data.cluster_jewels.get(b))
+            .ok_or("no cluster jewel")?;
+        let unavailable = [
+            "affliction_strength",
+            "affliction_dexterity",
+            "affliction_intelligence",
+        ];
+        let mut skills: Vec<(&String, &String)> = cj
+            .skill_data
+            .iter()
+            .filter(|(id, _)| !unavailable.contains(&id.as_str()))
+            .map(|(id, s)| (&s.name, id))
+            .collect();
+        skills.sort();
+        if item
+            .cluster_jewel_skill
+            .as_ref()
+            .is_none_or(|s| !cj.skill_data.contains_key(s))
+        {
+            item.cluster_jewel_skill = Some(skills.first().ok_or("no cluster skill")?.1.clone());
+        }
+        let count = item.cluster_jewel_node_count.unwrap_or(cj.min_nodes);
+        let count = count.max(cj.min_nodes).min(cj.max_nodes);
+        item.cluster_jewel_node_count = Some(count);
+        self.editor.cluster_count_val = (count - cj.min_nodes) / (cj.max_nodes - cj.min_nodes);
+        self.craft_cluster_jewel()
+    }
+
+    /// `CraftClusterJewel()`: the enchant lines of the jewel's size, node
+    /// count and skill, then every affix selected again
+    pub(super) fn craft_cluster_jewel(&mut self) -> Result<()> {
+        let data = &self.data.game.items;
+        let ctx = self.data.item_context();
+        let item = self.display_item.as_mut().ok_or("no item in the editor")?;
+        let cj = item
+            .base_name
+            .as_ref()
+            .and_then(|b| data.cluster_jewels.get(b))
+            .ok_or("no cluster jewel")?;
+        let crafted = |line: String| {
+            let mut ml = engine::item::ModLine {
+                line,
+                ..Default::default()
+            };
+            ml.flags.crafted = true;
+            ml
+        };
+        let count = item.cluster_jewel_node_count.unwrap_or(cj.min_nodes);
+        let mut lines = vec![crafted(format!(
+            "Adds {} Passive Skills",
+            engine::pat::num(count)
+        ))];
+        match cj.size.as_str() {
+            "Large" => lines.push(crafted("2 Added Passive Skills are Jewel Sockets".into())),
+            "Medium" => lines.push(crafted("1 Added Passive Skill is a Jewel Socket".into())),
+            _ => {}
+        }
+        let skill = item
+            .cluster_jewel_skill
+            .as_ref()
+            .and_then(|s| cj.skill_data.get(s))
+            .ok_or("attempt to index local 'skill' (a nil value)")?;
+        lines.push(crafted(skill.enchant.join("\n")));
+        item.enchant_mod_lines = lines;
+        let raw = item.build_raw();
+        item.parse_raw(&ctx, &raw, None, false)?;
+        // Every affix again, to force out those no longer valid
+        self.update_affix_controls()?;
+        // The loop's bound is read once
+        let limit = self.display_item.as_ref().unwrap().affix_limit;
+        let mut i = 0;
+        while ((i + 1) as f64) <= limit {
+            self.select_affix(i)?;
+            i += 1;
+        }
+        Ok(())
+    }
+
+    /// The affix drop-down's `selFunc` with its selected entry: the affix
+    /// of that tier and roll, crafted
+    pub(super) fn select_affix(&mut self, i: usize) -> Result<()> {
+        let ctx = self.data.item_context();
+        let c = &self.editor.affix[i];
+        let item = self.display_item.as_mut().ok_or("no item in the editor")?;
+        let slots = item.affix_slots(c.table);
+        let fractured = slots
+            .get(c.index - 1)
+            .ok_or("attempt to index field '?' (a nil value)")?
+            .fractured;
+        let mut affix = engine::item::AffixSlot {
+            mod_id: "None".into(),
+            range: None,
+            fractured,
+        };
+        if let Some(Some(series)) = c.list.get(c.sel) {
+            let div = series.mod_list.len() as f64;
+            let (at, range) = div_val(c.slider_val, Some(div));
+            affix.mod_id = series.mod_list[at - 1].clone();
+            let affixes = item.affixes.clone().ok_or("no affixes")?;
+            let range = verify_range(range, at, &series.mod_list, &affixes);
+            affix.range = Some(engine::item_tools::Range::One(range));
+        }
+        let slots = item.affix_slots_mut(c.table);
+        slots[c.index - 1] = affix;
+        item.craft(&ctx)?;
+        self.update_affix_controls()
+    }
+
     /// `AddItem(item, noAutoEquip)`: the item's id
-    fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
+    pub(super) fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
         let new = item.id.is_none();
         if new {
             let mut id = 1.0;
@@ -166,32 +489,19 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `AddDisplayItem()`
-    fn add_display_item(&mut self) -> Result<()> {
+    pub(super) fn add_display_item(&mut self) -> Result<()> {
         let item = self.display_item.take().ok_or("no item in the editor")?;
-        if let Some((_, other)) = FORBIDDEN
+        let old = item.id.and_then(|id| self.build.items.item(id)).cloned();
+        let other = FORBIDDEN
             .iter()
-            .find(|(t, _)| item.title.as_deref() == Some(t))
-        {
-            // `UpdateForbiddenJewelCounterpart` and
-            // `AddForbiddenJewelCounterpart` read the unique database
-            let variant = |i: &Item| {
-                let v = i.variant.filter(|v| *v >= 1.0)? as usize;
-                i.variant_list.as_ref()?.get(v - 1).cloned()
-            };
-            let name = variant(&item);
-            let old = item.id.and_then(|id| self.build.items.item(id));
-            let changed = old.is_some_and(|o| o.title == item.title && variant(o) != name);
-            let paired = self
-                .build
-                .items
-                .items
-                .values()
-                .any(|i| i.title.as_deref() == Some(other) && variant(i) == name);
-            if name.is_some() && (changed || !paired) {
-                return Err(format!("{NOT_PORTED}: the Forbidden jewels' counterparts"));
-            }
+            .find(|(t, _)| item.title.as_deref() == Some(*t))
+            .map(|(_, o)| *o);
+        let id = self.add_item(item, false)?;
+        if let Some(other) = other {
+            let item = self.build.items.item(id).unwrap().clone();
+            self.update_forbidden_counterpart(old.as_ref(), &item, other)?;
+            self.add_forbidden_counterpart(&item, other)?;
         }
-        self.add_item(item, false)?;
         self.items_changed()
     }
 

@@ -69,6 +69,9 @@ pub struct BuildOutput {
     /// What the Calcs tab reads of its calculation besides the outputs
     /// (`CALCS` only)
     pub view: Option<Box<CalcsView>>,
+    /// What the build exports for its party (`partyTab.buffExports`),
+    /// when it does
+    pub buff_exports: Option<crate::party::BuffExports>,
 }
 
 /// The main skill of an actor of [`CalcsView`]
@@ -715,6 +718,7 @@ fn output_of(
     match mode {
         CalcMode::Main => {
             main_extras(&mut p, &recalc)?;
+            text_lists_used(&p)?;
             multipliers_used = used_multipliers(&p);
             sidebar = Some(crate::sidebar::collect(&p)?);
         }
@@ -724,6 +728,7 @@ fn output_of(
         }
         CalcMode::Calculator => {}
     }
+    let buff_exports = p.buff_exports.take();
     let minion_actor = p.minion_actor();
     let mut view = match mode {
         CalcMode::Calcs => Some(Box::new(CalcsView::take(&mut p)?)),
@@ -755,6 +760,7 @@ fn output_of(
             minion_breakdown,
             sidebar,
             view,
+            buff_exports,
         },
         picked,
     ))
@@ -812,6 +818,47 @@ fn used_multipliers(p: &Perform) -> HashSet<Sym> {
         }
     }
     used
+}
+
+/// What `buildOutput` collects for the Configuration tab fails on a tag
+/// whose list is text (the Party tab's mods read back from text,
+/// `addVarTag`'s `ipairs`): the actors', the skills' base lists' and the
+/// enemy's mods
+fn text_lists_used(p: &Perform) -> Result<()> {
+    let check = |m: &Mod| -> Result<()> {
+        for t in &m.tags {
+            let TagKind::Other { kind, fields } = &t.kind else {
+                continue;
+            };
+            match kind.as_str() {
+                "IgnoreCond" => break,
+                "Condition"
+                | "Multiplier"
+                | "MultiplierThreshold"
+                | "PerStat"
+                | "StatThreshold"
+                    if fields.get("varList").is_some() =>
+                {
+                    return Err("upstream fails too: a party mod's tag list read back from text, in what buildOutput collects for the Configuration tab (bad argument #1 to 'ipairs' (table expected, got string))".into());
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    };
+    let mut stores = vec![p.c.db(PLAYER), p.c.db(crate::calc::ENEMY)];
+    stores.extend(p.minion_actor().map(|a| p.c.db(a)));
+    stores.extend(p.lists.iter().map(|l| l.base));
+    for id in stores {
+        let s = p.c.store(id);
+        for st in std::iter::once(s).chain(s.base.as_deref()) {
+            match &st.mods {
+                Mods::Db(by_name) => by_name.values().flatten().try_for_each(check)?,
+                Mods::List(list) => list.iter().try_for_each(check)?,
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The charges, buffs and curses the Calcs tab lists (`BuffList`,

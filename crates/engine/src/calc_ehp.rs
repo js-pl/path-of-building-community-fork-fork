@@ -2740,7 +2740,9 @@ impl<'a> Perform<'a> {
                 .base(db, None, &["TakenFromPartyMemberESBeforeYou"])?;
             set(self, "SoulLinkMitigation", v);
             if v != 0.0 {
-                return Err("not ported: energy shield of party members".into());
+                let party = self.party_of(actor)?;
+                let v = self.c.out(party, "EnergyShieldRecoveryCap").unwrap_or(0.0);
+                set(self, "AlliedEnergyShield", v);
             }
         }
 

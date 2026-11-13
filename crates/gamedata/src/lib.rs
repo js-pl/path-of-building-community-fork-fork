@@ -5,8 +5,10 @@
 //! (`engine::codec`). No Lua runs when the engine loads it.
 
 pub mod data_lua;
+mod enchantments;
 mod jsonc;
 pub mod mod_parser;
+mod uniques;
 
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
@@ -167,20 +169,9 @@ impl Source {
         let mapping = im
             .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
             .map_err(|e| e.to_string())?;
-        let dir = self.src_dir.join("Data/TimelessJewelData");
+        let src_dir = self.src_dir.clone();
         let loader = move |name: &str| -> Option<Vec<u8>> {
-            let mut packed = std::fs::read(dir.join(format!("{name}.zip"))).ok();
-            if packed.is_none() {
-                let mut parts = Vec::new();
-                for k in 0.. {
-                    match std::fs::read(dir.join(format!("{name}.zip.part{k}"))) {
-                        Ok(b) => parts.extend(b),
-                        Err(_) => break,
-                    }
-                }
-                packed = (!parts.is_empty()).then_some(parts);
-            }
-            miniz_oxide::inflate::decompress_to_vec_zlib(&packed?).ok()
+            miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
         };
         engine::timeless::Timeless::from_lua(&legion, &mapping, parser, Box::new(loader))
     }
@@ -232,8 +223,30 @@ impl Source {
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_versions: versions,
+            uniques: self.uniques()?,
+            rares: self.rares()?,
+            item_base_lists: self.item_base_lists()?,
+            enchantments: self.enchantments()?,
         })
     }
+}
+
+/// A timeless jewel's look-up table as upstream ships it, by its name
+/// without spaces (`LethalPride`): a zlib stream in `<name>.zip`, or split
+/// over `<name>.zip.part0`, `part1`, ...
+pub fn timeless_lut_packed(src_dir: &Path, name: &str) -> Option<Vec<u8>> {
+    let dir = src_dir.join("Data/TimelessJewelData");
+    if let Ok(b) = std::fs::read(dir.join(format!("{name}.zip"))) {
+        return Some(b);
+    }
+    let mut parts = Vec::new();
+    for k in 0.. {
+        match std::fs::read(dir.join(format!("{name}.zip.part{k}"))) {
+            Ok(b) => parts.extend(b),
+            Err(_) => break,
+        }
+    }
+    (!parts.is_empty()).then_some(parts)
 }
 
 /// The typed game data of upstream's `src/` directory, encoded.

@@ -13,7 +13,7 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::actor::{Actor, EnvActors, OutVal, ReservingSkill};
-use crate::calc::{Calc, ENEMY, PLAYER, m_max, m_min, number, round};
+use crate::calc::{Calc, ENEMY, PARTY, PLAYER, m_max, m_min, number, round};
 use crate::calc_env::{CalcData, Env};
 use crate::calc_skill_mods::Buff;
 use crate::config::{Inputs, Val};
@@ -33,6 +33,8 @@ use ModType::{Base, Flag as FlagT, Inc, List, Max as MaxT, More, Override};
 /// What `perform` reads besides the setup
 pub struct PerformInput<'a> {
     pub data: &'a CalcData<'a>,
+    /// The build's Party tab
+    pub party: &'a crate::party::Party,
     pub tree: &'a PassiveTree,
     pub tab: &'a ItemsTab,
     /// `env.configInput` and `env.configPlaceholder`
@@ -261,6 +263,8 @@ pub struct Perform<'a> {
     pub minion_skills: Vec<crate::calc_skills::ActiveSkill>,
     /// The minion of each of the player's skills that has one
     pub minions: Vec<crate::calc_minion::MinionActor>,
+    /// The flasks in use (`env.flasks`), by item id
+    pub active_flasks: Vec<i64>,
     /// `env.minion`, by place in `minions`
     pub env_minion: Option<usize>,
     /// `flasksApplyToMinion`, `quickSilverAppliesToAllies` and
@@ -287,6 +291,9 @@ pub struct Perform<'a> {
     pub(crate) main_copy_mod_flags: std::collections::BTreeSet<String>,
     /// `env.player.allyLifeList`: the allies in each life pool
     pub(crate) ally_life_list: Vec<(&'static str, Vec<AllyLife>)>,
+    /// `buffExports`, when the build exports its buffs for its party and
+    /// this is no calculator's calculation
+    pub buff_exports: Option<crate::party::BuffExports>,
 }
 
 /// An ally in a life pool (`allyLifeList`)
@@ -300,6 +307,84 @@ pub(crate) struct AllyLife {
 impl<'a> Perform<'a> {
     pub(crate) fn data(&self) -> &crate::calc_setup::SetupData {
         self.input.data.setup
+    }
+
+    /// `env.partyMembers.modDB:Flag(nil, name)`
+    pub(crate) fn party_flag(&self, name: &str) -> Result<bool> {
+        self.c.flag(self.c.db(PARTY), None, &[name])
+    }
+
+    /// `actor.partyMembers`: the Party tab's actor, which only the player
+    /// has
+    pub(crate) fn party_of(&self, actor: usize) -> Result<usize> {
+        self.c.actors.actors[actor]
+            .party_members
+            .ok_or_else(|| "attempt to index a nil value (field 'partyMembers')".into())
+    }
+
+    /// A party member's aura (`allyBuffs[group][name]`)
+    pub(crate) fn ally_aura(&self, group: &str, name: &str) -> Option<&'a crate::party::PartyBuff> {
+        self.input.party.aura.group(group)?.get(name)
+    }
+
+    /// Whether one's own aura of effect `mult` applies over a party
+    /// member's of the same name: none, or one that is not stronger
+    pub(crate) fn beats_ally_aura(&self, name: &str, mult: f64) -> Result<bool> {
+        Ok(match self.ally_aura("Aura", name) {
+            None => true,
+            Some(b) => b.effect()? / 100.0 <= mult,
+        })
+    }
+
+    /// Whether a party member's aura debuff is stronger than one's own
+    pub(crate) fn ally_debuff_stronger(&self, name: &str, mult: f64) -> Result<bool> {
+        Ok(match self.ally_aura("AuraDebuff", name) {
+            None => false,
+            Some(b) => b.effect()? / 100.0 > mult,
+        })
+    }
+
+    /// `buffExports["Aura"][name .. (buffExports["Aura"][name] and "_Debuff" or "")]`
+    pub(crate) fn export_aura_debuff(&mut self, name: &str, effect_mult: f64, mods: Vec<Mod>) {
+        if let Some(x) = &mut self.buff_exports {
+            let key = if x.aura_has(name) {
+                format!("{name}_Debuff")
+            } else {
+                name.to_string()
+            };
+            x.set_aura(
+                key,
+                crate::party::AuraExport::Buff(crate::party::ExportBuff {
+                    effect_mult,
+                    mods,
+                    is_mark: false,
+                }),
+            );
+        }
+    }
+
+    /// `buffExports["Aura"][name] = ...`, the earlier one moved to
+    /// `name_Debuff`
+    pub(crate) fn export_aura(&mut self, name: &str, effect_mult: f64, mods: Vec<Mod>) {
+        if let Some(x) = &mut self.buff_exports {
+            if let Some(old) = x.aura_get(name).cloned() {
+                x.set_aura(format!("{name}_Debuff"), old);
+            }
+            x.set_aura(
+                name.to_string(),
+                crate::party::AuraExport::Buff(crate::party::ExportBuff {
+                    effect_mult,
+                    mods,
+                    is_mark: false,
+                }),
+            );
+        }
+    }
+
+    /// Whether the build exports its buffs for its party in this
+    /// calculation (`partyTabEnableExportBuffs`)
+    pub(crate) fn exports_buffs(&self) -> bool {
+        self.input.party.export_buffs && self.env.calc_mode != crate::calc_env::CalcMode::Calculator
     }
 
     pub(crate) fn mf(&self, n: &str) -> u32 {
@@ -589,6 +674,12 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
     // The databases move into the calculation's stores
     let pdb = stores.push(std::mem::replace(&mut env.player_db, Store::db()));
     let edb = stores.push(std::mem::replace(&mut env.enemy_db, Store::db()));
+    // The Party tab's actor (`partyTab.actor`), with its database
+    let mut party = Store::db();
+    for m in &input.party.member_mods {
+        party.add(m.clone());
+    }
+    let party_db = stores.push(party);
     let mut item_list = env.setup.items.item_list.clone();
     if env.setup.items.aegis_mods.is_some() {
         item_list.remove("Weapon 2");
@@ -602,6 +693,7 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
                 weapon_data: [Some(weapon_data[0].clone()), Some(weapon_data[1].clone())],
                 player: Some(0),
                 enemy: Some(1),
+                party_members: Some(PARTY),
                 ..Actor::default()
             },
             Actor {
@@ -610,8 +702,20 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
                 enemy: Some(0),
                 ..Actor::default()
             },
+            Actor {
+                store: party_db,
+                output: input
+                    .party
+                    .member_output
+                    .iter()
+                    .map(|(k, v)| (Sym::new(k), v.clone()))
+                    .collect(),
+                ..Actor::default()
+            },
         ],
-        store_actor: [(pdb, 0), (edb, 1)].into_iter().collect(),
+        store_actor: [(pdb, 0), (edb, 1), (party_db, PARTY)]
+            .into_iter()
+            .collect(),
         tab: input.tab,
         item_data: input.data.items,
         skill_data: input.data.skills,
@@ -632,7 +736,8 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         str_dmg_bonus: None,
         reserved: [(0.0, 0.0); 2],
         uncancellable: [0.0; 2],
-        applied_enemy_modifiers: vec![Vec::new(), Vec::new()],
+        applied_enemy_modifiers: vec![Vec::new(), Vec::new(), Vec::new()],
+        buff_exports: None,
         curse_slots: Vec::new(),
         has_guaranteed_bonechill: false,
         guaranteed_chill: Vec::new(),
@@ -641,6 +746,7 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         n_player: n,
         minion_skills: Vec::new(),
         minions: Vec::new(),
+        active_flasks: Vec::new(),
         env_minion: None,
         flasks_to_minion: [false; 3],
         merged_buffs: (Vec::new(), Vec::new()),
@@ -978,6 +1084,7 @@ impl<'a> Perform<'a> {
             self.c.set_out(PLAYER, "TinctureEffect", effect);
             self.c.set_out(PLAYER, "TinctureLimit", limit);
         }
+        self.active_flasks = flasks.clone();
         let mode = self.env.mode;
         if mode.combat {
             self.merge_flasks(&flasks, false, true)?;
@@ -3100,11 +3207,17 @@ impl<'a> Perform<'a> {
         }
         let v = m_max(b(self, "EnduranceChargesMin")?, 0.0);
         set(self, "EnduranceChargesMin", v);
-        // The party tab's members have no mods
+        let party_max = if self.party_flag("PartyMemberMaximumEnduranceChargesEqualToYours")? {
+            self.c.out(PARTY, "EnduranceChargesMax")
+        } else {
+            None
+        };
         let v = match ov(self, "EnduranceChargesMax")? {
             Some(v) => v,
             None => m_max(
-                if f(self, "MaximumEnduranceChargesIsMaximumFrenzyCharges")? {
+                if let Some(v) = party_max {
+                    v
+                } else if f(self, "MaximumEnduranceChargesIsMaximumFrenzyCharges")? {
                     out(self, "FrenzyChargesMax")
                 } else {
                     b(self, "EnduranceChargesMax")?
@@ -3446,13 +3559,18 @@ impl<'a> Perform<'a> {
             if min_rage > self.c.mult(db, "Rage").unwrap_or(0.0) {
                 self.c.set_mult(db, "Rage", min_rage);
             }
-            let allied_fortify = if self.c.flag(db, None, &["YourFortifyEqualToParent"])? {
+            let from_parent = if self.c.flag(db, None, &["YourFortifyEqualToParent"])? {
                 let parent = self.c.actors.actors[actor].parent.ok_or("no parent")?;
-                self.c
-                    .out(parent, "FortificationStacks")
-                    .unwrap_or(f64::NAN)
+                self.c.out(parent, "FortificationStacks")
             } else {
-                0.0
+                None
+            };
+            let allied_fortify = match from_parent {
+                Some(v) => v,
+                None if self.party_flag("PartyMemberFortifyEqualToYours")? => {
+                    self.c.out(PARTY, "FortificationStacks").unwrap_or(0.0)
+                }
+                None => 0.0,
             };
             if self.c.base(db, None, &["MinimumFortification"])? > 0.0 || allied_fortify > 0.0 {
                 self.c.set_cond(db, "Fortified", true);
@@ -4162,6 +4280,25 @@ fn tag_num(b: &Buff, k: &str) -> Option<f64> {
     b.tag.get(k).and_then(ModValue::as_number)
 }
 
+/// A warcry mod with `warcryPowerBonus` set on its first tag, as
+/// upstream sets it on the skill's mods
+fn with_power_bonus(m: &Mod, bonus: Option<f64>) -> Mod {
+    let mut m = m.clone();
+    if let Some(b) = bonus
+        && let Some(Tag {
+            kind: TagKind::Other { fields, .. },
+            ..
+        }) = m.tags.first_mut()
+    {
+        let k = Sym::new("warcryPowerBonus");
+        match fields.get_mut(k) {
+            Some(v) => *v = ModValue::Number(b),
+            None => fields.fields.push((k, ModValue::Number(b))),
+        }
+    }
+    m
+}
+
 /// The `GlobalEffect` fields of a mod's first tag
 pub(crate) fn first_tag_fields(m: &Mod) -> Option<&crate::mods::Record> {
     match &m.tags.first()?.kind {
@@ -4249,6 +4386,152 @@ impl<'a> Perform<'a> {
         base + socket_p + slot_p + source_p
     }
 
+    /// The party members' buffs, auras, aura debuffs, warcries and links
+    fn party_buffs(
+        &mut self,
+        buffs: &mut BuffMap,
+        minion_buffs: &mut BuffMap,
+        debuffs: &mut BuffMap,
+        mdb: Option<StoreId>,
+    ) -> Result<()> {
+        let party = self.input.party;
+        let precision = self.c.precision;
+        let pdb = self.pdb();
+        let edb = self.edb();
+        let on_self = ["BuffEffectOnSelf", "AuraEffectOnSelf"];
+        let no_vaal = |g: Option<&crate::party::BuffGroup>, what: &str| -> Result<()> {
+            if g.is_some_and(|g| g.vaal.is_some()) {
+                return Err(format!("attempt to index a nil value (the party's {what})"));
+            }
+            Ok(())
+        };
+        let other = party.aura.group("otherEffects");
+        no_vaal(other, "other effects")?;
+        for (name, b) in other.iter().flat_map(|g| &g.buffs) {
+            let cond = format!("AffectedBy{}", nospace(name));
+            self.c.set_cond(pdb, &cond, true);
+            let inc = self.c.inc(pdb, None, &on_self)?;
+            let more = self.c.more(pdb, None, &on_self)?;
+            let l = scaled(&b.mods, (b.effect()? + inc) / 100.0 * more, precision);
+            merge_buff(&l, buffs, name)?;
+            if let Some(mdb) = mdb {
+                self.c.set_cond(mdb, &cond, true);
+                let inc = self.c.inc(mdb, None, &on_self)?;
+                let more = self.c.more(mdb, None, &on_self)?;
+                let l = scaled(&b.mods, (b.effect()? + inc) / 100.0 * more, precision);
+                merge_buff(&l, minion_buffs, name)?;
+            }
+        }
+        if let Some(g) = party.aura.group("Aura") {
+            let lists = [(&g.buffs, false)]
+                .into_iter()
+                .chain(g.vaal.iter().map(|v| (v, true)));
+            for (list, vaal) in lists {
+                for (name, aura) in list {
+                    let cond = format!("AffectedBy{}", nospace(name));
+                    if !self.c.flag(pdb, None, &["AlliesAurasCannotAffectSelf"])?
+                        && !self.c.cond(pdb, &cond)
+                    {
+                        self.c.set_cond(pdb, "AffectedByAura", true);
+                        if vaal {
+                            let rest: String = name.chars().skip(5).collect();
+                            self.c
+                                .set_cond(pdb, &format!("AffectedBy{}", nospace(&rest)), true);
+                        }
+                        self.c.set_cond(pdb, &cond, true);
+                        let l = scaled(&aura.mods, aura.effect()? / 100.0, precision);
+                        merge_buff(&l, buffs, name)?;
+                    }
+                    if let Some(mdb) = mdb
+                        && !self.c.cond(mdb, &cond)
+                    {
+                        self.c.set_cond(mdb, "AffectedByAura", true);
+                        self.c.set_cond(mdb, &cond, true);
+                        let l = scaled(&aura.mods, aura.effect()? / 100.0, precision);
+                        merge_buff(&l, minion_buffs, name)?;
+                    }
+                }
+            }
+        }
+        if let Some(g) = party.aura.group("AuraDebuff")
+            && self.env.mode.effective
+        {
+            let lists = [&g.buffs].into_iter().chain(g.vaal.iter());
+            for list in lists {
+                for (name, aura) in list {
+                    let cond = format!("AffectedBy{}", nospace(name));
+                    if !self.c.cond(edb, &cond) {
+                        self.c.set_cond(edb, &cond, true);
+                        self.c.set_cond(pdb, &cond, true);
+                        let l = scaled(&aura.mods, aura.effect()? / 100.0, precision);
+                        merge_buff(&l, debuffs, name)?;
+                    }
+                }
+            }
+        }
+        let warcries = party.warcry.group("Warcry");
+        no_vaal(warcries, "warcries")?;
+        for (name, w) in warcries.iter().flat_map(|g| &g.buffs) {
+            let cond = format!("AffectedBy{}", nospace(name));
+            let scaled_warcry = || -> Result<Vec<Mod>> {
+                let mut l = Vec::new();
+                for m in &w.mods {
+                    let bonus = match m.tags.first().map(|t| &t.kind) {
+                        None => {
+                            return Err(
+                                "attempt to index a nil value (a party warcry's tag)".into()
+                            );
+                        }
+                        Some(TagKind::Other { fields, .. }) => match fields.get("warcryPowerBonus")
+                        {
+                            Some(ModValue::Number(n)) => *n,
+                            Some(ModValue::Str(s)) => crate::pat::to_number(s).ok_or(
+                                "attempt to perform arithmetic on a string value (warcryPowerBonus)",
+                            )?,
+                            Some(ModValue::Bool(false)) | None => 1.0,
+                            Some(_) => {
+                                return Err("attempt to perform arithmetic on warcryPowerBonus"
+                                    .into());
+                            }
+                        },
+                        Some(_) => 1.0,
+                    };
+                    let mult = w.effect_mult.unwrap_or(100.0) / 100.0 * bonus;
+                    l.extend(scaled(std::slice::from_ref(m), mult, precision));
+                }
+                Ok(l)
+            };
+            if !self.c.cond(pdb, &cond) {
+                self.c.set_cond(pdb, "AffectedByWarcry", true);
+                self.c.set_cond(pdb, &cond, true);
+                merge_buff(&scaled_warcry()?, buffs, name)?;
+            }
+            if let Some(mdb) = mdb
+                && !self.c.cond(mdb, &cond)
+            {
+                self.c.set_cond(mdb, "AffectedByWarcry", true);
+                self.c.set_cond(mdb, &cond, true);
+                merge_buff(&scaled_warcry()?, minion_buffs, name)?;
+            }
+        }
+        let links = party.link.group("Link");
+        no_vaal(links, "links")?;
+        for (name, link) in links.iter().flat_map(|g| &g.buffs) {
+            let cond = format!("AffectedBy{}", nospace(name));
+            if !self.c.cond(pdb, &cond) {
+                self.c.set_cond(pdb, "AffectedByLink", true);
+                self.c.set_cond(pdb, &cond, true);
+                let l = scaled(
+                    &link.mods,
+                    link.effect_mult.unwrap_or(100.0) / 100.0,
+                    precision,
+                );
+                merge_buff(&l, buffs, name)?;
+            }
+        }
+        Ok(())
+    }
+
     /// The buffs, auras, curses and debuffs of the skills of a skill's
     /// minion (`activeSkill.minion.activeSkillList` in `calcs.perform`)
     fn minion_skill_buffs(
@@ -4312,6 +4595,20 @@ impl<'a> Perform<'a> {
                                 && let Some(b) = buffs.iter_mut().find(|b| b.0 == bname)
                             {
                                 b.2 = true;
+                            }
+                            if self.buff_exports.is_some() {
+                                let inc = self.c.inc(store, bcfg.as_ref(), &["BuffEffect"])?;
+                                let more = self.c.more(store, bcfg.as_ref(), &["BuffEffect"])?;
+                                if let Some(x) = &mut self.buff_exports {
+                                    x.set_other_effect(
+                                        bname,
+                                        crate::party::ExportBuff {
+                                            effect_mult: (1.0 + inc / 100.0) * more,
+                                            mods: buff.mod_list.clone(),
+                                            is_mark: false,
+                                        },
+                                    );
+                                }
                             }
                         }
                         let env_check = env_db.is_some() && (is_env || buff.apply_allies);
@@ -4381,21 +4678,23 @@ impl<'a> Perform<'a> {
                                 &["AuraEffect", "BuffEffect", "AuraBuffEffect"],
                             )? * self.c.more(pdb, Some(&cfg), &on_self)?;
                             let mult = (1.0 + inc / 100.0) * more;
-                            self.marks[j].buff_skill = true;
-                            self.c.set_cond(pdb, "AffectedByAura", true);
-                            if bname.starts_with("Vaal") {
-                                let rest: String = bname.chars().skip(5).collect();
-                                self.c.set_cond(
-                                    pdb,
-                                    &format!("AffectedBy{}", nospace(&rest)),
-                                    true,
-                                );
+                            if self.beats_ally_aura(bname, mult)? {
+                                self.marks[j].buff_skill = true;
+                                self.c.set_cond(pdb, "AffectedByAura", true);
+                                if bname.starts_with("Vaal") {
+                                    let rest: String = bname.chars().skip(5).collect();
+                                    self.c.set_cond(
+                                        pdb,
+                                        &format!("AffectedBy{}", nospace(&rest)),
+                                        true,
+                                    );
+                                }
+                                self.c.set_cond(pdb, &affected, true);
+                                let mut l = scaled(&buff.mod_list, mult, precision);
+                                l.extend(scaled(&extra, mult, precision));
+                                set_source(&mut l, Some(bname));
+                                merge_buff(&l, buffs, bname)?;
                             }
-                            self.c.set_cond(pdb, &affected, true);
-                            let mut l = scaled(&buff.mod_list, mult, precision);
-                            l.extend(scaled(&extra, mult, precision));
-                            set_source(&mut l, Some(bname));
-                            merge_buff(&l, buffs, bname)?;
                         }
                         if let Some(mdb) = env_db
                             && !self.c.cond(mdb, &affected)
@@ -4410,13 +4709,24 @@ impl<'a> Perform<'a> {
                                     .more(list, Some(&cfg), &["AuraEffect", "BuffEffect"])?
                                     * self.c.more(mdb, Some(&cfg), &on_self)?;
                             let mult = (1.0 + inc / 100.0) * more;
-                            self.marks[j].minion_buff_skill = true;
-                            self.c.set_cond(mdb, &affected, true);
-                            self.c.set_cond(mdb, "AffectedByAura", true);
-                            let mut l = scaled(&buff.mod_list, mult, precision);
-                            l.extend(scaled(&extra, mult, precision));
-                            set_source(&mut l, Some(bname));
-                            merge_buff(&l, minion_buffs, bname)?;
+                            if self.beats_ally_aura(bname, mult)? {
+                                self.marks[j].minion_buff_skill = true;
+                                self.c.set_cond(mdb, &affected, true);
+                                self.c.set_cond(mdb, "AffectedByAura", true);
+                                let mut l = scaled(&buff.mod_list, mult, precision);
+                                l.extend(scaled(&extra, mult, precision));
+                                set_source(&mut l, Some(bname));
+                                merge_buff(&l, minion_buffs, bname)?;
+                            }
+                        }
+                        if self.buff_exports.is_some() {
+                            let names = ["AuraEffect", "BuffEffect"];
+                            let inc = self.c.inc(list, Some(&cfg), &names)?;
+                            let more = self.c.more(list, Some(&cfg), &names)?;
+                            let mut mods = buff.mod_list.clone();
+                            mods.extend(extra.iter().cloned());
+                            set_source(&mut mods, Some(bname));
+                            self.export_aura(bname, (1.0 + inc / 100.0) * more, mods);
                         }
                         let main_list = self.lists[main].list;
                         if self.has_flag(main, "totem") && !self.c.cond(main_list, &affected) {
@@ -4502,6 +4812,11 @@ impl<'a> Perform<'a> {
                                 mult = (1.0 + inc / 100.0) * more;
                                 if self.c.cond(edb, &affected) {
                                     mult = 0.0;
+                                } else {
+                                    self.export_aura_debuff(bname, mult, buff.mod_list.clone());
+                                    if self.ally_debuff_stronger(bname, mult)? {
+                                        mult = 0.0;
+                                    }
                                 }
                             }
                         }
@@ -4590,6 +4905,8 @@ impl<'a> Perform<'a> {
         let mut minion_curse_limit = 1.0;
         let mut link_skills = 0;
         let mut non_unique_flasks_to_minion = self.flasks_to_minion[2];
+        let exports = self.exports_buffs();
+        self.buff_exports = exports.then(crate::party::BuffExports::default);
 
         // Spectres' mods for the player and the minions
         let mut active_spectres: Vec<String> = Vec::new();
@@ -4842,6 +5159,30 @@ impl<'a> Perform<'a> {
                             let l = scaled(&buff.mod_list, (1.0 + inc / 100.0) * more, precision);
                             merge_buff(&l, &mut minion_buffs, bname)?;
                         }
+                        if buff.typ == "Buff"
+                            && exports
+                            && (buff.apply_allies
+                                || self.c.flag(list, None, &["BuffAppliesToAllies"])?
+                                || self.c.flag(list, None, &["BuffAppliesToPartyMembers"])?)
+                        {
+                            let inc = self.c.inc(store, bcfg.as_ref(), &["BuffEffect"])?
+                                + self.c.inc(
+                                    list,
+                                    bcfg.as_ref(),
+                                    &[&format!("{}Effect", nospace(bname))],
+                                )?;
+                            let more = self.c.more(store, bcfg.as_ref(), &["BuffEffect"])?;
+                            if let Some(x) = &mut self.buff_exports {
+                                x.set_other_effect(
+                                    bname,
+                                    crate::party::ExportBuff {
+                                        effect_mult: (1.0 + inc / 100.0) * more,
+                                        mods: buff.mod_list.clone(),
+                                        is_mark: false,
+                                    },
+                                );
+                            }
+                        }
                     }
                     "Warcry" => {
                         if !mode.buffs {
@@ -4917,6 +5258,7 @@ impl<'a> Perform<'a> {
                         } else {
                             m_min(full_duration / cooldown, 1.0)
                         };
+                        let mut extra_warcry: Vec<Mod> = Vec::new();
                         if !self.c.flag(pdb, None, &["CannotGainWarcryBuffs"])?
                             && !buff.apply_not_player
                         {
@@ -4995,8 +5337,32 @@ impl<'a> Perform<'a> {
                                     (1.0 + inc / 100.0) * more_mult * uptime,
                                     precision,
                                 ));
+                                extra_warcry = extra;
                             }
                             merge_buff(&l, &mut minion_buffs, bname)?;
+                        }
+                        if exports {
+                            let inc = self.c.inc(list, Some(&cfg), &["BuffEffect"])?;
+                            let more = self.c.more(list, Some(&cfg), &["BuffEffect"])?;
+                            // `warcryPowerBonus` set on the mods' first tags
+                            let mut mods: Vec<Mod> = buff
+                                .mod_list
+                                .iter()
+                                .zip(&bonus)
+                                .map(|(m, b)| with_power_bonus(m, *b))
+                                .collect();
+                            mods.extend(extra_warcry);
+                            if let Some(x) = &mut self.buff_exports {
+                                let b = crate::party::ExportBuff {
+                                    effect_mult: (1.0 + inc / 100.0) * more * uptime,
+                                    mods,
+                                    is_mark: false,
+                                };
+                                match x.warcry.iter_mut().find(|(n, _)| n == bname) {
+                                    Some(e) => e.1 = b,
+                                    None => x.warcry.push((bname.to_string(), b)),
+                                }
+                            }
                         }
                     }
                     "Aura" => {
@@ -5017,21 +5383,28 @@ impl<'a> Perform<'a> {
                             let inc = self.c.inc(list, Some(&cfg), &names)?;
                             let more = self.c.more(list, Some(&cfg), &names)?;
                             let mult = (1.0 + inc / 100.0) * more;
-                            self.marks[i].buff_skill = true;
-                            self.c.set_cond(pdb, "AffectedByAura", true);
-                            if bname.starts_with("Vaal") {
-                                let rest: String = bname.chars().skip(5).collect();
+                            if self.c.flag(pdb, None, &["AlliesAurasCannotAffectSelf"])?
+                                || self.beats_ally_aura(bname, mult)?
+                            {
+                                self.marks[i].buff_skill = true;
+                                self.c.set_cond(pdb, "AffectedByAura", true);
+                                if bname.starts_with("Vaal") {
+                                    let rest: String = bname.chars().skip(5).collect();
+                                    self.c.set_cond(
+                                        pdb,
+                                        &format!("AffectedBy{}", nospace(&rest)),
+                                        true,
+                                    );
+                                }
                                 self.c.set_cond(
                                     pdb,
-                                    &format!("AffectedBy{}", nospace(&rest)),
+                                    &format!("AffectedBy{}", nospace(bname)),
                                     true,
                                 );
+                                let mut l = scaled(&buff.mod_list, mult, precision);
+                                l.extend(scaled(&extra, mult, precision));
+                                merge_buff(&l, &mut buffs, bname)?;
                             }
-                            self.c
-                                .set_cond(pdb, &format!("AffectedBy{}", nospace(bname)), true);
-                            let mut l = scaled(&buff.mod_list, mult, precision);
-                            l.extend(scaled(&extra, mult, precision));
-                            merge_buff(&l, &mut buffs, bname)?;
                         }
                         if let Some((_, _, mdb, hostile)) = minion
                             && !(self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])?
@@ -5051,13 +5424,42 @@ impl<'a> Perform<'a> {
                                     .more(list, Some(&cfg), &["AuraEffect", "BuffEffect"])?
                                     * self.c.more(mdb, Some(&cfg), &on_self)?;
                             let mult = (1.0 + inc / 100.0) * more;
-                            self.marks[i].minion_buff_skill = true;
-                            self.c
-                                .set_cond(mdb, &format!("AffectedBy{}", nospace(bname)), true);
-                            self.c.set_cond(mdb, "AffectedByAura", true);
-                            let mut l = scaled(&buff.mod_list, mult, precision);
-                            l.extend(scaled(&extra, mult, precision));
-                            merge_buff(&l, &mut minion_buffs, bname)?;
+                            if self.beats_ally_aura(bname, mult)? {
+                                self.marks[i].minion_buff_skill = true;
+                                self.c.set_cond(
+                                    mdb,
+                                    &format!("AffectedBy{}", nospace(bname)),
+                                    true,
+                                );
+                                self.c.set_cond(mdb, "AffectedByAura", true);
+                                let mut l = scaled(&buff.mod_list, mult, precision);
+                                l.extend(scaled(&extra, mult, precision));
+                                merge_buff(&l, &mut minion_buffs, bname)?;
+                            }
+                        }
+                        if exports
+                            && !(self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])?
+                                || self.c.flag(pdb, None, &["SelfAurasOnlyAffectYou"])?
+                                || self
+                                    .c
+                                    .flag(pdb, None, &["SelfAuraSkillsCannotAffectAllies"])?)
+                        {
+                            let names = ["AuraEffect", "BuffEffect"];
+                            let inc = self.c.inc(list, Some(&cfg), &names)?;
+                            let more = self.c.more(list, Some(&cfg), &names)?;
+                            let mult = (1.0 + inc / 100.0) * more;
+                            let mut mods = buff.mod_list.clone();
+                            mods.extend(extra.iter().cloned());
+                            self.export_aura(bname, mult, mods.clone());
+                            if self.c.flag(pdb, None, &["AurasAffectEnemies"])?
+                                && !self.c.flag(
+                                    list,
+                                    Some(&cfg),
+                                    &["SelfAurasAffectYouAndLinkedTarget"],
+                                )?
+                            {
+                                self.export_aura_debuff(bname, mult, mods);
+                            }
                         }
                         if !(self.c.flag(pdb, None, &["SelfAurasCannotAffectAllies"])?
                             || self.c.flag(pdb, None, &["SelfAurasOnlyAffectYou"])?
@@ -5122,6 +5524,16 @@ impl<'a> Perform<'a> {
                                 Some(&cfg),
                                 &["ExtraAuraDebuffEffect"],
                             )?)?;
+                            if exports {
+                                let names = ["AuraEffect", "BuffEffect", "DebuffEffect"];
+                                let inc = self.c.inc(list, Some(&cfg), &names)?;
+                                let more = self.c.more(list, Some(&cfg), &names)?;
+                                self.export_aura_debuff(
+                                    bname,
+                                    (1.0 + inc / 100.0) * more,
+                                    extra.clone(),
+                                );
+                            }
                             merge_buff(&extra, &mut debuffs, bname)?;
                         }
                     }
@@ -5169,6 +5581,14 @@ impl<'a> Perform<'a> {
                                 let inc = self.c.inc(list, Some(&cfg), &names)?;
                                 let more = self.c.more(list, Some(&cfg), &names)?;
                                 mult = (1.0 + inc / 100.0) * more;
+                                if exports {
+                                    let mut mods = buff.mod_list.clone();
+                                    mods.extend(extra.iter().cloned());
+                                    self.export_aura_debuff(bname, mult, mods);
+                                }
+                                if self.ally_debuff_stronger(bname, mult)? {
+                                    mult = 0.0;
+                                }
                             }
                         } else {
                             let inc = self.c.inc(list, Some(&cfg), &["DebuffEffect"])?;
@@ -5228,6 +5648,7 @@ impl<'a> Perform<'a> {
                             inc += self.c.inc(list, Some(&cfg), &["AuraEffect"])?;
                         }
                         let mut more = self.c.more(list, Some(&cfg), &["CurseEffect"])?;
+                        let more_mark = more;
                         if !mark {
                             more *= self.c.more(edb, None, &["CurseEffectOnSelf"])?;
                         }
@@ -5244,6 +5665,21 @@ impl<'a> Perform<'a> {
                         }
                         if buff.typ == "Curse" {
                             curse.mod_list = Some(scaled(&buff.mod_list, mult, precision));
+                            if let Some(x) = &mut self.buff_exports {
+                                let b = crate::party::ExportBuff {
+                                    effect_mult: if mark {
+                                        mult
+                                    } else {
+                                        (1.0 + inc / 100.0) * more_mark
+                                    },
+                                    mods: buff.mod_list.clone(),
+                                    is_mark: mark,
+                                };
+                                match x.curse.iter_mut().find(|(n, _)| n == bname) {
+                                    Some(e) => e.1 = b,
+                                    None => x.curse.push((bname.to_string(), b)),
+                                }
+                            }
                         } else {
                             let temp = scaled(&buff.mod_list, mult, precision);
                             let binc = self.c.inc(pdb, Some(&cfg), &["BuffEffectOnSelf"])?;
@@ -5260,15 +5696,17 @@ impl<'a> Perform<'a> {
                         curses.push(curse);
                     }
                     "Link" => {
-                        let Some((m, _, mdb, _)) = minion else {
-                            continue;
+                        let applies = match minion {
+                            Some((m, _, mdb, _)) => {
+                                let summon = self.minions[m].skill;
+                                self.c.flag(pdb, None, &["Condition:CanLinkToMinions"])?
+                                    && self.c.flag(pdb, None, &["Condition:LinkedToMinion"])?
+                                    && !self.c.flag(mdb, None, &["Condition:CannotBeDamaged"])?
+                                    && !self.has_type(summon, "MinionsAreUndamagable")
+                            }
+                            None => false,
                         };
-                        let summon = self.minions[m].skill;
-                        let applies = self.c.flag(pdb, None, &["Condition:CanLinkToMinions"])?
-                            && self.c.flag(pdb, None, &["Condition:LinkedToMinion"])?
-                            && !self.c.flag(mdb, None, &["Condition:CannotBeDamaged"])?
-                            && !self.has_type(summon, "MinionsAreUndamagable");
-                        if !(mode.buffs && link_skills < 1 && applies) {
+                        if !(mode.buffs && link_skills < 1 && (exports || applies)) {
                             continue;
                         }
                         let mut extra: Vec<Mod> = Vec::new();
@@ -5294,11 +5732,27 @@ impl<'a> Perform<'a> {
                             }
                         }
                         let names = ["LinkEffect", "BuffEffect"];
+                        let inc = self.c.inc(list, Some(&cfg), &names)?;
+                        let more = self.c.more(list, Some(&cfg), &names)?;
+                        if let Some(x) = &mut self.buff_exports {
+                            let mut mods = buff.mod_list.clone();
+                            mods.extend(extra.iter().cloned());
+                            let b = crate::party::ExportBuff {
+                                effect_mult: (1.0 + inc / 100.0) * more,
+                                mods,
+                                is_mark: false,
+                            };
+                            match x.link.iter_mut().find(|(n, _)| n == bname) {
+                                Some(e) => e.1 = b,
+                                None => x.link.push((bname.to_string(), b)),
+                            }
+                        }
+                        let Some((_, _, mdb, _)) = minion.filter(|_| applies) else {
+                            continue;
+                        };
                         let on_self = ["BuffEffectOnSelf", "LinkEffectOnSelf"];
-                        let inc = self.c.inc(list, Some(&cfg), &names)?
-                            + self.c.inc(mdb, None, &on_self)?;
-                        let more = self.c.more(list, Some(&cfg), &names)?
-                            * self.c.more(mdb, None, &on_self)?;
+                        let inc = inc + self.c.inc(mdb, None, &on_self)?;
+                        let more = more * self.c.more(mdb, None, &on_self)?;
                         let mult = (1.0 + inc / 100.0) * more;
                         self.marks[i].minion_buff_skill = true;
                         self.c
@@ -5364,6 +5818,13 @@ impl<'a> Perform<'a> {
                 &mut minion_curses,
             )?;
         }
+
+        self.party_buffs(
+            &mut buffs,
+            &mut minion_buffs,
+            &mut debuffs,
+            minion.map(|(_, _, mdb, _)| mdb),
+        )?;
 
         if mode.combat {
             self.flasks_to_minion[2] = non_unique_flasks_to_minion;
@@ -5513,6 +5974,37 @@ impl<'a> Perform<'a> {
             }
         }
 
+        // The party members' curses
+        let party = self.input.party;
+        let ally_group = party.curse.group("Curse");
+        let mut ally_curses: Vec<Curse> = Vec::new();
+        for (name, c) in ally_group.iter().flat_map(|g| &g.buffs) {
+            let mut mult = c.effect()? / 100.0;
+            if !c.is_mark {
+                mult *= self.c.more(edb, None, &["CurseEffectOnSelf"])?;
+            }
+            ally_curses.push(Curse {
+                name: name.clone(),
+                priority: 0.0,
+                is_mark: c.is_mark,
+                ignore_hex_limit: false,
+                socketed_curses_hex_limit: false,
+                mod_list: Some(scaled(&c.mods, mult, precision)),
+                buff_mod_list: None,
+                minion_buff_mod_list: None,
+            });
+        }
+        if ally_group.is_some_and(|g| g.vaal.is_some()) {
+            return Err("attempt to perform arithmetic on a nil value (a party curse)".into());
+        }
+        let ally_limit = match ally_group.and(party.curse.limit) {
+            Some(l) => l,
+            None if !ally_curses.is_empty() => {
+                return Err("'for' limit must be a number (the party's curse limit)".into());
+            }
+            None => 0.0,
+        };
+
         // Curse limit and slots
         let limit = if self
             .c
@@ -5523,9 +6015,16 @@ impl<'a> Perform<'a> {
             self.c.base(pdb, None, &["EnemyCurseLimit"])?
         };
         self.c.set_out(PLAYER, "EnemyCurseLimit", limit);
+        if let Some(x) = &mut self.buff_exports {
+            x.curse_limit = limit;
+        }
         let mut slots: Vec<Curse> = Vec::new();
         let mut mark_slotted = false;
-        let sources = [(&curses, limit), (&minion_curses, minion_curse_limit)];
+        let sources = [
+            (&curses, limit),
+            (&minion_curses, minion_curse_limit),
+            (&ally_curses, ally_limit),
+        ];
         for (curse, limit) in sources
             .iter()
             .flat_map(|(c, l)| c.iter().map(move |x| (x, *l)))
@@ -5782,6 +6281,16 @@ impl<'a> Perform<'a> {
         }
 
         // Extra auras
+        if let Some(x) = &mut self.buff_exports {
+            x.set_aura(
+                "extraAura".into(),
+                crate::party::AuraExport::Buff(crate::party::ExportBuff {
+                    effect_mult: 1.0,
+                    mods: vec![],
+                    is_mark: false,
+                }),
+            );
+        }
         for v in self.c.list(pdb, None, &["ExtraAura"])? {
             let ModValue::Record(r) = &v else { continue };
             let Some(ModValue::Mod(m)) = r.get("mod") else {
@@ -5813,6 +6322,12 @@ impl<'a> Perform<'a> {
                     self.c
                         .scale_add_list(mdb, std::slice::from_ref(m), (1.0 + inc / 100.0) * more);
                 }
+                if let Some(x) = &mut self.buff_exports
+                    && let Some((_, crate::party::AuraExport::Buff(b))) =
+                        x.aura.iter_mut().find(|(n, _)| n == "extraAura")
+                {
+                    b.mods.push((**m).clone());
+                }
                 let name = m.name.as_str();
                 let blacklist = name == "Speed" || name == "CritMultiplier" || name == "CritChance";
                 if self.has_flag(main, "totem") && !blacklist {
@@ -5826,6 +6341,25 @@ impl<'a> Perform<'a> {
                     });
                     self.c.add(pdb, t);
                 }
+            }
+        }
+
+        // The party members' extra auras
+        let extra = self.input.party.aura.group("extraAura");
+        if extra.is_some_and(|g| g.vaal.is_some()) {
+            return Err("attempt to index a nil value (a party extra aura)".into());
+        }
+        for (_, b) in extra.iter().flat_map(|g| &g.buffs) {
+            let on_self = ["BuffEffectOnSelf", "AuraEffectOnSelf"];
+            let inc = self.c.inc(pdb, None, &on_self)?;
+            let more = self.c.more(pdb, None, &on_self)?;
+            self.c
+                .scale_add_list(pdb, &b.mods, (1.0 + inc / 100.0) * more);
+            if let Some((_, _, mdb, _)) = minion {
+                let inc = self.c.inc(mdb, None, &on_self)?;
+                let more = self.c.more(mdb, None, &on_self)?;
+                self.c
+                    .scale_add_list(mdb, &b.mods, (1.0 + inc / 100.0) * more);
             }
         }
 
@@ -6403,6 +6937,7 @@ impl<'a> PerformInput<'a> {
         let stat = |i: usize| class.base_stats[i].unwrap_or(f64::NAN);
         Ok(PerformInput {
             data,
+            party: &build.party,
             tree,
             tab: &build.items,
             config: &build.config.active().input,

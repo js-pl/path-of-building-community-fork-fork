@@ -893,6 +893,8 @@ pub struct BaseInput<'a> {
     pub config_input: &'a Inputs,
     pub config_mods: &'a [Mod],
     pub config_enemy_mods: &'a [Mod],
+    /// The Party tab's mods for the enemy (`partyTab.enemyModList`)
+    pub party_enemy_mods: &'a [Mod],
     pub mode: BuffMode,
 }
 
@@ -1303,11 +1305,14 @@ pub fn base_dbs(d: &SetupData, parser: &ModParser, b: &BaseInput) -> Result<(Sto
         .tag(Tag::actor_condition("player", "Combat")),
     );
 
-    // The configuration's mods; the party tab adds none for the enemy here
+    // The configuration's mods, then the Party tab's for the enemy
     for m in b.config_mods {
         db.add(m.clone());
     }
     for m in b.config_enemy_mods {
+        enemy.add(m.clone());
+    }
+    for m in b.party_enemy_mods {
         enemy.add(m.clone());
     }
     Ok((db, enemy))
@@ -1496,8 +1501,10 @@ pub fn build_mod_list_for_node_list(
         per_node.push((spec.nodes[i].id, node));
     }
     if finish {
+        // Their lists are their `finalModList` too, in MAIN mode
         for &i in extra {
-            build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+            let node = build_mod_list_for_node(spec, i, alloc, rads, precision)?;
+            per_node.push((spec.nodes[i].id, node));
         }
         for rad in rads.iter_mut() {
             rad.func.run(None, &mut out, &mut rad.data)?;

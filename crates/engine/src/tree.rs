@@ -126,6 +126,11 @@ pub struct Node {
     /// For jewel sockets and keystones: the nodes within each jewel radius,
     /// in the order the data lists them
     pub nodes_in_radius: Option<Vec<Vec<u32>>>,
+    /// The tooltip's `reminderText` and `flavourText` lines of the data
+    pub reminder_text: Option<Vec<Arc<str>>>,
+    pub flavour_text: Option<Vec<Arc<str>>>,
+    /// The oils that anoint the node (`recipe`)
+    pub recipe: Vec<Arc<str>>,
 }
 
 /// A node that replaces a tree node's stats: a tattoo
@@ -145,6 +150,9 @@ pub struct Overlay {
     pub override_type: Option<Arc<str>>,
     pub icon: Option<Arc<str>>,
     pub active_effect_image: Option<Arc<str>>,
+    /// `reminderText`: what `ReplaceNode` leaves the node, whose own
+    /// table it empties when this has none
+    pub reminder_text: Option<Vec<Arc<str>>>,
 }
 
 impl Overlay {
@@ -162,6 +170,7 @@ impl Overlay {
             override_type: None,
             icon: n.icon.clone(),
             active_effect_image: None,
+            reminder_text: n.reminder_text.clone(),
         }
     }
 
@@ -207,6 +216,7 @@ impl Overlay {
             override_type: s("overrideType")?,
             icon: s("icon")?,
             active_effect_image: s("activeEffectImage")?,
+            reminder_text: opt_texts(&get(nt, "reminderText"))?,
         })
     }
 }
@@ -328,6 +338,15 @@ fn texts(v: &Value) -> Result<Vec<Arc<str>>> {
         .iter()
         .map(text)
         .collect()
+}
+
+/// A list of texts, or `None` for nil
+fn opt_texts(v: &Value) -> Result<Option<Vec<Arc<str>>>> {
+    if v.is_nil() {
+        Ok(None)
+    } else {
+        texts(v).map(Some)
+    }
 }
 
 /// The entries of a table in `pairs` order
@@ -982,6 +1001,9 @@ impl PassiveTree {
                 unknown,
                 extra,
                 nodes_in_radius: None,
+                reminder_text: opt_texts(&get(nt, "reminderText"))?,
+                flavour_text: opt_texts(&get(nt, "flavourText"))?,
+                recipe: opt_texts(&get(nt, "recipe"))?.unwrap_or_default(),
             });
         }
 
@@ -1211,6 +1233,9 @@ crate::codec_struct!(Node {
     unknown,
     extra,
     nodes_in_radius,
+    reminder_text,
+    flavour_text,
+    recipe,
 });
 crate::codec_struct!(Overlay {
     id,
@@ -1224,6 +1249,7 @@ crate::codec_struct!(Overlay {
     override_type,
     icon,
     active_effect_image,
+    reminder_text,
 });
 crate::codec_struct!(Ascendancy {
     id,

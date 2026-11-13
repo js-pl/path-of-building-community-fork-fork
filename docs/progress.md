@@ -102,8 +102,10 @@ State at the handoff:
   Zorath's eye jewels): the legion passives and `NodeIndexMapping`
   (`engine::timeless::Timeless`, made by `gamedata::Source::timeless`),
   the look-up tables decompressed from the submodule's `.zip` files when
-  a build first needs them (a loader the caller gives; without one a
-  conquered node is `not ported`), and the conquered nodes of
+  a build first needs them (a loader the caller gives; without the table
+  a conquered node is `not ported`, and the loader is asked again next
+  time), the rest in `engine::codec`'s binary form (`Timeless::encode`,
+  shipped in the bundle), and the conquered nodes of
   `BuildAllDependsAndPaths` (replacements, additions, rolled values,
   `ReconnectNodeToClassStart`). The Abyss jewels' tables are read by
   socket, Zorath's by the nodes of the allocated path from its socket to
@@ -111,12 +113,18 @@ State at the handoff:
   ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
   `timeless_specs_match_upstream` and `timeless_match_upstream` socket
   each jewel and conqueror with a seed of its own in generated corpus
-  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
-  replaced), against the translation with `Inflate` installed (headless
-  upstream has none, so the oracle cannot run them). The Abyss variants
-  run last: a conquered node's `setSource` rewrites the mod parser's
-  cached mods, which the legion keystones share, so a keystone conquered
-  later in the same translation names another node as its mods' source.
+  builds: every fifth build's socket with the most allocated nodes in
+  its radius (each jewel in all its variants, the legacy ones in every
+  third of those builds), and in every build each socket with allocated
+  keystones in its radius, with one legacy jewel in turn (113 specs,
+  3893 nodes replaced), against the translation with `Inflate` installed
+  (headless upstream has none, so the oracle cannot run them). A
+  conquered Necromantic Aegis no longer sends the shield's mods to the
+  minions (`env.allocNodes[45175].dn` is the spec's node). The Abyss
+  variants run last: a conquered node's `setSource` rewrites the mod
+  parser's cached mods, which the legion keystones share, so a keystone
+  conquered later in the same translation names another node as its
+  mods' source; `tests/spec.rs` aligns those sources.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -135,8 +143,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The party tab. `CalcSections.lua` (which breakdown each cell shows)
-   belongs to the session API.
+1. `CalcSections.lua` (which breakdown each cell shows) belongs to the
+   session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
@@ -157,8 +165,9 @@ What remains for the full migration, in order:
    `ModCache.lua` at load took about 1.1 s), and parsing a line runs no Lua
    (closures compute on `mod_parser::val`, results are typed mods). Left:
    the `from_lua` constructors only run at build time now and can move
-   into `gamedata`; `pob bundle` should ship the binary once the engine
-   API uses the typed engine.
+   into `gamedata`. `pob bundle` ships the binary form (see "Shipping the
+   typed engine to the browser"); the wasm module built without the
+   translation reads it and runs no Lua at load.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -268,7 +277,7 @@ What remains for the full migration, in order:
    round trips (a file saved by either loads in the other to the same
    file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
    saving re-parses each item from it as `BuildAndParseRaw` does. What
-   the typed build does not hold (notes, party buffers, import, tree
+   the typed build does not hold (notes, the Party tab's settings, import, tree
    view and timeless jewel settings, item set links, trade weights)
    comes from the loaded file as the tabs' `Load` keeps it. Ported on
    the way, as upstream leaves them nil: `includeInFullDPS` of a group
@@ -278,20 +287,39 @@ What remains for the full migration, in order:
    go back to the gems, the Calcs tab's from the sidebar's calculation,
    which has the same minion skills),
    `enableGlobal2` of the gems the calculations make,
-   `secondaryAscendClassId="nil"`. A build with exported party buffs
-   falls back. Typed saves take 0.2 to 1.5 s over the corpus (the first save
+   `secondaryAscendClassId="nil"`. A build that exports its buffs for its
+   party (`exportParty`) saves the `ExportedBuffs` of its Calcs tab's
+   calculation (`engine::party::BuffExports::texts`, upstream's
+   `exportBuffs`). Typed saves take 0.2 to 1.5 s over the corpus (the first save
    re-parses every item), the translation's 2.2 s; the browser's
    background node power, which saves the build first, no longer
    replays the typed edits on the translation (its load alone took
    about 1.2 s per corpus build).
+
+   The Party tab is typed in the engine (`engine::party`, the session's
+   `party` view command is not): the `party` phase of
+   `typed_session_matches_translated` gives every other corpus build
+   socket groups with a link, an aura, a curse or warcry, makes it
+   export its buffs and compares sidebar, outputs, Calcs tab and file;
+   then each such build takes another's exported buffs as its party
+   members' (and every fourth hand-written party stats and every link's
+   mods) and is compared again (`PARTY_STEP=1` for all builds). Where
+   the typed engine fails on a party build (upstream exports no
+   `MaxLifeLeechRatePercent` for Vampiric Link, and a `varList` read
+   back from text, also in what `buildOutput` collects for the
+   Configuration tab), the translation fails too. Exported mods whose
+   keystone source upstream's `mergeKeystones` changed on the tree's
+   shared mods are aligned, as `align_keystone_sources` does.
 
    Items, sets and specs are typed (`session::typed::items`, `sets`):
    `items` (`UpdateSockets`' labels, which slots show, what fits each
    slot in `ItemsTab.items`' `pairs` order), `equipItem`, `deleteItem`
    (with upstream's `allocNodes[index]` quirk on other specs' jewel
    sockets), `selectItemSet`, `selectTreeSpec` (every spec loaded, the
-   sockets' jewels moved between them; a spec on another tree version
-   falls back), `selectConfigSet`, `copySocketGroup`,
+   sockets' jewels moved between them, also to a spec on another tree
+   version, which carries its own tree: phase `overlays` switches every
+   eighth build to copies of its spec on 3_15 and 3_25 and back),
+   `selectConfigSet`, `copySocketGroup`,
    `pasteSocketGroup` and the level box's `control`.
    `PopulateSlots` now empties abyssal sockets past their item's count.
    `items_edits_match`: random sequences of these (6 per build) give the
@@ -299,6 +327,77 @@ What remains for the full migration, in order:
    after each step and its file at the end (357 edits: typed 7 s,
    translated 71 s with its replays). Saving first makes the Calcs
    tab's calculation, as a frame does, for its write-backs to the gems.
+
+   Tooltips, notes and the party view are typed
+   (`session::typed::tooltip`, `node_tooltip`, `item_tooltip`, `notes`,
+   `party`): `socketGroupTooltip` (`SkillsTab:AddSocketGroupTooltip`;
+   the setup now keeps each gem's `displayEffect`, whether supports are
+   superseded and whom they support, and `displayGemList`),
+   `nodeTooltip` (`PassiveTreeView:AddNodeTooltip` with its stat
+   comparisons on the misc calculator; the tree keeps the nodes'
+   `reminderText` and `flavourText`), `itemTooltip` and `previewItem`
+   (`ItemsTab:AddItemTooltip` and `AddItemStatDifferences`: every slot
+   the item fits, or the named slot, flasks' and tinctures' effective
+   stats; the item data keeps `data.flavourText` and the bases' flavour
+   text), `buildMode:CompareStatList` with `lowerIsBetter` and
+   `compPercent` read from `BuildDisplayStats.lua` at build time,
+   `notes`, `setNotes` (saving turns escaped colour codes back, as
+   `NotesTab:Save` does) and `party` without imported party data.
+   `tooltips_match` (every corpus build: every socket group's and
+   item's tooltip, three items in their own slot, the first item as a
+   preview, 10 nodes on and around the tree and the allocated sockets,
+   notes and party, then notes set and a node clicked) gives the
+   translation's: 1133 item tooltips (typed 19 s, translated 54 s), 695
+   node tooltips (10 s, 44 s), 379 socket group tooltips, 59 previews,
+   182 notes and 61 party views; 40 requests fell back (listed by the
+   test). Upstream's `ProcessSocketGroup` clears a triggered granted
+   skill's level cost on the shared skill data for the rest of the
+   process (gen-0010's Farrul's Chase triggers Intimidating Cry at level
+   20), so a build loaded later in the same session sees that level
+   without a cost: taking off Ashes of the Stars in gen-0018 drops its
+   level 21 Intimidating Cry to 20, which costs 20 mana in a fresh
+   translation and in the typed engine but 0 after gen-0010 was loaded.
+   The test asks a request that differs again of a fresh translation
+   with the same edits before it, and counts it as aligned when that one
+   agrees (2 requests, both gen-0018's amulet, when gen-0010 runs
+   earlier in the same shard of phase `tooltips`; with the default 3
+   shards they run apart and none needs aligning). `tests/calculator.rs`
+   now also takes off the amulet, and recalculates a build that differs
+   on a fresh translation the same way (gen-0018 again). Comparing a jewel that changes the
+   tree (timeless, Intuitive Leap, Impossible Escape) is
+   `buildSpecForJewelComparison`: a copy of the spec with the jewel in
+   the socket and its paths built again, which the calculator's
+   calculation takes as `override.spec`
+   (`MiscCalculator::calculate_on_spec`). Toggling a previewed flask
+   or tincture that is not in the build (`toggleFlask = item`) adds it:
+   it joins a copy of the items tab under a free negative id
+   (`MiscCalculator::calculate_on`). Upstream keeps `displayEffect`,
+   `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
+   across calculations; the typed tooltips read the sidebar's last
+   calculation. A socket's threshold lines sum each radius node's
+   `finalModList`: the calculation's for allocated nodes and those near
+   a radius jewel (`extraRadiusNodeList`, now kept as well), else the
+   node's own `modList`, which `CalcsTab:BuildOutput` sets on every
+   node first. Tattooed and conquered nodes show their replacement's
+   reminder text, none when it has none (`ReplaceNode` empties the
+   node's table), and a tattoo's own only when the tree node has one:
+   `BuildAllDependsAndPaths` puts the tree node back before each tattoo,
+   which empties the tattoo's table otherwise. The emptied table can be
+   the shared tree node's, read through the spec node's metatable, so
+   later builds of the process lose that reminder text too: phase
+   `overlays` (the tattoo and timeless jewel builds of
+   `equivalence::variants`, which the corpus has none of) asks a
+   tooltip that differs again of a fresh translation and aligns it when
+   that one agrees (11 of 218). An allocated mastery's tooltip with a
+   popup open compares reallocating it (`addNodes` of the node), as
+   upstream does for the mastery popup's options; `config_edits_match`
+   asks for one while a class change popup is open. Falling back: the
+   party view with imported data. A radius jewel's
+   "Attributes in Radius" is the data of its last radius function, as
+   each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
+   40 Str in gen-0029).
+   The translated runtime's `%d` of `-2^63` printed two
+   minus signs; it now prints LuaJIT's.
 
    The Configuration tab, class changes, undo and new builds are typed
    (`session::typed::config`, `undo`): `config` (each option control's
@@ -308,9 +407,15 @@ What remains for the full migration, in order:
    options' functions set, tooltips), `control` of the option controls
    with `BuildModList` and the recalculation, of the class, ascendancy
    and bloodline drop-downs (with `IsClassConnected` and the class change
-   popup, whose Continue `popupButton` and `closePopup` are typed),
-   `undo` (the active spec's `UndoHandler`; a spec with tattoos or
-   cluster jewel subgraphs falls back) and `newBuild`. The options'
+   popup, whose Continue `popupButton` and `closePopup` are typed; the
+   typed session's popups are these, so any other button gets the
+   translation's "no popup button" error without falling back),
+   `undo` (the active spec's `UndoHandler`, also with tattoos and
+   cluster jewel subgraphs: `RestoreUndoState` keeps the subgraphs, and
+   `ImportFromNodeList` allocates again every subgraph node
+   `BuildClusterJewelGraphs` ever allocated anew, `allocExtendedNodes`,
+   which upstream never empties; `tree_edits_match` undoes at random
+   too) and `newBuild`. The options'
    metadata comes from `Modules/ConfigOptions.lua` at build time
    (`engine::config_tab::ConfigVar` in the game data), with
    `data.enemyIsBossTooltip` evaluated from `Data.lua`.
@@ -323,31 +428,87 @@ What remains for the full migration, in order:
    opened keeps it, as upstream's popups belong to `main` (the
    dispatcher carries the typed popups over; a popup the translation
    opened while the build was on it is not carried). Saviour's mirage as
-   the main skill and undo on specs with tattoos or cluster jewel
-   subgraphs fall back.
+   the main skill falls back.
+
+   A typed error starting with `UPSTREAM_ERROR` is one the translation
+   answers the same request with (`no node <id>` of `clickNode`,
+   `nodePath` and `nodeTooltip`): the dispatcher answers it as the
+   request's error and keeps the typed build.
+
+   The dispatcher records each request the typed engine gave to the
+   translation while it held the build (`Dispatcher::fallbacks`, with
+   the command and why); `typed_session_matches_translated` prints them
+   per phase and fails on any not in its `KNOWN_FALLBACKS`.
 
    Still on the translation, before it can be dropped:
-   - Read-only views: `itemDb`, `party`, `notes`, `controls` of other
-     tabs.
-   - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
-     `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
-     `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
-   - Items and crafting: `displayItem`, `craftItem`, `setNotes`,
-     `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
-     popups, the unique and rare databases: `Data/Uniques/Special/Generated.lua`
-     and `Item:Craft` are not ported). `addItem`, `editItem`,
-     `setDisplayItem` and `saveDisplayItem` are typed
-     (`session::typed::item_editor`: `AddItem` with its auto-equip,
-     `CreateDisplayItemFromRaw`, `CopyAnointsAndEldritchImplicits`,
-     `AddDisplayItem`) and in `items_edits_match`; a crafted cluster
-     jewel in the editor (`UpdateClusterJewelControls` crafts it again)
-     and a Forbidden jewel whose counterpart is missing fall back. The
-     display item is held typed, so `displayItem` answers on the
-     translation after its replays.
-   - Engine gaps that make a build fall back: Combust's trigger
-     (gen-0028), tree edits with Intuitive
-     Leap and the like, tattoos, specs in the URL format only, exported
-     party buffs, the character level's auto mode.
+   - Read-only views: `party` with imported party data,
+     `controls` of other tabs.
+   - Tooltips in the cases above that fall back.
+   - Items and crafting: the item editor's enchant, anoint, corrupt,
+     add implicit, custom and crucible modifier popups, its modifier
+     sorting by power (`craftingSorting`), the Foulborn mutation
+     checkboxes.
+     Typed (`session::typed::item_editor`, `item_db`, `item_popups`):
+     `addItem`, `editItem`, `setDisplayItem` and `saveDisplayItem`
+     (`AddItem` with its auto-equip, `CreateDisplayItemFromRaw`,
+     `CopyAnointsAndEldritchImplicits`, `AddDisplayItem` with the
+     Forbidden jewels' counterparts, `SetDisplayItem` with the affix
+     drop-downs' lists, `UpdateAffixControl` without the sort by power,
+     and `UpdateClusterJewelControls`/`CraftClusterJewel`, which craft a
+     crafted cluster jewel again; `Item:Craft` is `engine::item_craft`),
+     `itemDb` (`main.uniqueDB` and `main.rareDB`: `data.uniques` and
+     `data.rares` with the uniques of `Generated.lua`, made in
+     `gamedata::uniques` from the importer's literals of the file, and
+     its tree-dependent ones from the typed tree; Pearl of Tsoatha's
+     lines come from a port of `describeStats` for its one stat
+     description), `craftItem` (Craft Item, and Edit Item Text for a
+     unique or relic) with `control` of their `popup.*` inputs,
+     `popupButton` and `closePopup`, and `displayItem`
+     (`session::typed::item_display`: the tooltip of `item_tooltip.rs`
+     on a copy without an id, as upstream compares by identity, and the
+     editor's controls as `layoutControls` lists them, placed by their
+     anchors as `Control:GetPos` does; a flask in the editor is toggled
+     in a copy of the items tab under a free id), with `control` of the editor's
+     controls (`session::typed::item_editor_controls`: variants and
+     version, sockets and links, influences, quality, catalysts, cluster
+     jewel skill and node count, affixes and their rolls, range lines,
+     custom modifier removal, the Foulborn mutation checkboxes
+     (`Item:MutateMod` in `engine::item_craft`), and the Save, Edit and
+     Cancel buttons;
+     upstream's state on the controls, such as the edits' text and the
+     sliders' values, is kept in `item_editor::Editor`), the Enchant Item
+     popup (`session::typed::item_enchant`, with `data.enchantments` from
+     `gamedata::enchantments` and `engine::item_enchant`: skill, all
+     skills, source, sort by a power stat's calculation with the
+     enchanted item, enchantment; Enchant, Remove, Cancel), Corrupt Item
+     (`session::typed::item_corrupt`: Corrupted, Scourge and Glimpse of
+     Chaos implicits in upstream's sort order, sorted by power, Scourge
+     pairs, and a unique's corrupted roll ranges) and Anoint Item
+     (`session::typed::item_anoint`: the notable list of
+     `NotableDBControl`, searched with `matchOrPattern`, sorted by name or
+     a power stat with the anointed item; the translated session's
+     `describePopups` builds and lists it, with its search and sort, and
+     `control` selects a row). All in `items_edits_match`, with
+     database items and Forbidden jewels in its pool. The translation's
+     tooltip comparison can carry another build's change of upstream's
+     shared data (gen-0010's before gen-0018's: a mana cost); the test
+     asks a `displayItem` whose lines differ again of a fresh translation
+     with the edits since the load. The same gap shows in outputs: upstream clears a
+     triggered granted skill's level cost on the shared skill data for
+     the rest of the process, the typed engine for the build only
+     (`calc_offence::cost_cleared`), so gen-0018 without its amulet
+     differs after gen-0010 in one translated session (CI's shards keep
+     them apart). The display item
+     is held typed, so `displayItem` answers on the translation after
+     its replays. A load with an item popup open falls back (the
+     popup's buttons act on the tab it came from). Ported on the way:
+     `initEnv`'s write-back of the clamped `build.mainSocketGroup` (an
+     item granting the main socket group replaced).
+   - Engine gaps that make a build fall back: none over the corpus.
+     Combust (gen-0028), the character level's auto mode, tattoos and
+     tree edits with Intuitive Leap no longer do; specs in the old URL
+     format (`PassiveSpec:DecodeURL`) are typed, and `commands_match`
+     loads every tenth build with its specs as tree links.
 
 ## Done
 
@@ -401,6 +562,8 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id: all of them, the minions' tested only through the corpus |
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
+| `PartyTab:Load`, `ParseBuffs`, `exportBuffs`, `modLib.parseFormattedSourceMod`, `formatSourceMod` | `party.rs`: the build's `<Party>` section and `exportParty` (`Build::party`) |
+| `env.partyMembers` in `initEnv` and `perform`: the party's enemy mods, its actor (`PARTY`, the player's `partyMembers`), auras, aura debuffs, warcries, links, curses, extra auras and other effects, the `...EqualToPartyMember` stats; `buffExports` | `calc_setup.rs`, `calc_perform.rs` (`party_buffs`), `calc_defence.rs`, `calc_ehp.rs`, `calc_offence*.rs`; `calc_party.rs` (the end of perform's exports) |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
@@ -531,8 +694,6 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The party tab (`env.partyMembers`; the build's `<Party>` section is not
-  read, so a build with party members calculates as without them)
 - A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
@@ -559,6 +720,82 @@ trigger, or a source skill the templates lack).
 ## Next
 
 See the handoff above.
+
+## Shipping the typed engine to the browser
+
+`crates/wasm` and `crates/session` have a `translation` cargo feature, on
+by default. Built with it, the module holds upstream's translated program
+(`crates/upstream`, the Lua runtime, `lua/session.lua`) as the fallback
+of commands the typed engine does not have yet. Built without it
+(`web/scripts/build-wasm.mjs --typed`, `cargo build -p wasm
+--no-default-features`), neither the translation nor the Lua interpreter
+is linked, and those commands are `not ported: <cmd>` errors
+(`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
+`loadXml`/`loadCode` opens a build on the typed engine, and the browser
+frontend works for everything the typed session answers (sidebar,
+outputs, Calcs tab and breakdowns, tree edits and geometry, skills,
+items and the item editor, configuration, class drop-downs, undo, save,
+node power): the dispatcher's typed commands are the same in both
+builds. The module opens a new build on start (the typed `newBuild`); its
+file matches the translation's also after a skill is added (the `new`
+phase of `typed_session_matches_translated`).
+
+Data no longer goes through Lua at load. `pob bundle <out>` ships the
+typed engine's data in `engine::codec`'s binary form (`session::bundle`):
+`core.bin` holds the game data, the mod parser (with upstream's ModCache)
+and the current tree, each compressed; every tree version is a separate
+file under `files/`, fetched when a build needs an older one. So are
+the timeless jewels' data (`typed/timeless.bin`, 47 kB) and each jewel's
+look-up table (`typed/timeless/<Name>.bin`, upstream's zlib stream, 0.9 to
+30 MB): a build with a timeless jewel asks for them, the worker fetches
+them and retries (`session::bundle::decode_timeless`). `tests/bundle.rs`
+in `equivalence` loads a build with each of the 11 jewels on the data
+read from a bundle, adding the files each asks for, and gets the same
+sidebar, outputs and tree as on the data made from source. With
+`pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
+data files the translation reads starting up and loading the given builds,
+and every tree version's Lua data, for an engine built with the
+translation (`build-data.mjs` without `--typed`).
+
+The frontend takes `not ported` answers as such
+(`isNotPorted` in `web/src/engine/client.ts`, `web/src/ui/NotPorted.tsx`): an edit the engine
+does not have shows a notice instead of an error, a view it does not have
+(notes, party, the item database) a note in its place, the controls of
+commands that answered `not ported` are disabled, and tooltips it does
+not have are left out.
+
+### Size and load time
+
+wasm module (release `web` profile, `strip = true`) and the `core.bin` it
+loads with:
+
+| build | wasm | wasm gzip | core.bin |
+|---|---|---|---|
+| with the translation | 87.7 MB | 17.1 MB | 33.7 MB |
+| typed engine only | 8.2 MB | 2.0 MB | 2.6 MB |
+
+(The 78 MB baseline in `docs/design.md` was before the typed session and
+the Calcs tab data were linked; the translation build is 80 MB without
+them.) The typed module's code is 7.5 MB unstripped: 5.8 MB engine, 0.5 MB
+core, 0.5 MB alloc, 0.3 MB session, 0.2 MB hashbrown, 0.06 MB of the Lua
+runtime (`ljtab` and `pattern`, which the typed engine uses for upstream's
+table layout and item patterns); no translated program, no Lua evaluator.
+
+Time to the first sidebar in headless Chromium (the frontend built with
+Vite, served by a plain static server that sends `application/wasm` so the
+module streams and compiles while it downloads, two engine workers each
+loading the module and the bundle), median of 3 runs:
+
+| build | localhost | 50 Mbit/s, 40 ms |
+|---|---|---|
+| with the translation | ~13.5 s | ~48 s |
+| typed engine only | ~0.85 s | ~4.0 s |
+
+Each worker logs `engine ready in <n> ms` with the module-compile and
+bundle-read splits (`web/src/engine/worker.ts`). The static server does
+not gzip; a real host serving the gzipped sizes above cuts the transfer
+further. The translated module takes about 14 s just to compile and
+instantiate per worker, so it dominates regardless of the link.
 
 ## Upstream quirks met so far
 

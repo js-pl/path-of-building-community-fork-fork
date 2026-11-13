@@ -459,6 +459,8 @@ impl<'t> PassiveSpec<'t> {
                 mastery: false,
                 icon: Some("Art/2DArt/SkillIcons/passives/MasteryBlank.png".into()),
                 mastery_icon: None,
+                tag: None,
+                enchant: vec![],
             });
         let socket_count = field_num(jewel, "clusterJewelSocketCountOverride")
             .or(field_num(jewel, "clusterJewelSocketCount"))
@@ -821,6 +823,9 @@ impl<'t> PassiveSpec<'t> {
             unknown,
             extra,
             nodes_in_radius: None,
+            reminder_text: None,
+            flavour_text: None,
+            recipe: Vec::new(),
         })
     }
 }

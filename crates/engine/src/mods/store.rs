@@ -13,6 +13,25 @@ use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
+/// The tag kinds `EvalMod` evaluates
+pub const EVALUATED_TAGS: [&str; 15] = [
+    "Multiplier",
+    "MultiplierThreshold",
+    "PerStat",
+    "PercentStat",
+    "StatThreshold",
+    "DistanceRamp",
+    "MeleeProximity",
+    "Condition",
+    "ActorCondition",
+    "SocketedIn",
+    "SkillName",
+    "SkillPart",
+    "SkillType",
+    "SlotName",
+    "MonsterTag",
+];
+
 /// Index of a store in [`Stores`].
 pub type StoreId = usize;
 
@@ -1152,7 +1171,16 @@ impl<'a> Query<'a> {
                     return Ok(false);
                 }
             }
-            TagKind::Other { .. } => {}
+            TagKind::Other { kind, .. } => {
+                // A tag of a kind evaluated above whose list is text (the
+                // Party tab's mods, read back from text): upstream fails
+                // iterating it
+                if EVALUATED_TAGS.contains(&kind.as_str()) {
+                    return Err(format!(
+                        "upstream fails too: a party mod's {kind} tag list read back from text (bad argument #1 to 'ipairs' (table expected, got string))"
+                    ));
+                }
+            }
         }
         Ok(true)
     }

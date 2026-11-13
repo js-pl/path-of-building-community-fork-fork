@@ -543,6 +543,26 @@ fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(Strin
                         }
                     }
                 }
+                // A legion keystone's mods come from the mod parser's
+                // cache, whose `setSource` by an earlier conquest of the
+                // translation names the node it conquered then
+                if let Some(o) = &spec.nodes[i].overlay
+                    && spec.nodes[i].conquered.is_some()
+                    && spec
+                        .mod_list(i)
+                        .iter()
+                        .all(|m| m.source.as_deref() == Some(&*format!("Tree:{}", o.id)))
+                {
+                    let legion: std::sync::Arc<str> = format!("Tree:{}", o.id).into();
+                    for m in &mut l {
+                        let s = m.source.as_deref().unwrap_or("");
+                        if s.strip_prefix("Tree:")
+                            .is_some_and(|id| id.parse::<u32>().is_ok())
+                        {
+                            m.source = Some(legion.clone());
+                        }
+                    }
+                }
             }
             l
         });

@@ -22,9 +22,6 @@ impl TypedSession<'_> {
         let from = self.specs.0;
         if to != from {
             let next = self.other_specs[to - 1].clone().ok_or("no spec")?;
-            if next.tree.version != self.build.spec.tree.version {
-                return Err(format!("{NOT_PORTED}: specs on another tree version"));
-            }
             let mut prev = std::mem::replace(&mut self.build.spec, next);
             // The sockets' jewels stay with the spec they were in
             let prev_mut = std::sync::Arc::make_mut(&mut prev);
@@ -92,12 +89,13 @@ impl TypedSession<'_> {
             text.push_str(&format!("Slot: {s}\r\n"));
         }
         for gem in &g.gem_list {
-            let (Some(level), Some(quality), Some(qid)) = (gem.level, gem.quality, &gem.quality_id)
-            else {
+            // `%d` of nil fails in the translation too; `%s` writes "nil"
+            let (Some(level), Some(quality)) = (gem.level, gem.quality) else {
                 return Err(format!(
-                    "{NOT_PORTED}: copying a gem without a level, quality or quality id"
+                    "{NOT_PORTED}: copying a gem without a level or quality"
                 ));
             };
+            let qid = gem.quality_id.as_deref().unwrap_or("nil");
             text.push_str(&format!(
                 "{} {}/{} {} {} {}\r\n",
                 gem.name_spec,

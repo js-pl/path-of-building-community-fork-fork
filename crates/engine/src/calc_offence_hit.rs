@@ -1868,7 +1868,12 @@ impl<'a> Perform<'a> {
                 .c
                 .flag(list, c, &["MainHandCritIsEqualToPartyMember"])?
             {
-                return Err("not ported: party".into());
+                let party = self.party_of(actor)?;
+                let from_output = match self.c.out_val(party, "MainHand") {
+                    Some(OutVal::Table(t)) => t.get("CritChance").and_then(OutVal::num),
+                    _ => None,
+                };
+                crit_override = Some(from_output.unwrap_or(0.0));
             }
             let mut base_crit = crit_override
                 .or_else(|| self.src_num(o, "CritChance"))
@@ -3518,6 +3523,8 @@ impl<'a> Perform<'a> {
             &[&format!("Enemy{source_res}ResistEqualToYours")],
         )? {
             format!("Your {source_res} Resistance")
+        } else if self.party_flag(&format!("Enemy{source_res}ResistEqualToYours"))? {
+            format!("Party Member {source_res} Resistance")
         } else {
             source_res.to_string()
         };
