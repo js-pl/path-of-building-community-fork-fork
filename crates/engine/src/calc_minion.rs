@@ -53,7 +53,8 @@ impl<'a> Perform<'a> {
     /// Gives every skill with a minion its actor and the minion its
     /// skills (`calcs.createMinionSkills`), then sets `env.minion`
     pub(crate) fn create_minions(&mut self) -> Result<()> {
-        for i in 0..self.n_player {
+        let external = self.external.map(|e| e.skill);
+        for i in (0..self.n_player).chain(external) {
             let Some(minion) = self.mods(i).minion.clone() else {
                 continue;
             };
@@ -136,13 +137,34 @@ impl<'a> Perform<'a> {
         }
         // The databases the skills' mod lists are built with: the
         // minion's is still empty
-        let pdb = self.pdb();
-        let edb = self.edb();
+        // A mirage's copy makes its minion's skills on the databases of
+        // the calculation it comes from, in that calculation's mode
+        let external = self.external.filter(|e| e.skill == i);
+        let (pdb, edb) = match external {
+            Some(e) => (e.player_store, e.enemy_store),
+            None => (self.pdb(), self.edb()),
+        };
+        let (item_list, weapon_data) = match external {
+            Some(e) => {
+                let a = &self.c.actors.actors[e.actor];
+                (
+                    a.item_list.clone(),
+                    [
+                        a.weapon_data[0].clone().unwrap_or_default(),
+                        a.weapon_data[1].clone().unwrap_or_default(),
+                    ],
+                )
+            }
+            None => (
+                self.env.setup.items.item_list.clone(),
+                self.env.skills.weapon_data.clone(),
+            ),
+        };
         let mut db = PlayerDb::new(
             self.c.store(pdb).clone(),
             self.c.store(edb),
-            &self.env.setup.items.item_list,
-            &self.env.skills.weapon_data,
+            &item_list,
+            &weapon_data,
             self.input.tab,
             self.input.data.items,
             skill_data,
@@ -165,10 +187,10 @@ impl<'a> Perform<'a> {
                 skill_data,
                 tab: self.input.tab,
                 item_data: self.input.data.items,
-                item_list: &self.env.setup.items.item_list,
-                weapon_data: &self.env.skills.weapon_data,
+                item_list: &item_list,
+                weapon_data: &weapon_data,
                 mode: self.env.mode,
-                calcs: self.calcs_mode(),
+                calcs: external.map_or(self.calcs_mode(), |e| e.calcs),
                 config: self.input.config,
                 placeholders: self.input.placeholder,
                 spectre_list: self.input.spectre_list,
@@ -262,7 +284,7 @@ impl<'a> Perform<'a> {
         }
         // The selected skill
         let n = self.minions[m].skills.len() as f64;
-        let breakdown = self.calcs_mode();
+        let breakdown = external.map_or(self.calcs_mode(), |e| e.calcs);
         let gem = self.skill(i).active_effect.src;
         let chosen = gem
             .and_then(|(g, k)| self.env.groups.get(g)?.gem_list.get(k))
@@ -274,7 +296,8 @@ impl<'a> Perform<'a> {
                 }
             });
         let index = chosen.unwrap_or(1.0).min(n).max(1.0);
-        if let Some((g, k)) = gem
+        // The copied skill's own calculation wrote the same selection back
+        if let Some((g, k)) = gem.filter(|_| external.is_none())
             && let Some(g) = self
                 .env
                 .groups

@@ -35,7 +35,6 @@ impl<'d> TypedSession<'d> {
             engine::calc_env::CalcMode::Main,
             None,
         )?;
-        self.check_main()?;
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
@@ -62,7 +61,7 @@ impl<'d> TypedSession<'d> {
 
     fn secondary_id(&self) -> Option<Arc<str>> {
         let spec = &self.build.spec;
-        let id = spec.cur_secondary_ascend_class_id?;
+        let id = spec.cur_secondary_ascend_class?;
         spec.tree
             .alternate_ascendancies
             .as_ref()?
@@ -78,6 +77,7 @@ impl<'d> TypedSession<'d> {
         if spec.nodes[i].alloc {
             let b = &mut self.build;
             Arc::make_mut(&mut b.spec).dealloc_node(i, &b.items, &self.data.game.items)?;
+            self.add_undo_state();
             self.rebuild()?;
             return Ok(json!([]));
         }
@@ -94,6 +94,7 @@ impl<'d> TypedSession<'d> {
                         .find(|(_, a)| a.id.as_deref() == Some(&*asc))
                 {
                     self.spec_mut().select_ascend_class(aid)?;
+                    self.add_undo_state();
                     changed = true;
                 }
             } else if self.secondary_id().as_deref() != Some(&*asc)
@@ -106,6 +107,7 @@ impl<'d> TypedSession<'d> {
                     .map(|(i, _)| *i)
             {
                 self.spec_mut().select_secondary_ascend_class(aid)?;
+                self.add_undo_state();
                 changed = true;
             }
         }
@@ -120,6 +122,7 @@ impl<'d> TypedSession<'d> {
                 return Ok(json!({ "mastery": options }));
             }
             self.alloc(i)?;
+            self.add_undo_state();
             changed = true;
         }
         if changed {
@@ -172,6 +175,7 @@ impl<'d> TypedSession<'d> {
         } else {
             self.alloc(i)?;
         }
+        self.add_undo_state();
         self.rebuild()?;
         Ok(json!([]))
     }
@@ -181,6 +185,7 @@ impl<'d> TypedSession<'d> {
         let spec = self.spec_mut();
         spec.reset_nodes();
         spec.build_all_depends_and_paths()?;
+        self.add_undo_state();
         self.rebuild()?;
         Ok(json!([]))
     }

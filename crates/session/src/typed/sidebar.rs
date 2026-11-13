@@ -92,9 +92,9 @@ pub struct Controls {
     pub(super) level: Edit,
     /// The level box was typed in: its text stays as typed
     pub(super) level_typed: bool,
-    class: Drop,
-    ascend: Drop,
-    secondary: Drop,
+    pub(super) class: Drop,
+    pub(super) ascend: Drop,
+    pub(super) secondary: Drop,
     pub(super) skill_select: SkillSelect,
 }
 
@@ -409,7 +409,7 @@ impl TypedSession<'_> {
 
     /// `PassiveSpec:CountAllocNodes()`: points, ascendancy points and
     /// secondary ascendancy points used
-    fn count_alloc_nodes(&self) -> (f64, f64, f64) {
+    pub(super) fn count_alloc_nodes(&self) -> (f64, f64, f64) {
         let spec = &self.build.spec;
         let secondary: Vec<&str> = spec
             .tree
@@ -542,6 +542,7 @@ impl TypedSession<'_> {
             let data = self.data;
             self.build
                 .set_character_level(level, &data.game.config, &data.parser)?;
+            self.config_mods_built();
         }
         Ok(())
     }
@@ -562,26 +563,78 @@ impl TypedSession<'_> {
         }
     }
 
+    /// The class drop-down's entries (`UpdateClassDropdowns`): class ids
+    /// and names, by name
+    pub(super) fn class_entries(&self) -> Vec<(i64, std::sync::Arc<str>)> {
+        let mut classes: Vec<_> = self
+            .build
+            .spec
+            .tree
+            .classes
+            .iter()
+            .map(|(id, c)| (*id, c.name.clone()))
+            .collect();
+        classes.sort_by(|a, b| a.1.cmp(&b.1));
+        classes
+    }
+
+    /// A class's ascendancies in the drop-down: ids from 0 ("None") on
+    pub(super) fn ascend_entries(&self, class: i64) -> Vec<(i64, std::sync::Arc<str>)> {
+        let tree = self.build.spec.tree;
+        let Some((_, c)) = tree.classes.iter().find(|(id, _)| *id == class) else {
+            return Vec::new();
+        };
+        let mut asc: Vec<_> = c
+            .ascendancies
+            .iter()
+            .map(|(id, a)| (*id, a.name.clone()))
+            .collect();
+        asc.sort_by_key(|(id, _)| *id);
+        asc
+    }
+
+    /// The bloodline drop-down's entries (`UpdateSecondaryAscendancyDropdown`):
+    /// "None", then the alternate ascendancies by name, the legacy ones
+    /// only when selected
+    pub(super) fn secondary_entries(&self) -> Vec<(i64, String)> {
+        let spec = &self.build.spec;
+        let selection = spec.cur_secondary_ascend_class_id.unwrap_or(0);
+        let legacy = ["Warden", "Warlock", "Primalist"];
+        let mut alt: Vec<(String, i64)> = spec
+            .tree
+            .alternate_ascendancies
+            .iter()
+            .flatten()
+            .filter(|(id, a)| {
+                a.id.as_deref()
+                    .is_some_and(|i| !legacy.contains(&i) || *id == selection)
+            })
+            .map(|(id, a)| (a.name.to_string(), *id))
+            .collect();
+        alt.sort();
+        let mut entries = vec![(0, "None".to_string())];
+        entries.extend(alt.into_iter().map(|(n, id)| (id, n)));
+        entries
+    }
+
     /// `OnFrame`'s class drop-downs and `RefreshSkillSelectControls`
     pub(super) fn refresh_controls(&mut self) -> Result<()> {
+        let classes = self.class_entries();
+        let class_at = classes
+            .iter()
+            .position(|(id, _)| Some(*id) == self.build.spec.cur_class_id);
+        let asc = class_at.map(|i| self.ascend_entries(classes[i].0));
+        let entries = self.secondary_entries();
         let spec = &self.build.spec;
-        let tree = spec.tree;
         let c = &mut self.controls;
         if !c.level_typed {
             c.level.text = engine::pat::num(self.build.info.character_level);
         }
         // `UpdateClassDropdowns(treeVersion)`
-        let mut classes: Vec<_> = tree.classes.iter().collect();
-        classes.sort_by(|a, b| a.1.name.cmp(&b.1.name));
-        c.class.list = classes.iter().map(|(_, cl)| cl.name.to_string()).collect();
-        if let Some(i) = classes
-            .iter()
-            .position(|(id, _)| Some(*id) == spec.cur_class_id)
-        {
+        c.class.list = classes.iter().map(|(_, n)| n.to_string()).collect();
+        if let (Some(i), Some(asc)) = (class_at, asc) {
             c.class.sel = (i + 1) as f64;
-            let mut asc: Vec<_> = classes[i].1.ascendancies.iter().collect();
-            asc.sort_by_key(|(id, _)| *id);
-            c.ascend.list = asc.iter().map(|(_, a)| a.name.to_string()).collect();
+            c.ascend.list = asc.iter().map(|(_, a)| a.to_string()).collect();
             if let Some(k) = asc
                 .iter()
                 .position(|(id, _)| Some(*id) == spec.cur_ascend_class_id)
@@ -590,22 +643,12 @@ impl TypedSession<'_> {
             }
         }
         // `UpdateSecondaryAscendancyDropdown`
-        let mut alt: Vec<(String, i64)> = tree
-            .alternate_ascendancies
-            .iter()
-            .flatten()
-            .filter(|(_, a)| a.id.is_some())
-            .map(|(id, a)| (a.name.to_string(), *id))
-            .collect();
-        alt.sort();
-        let mut entries = vec![("None".to_string(), 0)];
-        entries.extend(alt);
         let selection = spec.cur_secondary_ascend_class_id.unwrap_or(0);
-        if let Some(k) = entries.iter().position(|(_, id)| *id == selection) {
+        if let Some(k) = entries.iter().position(|(id, _)| *id == selection) {
             c.secondary.sel = (k + 1) as f64;
         }
         c.secondary.enabled = entries.len() > 1;
-        c.secondary.list = entries.into_iter().map(|(n, _)| n).collect();
+        c.secondary.list = entries.into_iter().map(|(_, n)| n).collect();
         self.refresh_skill_controls()
     }
 

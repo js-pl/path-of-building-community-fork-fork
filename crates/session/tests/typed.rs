@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 8] = [
+const PHASES: [(&str, usize); 9] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -94,6 +94,7 @@ const PHASES: [(&str, usize); 8] = [
     ("skills", 3),
     ("save", 3),
     ("items", 3),
+    ("config", 3),
     ("party", 2),
 ];
 
@@ -136,9 +137,182 @@ fn typed_session_matches_translated() {
         "skills" => skills_edits_match(&mut d),
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
+        "config" => config_edits_match(&mut d),
         "party" => party_match(data, &mut d),
         _ => panic!("unknown phase {phase}"),
     }
+}
+
+/// The views compared after a config or class edit
+const CONFIG_VIEWS: [&str; 4] = ["config", "state", "outputs", "treeState"];
+
+/// Compares read-only commands of the typed engine and the translation
+fn compare_views(d: &mut Dispatcher, cmds: &[&str], label: &str, out: &mut Vec<String>) {
+    for cmd in cmds {
+        let q = json!({ "cmd": cmd }).to_string();
+        let typed = answer(d.request(&q), cmd);
+        assert!(d.typed_active(), "{label} {cmd}: {:?}", d.typed_error);
+        let tr = answer(d.translated_request(&q), cmd);
+        diff(&typed, &tr, &format!("{label} {cmd}"), out);
+    }
+}
+
+/// A random edit of the Configuration tab's shown options, the class,
+/// ascendancy and bloodline drop-downs (with the class change popup),
+/// config sets and the tree's undo
+fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
+    let config = answer(d.request(r#"{"cmd":"config"}"#), "config");
+    let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+    if let Some(p) = state["ok"]["popups"].as_array().and_then(|p| p.first()) {
+        let _ = p;
+        return if rng.below(2) == 0 {
+            json!({"cmd": "popupButton", "name": "confirm"})
+        } else {
+            json!({"cmd": "closePopup"})
+        };
+    }
+    let vars: Vec<&J> = config["ok"]["sections"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|s| s["vars"].as_array().unwrap())
+        .collect();
+    match rng.below(10) {
+        0 | 1 => {
+            let path = [
+                "build.classDrop",
+                "build.ascendDrop",
+                "build.secondaryAscendDrop",
+            ][rng.below(3)];
+            let n = state["ok"]["controls"][path]["list"]
+                .as_array()
+                .map_or(1, Vec::len);
+            json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+        }
+        2 => json!({"cmd": "undo"}),
+        3 => {
+            let sets = config["ok"]["configSets"].as_array().unwrap();
+            let id = &sets[rng.below(sets.len())]["id"];
+            json!({"cmd": "selectConfigSet", "id": id})
+        }
+        _ => {
+            let v = vars[rng.below(vars.len())];
+            let path = format!("config.{}", v["var"].as_str().unwrap());
+            match v["class"].as_str().unwrap() {
+                "CheckBoxControl" => {
+                    json!({"cmd": "control", "path": path, "state": v["state"] != J::Bool(true)})
+                }
+                "DropDownControl" => {
+                    let n = v["list"].as_array().unwrap().len();
+                    json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+                }
+                _ => {
+                    let texts = ["", "0", "1", "5", "50", "100", "-10", "3.5", "1000"];
+                    json!({"cmd": "control", "path": path, "text": texts[rng.below(texts.len())]})
+                }
+            }
+        }
+    }
+}
+
+/// Random sequences of Configuration tab edits, class changes and undo
+/// give the translation's options (shown, values, tooltips), sidebar,
+/// outputs and tree after each step; then a new build does
+fn config_edits_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
+    let mut skipped = Vec::new();
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(6);
+    for (id, path) in mine(corpus()) {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 3);
+        let mut out = Vec::new();
+        compare_views(d, &CONFIG_VIEWS, "load", &mut out);
+        for step in 0..steps_per_build {
+            if !out.is_empty() {
+                break;
+            }
+            let req = config_edit(d, &mut rng);
+            let label = format!("step {step} {req}");
+            let r = req.to_string();
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed edit");
+            times[0] += t.elapsed();
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            times[1] += t.elapsed();
+            let _ = typed;
+            compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            steps += 1;
+        }
+        if out.is_empty() && d.typed_active() {
+            compare_saves(d, "after the config edits", &mut out);
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    // A new build, a class change on it and its undo, in the first shard
+    let mut out = Vec::new();
+    if SHARD.get().is_none_or(|&(k, _)| k == 0) {
+        answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+        assert!(d.typed_active(), "newBuild: {:?}", d.typed_error);
+        let views = [
+            "config",
+            "state",
+            "outputs",
+            "treeState",
+            "skills",
+            "items",
+            "treeSpecs",
+        ];
+        compare_views(d, &views, "newBuild", &mut out);
+        compare_saves(d, "new build", &mut out);
+        for req in [
+            json!({"cmd": "control", "path": "build.classDrop", "sel": 3}),
+            json!({"cmd": "control", "path": "build.ascendDrop", "sel": 2}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+            json!({"cmd": "undo"}),
+        ] {
+            answer(d.request(&req.to_string()), "new build edit");
+            compare_views(d, &CONFIG_VIEWS, &format!("new build {req}"), &mut out);
+        }
+    }
+    if !out.is_empty() {
+        let n = out.len();
+        out.truncate(8);
+        failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
+    }
+    eprintln!(
+        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        times[0],
+        times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// This process's shard of the corpus: the `k`-th of every `n` builds
@@ -156,8 +330,9 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 }
 
 /// Random sequences of item, set, spec, config set, level and socket
-/// group copy edits give the translation's items, skills, sidebar,
-/// outputs and specs after each step, and its file at the end
+/// group copy edits, items added, edited and saved from the editor give
+/// the translation's items, skills, sidebar, outputs and specs after each
+/// step, and its file at the end
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
@@ -165,6 +340,8 @@ fn items_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
+    // Item texts of the builds so far, for adding and editing items
+    let mut pool: Vec<J> = Vec::new();
     for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
@@ -184,6 +361,9 @@ fn items_edits_match(d: &mut Dispatcher) {
             typed
         };
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
+        if let Some(a) = items["ok"]["items"].as_array() {
+            pool.extend(a.iter().map(|i| i["raw"].clone()));
+        }
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -204,7 +384,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(8) {
+            let req = match rng.below(12) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -233,6 +413,30 @@ fn items_edits_match(d: &mut Dispatcher) {
                         Some(t) => json!({"cmd": "pasteSocketGroup", "text": t}),
                         None => continue,
                     }
+                }
+                8 => {
+                    let text = &pool[rng.below(pool.len())];
+                    match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
+                        Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
+                        None => json!({"cmd": "addItem", "text": text}),
+                    }
+                }
+                9 => match pick(&mut rng, &items["ok"]["items"]) {
+                    Some(i) => {
+                        let text = &pool[rng.below(pool.len())];
+                        json!({"cmd": "editItem", "id": i["id"], "text": text})
+                    }
+                    None => continue,
+                },
+                10 | 11 => {
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    compare(d, &open, &format!("step {step}"), &mut out);
+                    json!({"cmd": "saveDisplayItem"})
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
@@ -306,6 +510,13 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
         "translated save",
     );
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
+    if a != b && std::env::var("DUMP_SAVES").is_ok() {
+        eprintln!(
+            "TYPED\n{}\nTRANSLATED\n{}",
+            a.unwrap_or(""),
+            b.unwrap_or("")
+        );
+    }
     if a != b {
         let (a, b) = (a.unwrap_or(""), b.unwrap_or(""));
         let line = a.lines().zip(b.lines()).position(|(x, y)| x != y);

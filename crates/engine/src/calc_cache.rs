@@ -67,10 +67,7 @@ pub trait Recalc {
         &self,
         ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<(
-        crate::mods::SymMap<OutVal>,
-        crate::calc_skill_mods::SkillMods,
-    )>;
+    ) -> Result<crate::calc_mirage::MirageCalc>;
 }
 
 /// `cacheSkillUUID(skill, env)` of a skill of the setup
@@ -197,12 +194,23 @@ impl Recalc for Recalculator<'_, '_> {
         &self,
         mut ext: crate::calc_mirage::External,
         limited: &[String],
-    ) -> Result<(
-        crate::mods::SymMap<OutVal>,
-        crate::calc_skill_mods::SkillMods,
-    )> {
+    ) -> Result<crate::calc_mirage::MirageCalc> {
         use crate::calc_skill_mods::{ModsInput, Owner};
-        let (build, mut env) = self.init_env()?;
+        // `calcs.copyActiveSkill(env, "CALCULATOR", skill)`
+        let (build, mut env) = if self.mode == CalcMode::Calculator {
+            self.init_env()?
+        } else {
+            let mut build = self.build.clone();
+            let base = CalcMode::Calculator.buff_mode(&build);
+            let env = crate::calc_env::init_env_with(
+                &mut build,
+                self.data,
+                CalcMode::Calculator,
+                base,
+                &self.ovr,
+            )?;
+            (build, env)
+        };
         let data = self.data;
         let weapons = [
             ext.player_actor.weapon_data[0].clone().unwrap_or_default(),
@@ -344,7 +352,18 @@ impl Recalc for Recalculator<'_, '_> {
         let mut p = crate::calc_perform::perform(env, input)?;
         p.finish()?;
         let copy = p.mods(p.main()).clone();
+        let gem = p.gem_sums(p.main())?;
+        let mod_flags = crate::sidebar::main_skill_mod_flags(&p)?;
         let mut output = p.c.actors.actors[crate::calc::PLAYER].output.clone();
+        // `output.Minion`: the copy's minion's output
+        if let Some(a) = p.minion_actor() {
+            let m = p.c.actors.actors[a]
+                .output
+                .iter()
+                .map(|(k, v)| (k.as_str().to_string(), v.clone()))
+                .collect();
+            output.insert(Sym::new("Minion"), OutVal::Table(std::sync::Arc::new(m)));
+        }
         if let Some((source, cap, rate)) = tawhoa {
             for (k, v) in [
                 ("Speed", rate),
@@ -355,7 +374,12 @@ impl Recalc for Recalculator<'_, '_> {
                 output.insert(Sym::new(k), OutVal::Num(v));
             }
         }
-        Ok((output, copy))
+        Ok(crate::calc_mirage::MirageCalc {
+            output,
+            copy,
+            gem,
+            mod_flags,
+        })
     }
 }
 

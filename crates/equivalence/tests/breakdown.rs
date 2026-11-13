@@ -11,7 +11,7 @@ use engine::breakdown::{Breakdown, Breakdowns, Cell, Row};
 use engine::items_tab::ItemsTab;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
-use engine::skill_data::{Gem, SkillData};
+use engine::skill_data::Gem;
 use equivalence::outputs::{compare, entries, key_str, list, lua_outputs, number, typed_outputs};
 use equivalence::typed_build::TypedData;
 use equivalence::{corpus_builds, gem_variants, skill_variants, typed_json, upstream_src};
@@ -265,7 +265,7 @@ fn skill_function_breakdowns_match_upstream() {
         "SeismicTrap",
     ];
     run(&|data| {
-        skill_variants(data, |ge| {
+        skill_variants(&data.skills, |ge| {
             !ge.funcs.is_empty() && WRITERS.iter().any(|w| ge.id.starts_with(w))
         })
     });
@@ -302,7 +302,7 @@ fn calcs_inputs_match_upstream() {
         let parts = |g: &Gem| g.granted_effect.parts.as_ref().map_or(0, Vec::len);
         let main = "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string();
         let part = gem_variants(
-            data,
+            &data.skills,
             |g| parts(g) >= 2,
             |g| {
                 vec![(
@@ -314,7 +314,7 @@ fn calcs_inputs_match_upstream() {
         );
         out.extend(part.into_iter().take(8));
         let active = gem_variants(
-            data,
+            &data.skills,
             |g| g.secondary_granted_effect.is_some(),
             |g| {
                 vec![(
@@ -329,7 +329,14 @@ fn calcs_inputs_match_upstream() {
     });
 }
 
-fn run(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
+/// Mirages of skills with minions as the main skill
+/// (`equivalence::variants::mirage_variants`)
+#[test]
+fn mirage_breakdowns_match_upstream() {
+    run(&equivalence::variants::mirage_variants);
+}
+
+fn run(make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
@@ -339,13 +346,18 @@ fn run(make: &dyn Fn(&SkillData) -> Vec<(String, String)>) {
     let mut failures = Vec::new();
     let mut compared = 0;
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for (id, xml) in make(&data.skills) {
+    for (id, xml) in make(&mut data) {
         if !id.contains(&filter) {
             continue;
         }
         host.load_build_xml(xml.as_bytes(), &id)
             .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let build = host.build().unwrap();
+        // The calculation on a cache of its own, as a frame's starts with
+        // (`wipeGlobalCache` in `buildMode:OnFrame`); the typed
+        // calculation makes a cache of its own
+        rt::call(&host.global("wipeGlobalCache"), &[])
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
         let calcs = get(&get(&build, "calcsTab"), "calcs");
         let result = rt::call(&get(&calcs, "buildOutput"), &[build.clone(), s("CALCS")]);
         let env = match result {
