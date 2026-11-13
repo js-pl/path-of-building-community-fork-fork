@@ -121,8 +121,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The party tab. `CalcSections.lua` (which breakdown each cell shows)
-   belongs to the session API.
+1. `CalcSections.lua` (which breakdown each cell shows) belongs to the
+   session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
    built once. Natively the candidates' calculations already run on a
@@ -141,8 +141,9 @@ What remains for the full migration, in order:
    `ModCache.lua` at load took about 1.1 s), and parsing a line runs no Lua
    (closures compute on `mod_parser::val`, results are typed mods). Left:
    the `from_lua` constructors only run at build time now and can move
-   into `gamedata`; `pob bundle` should ship the binary once the engine
-   API uses the typed engine.
+   into `gamedata`. `pob bundle` ships the binary form (see "Shipping the
+   typed engine to the browser"); the wasm module built without the
+   translation reads it and runs no Lua at load.
 5. The engine API (`crates/session`): replace `session.lua`'s commands,
    which drive upstream's UI classes (controls, tooltips, item crafting,
    tree, Calcs tab cells), with Rust on the typed engine; then drop the
@@ -252,7 +253,7 @@ What remains for the full migration, in order:
    round trips (a file saved by either loads in the other to the same
    file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
    saving re-parses each item from it as `BuildAndParseRaw` does. What
-   the typed build does not hold (notes, party buffers, import, tree
+   the typed build does not hold (notes, the Party tab's settings, import, tree
    view and timeless jewel settings, item set links, trade weights)
    comes from the loaded file as the tabs' `Load` keeps it. Ported on
    the way, as upstream leaves them nil: `includeInFullDPS` of a group
@@ -262,12 +263,29 @@ What remains for the full migration, in order:
    go back to the gems, the Calcs tab's from the sidebar's calculation,
    which has the same minion skills),
    `enableGlobal2` of the gems the calculations make,
-   `secondaryAscendClassId="nil"`. A build with exported party buffs
-   falls back. Typed saves take 0.2 to 1.5 s over the corpus (the first save
+   `secondaryAscendClassId="nil"`. A build that exports its buffs for its
+   party (`exportParty`) saves the `ExportedBuffs` of its Calcs tab's
+   calculation (`engine::party::BuffExports::texts`, upstream's
+   `exportBuffs`). Typed saves take 0.2 to 1.5 s over the corpus (the first save
    re-parses every item), the translation's 2.2 s; the browser's
    background node power, which saves the build first, no longer
    replays the typed edits on the translation (its load alone took
    about 1.2 s per corpus build).
+
+   The Party tab is typed in the engine (`engine::party`, the session's
+   `party` view command is not): the `party` phase of
+   `typed_session_matches_translated` gives every other corpus build
+   socket groups with a link, an aura, a curse or warcry, makes it
+   export its buffs and compares sidebar, outputs, Calcs tab and file;
+   then each such build takes another's exported buffs as its party
+   members' (and every fourth hand-written party stats and every link's
+   mods) and is compared again (`PARTY_STEP=1` for all builds). Where
+   the typed engine fails on a party build (upstream exports no
+   `MaxLifeLeechRatePercent` for Vampiric Link, and a `varList` read
+   back from text, also in what `buildOutput` collects for the
+   Configuration tab), the translation fails too. Exported mods whose
+   keystone source upstream's `mergeKeystones` changed on the tree's
+   shared mods are aligned, as `align_keystone_sources` does.
 
    Items, sets and specs are typed (`session::typed::items`, `sets`):
    `items` (`UpdateSockets`' labels, which slots show, what fits each
@@ -310,6 +328,11 @@ What remains for the full migration, in order:
    the main skill and undo on specs with tattoos or cluster jewel
    subgraphs fall back.
 
+   The dispatcher records each request the typed engine gave to the
+   translation while it held the build (`Dispatcher::fallbacks`, with
+   the command and why); `typed_session_matches_translated` prints them
+   per phase and fails on any not in its `KNOWN_FALLBACKS`.
+
    Still on the translation, before it can be dropped:
    - Read-only views: `itemDb`, `party`, `notes`, `controls` of other
      tabs.
@@ -332,8 +355,8 @@ What remains for the full migration, in order:
      so `displayItem` answers on the translation after its replays.
    - Engine gaps that make a build fall back: Combust's trigger
      (gen-0028), tree edits with Intuitive
-     Leap and the like, tattoos, specs in the URL format only, exported
-     party buffs, the character level's auto mode.
+     Leap and the like, tattoos, specs in the URL format only, the character
+     level's auto mode.
 
 ## Done
 
@@ -387,6 +410,8 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.offence` | `calc_offence.rs` (setup, skill types, durations, costs), `calc_offence_hit.rs` (speed and hit passes), `calc_offence_ailments.rs`, `calc_offence_dot.rs` (DoT, combined DPS) |
 | skills' `preDamageFunc`, ... | `calc_skill_funcs.rs`, by granted effect id: all of them, the minions' tested only through the corpus |
 | `calcs.createMinionSkills`, `initMinionModDB`, `addMinionModifiers`, the minion's defence and offence | `calc_minion.rs`; the minion branches of perform, defence and offence in place |
+| `PartyTab:Load`, `ParseBuffs`, `exportBuffs`, `modLib.parseFormattedSourceMod`, `formatSourceMod` | `party.rs`: the build's `<Party>` section and `exportParty` (`Build::party`) |
+| `env.partyMembers` in `initEnv` and `perform`: the party's enemy mods, its actor (`PARTY`, the player's `partyMembers`), auras, aura debuffs, warcries, links, curses, extra auras and other effects, the `...EqualToPartyMember` stats; `buffExports` | `calc_setup.rs`, `calc_perform.rs` (`party_buffs`), `calc_defence.rs`, `calc_ehp.rs`, `calc_offence*.rs`; `calc_party.rs` (the end of perform's exports) |
 | `calcs.buildActiveSkill`, `GlobalCache` | `calc_cache.rs`: a `Recalculator` reruns a copy of the build with another main skill and caches its results by `cacheSkillUUID` |
 | `calcs.triggers` | `calc_triggers.rs`: `defaultTriggerHandler`, the rotation simulation and the configurations the corpus needs |
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
@@ -516,8 +541,6 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- The party tab (`env.partyMembers`; the build's `<Party>` section is not
-  read, so a build with party members calculates as without them)
 - A gap in the curse slots, a minion's debuff without a stack count
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
@@ -544,6 +567,68 @@ trigger, or a source skill the templates lack).
 ## Next
 
 See the handoff above.
+
+## Shipping the typed engine to the browser
+
+`crates/wasm` and `crates/session` have a `translation` cargo feature, on
+by default. Built with it, the module holds upstream's translated program
+(`crates/upstream`, the Lua runtime, `lua/session.lua`) as the fallback
+of commands the typed engine does not have yet. Built without it
+(`web/scripts/build-wasm.mjs --typed`, `cargo build -p wasm
+--no-default-features`), neither the translation nor the Lua interpreter
+is linked, and those commands are `not ported: <cmd>` errors
+(`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
+`loadXml`/`loadCode` opens a build on the typed engine, and the browser
+frontend works for everything the typed session answers (sidebar,
+outputs, Calcs tab and breakdowns, tree edits and geometry, skills,
+items and the item editor, configuration, class drop-downs, undo, save,
+node power): the dispatcher's typed commands are the same in both
+builds. The module opens a new build on start (the typed `newBuild`); its
+file matches the translation's also after a skill is added (the `new`
+phase of `typed_session_matches_translated`).
+
+Data no longer goes through Lua at load. `pob bundle <out>` ships the
+typed engine's data in `engine::codec`'s binary form (`session::bundle`):
+`core.bin` holds the game data, the mod parser (with upstream's ModCache)
+and the current tree, each compressed; every tree version is a separate
+file under `files/`, fetched when a build needs an older one. With
+`pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
+data files the translation reads starting up and loading the given builds,
+and every tree version's Lua data, for an engine built with the
+translation (`build-data.mjs` without `--typed`).
+
+### Size and load time
+
+wasm module (release `web` profile, `strip = true`) and the `core.bin` it
+loads with:
+
+| build | wasm | wasm gzip | core.bin |
+|---|---|---|---|
+| with the translation | 87.7 MB | 17.1 MB | 33.7 MB |
+| typed engine only | 8.2 MB | 2.0 MB | 2.6 MB |
+
+(The 78 MB baseline in `docs/design.md` was before the typed session and
+the Calcs tab data were linked; the translation build is 80 MB without
+them.) The typed module's code is 7.5 MB unstripped: 5.8 MB engine, 0.5 MB
+core, 0.5 MB alloc, 0.3 MB session, 0.2 MB hashbrown, 0.06 MB of the Lua
+runtime (`ljtab` and `pattern`, which the typed engine uses for upstream's
+table layout and item patterns); no translated program, no Lua evaluator.
+
+Time to the first sidebar in headless Chromium (the frontend built with
+Vite, served by a plain static server that sends `application/wasm` so the
+module streams and compiles while it downloads, two engine workers each
+loading the module and the bundle), median of 3 runs:
+
+| build | localhost | 50 Mbit/s, 40 ms |
+|---|---|---|
+| with the translation | ~13.5 s | ~48 s |
+| typed engine only | ~0.85 s | ~4.0 s |
+
+Each worker logs `engine ready in <n> ms` with the module-compile and
+bundle-read splits (`web/src/engine/worker.ts`). The static server does
+not gzip; a real host serving the gzipped sizes above cuts the transfer
+further. The translated module takes about 14 s just to compile and
+instantiate per worker, so it dominates regardless of the link.
 
 ## Upstream quirks met so far
 

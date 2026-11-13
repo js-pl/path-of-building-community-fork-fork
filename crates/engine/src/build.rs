@@ -4,7 +4,7 @@
 //! The calculations' inputs, without the UI.
 //!
 //! The character level's auto mode sets the level after a calculation
-//! ([`Build::set_character_level`]). Not ported yet: notes, party and import sections, the Calcs tab's inputs other than the
+//! ([`Build::set_character_level`]). Not ported yet: notes and the import section other than `exportParty`, the Calcs tab's inputs other than the
 //! calculations'.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
@@ -121,6 +121,8 @@ pub struct LoadContext<'a> {
     /// The timeless jewels' data, without which conquered nodes are not
     /// ported
     pub timeless: Option<Arc<crate::timeless::Timeless>>,
+    /// `ModFlag` and `KeywordFlag`, for the Party tab's mods
+    pub setup: &'a crate::calc_setup::SetupData,
 }
 
 /// A loaded build: what the calculations read of it
@@ -138,6 +140,8 @@ pub struct Build<'t> {
     pub items: ItemsTab,
     pub skills: Option<Skills>,
     pub calcs: CalcsInput,
+    /// The Party tab, shared between a build's copies
+    pub party: Arc<crate::party::Party>,
     /// The base databases of the build's calculations, shared between its
     /// copies
     pub base_dbs: crate::calc_env::BaseDbs,
@@ -269,6 +273,15 @@ impl<'t> Build<'t> {
         };
         let skills = pob.child("Skills").map(|x| Skills::load(x, ctx.skill_data));
         let calcs = pob.child("Calcs").map(CalcsInput::load).unwrap_or_default();
+        let export = pob.child("Import").and_then(|i| i.attr("exportParty")) == Some("true");
+        let setup = ctx.setup;
+        let party = crate::party::Party::load(
+            pob.child("Party"),
+            export,
+            &|n| setup.mod_flags.get(n).copied(),
+            &|n| setup.keyword_flags.get(n).copied(),
+            &|id| ctx.skill_data.skills.contains_key(id),
+        )?;
         let mut spec = PassiveSpec::new(tree, parser)?;
         spec.timeless = ctx.timeless.clone();
         if let Some(s) = active_spec(root) {
@@ -297,6 +310,7 @@ impl<'t> Build<'t> {
             items,
             skills,
             calcs,
+            party: Arc::new(party),
             base_dbs: Default::default(),
         })
     }
