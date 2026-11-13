@@ -482,7 +482,10 @@ What remains for the full migration, in order:
      prefix and suffix mods from `item_data::CraftData`, or a custom
      line; sorted by power) and Add Crucible Modifier
      (`session::typed::item_crucible`: each crucible node's mods of
-     `data.crucible`, the item's own selected). All in `items_edits_match`, with
+     `data.crucible`, the item's own selected), and the Modifier sorting
+     drop-down (`craftingSorting`, which both sessions now list with the
+     editor's controls: the affix lists' series by the power of a stat,
+     their middle tier added to the item, re-parsed). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
