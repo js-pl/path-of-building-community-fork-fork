@@ -409,7 +409,12 @@ impl<'a> Perform<'a> {
             .c
             .flag(db, None, &["MaximumBlockAttackChanceIsEqualToPartyMember"])?
         {
-            return Err("not ported: block chance from party members".into());
+            let party = self.party_of(actor)?;
+            let v = self
+                .c
+                .out(party, "BlockChanceMax")
+                .ok_or("attempt to compare nil with number (the party's BlockChanceMax)")?;
+            self.c.set_out(actor, "BlockChanceMax", v);
         }
         let block_max = o(self, "BlockChanceMax");
         self.c.set_out(actor, "BlockChanceOverCap", 0.0);
@@ -448,7 +453,12 @@ impl<'a> Perform<'a> {
             .c
             .flag(db, None, &["BlockAttackChanceIsEqualToPartyMember"])?
         {
-            return Err("not ported: block chance from party members".into());
+            let party = self.party_of(actor)?;
+            let v = self
+                .c
+                .out(party, "BlockChance")
+                .ok_or("bad argument #1 to 'min' (the party's BlockChance is nil)")?;
+            self.c.set_out(actor, "BlockChance", m_min(v, block_max));
         } else if self.c.flag(db, None, &["MaxBlockIfNotBlockedRecently"])? {
             self.c.set_out(actor, "BlockChance", block_max);
         } else {
@@ -809,7 +819,12 @@ impl<'a> Perform<'a> {
             .c
             .flag(db, None, &["MaximumLifeLeechIsEqualToPartyMember"])?
         {
-            return Err("not ported: leech from party members".into());
+            let party = self.party_of(actor)?;
+            let v = self
+                .c
+                .out(party, "MaxLifeLeechRatePercent")
+                .ok_or("attempt to perform arithmetic on a nil value (mul)")?;
+            self.c.set_out(actor, "MaxLifeLeechRatePercent", v);
         }
         let pct = o(self, "MaxLifeLeechRatePercent");
         let v = life * pct / 100.0;
@@ -1002,13 +1017,20 @@ impl<'a> Perform<'a> {
         let ms = match self.c.override_num(db, None, &["MovementSpeed"])? {
             Some(v) => v,
             None => {
-                if self
-                    .c
-                    .flag(db, None, &["MovementSpeedEqualHighestLinkedPlayers"])?
-                {
-                    return Err("not ported: movement speed of party members".into());
+                let linked =
+                    if self
+                        .c
+                        .flag(db, None, &["MovementSpeedEqualHighestLinkedPlayers"])?
+                    {
+                        let party = self.party_of(actor)?;
+                        self.c.out(party, "MovementSpeedMod")
+                    } else {
+                        None
+                    };
+                match linked {
+                    Some(v) => v,
+                    None => self.c.calc_mod(db, None, &["MovementSpeed"])?,
                 }
-                self.c.calc_mod(db, None, &["MovementSpeed"])?
             }
         };
         let ms = if self.c.flag(db, None, &["MovementSpeedCannotBeBelowBase"])? {

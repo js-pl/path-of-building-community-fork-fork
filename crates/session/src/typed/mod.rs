@@ -75,8 +75,39 @@ impl TypedData {
         Ok(TypedData { socket_ids, ..data })
     }
 
+    /// Reads the data from its binary form in a data bundle
+    /// ([`crate::bundle`]): the game data, the mod parser and the latest
+    /// tree must be there; other tree versions are read when a build
+    /// first needs them, and a missing one is recorded in `files` so the
+    /// caller can add it and retry.
+    pub fn from_files(files: std::rc::Rc<crate::Files>) -> Result<TypedData> {
+        use crate::bundle::{GAME_DATA, MOD_PARSER};
+        let read = |path: &str| {
+            files
+                .get(path)
+                .ok_or_else(|| format!("missing data file {path}"))
+        };
+        let game = GameData::decode(&read(GAME_DATA)?)?;
+        let parser = ModParser::decode(&read(MOD_PARSER)?)?;
+        let trees = files.clone();
+        let source = move |v: &str, _: &ModParser| {
+            let path = crate::bundle::tree_path(v);
+            let bytes = trees
+                .get(&path)
+                .ok_or_else(|| format!("missing data file {path}"))?;
+            let tree = crate::bundle::decode_tree(&bytes).map_err(|e| format!("{path}: {e}"))?;
+            trees.remove(&path);
+            Ok(tree)
+        };
+        let data = TypedData::new(game, parser, Box::new(source))?;
+        files.remove(GAME_DATA);
+        files.remove(MOD_PARSER);
+        Ok(data)
+    }
+
     /// Makes the data from upstream's source directory, as `gamedata`
     /// does at build time
+    #[cfg(feature = "source")]
     pub fn from_source(src_dir: &std::path::Path) -> Result<TypedData> {
         let src = gamedata::Source::load(src_dir)?;
         let game = src.game_data()?;
@@ -153,6 +184,7 @@ impl TypedData {
             } else {
                 None
             },
+            setup: &self.game.setup,
         };
         Build::load(root, &ctx, tree, &self.parser)
     }
