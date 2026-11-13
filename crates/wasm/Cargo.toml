@@ -10,6 +10,12 @@ publish.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["translation"]
+# Commands the typed engine does not have yet fall back to upstream's
+# translated program; without it they are "not ported" errors and the
+# module holds neither the translation nor the Lua runtime
+translation = ["session/translation"]
+
 [dependencies]
-session = { path = "../session" }
-upstream.workspace = true
+session = { path = "../session", default-features = false }
