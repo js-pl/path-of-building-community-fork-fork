@@ -389,16 +389,18 @@ What remains for the full migration, in order:
    - Tooltips in the cases above that fall back.
    - Items and crafting: `displayItem`, `craftItem`,
      `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
-     popups, the unique and rare databases: `Data/Uniques/Special/Generated.lua`
-     and `Item:Craft` are not ported). `addItem`, `editItem`,
-     `setDisplayItem` and `saveDisplayItem` are typed
+     popups, the unique and rare databases:
+     `Data/Uniques/Special/Generated.lua` is not ported). `addItem`,
+     `editItem`, `setDisplayItem` and `saveDisplayItem` are typed
      (`session::typed::item_editor`: `AddItem` with its auto-equip,
      `CreateDisplayItemFromRaw`, `CopyAnointsAndEldritchImplicits`,
-     `AddDisplayItem`) and in `items_edits_match`; a crafted cluster
-     jewel in the editor (`UpdateClusterJewelControls` crafts it again)
-     and a Forbidden jewel whose counterpart is missing fall back. The
-     display item is held typed, so `displayItem` answers on the
-     translation after its replays.
+     `AddDisplayItem`, `SetDisplayItem` with the affix drop-downs'
+     lists, `UpdateAffixControl` without the sort by power, and
+     `UpdateClusterJewelControls`/`CraftClusterJewel`, which craft a
+     crafted cluster jewel again) and in `items_edits_match`.
+     `Item:Craft` is `engine::item_craft`. A Forbidden jewel whose
+     counterpart is missing falls back. The display item is held typed,
+     so `displayItem` answers on the translation after its replays.
    - Engine gaps that make a build fall back: Combust's trigger
      (gen-0028), tree edits with Intuitive
      Leap and the like, tattoos, specs in the URL format only, the character
