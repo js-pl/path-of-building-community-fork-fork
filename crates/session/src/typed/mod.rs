@@ -265,6 +265,8 @@ pub struct TypedSession<'d> {
     gem_quality_nil: bool,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
+    /// The item editor's controls
+    editor: item_editor::Editor,
 }
 
 impl<'d> TypedSession<'d> {
@@ -301,6 +303,7 @@ impl<'d> TypedSession<'d> {
             undo: HashMap::new(),
             gem_quality_nil: false,
             display_item: None,
+            editor: Default::default(),
             root,
         };
         // `ConfigTab:Load` shows the loaded set

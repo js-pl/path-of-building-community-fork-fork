@@ -79,6 +79,10 @@ pub struct Affix {
     pub weight_val: Vec<f64>,
     pub weight_multiplier_key: Vec<String>,
     pub weight_multiplier_val: Vec<f64>,
+    pub level: Option<f64>,
+    pub group: Option<String>,
+    /// `tags`: what the affix adds to an item's tags while crafting
+    pub tags: Vec<String>,
 }
 
 /// A table of affixes, in data order
@@ -126,6 +130,9 @@ impl AffixSet {
                 weight_val: numbers("weightVal")?,
                 weight_multiplier_key: strings("weightMultiplierKey")?,
                 weight_multiplier_val: numbers("weightMultiplierVal")?,
+                level: opt_number(&get(&m, "level"))?,
+                group: opt_string(&get(&m, "group"))?,
+                tags: strings("tags")?,
             };
             let affix = Arc::new(affix);
             if let Some(p) = addr {
@@ -147,6 +154,7 @@ pub struct RareLikeUnique {
     pub prefix_limit: f64,
     pub suffix_limit: f64,
     pub ignore_mod_type: bool,
+    pub allow_duplicate_groups: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -174,6 +182,9 @@ pub struct ClusterSkill {
     /// `icon` and `masteryIcon`, art paths the tree view shows
     pub icon: Option<String>,
     pub mastery_icon: Option<String>,
+    pub tag: Option<String>,
+    /// The enchant lines a crafted jewel with this skill gets
+    pub enchant: Vec<String>,
 }
 
 /// One value of a line in `data.modScalability`
@@ -433,6 +444,7 @@ impl ItemData {
                     prefix_limit: number(&get(&v, "prefixLimit"))?,
                     suffix_limit: number(&get(&v, "suffixLimit"))?,
                     ignore_mod_type: get(&v, "ignoreModType").truthy(),
+                    allow_duplicate_groups: get(&v, "allowDuplicateGroups").truthy(),
                 },
             );
         }
@@ -470,6 +482,11 @@ impl ItemData {
                                     mastery: !get(sk, "masteryIcon").is_nil(),
                                     icon: opt_string(&get(sk, "icon"))?,
                                     mastery_icon: opt_string(&get(sk, "masteryIcon"))?,
+                                    tag: opt_string(&get(sk, "tag"))?,
+                                    enchant: array(&get(sk, "enchant"))
+                                        .iter()
+                                        .map(string)
+                                        .collect::<Result<_>>()?,
                                 },
                             ))
                         })
@@ -619,13 +636,18 @@ crate::codec_struct!(Affix {
     weight_val,
     weight_multiplier_key,
     weight_multiplier_val,
+    level,
+    group,
+    tags,
 });
 crate::codec_struct!(ClusterSkill {
     name,
     stats,
     mastery,
     icon,
-    mastery_icon
+    mastery_icon,
+    tag,
+    enchant,
 });
 crate::codec_struct!(ClusterJewel {
     size,
@@ -700,6 +722,7 @@ impl Codec for ItemData {
             u.prefix_limit.put(w);
             u.suffix_limit.put(w);
             u.ignore_mod_type.put(w);
+            u.allow_duplicate_groups.put(w);
         }
         self.bases.put(w);
         self.foulborn_map.put(w);
@@ -763,6 +786,7 @@ impl Codec for ItemData {
                     prefix_limit: Codec::get(r)?,
                     suffix_limit: Codec::get(r)?,
                     ignore_mod_type: Codec::get(r)?,
+                    allow_duplicate_groups: Codec::get(r)?,
                 },
             );
         }
