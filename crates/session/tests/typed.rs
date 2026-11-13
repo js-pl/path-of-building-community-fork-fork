@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 11] = [
+const PHASES: [(&str, usize); 12] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -98,6 +98,7 @@ const PHASES: [(&str, usize); 11] = [
     ("tooltips", 3),
     ("party", 2),
     ("new", 1),
+    ("overlays", 2),
 ];
 
 /// The typed engine's commands against the translated session's: the
@@ -155,12 +156,154 @@ fn typed_session_matches_translated() {
         "items" => items_edits_match(&mut d),
         "config" => config_edits_match(&mut d),
         "tooltips" => tooltips_match(data, &mut d),
+        "overlays" => overlays_match(data, &mut d),
         "party" => party_match(data, &mut d),
         "new" => new_build_matches(&mut d),
         _ => panic!("unknown phase {phase}"),
     }
     at_build(&mut d, "");
     report_fallbacks(phase);
+}
+
+/// Node tooltips of tattooed nodes and of the nodes timeless jewels
+/// conquer, which the corpus has none of: the builds of
+/// `equivalence::variants` (tattoos; a build with each timeless jewel)
+fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
+    const JEWELS: [&str; 11] = [
+        "Glorious Vanity",
+        "Lethal Pride",
+        "Brutal Restraint",
+        "Militant Faith",
+        "Elegant Hubris",
+        "Heroic Tragedy",
+        "Festering Vengeance",
+        "Extinguishing Grasp",
+        "Baleful Dominion",
+        "Destructive Aspiration",
+        "Reclaimed Malevolence",
+    ];
+    let mut eq = equivalence::typed_build::TypedData::load();
+    let mut seen = std::collections::HashSet::new();
+    let mut builds = equivalence::variants::tattoo_variants(&mut eq);
+    builds.extend(
+        equivalence::variants::timeless_variants(&mut eq)
+            .into_iter()
+            .filter(|(id, _)| seen.insert(id.split('-').nth(1).unwrap_or("").to_string())),
+    );
+    let tree = data.tree(data.game.latest_tree_version()).unwrap();
+    let (mut failures, mut compared, mut aligned) = (Vec::new(), 0, Vec::new());
+    for (id, xml) in mine(builds) {
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+        let alloc: Vec<u32> = state["ok"]["alloc"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_u64().map(|v| v as u32))
+            .collect();
+        // The tattooed nodes
+        let attr = |e: &str, k: &str| -> Option<String> {
+            Some(
+                e.split(&format!("{k}=\""))
+                    .nth(1)?
+                    .split('"')
+                    .next()?
+                    .to_string(),
+            )
+        };
+        let mut nodes: Vec<u32> = xml
+            .split("<Override ")
+            .skip(1)
+            .filter_map(|o| attr(o, "nodeId")?.parse().ok())
+            .collect();
+        // The nodes in the radius of the sockets with timeless jewels
+        let timeless: Vec<String> = xml
+            .split("<Item ")
+            .skip(1)
+            .filter(|i| {
+                JEWELS
+                    .iter()
+                    .any(|j| i.split("</Item>").next().unwrap_or("").contains(j))
+            })
+            .filter_map(|i| attr(i, "id"))
+            .collect();
+        for sock in xml.split("<Socket ").skip(1) {
+            if !attr(sock, "itemId").is_some_and(|i| timeless.contains(&i)) {
+                continue;
+            }
+            let Some(radius) = attr(sock, "nodeId")
+                .and_then(|n| n.parse::<u32>().ok())
+                .and_then(|n| tree.node(n)?.nodes_in_radius.as_ref()?.last())
+            else {
+                continue;
+            };
+            let (on, off): (Vec<u32>, Vec<u32>) = radius.iter().partition(|n| alloc.contains(n));
+            nodes.extend(on);
+            nodes.extend(off.into_iter().step_by(8));
+        }
+        nodes.sort_unstable();
+        nodes.dedup();
+        let mut out = Vec::new();
+        let mut recheck = Vec::new();
+        for n in nodes {
+            let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
+            let typed = answer(d.request(&req), "typed");
+            let tr = answer(d.translated_request(&req), "translated");
+            let mut lines = Vec::new();
+            diff(&typed, &tr, &req, &mut lines);
+            if !lines.is_empty() {
+                recheck.push((req, typed, lines));
+            }
+            compared += 1;
+        }
+        // `ReplaceNode` wipes the reminder text a node reads from the
+        // shared tree node (`wipeTable(old.reminderText)`), for every later
+        // build of the process: a tooltip that differs is asked again of a
+        // fresh translation, and aligned when that one agrees
+        if !recheck.is_empty() {
+            let fresh = session();
+            let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+            answer(fresh.request(&load), "fresh load");
+            for (req, typed, lines) in recheck {
+                let tr = answer(fresh.request(&req), "fresh");
+                let mut again = Vec::new();
+                diff(&typed, &tr, &req, &mut again);
+                if again.is_empty() {
+                    aligned.push(format!("{id}: {req}"));
+                } else {
+                    out.extend(lines);
+                }
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(4);
+            for l in &mut out {
+                if let Some((at, _)) = l.char_indices().nth(600) {
+                    l.truncate(at);
+                }
+            }
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{compared} overlay node tooltips compared, aligned with a fresh translation {}:\n{}",
+        aligned.len(),
+        aligned.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// The fallbacks the typed session still has, as substrings of their
@@ -384,6 +527,31 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
                 nodes.push(pool[rng.below(pool.len())]);
             }
         }
+        // Tattooed nodes, and nodes in the radius of socketed jewels,
+        // which timeless jewels conquer
+        for o in xml.split("<Override ").skip(1) {
+            let id = o
+                .split("nodeId=\"")
+                .nth(1)
+                .and_then(|v| v.split('"').next()?.parse::<u32>().ok());
+            nodes.extend(id);
+        }
+        for s in &slots {
+            let Some(radius) = s["nodeId"]
+                .as_u64()
+                .and_then(|n| tree.node(n as u32)?.nodes_in_radius.as_ref()?.last())
+            else {
+                continue;
+            };
+            let (on, off): (Vec<u32>, Vec<u32>) = radius.iter().partition(|n| alloc.contains(n));
+            for pool in [&on, &on, &off] {
+                if !pool.is_empty() {
+                    nodes.push(pool[rng.below(pool.len())]);
+                }
+            }
+        }
+        nodes.sort_unstable();
+        nodes.dedup();
         for n in nodes {
             compare(d, json!({"cmd": "nodeTooltip", "id": n}));
         }

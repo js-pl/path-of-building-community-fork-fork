@@ -32,6 +32,7 @@ serde_json.workspace = true
 
 [dev-dependencies]
 testkit.workspace = true
+equivalence = { path = "../equivalence" }
 
 [[test]]
 name = "session"

@@ -360,8 +360,18 @@ What remains for the full migration, in order:
    `finalModList`: the calculation's for allocated nodes and those near
    a radius jewel (`extraRadiusNodeList`, now kept as well), else the
    node's own `modList`, which `CalcsTab:BuildOutput` sets on every
-   node first. Falling back: tattooed and conquered nodes, a mastery
-   tooltip with a popup open, the party view with imported data. A radius jewel's
+   node first. Tattooed and conquered nodes show their replacement's
+   reminder text, none when it has none (`ReplaceNode` empties the
+   node's table), and a tattoo's own only when the tree node has one:
+   `BuildAllDependsAndPaths` puts the tree node back before each tattoo,
+   which empties the tattoo's table otherwise. The emptied table can be
+   the shared tree node's, read through the spec node's metatable, so
+   later builds of the process lose that reminder text too: phase
+   `overlays` (the tattoo and timeless jewel builds of
+   `equivalence::variants`, which the corpus has none of) asks a
+   tooltip that differs again of a fresh translation and aligns it when
+   that one agrees (11 of 218). Falling back: a mastery tooltip with a
+   popup open, the party view with imported data. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -441,7 +451,9 @@ What remains for the full migration, in order:
      controls (`session::typed::item_editor_controls`: variants and
      version, sockets and links, influences, quality, catalysts, cluster
      jewel skill and node count, affixes and their rolls, range lines,
-     custom modifier removal, and the Save, Edit and Cancel buttons;
+     custom modifier removal, the Foulborn mutation checkboxes
+     (`Item:MutateMod` in `engine::item_craft`), and the Save, Edit and
+     Cancel buttons;
      upstream's state on the controls, such as the edits' text and the
      sliders' values, is kept in `item_editor::Editor`), the Enchant Item
      popup (`session::typed::item_enchant`, with `data.enchantments` from
