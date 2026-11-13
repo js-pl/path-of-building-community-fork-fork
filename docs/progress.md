@@ -267,7 +267,7 @@ What remains for the full migration, in order:
    re-parses every item), the translation's 2.2 s; the browser's
    background node power, which saves the build first, no longer
    replays the typed edits on the translation (its load alone took
-   about 1.2 s per corpus build). `undo` is not ported.
+   about 1.2 s per corpus build).
 
    Items, sets and specs are typed (`session::typed::items`, `sets`):
    `items` (`UpdateSockets`' labels, which slots show, what fits each
@@ -284,15 +284,34 @@ What remains for the full migration, in order:
    translated 71 s with its replays). Saving first makes the Calcs
    tab's calculation, as a frame does, for its write-backs to the gems.
 
+   The Configuration tab, class changes, undo and new builds are typed
+   (`session::typed::config`, `undo`): `config` (each option control's
+   visibility from its `ifCond`, `ifSkill`, ... rules on the sidebar's
+   calculation, whose `env.conditionsUsed`, `skillsUsed`, ... tables
+   `engine::sidebar::ConfigUsed` records; values, placeholders the
+   options' functions set, tooltips), `control` of the option controls
+   with `BuildModList` and the recalculation, of the class, ascendancy
+   and bloodline drop-downs (with `IsClassConnected` and the class change
+   popup, whose Continue `popupButton` and `closePopup` are typed),
+   `undo` (the active spec's `UndoHandler`; a spec with tattoos or
+   cluster jewel subgraphs falls back) and `newBuild`. The options'
+   metadata comes from `Modules/ConfigOptions.lua` at build time
+   (`engine::config_tab::ConfigVar` in the game data), with
+   `data.enemyIsBossTooltip` evaluated from `Data.lua`.
+   `config_edits_match` (phase `config`): random sequences of option,
+   class drop-down, popup, config set and undo edits (6 per build) give
+   the translation's `config`, sidebar, outputs and tree after each step
+   and its file at the end; then a new build with a class change and its
+   undo. With `SESSION_STEPS=12`: 707 edits, typed 13.5 s, translated
+   129 s with its replays. A build loaded after a class change popup
+   opened keeps it, as upstream's popups belong to `main` (the
+   dispatcher carries the typed popups over; a popup the translation
+   opened while the build was on it is not carried). Saviour's mirage as
+   the main skill and undo on specs with tattoos or cluster jewel
+   subgraphs fall back.
+
    Still on the translation, before it can be dropped:
-   - Edits with a recalculation: `control` of the class, ascendancy and
-     bloodline drop-downs (`buildMode` opens a popup when points are
-     spent) and of the config options (`ConfigTab`'s option controls),
-     `undo`, `newBuild`.
-   - Read-only views: `config`
-     (each option's visibility, `ConfigVisibility.lua` and the options'
-     `ifCond`, `ifSkill`, ... rules on the sidebar's calculation, and
-     their tooltips), `itemDb`, `party`, `notes`, `controls` of other
+   - Read-only views: `itemDb`, `party`, `notes`, `controls` of other
      tabs.
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
      `previewItem` (the `Tooltip` lines of `PassiveTreeView`,

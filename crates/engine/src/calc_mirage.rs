@@ -61,6 +61,8 @@ pub struct MirageCalc {
     /// The copy's gem level and quality, which a calculation whose main
     /// skill the copy replaces writes to its breakdown
     pub gem: Option<GemSums>,
+    /// The flags the copy's mod list sets, as the calculation left it
+    pub mod_flags: std::collections::BTreeSet<String>,
 }
 
 /// A main skill's gem level and quality, and the sums of its mod list
@@ -350,8 +352,10 @@ impl<'a> Perform<'a> {
                 output,
                 mut copy,
                 gem,
+                mod_flags,
             } = recalc()?.mirage(ext, &self.input.limited)?;
             self.main_copy_gem = gem;
+            self.main_copy_mod_flags = mod_flags;
             // The player's output and main skill are the warriors'
             self.c.actors.actors[PLAYER].output = output;
             let n = crate::pat::num(warriors);
@@ -413,8 +417,10 @@ impl<'a> Perform<'a> {
                 output,
                 mut copy,
                 gem,
+                mod_flags,
             } = recalc()?.mirage(ext, &self.input.limited)?;
             self.main_copy_gem = gem;
+            self.main_copy_mod_flags = mod_flags;
             self.c.actors.actors[PLAYER].output = output;
             copy.info_message = Some(format!(
                 "Tawhoa's Chosen using {}",

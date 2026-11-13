@@ -353,6 +353,7 @@ impl Recalc for Recalculator<'_, '_> {
         p.finish()?;
         let copy = p.mods(p.main()).clone();
         let gem = p.gem_sums(p.main())?;
+        let mod_flags = crate::sidebar::main_skill_mod_flags(&p)?;
         let mut output = p.c.actors.actors[crate::calc::PLAYER].output.clone();
         // `output.Minion`: the copy's minion's output
         if let Some(a) = p.minion_actor() {
@@ -373,7 +374,12 @@ impl Recalc for Recalculator<'_, '_> {
                 output.insert(Sym::new(k), OutVal::Num(v));
             }
         }
-        Ok(crate::calc_mirage::MirageCalc { output, copy, gem })
+        Ok(crate::calc_mirage::MirageCalc {
+            output,
+            copy,
+            gem,
+            mod_flags,
+        })
     }
 }
 
