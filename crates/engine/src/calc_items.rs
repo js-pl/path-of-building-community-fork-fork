@@ -749,11 +749,12 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             }
             out.add_mult(&mult, 1.0);
         }
-        let aegis = input.alloc.contains(45175)
-            && spec
-                .tree
-                .node(45175)
-                .is_some_and(|n| &*n.dn == "Necromantic Aegis");
+        // `env.allocNodes[45175].dn`: the spec's node, which a timeless
+        // jewel may have replaced
+        let aegis = input
+            .alloc
+            .get(45175)
+            .is_some_and(|&i| spec.dn(i) == "Necromantic Aegis");
         let weapon = slot_name == "Weapon 1" || slot_name == "Weapon 2";
         if typ(item) == "Shield" && aegis {
             // Necromantic Aegis: the shield's mods go to the minions, but

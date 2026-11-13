@@ -99,12 +99,18 @@ State at the handoff:
   ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
   `timeless_specs_match_upstream` and `timeless_match_upstream` socket
   each jewel and conqueror with a seed of its own in generated corpus
-  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
-  replaced), against the translation with `Inflate` installed (headless
-  upstream has none, so the oracle cannot run them). The Abyss variants
-  run last: a conquered node's `setSource` rewrites the mod parser's
-  cached mods, which the legion keystones share, so a keystone conquered
-  later in the same translation names another node as its mods' source.
+  builds: every fifth build's socket with the most allocated nodes in
+  its radius (each jewel in all its variants, the legacy ones in every
+  third of those builds), and in every build each socket with allocated
+  keystones in its radius, with one legacy jewel in turn (113 specs,
+  3893 nodes replaced), against the translation with `Inflate` installed
+  (headless upstream has none, so the oracle cannot run them). A
+  conquered Necromantic Aegis no longer sends the shield's mods to the
+  minions (`env.allocNodes[45175].dn` is the spec's node). The Abyss
+  variants run last: a conquered node's `setSource` rewrites the mod
+  parser's cached mods, which the legion keystones share, so a keystone
+  conquered later in the same translation names another node as its
+  mods' source; `tests/spec.rs` aligns those sources.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
