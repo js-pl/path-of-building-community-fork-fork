@@ -63,6 +63,8 @@ pub struct Base {
     /// The base's implicit lines, separated by newlines
     pub implicit: Option<String>,
     pub implicit_mod_types: Option<Vec<Vec<String>>>,
+    /// The tooltip's flavour text (`flavourText`)
+    pub flavour_text: Option<Vec<String>>,
 }
 
 /// An affix or other item mod (`data.itemMods.<group>[id]`).
@@ -226,6 +228,10 @@ pub struct ItemData {
     /// numbers replaced (`uniqueModStatOrder` of `Classes/Item.lua`)
     pub unique_stat_order_exact: HashMap<String, f64>,
     pub unique_stat_order_normalised: HashMap<String, f64>,
+    /// `data.flavourText`: each unique's flavour texts by id, in the order
+    /// `flavourLookup` of `Classes/ItemsTab.lua` gets them (`pairs` of the
+    /// data)
+    pub flavour_text: HashMap<String, Vec<(String, Vec<String>)>>,
 }
 
 fn pairs(v: &Value) -> Vec<(Key, Value)> {
@@ -335,6 +341,7 @@ impl Base {
             },
             socket_limit: opt_number(&get(v, "socketLimit"))?,
             cannot_be_anointed: get(v, "cannotBeAnointed").truthy(),
+            flavour_text: opt_lines(&get(v, "flavourText"))?,
             weapon: opt_map("weapon")?,
             armour: opt_map("armour")?,
             flask: if flask.is_nil() {
@@ -386,6 +393,21 @@ impl ItemData {
                 .collect::<Result<_>>()?,
             ..ItemData::default()
         };
+        // `pairs` order, as `flavourLookup` is filled: the data's table has
+        // explicit keys, so the order is the hash part's
+        for (_, entry) in pairs(&get(data, "flavourText")) {
+            let (name, id, text) = (get(&entry, "name"), get(&entry, "id"), get(&entry, "text"));
+            if name.is_nil() || id.is_nil() || text.is_nil() {
+                continue;
+            }
+            let list = d.flavour_text.entry(string(&name)?).or_default();
+            let id = string(&id)?;
+            let text = opt_lines(&text)?.unwrap_or_default();
+            match list.iter_mut().find(|(i, _)| *i == id) {
+                Some(e) => e.1 = text,
+                None => list.push((id, text)),
+            }
+        }
         for (k, v) in pairs(&get(data, "itemBases")) {
             let name = key_string(&k)?;
             let base = Base::from_lua(&name, &v).map_err(|e| format!("base {name}: {e}"))?;
@@ -609,6 +631,7 @@ crate::codec_struct!(Base {
     cannot_be_anointed,
     implicit,
     implicit_mod_types,
+    flavour_text,
 });
 crate::codec_struct!(Affix {
     id,
@@ -724,6 +747,7 @@ impl Codec for ItemData {
         self.minion_tag_crucible_uniques.put(w);
         self.unique_stat_order_exact.put(w);
         self.unique_stat_order_normalised.put(w);
+        self.flavour_text.put(w);
     }
 
     fn get(r: &mut Reader) -> codec::Result<Self> {
@@ -799,6 +823,7 @@ impl Codec for ItemData {
             minion_tag_crucible_uniques: Codec::get(r)?,
             unique_stat_order_exact: Codec::get(r)?,
             unique_stat_order_normalised: Codec::get(r)?,
+            flavour_text: Codec::get(r)?,
         })
     }
 }

@@ -10,11 +10,16 @@ mod geometry;
 mod item_db;
 mod item_editor;
 mod item_popups;
+mod item_tooltip;
 mod items;
+mod node_tooltip;
+mod notes;
+mod party;
 mod save;
 mod sets;
 mod sidebar;
 mod skills;
+pub mod tooltip;
 mod tree;
 mod undo;
 
@@ -252,6 +257,8 @@ pub struct TypedSession<'d> {
     item_keys: lua::ljtab::LjMap<()>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
+    /// The Notes tab's text
+    notes: String,
     /// The Configuration tab's option controls
     config_controls: config::ConfigControls,
     /// The class each open class change popup selects, front first
@@ -294,6 +301,7 @@ impl<'d> TypedSession<'d> {
             other_specs: Vec::new(),
             item_keys: Default::default(),
             socket_labels: HashMap::new(),
+            notes: notes::load_notes(&root),
             config_controls: config::ConfigControls::new(&data.game.config_vars),
             class_popups: Vec::new(),
             undo: HashMap::new(),

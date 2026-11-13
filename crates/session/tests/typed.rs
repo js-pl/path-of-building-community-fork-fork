@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 10] = [
+const PHASES: [(&str, usize); 11] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -95,13 +95,14 @@ const PHASES: [(&str, usize); 10] = [
     ("save", 3),
     ("items", 3),
     ("config", 3),
+    ("tooltips", 3),
     ("party", 2),
     ("new", 1),
 ];
 
 /// The typed engine's commands against the translated session's: the
 /// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
-/// and item edits and the saved files, each over the corpus. Each phase runs on shards of the
+/// and item edits, the saved files and the tooltips, each over the corpus. Each phase runs on shards of the
 /// corpus, each in a process of its own with one data and one translated
 /// session (`testkit::run_shards`): the translation keeps about 12 MB of
 /// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
@@ -126,7 +127,16 @@ fn typed_session_matches_translated() {
         return testkit::run_shards(
             test,
             &shards,
-            &[" builds", " edits", " trees", "skipped ", "fallback"],
+            &[
+                " builds",
+                " edits",
+                " trees",
+                "skipped ",
+                " compared",
+                "aligned ",
+                "fell back ",
+                "fallback",
+            ],
         );
     };
     let (phase, part) = shard.split_once(' ').unwrap();
@@ -144,6 +154,7 @@ fn typed_session_matches_translated() {
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
         "config" => config_edits_match(&mut d),
+        "tooltips" => tooltips_match(data, &mut d),
         "party" => party_match(data, &mut d),
         "new" => new_build_matches(&mut d),
         _ => panic!("unknown phase {phase}"),
@@ -157,6 +168,14 @@ fn typed_session_matches_translated() {
 const KNOWN_FALLBACKS: &[&str] = &[
     "undo with tattoos or cluster jewels",
     "specs on another tree version",
+    // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
+    // radius data kept from earlier calculations, or errors on these
+    "comparing a jewel that changes the tree",
+    "a jewel's attributes in radius",
+    "a socket tooltip with nodes the calculation did not build",
+    "toggling a flask that is not in the build",
+    // Node ids not in the build's tree: the translation errors too
+    ": no node ",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
@@ -254,6 +273,186 @@ fn new_build_matches(d: &mut Dispatcher) {
     compare_saves(d, "newBuild with a skill", &mut out);
     out.truncate(20);
     assert!(out.is_empty(), "newBuild differs:\n{}", out.join("\n"));
+}
+
+/// The notes, and the tooltips of every socket group and item and of
+/// nodes on and around the tree, give the translation's on every corpus
+/// build, also after a few edits; `SESSION_NODES` sets the nodes per build
+fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let (mut failures, mut fell_back, mut aligned) = (Vec::new(), Vec::new(), Vec::new());
+    let mut counts: std::collections::BTreeMap<&str, (usize, Duration, Duration)> =
+        Default::default();
+    let nodes_per_build: usize = std::env::var("SESSION_NODES")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let tree = data.tree(data.game.latest_tree_version()).unwrap();
+    for (id, path) in mine(corpus()) {
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id) + 23);
+        let mut out = Vec::new();
+        // Requests that differ, rechecked on a fresh translation, with the
+        // edits made before them
+        let mut recheck: Vec<(String, J, Vec<String>, Vec<String>)> = Vec::new();
+        let edits = std::cell::RefCell::new(Vec::<String>::new());
+        let mut compare = |d: &mut Dispatcher, req: J| {
+            let r = req.to_string();
+            let cmd = req["cmd"].as_str().unwrap().to_string();
+            if !d.typed_active() {
+                return;
+            }
+            d.typed_error = None;
+            let t = Instant::now();
+            let typed = answer(d.request(&r), "typed");
+            let tt = t.elapsed();
+            let fell = d.typed_error.take();
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&r), "translated");
+            let c = counts.entry(Box::leak(cmd.into_boxed_str())).or_default();
+            match fell {
+                Some(e) => {
+                    let e = e.lines().next().unwrap_or("").to_string();
+                    fell_back.push(format!("{id}: {r:.120}: {e:.160}"));
+                }
+                None => {
+                    c.0 += 1;
+                    c.1 += tt;
+                    c.2 += t.elapsed();
+                    let mut lines = Vec::new();
+                    diff(&typed, &tr, &format!("{r:.200}"), &mut lines);
+                    if !lines.is_empty() {
+                        recheck.push((r, typed, lines, edits.borrow().clone()));
+                    }
+                }
+            }
+        };
+        compare(d, json!({"cmd": "notes"}));
+        compare(d, json!({"cmd": "party"}));
+        let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
+            .as_array()
+            .map_or(0, Vec::len);
+        for g in 1..=groups {
+            compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
+        }
+        let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+        for item in items["ok"]["items"].as_array().into_iter().flatten() {
+            compare(d, json!({"cmd": "itemTooltip", "id": item["id"]}));
+        }
+        // Equipped items compared in their own slot, and the first item's
+        // text as a preview
+        let slots: Vec<J> = items["ok"]["slots"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|s| s["item"].is_number())
+            .cloned()
+            .collect();
+        for _ in 0..3.min(slots.len()) {
+            let s = &slots[rng.below(slots.len())];
+            let req = json!({"cmd": "itemTooltip", "id": s["item"], "slot": s["name"]});
+            compare(d, req);
+        }
+        if let Some(raw) = items["ok"]["items"][0]["raw"].as_str() {
+            compare(d, json!({"cmd": "previewItem", "text": raw}));
+        }
+        // Allocated nodes, their neighbours, and the allocated sockets
+        let state = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+        let alloc: Vec<u32> = state["ok"]["alloc"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_u64().map(|v| v as u32))
+            .collect();
+        let mut near: Vec<u32> = alloc
+            .iter()
+            .filter_map(|n| tree.node_index.get(n))
+            .flat_map(|&i| tree.nodes[i].linked_id.iter().copied())
+            .filter(|n| !alloc.contains(n))
+            .collect();
+        near.sort_unstable();
+        near.dedup();
+        let mut nodes: Vec<u32> = slots
+            .iter()
+            .filter_map(|s| s["nodeId"].as_u64().map(|n| n as u32))
+            .take(2)
+            .collect();
+        for k in 0..nodes_per_build {
+            let pool = if k % 2 == 0 { &alloc } else { &near };
+            if !pool.is_empty() {
+                nodes.push(pool[rng.below(pool.len())]);
+            }
+        }
+        for n in nodes {
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
+        }
+        // Notes edited, and tooltips after a tree edit
+        let text = format!("Notes of {id}\n^_1colour ^_xFF0000and ^1codes");
+        let req = json!({"cmd": "setNotes", "text": text}).to_string();
+        answer(d.request(&req), "setNotes");
+        edits.borrow_mut().push(req);
+        compare(d, json!({"cmd": "notes"}));
+        if let Some(&n) = near.first() {
+            let req = json!({"cmd": "clickNode", "id": n}).to_string();
+            answer(d.request(&req), "clickNode");
+            edits.borrow_mut().push(req);
+            compare(d, json!({"cmd": "nodeTooltip", "id": n}));
+            for g in 1..=groups.min(2) {
+                compare(d, json!({"cmd": "socketGroupTooltip", "index": g}));
+            }
+        }
+        if d.typed_active() {
+            compare_saves(d, "after the notes", &mut out);
+            compare(d, json!({"cmd": "notes"}));
+        }
+        // Upstream changes shared skill data for good (`ProcessSocketGroup`
+        // clears a triggered granted skill's level cost), so a build loaded
+        // earlier in the session can change the translation's answer: a
+        // request that differs is asked again of a fresh translation, with
+        // the same edits before it, and aligned when that one agrees
+        for (r, typed, lines, done) in recheck {
+            let fresh = session();
+            let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
+            answer(fresh.request(&load), "fresh load");
+            for e in &done {
+                answer(fresh.request(e), "fresh edit");
+            }
+            let tr = answer(fresh.request(&r), "fresh");
+            let mut again = Vec::new();
+            diff(&typed, &tr, &r, &mut again);
+            if again.is_empty() {
+                aligned.push(format!("{id}: {r:.120}"));
+            } else {
+                out.extend(lines);
+            }
+        }
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "aligned with a fresh translation {}:\n{}",
+        aligned.len(),
+        aligned.join("\n")
+    );
+    for (cmd, (n, t, tr)) in &counts {
+        eprintln!("{cmd}: {n} compared, typed {t:.1?}, translated {tr:.1?}");
+    }
+    eprintln!("fell back {}:\n{}", fell_back.len(), fell_back.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// The views compared after a config or class edit
@@ -1309,7 +1508,8 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
 fn color_codes_match_upstream() {
     let src = gamedata::Source::load(Path::new(&src())).unwrap();
     let codes = src.global("colorCodes");
-    for (name, code) in session::typed::display_stats::COLOR_CODES {
+    let all = session::typed::display_stats::COLOR_CODES.iter();
+    for (name, code) in all.chain(session::typed::tooltip::COLORS) {
         let v = codes.as_table().unwrap().get_str(name);
         assert_eq!(
             v.as_str().map(|s| s.to_str_lossy().into_owned()).as_deref(),
