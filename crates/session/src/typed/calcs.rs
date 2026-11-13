@@ -479,7 +479,7 @@ struct ModRow {
 
 impl TypedSession<'_> {
     /// The Calcs tab's calculation, made when first asked for
-    fn calcs_output(&mut self) -> Result<&mut BuildOutput> {
+    pub(super) fn calcs_output(&mut self) -> Result<&mut BuildOutput> {
         if self.calcs.is_none() {
             let data = self.data.calc_data();
             let out = engine::calcs::build_output(

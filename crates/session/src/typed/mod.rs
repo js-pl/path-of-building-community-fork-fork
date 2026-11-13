@@ -5,7 +5,9 @@
 
 mod calcs;
 pub mod display_stats;
+mod items;
 mod save;
+mod sets;
 mod sidebar;
 mod skills;
 mod tree;
@@ -167,6 +169,12 @@ pub struct TypedSession<'d> {
     view_mode: String,
     /// Whether the Calcs tab's `showMinion` input was set
     show_minion_set: bool,
+    /// The tree tab's specs; the active one is the build's (`None` here)
+    other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
+    /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
+    item_keys: lua::ljtab::LjMap<()>,
+    /// The jewel sockets' labels `UpdateSockets` last gave
+    socket_labels: HashMap<u32, String>,
 }
 
 impl<'d> TypedSession<'d> {
@@ -197,8 +205,15 @@ impl<'d> TypedSession<'d> {
                 .unwrap_or("TREE")
                 .to_string(),
             show_minion_set: false,
+            other_specs: Vec::new(),
+            item_keys: Default::default(),
+            socket_labels: HashMap::new(),
             root,
         };
+        s.load_specs()?;
+        for id in &s.build.items.item_order_list {
+            s.item_keys.insert(*id as u32, ());
+        }
         s.update_display_labels(true);
         s.refresh_controls()?;
         Ok(s)
@@ -313,7 +328,30 @@ fn out_val(v: &engine::actor::OutVal) -> J {
     }
 }
 
-impl TypedSession<'_> {
+impl<'d> TypedSession<'d> {
+    /// Every spec of the tree tab (`TreeTab:Load`, then `PostLoad`)
+    fn load_specs(&mut self) -> Result<()> {
+        let saved: Vec<engine::xml::Element> = self
+            .root
+            .child("PathOfBuilding")
+            .and_then(|p| p.child("Tree"))
+            .map(|t| t.elements().filter(|e| e.elem == "Spec").cloned().collect())
+            .unwrap_or_default();
+        let active = self.specs.0;
+        for (i, e) in saved.iter().enumerate() {
+            if i + 1 == active {
+                self.other_specs.push(None);
+                continue;
+            }
+            let tree = self.data.tree(e.attr("treeVersion").unwrap_or("2_6"))?;
+            let mut spec = engine::spec::PassiveSpec::new(tree, &self.data.parser)?;
+            spec.load(e).map_err(|e| format!("{NOT_PORTED}: {e}"))?;
+            spec.build_cluster_jewel_graphs(&self.build.items, &self.data.game.items)?;
+            self.other_specs.push(Some(std::sync::Arc::new(spec)));
+        }
+        Ok(())
+    }
+
     /// `nodePower`: `CalcsTab:PowerBuilder` with the tree tab's power stat
     /// of this index (1-based), as the heat map shows it
     pub fn node_power(&self, index: f64) -> Result<J> {

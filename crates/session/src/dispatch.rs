@@ -224,6 +224,36 @@ impl<'d> Dispatcher<'d> {
                     .collect::<Option<_>>()?;
                 self.typed.as_mut()?.breakdown(&cell).ok().map(ok)
             }
+            "items" => self.typed.as_mut()?.items().ok().map(ok),
+            "copySocketGroup" => {
+                let i = req["index"].as_f64()?;
+                self.typed.as_ref()?.copy_socket_group(i).ok().map(ok)
+            }
+            "pasteSocketGroup" => {
+                let text = req["text"].as_str()?.to_string();
+                self.edit(json, |s| s.paste_socket_group(&text))
+            }
+            "equipItem" => {
+                let slot = req["slot"].as_str()?.to_string();
+                let id = req["id"].as_f64().unwrap_or(0.0);
+                self.edit(json, |s| s.equip_item(&slot, id))
+            }
+            "deleteItem" => {
+                let id = req["id"].as_f64()?;
+                self.edit(json, |s| s.delete_item(id))
+            }
+            "selectItemSet" => {
+                let id = req["id"].as_f64()?;
+                self.edit(json, |s| s.select_item_set(id))
+            }
+            "selectTreeSpec" => {
+                let i = req["index"].as_f64()?;
+                self.edit(json, |s| s.select_tree_spec(i))
+            }
+            "selectConfigSet" => {
+                let id = req["id"].as_f64()?;
+                self.edit(json, |s| s.select_config_set(id))
+            }
             "saveXml" => self.edit(json, |s| Ok(json!({ "xml": s.save_xml()? }))),
             "saveCode" => self.edit(json, |s| Ok(json!({ "code": s.save_code()? }))),
             "nodePower" => {
