@@ -472,7 +472,11 @@ What remains for the full migration, in order:
      `NotableDBControl`, searched with `matchOrPattern`, sorted by name or
      a power stat with the anointed item; the translated session's
      `describePopups` builds and lists it, with its search and sort, and
-     `control` selects a row). All in `items_edits_match`, with
+     `control` selects a row) and Add Implicit to Item
+     (`session::typed::item_add_implicit`: Searing Exarch and Eater of
+     Worlds implicits grouped and sorted as `AddImplicitPopup` does, a
+     unique's vestigial implicits from `data.vestigialModMappings` and
+     `main.uniqueDB.byTitle`, or a custom line; sorted by power). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
