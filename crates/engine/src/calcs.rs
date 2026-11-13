@@ -16,7 +16,7 @@ use crate::actor::OutVal;
 use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
 use crate::build::Build;
 use crate::calc::{ENEMY, PLAYER, m_min};
-use crate::calc_cache::{Cache, Recalc, Recalculator, skill_uuid};
+use crate::calc_cache::{Cache, CacheAccess, Recalc, Recalculator, skill_uuid};
 use crate::calc_env::{CalcData, CalcMode, Env, init_env, init_env_cached};
 use crate::calc_override::Override;
 use crate::calc_perform::BuffMap;
@@ -261,6 +261,136 @@ impl Best {
     }
 }
 
+/// A calculation's player and enemy base databases
+type StoreBases = (Option<Arc<Store>>, Option<Arc<Store>>);
+
+/// Where a Full DPS skill's calculation starts
+enum Start {
+    /// The first setup itself, for the first skill
+    First,
+    /// A copy of the first setup and the build it left (`reuse_setup`)
+    Reuse,
+    /// A setup afresh on these base databases
+    Fresh(Option<(Arc<Store>, Arc<Store>)>),
+}
+
+impl Start {
+    fn same(&self, o: &Start) -> bool {
+        match (self, o) {
+            (Start::First, Start::First) | (Start::Reuse, Start::Reuse) => true,
+            (Start::Fresh(a), Start::Fresh(b)) => match (a, b) {
+                (None, None) => true,
+                (Some(a), Some(b)) => Arc::ptr_eq(&a.0, &b.0) && Arc::ptr_eq(&a.1, &b.1),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
+/// A skill's calculation, the cache it leaves and how it used the cache
+type Ran = (SkillRun, Cache, CacheAccess);
+
+/// What a Full DPS skill's calculation leaves for the sums
+struct SkillRun {
+    name: String,
+    part: Option<String>,
+    trigger: Option<String>,
+    info_message2: Option<String>,
+    minion: Option<MinionRun>,
+    mirage: Option<MirageRun>,
+    player: Output,
+    dot_can_stack: bool,
+    bases: StoreBases,
+}
+
+/// The main skill's minion
+struct MinionRun {
+    output: Output,
+    /// `"<minion name>: "`
+    name: String,
+    /// Whether the skill's damage counts once (Absolution, Dominating
+    /// Blow, Holy Strike)
+    counted_once: Result<bool>,
+}
+
+/// The main skill's mirage
+struct MirageRun {
+    name: String,
+    skill_part_name: Option<String>,
+    output: Output,
+    count: Option<f64>,
+}
+
+/// The calculation of a Full DPS skill, the main skill `i` of `env`
+fn run_skill(
+    b: &Build,
+    data: &CalcData,
+    mut env: Env,
+    i: usize,
+    recalc: &Recalculator,
+) -> Result<SkillRun> {
+    env.skills.main_skill = i;
+    let mut input = PerformInput::new(b, data, false)?;
+    input.recalc = Some(recalc);
+    input.skip_ehp = true;
+    let mut p = perform(env, input)?;
+    p.finish()?;
+    let bases = (
+        p.c.store(p.c.db(PLAYER)).base.clone(),
+        p.c.store(p.c.db(ENEMY)).base.clone(),
+    );
+    let name = p.skill_name(i).to_string();
+    let mods = p.mods(i);
+    let (part, trigger) = (mods.skill_part_name.clone(), mods.info_trigger.clone());
+    let info_message2 = mods.info_message2.clone();
+    let minion = p.minion_actor().map(|a| {
+        let m = &p.minions[p.env_minion.unwrap_or_default()].minion;
+        let mname = data
+            .setup
+            .minions
+            .get(&m.typ)
+            .and_then(|d| d.str("name"))
+            .unwrap_or_default();
+        let pdb = p.c.db(PLAYER);
+        let once = |skill: &str, cond: &str| -> Result<bool> {
+            Ok(name.contains(skill) && p.c.flag(pdb, None, &[cond])?)
+        };
+        let counted_once = (|| {
+            Ok(
+                once("Absolution", "Condition:AbsolutionSkillDamageCountedOnce")?
+                    || once(
+                        "Dominating Blow",
+                        "Condition:DominatingBlowSkillDamageCountedOnce",
+                    )?
+                    || once("Holy Strike", "Condition:HolyStrikeSkillDamageCountedOnce")?,
+            )
+        })();
+        MinionRun {
+            output: p.c.actors.actors[a].output.clone(),
+            name: format!("{mname}: "),
+            counted_once,
+        }
+    });
+    let mirage = p.mirage.as_ref().map(|m| MirageRun {
+        name: m.name.clone(),
+        skill_part_name: m.skill_part_name.clone(),
+        output: m.output.clone(),
+        count: m.count,
+    });
+    Ok(SkillRun {
+        name,
+        part,
+        trigger,
+        info_message2,
+        minion,
+        mirage,
+        player: p.c.actors.actors[PLAYER].output.clone(),
+        dot_can_stack: p.has_flag(i, "DotCanStack"),
+        bases,
+    })
+}
+
 /// `calcs.calcFullDPS(build, "CALCULATOR", {}, specEnv)` with the base
 /// databases of a calculation in the buff mode `base`
 pub fn calc_full_dps(build: &Build, data: &CalcData, base: BuffMode) -> Result<FullDps> {
@@ -276,9 +406,6 @@ pub fn calc_full_dps_with(
     ovr: &Override,
     cache: Cache,
 ) -> Result<(FullDps, Cache)> {
-    let recalc = Recalculator::new(build, data, CalcMode::Calculator)
-        .with_override(ovr)
-        .with_cache(cache);
     let setup =
         |b: &mut Build, bases| init_env_cached(b, data, CalcMode::Calculator, base, ovr, bases);
     // The setup does not depend on the main skill: each skill's
@@ -287,10 +414,10 @@ pub fn calc_full_dps_with(
     let mut set_up = build.clone();
     let first_env = setup(&mut set_up, None)?;
     // `ReplaceMod` changes the shared base databases for the skills after
-    let base_of = |e: &Env| (e.player_db.base.clone(), e.enemy_db.base.clone());
-    let first_bases = base_of(&first_env);
-    let mut bases = first_bases.clone();
-    let mut first = Some(first_env.clone());
+    let first_bases: StoreBases = (
+        first_env.player_db.base.clone(),
+        first_env.enemy_db.base.clone(),
+    );
     let reuse = crate::calc_env::reuse_setup();
     let list: Vec<(usize, f64)> = {
         let env = &first_env;
@@ -309,6 +436,59 @@ pub fn calc_full_dps_with(
             })
             .collect()
     };
+    // Where the `k`th skill's calculation starts, after skills that left
+    // the base databases `bases`
+    let start_for = |k: usize, bases: &StoreBases| {
+        let same = |a: &Option<Arc<Store>>, b: &Option<Arc<Store>>| match (a, b) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        };
+        let unchanged = same(&bases.0, &first_bases.0) && same(&bases.1, &first_bases.1);
+        if k == 0 {
+            Start::First
+        } else if reuse && unchanged {
+            Start::Reuse
+        } else {
+            Start::Fresh(bases.0.clone().zip(bases.1.clone()))
+        }
+    };
+    // A skill's calculation from a start, on a copy of a cache
+    let run = |i: usize, start: &Start, cache: Cache| -> Result<Ran> {
+        let recalc = Recalculator::new(build, data, CalcMode::Calculator)
+            .with_override(ovr)
+            .with_cache(cache);
+        let (b, env) = match start {
+            Start::First => (build.clone(), first_env.clone()),
+            Start::Reuse => (set_up.clone(), first_env.clone()),
+            Start::Fresh(given) => {
+                let mut b = build.clone();
+                let e = setup(&mut b, given.clone())?;
+                (b, e)
+            }
+        };
+        let r = run_skill(&b, data, env, i, &recalc)?;
+        let (cache, access) = recalc.into_parts();
+        Ok((r, cache, access))
+    };
+    // On threads, each skill is calculated ahead from the first setup and
+    // the calculator's cache. The pass in order takes a calculation where
+    // the skills before it left what it started from (the base databases,
+    // the cached skills it looked up), else calculates it again, so the
+    // results are the sequential ones.
+    let mut ahead: Vec<Option<(Start, Result<Ran>)>> =
+        if crate::parallel::full_dps_threads() && list.len() > 1 {
+            let jobs: Vec<(usize, usize)> = list.iter().map(|&(i, _)| i).enumerate().collect();
+            crate::parallel::map(jobs, crate::parallel::Threads::Current, |(k, i)| {
+                let start = start_for(k, &first_bases);
+                let r = run(i, &start, cache.clone());
+                Some((start, r))
+            })
+        } else {
+            list.iter().map(|_| None).collect()
+        };
+    let mut cache = cache;
+    let mut written: HashSet<String> = HashSet::new();
+    let mut bases = first_bases.clone();
     let mut full = FullDps::default();
     let [
         mut bleed,
@@ -318,50 +498,43 @@ pub fn calc_full_dps_with(
         mut caustic,
     ]: [Best; 5] = Default::default();
     let (mut poison, mut impale, mut decay, mut dot, mut culling) = (0.0, 0.0, 0.0, 0.0, 0.0);
-    for (i, mut count) in list {
-        let same = |a: &Option<Arc<Store>>, b: &Option<Arc<Store>>| match (a, b) {
-            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
-            _ => false,
+    for (k, &(i, mut count)) in list.iter().enumerate() {
+        let start = start_for(k, &bases);
+        let taken = match ahead[k].take() {
+            Some((s, r)) if s.same(&start) => match r {
+                Ok(r) if r.2.read.is_disjoint(&written) => Some(Ok(r)),
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
+            },
+            _ => None,
         };
-        let unchanged = same(&bases.0, &first_bases.0) && same(&bases.1, &first_bases.1);
-        let (b, mut env) = match first.take() {
-            Some(e) => (build.clone(), e),
-            None if reuse && unchanged => (set_up.clone(), first_env.clone()),
-            None => {
-                let mut b = build.clone();
-                let given = bases.0.clone().zip(bases.1.clone());
-                let e = setup(&mut b, given)?;
-                (b, e)
-            }
+        let (r, _, access) = match taken {
+            Some(r) => r?,
+            None => run(i, &start, cache.clone())?,
         };
-        env.skills.main_skill = i;
-        let mut input = PerformInput::new(&b, data, false)?;
-        input.recalc = Some(&recalc);
-        input.skip_ehp = true;
-        let mut p = perform(env, input)?;
-        p.finish()?;
-        bases = (
-            p.c.store(p.c.db(PLAYER)).base.clone(),
-            p.c.store(p.c.db(ENEMY)).base.clone(),
-        );
-        let name = p.skill_name(i).to_string();
-        let mods = p.mods(i);
-        let (part, trigger) = (mods.skill_part_name.clone(), mods.info_trigger.clone());
-        let mut info_message2 = mods.info_message2.clone();
+        for (uuid, calc) in access.written {
+            written.insert(uuid.clone());
+            cache.insert(uuid, calc);
+        }
+        bases = r.bases.clone();
+        let SkillRun {
+            name,
+            part,
+            trigger,
+            mut info_message2,
+            minion,
+            mirage,
+            player,
+            dot_can_stack,
+            ..
+        } = r;
         let mut minion_name = None;
-        if let Some(a) = p.minion_actor() {
-            let out = &p.c.actors.actors[a].output;
+        if let Some(mr) = &minion {
+            let out = &mr.output;
             if let Some(dps) = num(out, "TotalDPS")
                 && dps > 0.0
             {
-                let m = &p.minions[p.env_minion.unwrap_or_default()].minion;
-                let mname = data
-                    .setup
-                    .minions
-                    .get(&m.typ)
-                    .and_then(|d| d.str("name"))
-                    .unwrap_or_default();
-                let mname = format!("{mname}: ");
+                let mname = mr.name.clone();
                 let part = part.as_deref().ok_or(
                     "attempt to concatenate a nil value (field 'skillPartName')".to_string(),
                 )?;
@@ -393,23 +566,12 @@ pub fn calc_full_dps_with(
             if let Some(v) = num(out, "CullMultiplier").filter(|v| *v > 1.0 && *v > culling) {
                 culling = v;
             }
-            let pdb = p.c.db(PLAYER);
-            let once = |skill: &str, cond: &str| -> Result<bool> {
-                Ok(name.contains(skill) && p.c.flag(pdb, None, &[cond])?)
-            };
-            if once("Absolution", "Condition:AbsolutionSkillDamageCountedOnce")?
-                || once(
-                    "Dominating Blow",
-                    "Condition:DominatingBlowSkillDamageCountedOnce",
-                )?
-                || once("Holy Strike", "Condition:HolyStrikeSkillDamageCountedOnce")?
-            {
+            if mr.counted_once.clone()? {
                 count = 1.0;
                 info_message2 = Some("Skill Damage".into());
             }
         }
-        let player = &p.c.actors.actors[PLAYER].output;
-        if let Some(m) = &p.mirage {
+        if let Some(m) = &mirage {
             let n = m.count.unwrap_or(1.0) * count;
             let out = &m.output;
             let mname = || format!("{name} (Mirage)");
@@ -437,9 +599,9 @@ pub fn calc_full_dps_with(
             if let Some(v) = num(out, "DecayDPS").filter(|v| *v > 0.0) {
                 decay += v;
             }
-            let stack = p.has_flag(i, "DotCanStack");
+            let stack = dot_can_stack;
             if let Some(v) = num(out, "TotalDot").filter(|v| *v > 0.0)
-                && (stack || num(player, "TotalDot") == Some(0.0))
+                && (stack || num(&player, "TotalDot") == Some(0.0))
             {
                 dot += v * if stack { n } else { 1.0 };
             }
@@ -449,7 +611,7 @@ pub fn calc_full_dps_with(
             burning.offer(out, "BurningGroundDPS", mname);
             caustic.offer(out, "CausticGroundDPS", mname);
         }
-        let out = player;
+        let out = &player;
         if let Some(dps) = num(out, "TotalDPS")
             && dps > 0.0
         {
@@ -482,11 +644,7 @@ pub fn calc_full_dps_with(
             decay += v;
         }
         if let Some(v) = num(out, "TotalDot").filter(|v| *v > 0.0) {
-            dot += v * if p.has_flag(i, "DotCanStack") {
-                count
-            } else {
-                1.0
-            };
+            dot += v * if dot_can_stack { count } else { 1.0 };
         }
         if let Some(v) = num(out, "CullMultiplier").filter(|v| *v > 1.0 && *v > culling) {
             culling = v;
@@ -547,7 +705,7 @@ pub fn calc_full_dps_with(
         full.skills.push(row("Full Culling DPS", dps, None));
         full.combined_dps += dps;
     }
-    Ok((full, recalc.into_cache()))
+    Ok((full, cache))
 }
 
 impl FullDpsSkill {

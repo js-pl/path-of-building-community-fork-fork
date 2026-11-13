@@ -4,13 +4,15 @@
 //! afresh gives: the sidebar's and Calcs tab's outputs, the calculator's
 //! with overrides and Full DPS, and node power by Full DPS, for a sample
 //! of corpus builds. Node power on threads equals node power on one,
-//! calculated as needed.
+//! calculated as needed. The Full DPS skills on threads give what
+//! calculating them in order gives, for every corpus build.
 //!
 //! `CALCS_FILTER=<substring>` limits the builds run, and runs each of them.
 
 use engine::calc_env::set_reuse_setup;
 use engine::calc_override::Override;
 use engine::calculator::{CalcOutput, MiscCalculator};
+use engine::parallel::set_full_dps_threads;
 use engine::power::{PowerOptions, cluster_nodes, node_power, node_power_with, power_stats};
 use equivalence::corpus_builds;
 use equivalence::outputs::typed_outputs;
@@ -151,6 +153,51 @@ fn parallel_node_power_equals_sequential() {
         compared += 1;
     }
     eprintln!("{compared} builds compared");
+    assert!(compared > 0);
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The Full DPS skills calculated ahead on threads give what calculating
+/// them in order gives, with setups reused and afresh
+#[test]
+fn parallel_full_dps_equals_sequential() {
+    let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
+    let mut data = TypedData::load();
+    let (mut compared, mut failures) = (0, Vec::new());
+    for (id, xml) in corpus_builds() {
+        if !id.contains(&filter) {
+            continue;
+        }
+        let multi = xml.matches("includeInFullDPS=\"true\"").count() > 1;
+        if !multi {
+            continue;
+        }
+        data.load_tree(&engine::xml::parse(&xml).unwrap());
+        for reuse in [true, false] {
+            set_reuse_setup(reuse);
+            set_full_dps_threads(true);
+            let threaded = results(&data, &xml);
+            set_full_dps_threads(false);
+            let sequential = results(&data, &xml);
+            set_full_dps_threads(true);
+            match (threaded, sequential) {
+                (Ok(t), Ok(s)) => {
+                    if let Some(k) = (0..t.len()).find(|&k| t[k] != s[k]) {
+                        failures.push(format!("{id} (reuse {reuse}): result {k} differs"));
+                    }
+                }
+                (Err(t), Err(s)) if t == s => {}
+                (t, s) => failures.push(format!(
+                    "{id} (reuse {reuse}): threaded {:?}, sequential {:?}",
+                    t.err(),
+                    s.err()
+                )),
+            }
+        }
+        set_reuse_setup(true);
+        compared += 1;
+    }
+    eprintln!("{compared} builds with Full DPS skills compared");
     assert!(compared > 0);
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

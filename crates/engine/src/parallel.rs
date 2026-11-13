@@ -32,8 +32,25 @@ impl Threads {
     }
 }
 
+thread_local! {
+    static FULL_DPS_THREADS: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Whether the Full DPS skills of a calculation on this thread are
+/// calculated on threads ([`Threads::Current`]); both give the same
+/// results. Never in the browser.
+pub fn full_dps_threads() -> bool {
+    !cfg!(target_arch = "wasm32") && FULL_DPS_THREADS.with(|t| t.get())
+}
+
+/// Sets [`full_dps_threads`] on this thread, for comparing the two
+pub fn set_full_dps_threads(on: bool) {
+    FULL_DPS_THREADS.with(|t| t.set(on));
+}
+
 /// `f` of each item, in the items' order. The calculations' thread-local
-/// setting ([`crate::calc_env::reuse_setup`]) carries over to the threads.
+/// settings ([`crate::calc_env::reuse_setup`], [`full_dps_threads`]) carry
+/// over to the threads.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn map<T, R, F>(items: Vec<T>, threads: Threads, f: F) -> Vec<R>
 where
@@ -46,11 +63,13 @@ where
         return items.into_iter().map(f).collect();
     }
     let reuse = crate::calc_env::reuse_setup();
+    let full_dps = full_dps_threads();
     let run = || {
         items
             .into_par_iter()
             .map(|x| {
                 crate::calc_env::set_reuse_setup(reuse);
+                set_full_dps_threads(full_dps);
                 f(x)
             })
             .collect()

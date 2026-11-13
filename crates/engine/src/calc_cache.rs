@@ -20,7 +20,7 @@ use crate::calcs::Output;
 use crate::mods::Sym;
 use crate::skills::SocketGroup;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// What a calculation leaves for others (`GlobalCache.cachedData[mode][uuid]`)
@@ -104,6 +104,17 @@ pub struct Recalculator<'a, 't> {
     /// The setup of the calculations and the build it leaves, which does
     /// not depend on the main skill
     setup: RefCell<Option<Arc<(Build<'t>, Env)>>>,
+    access: RefCell<CacheAccess>,
+}
+
+/// How a recalculator's calculations used its cache: the skills they
+/// looked up that they had not cached themselves, and what they cached,
+/// in order
+#[derive(Clone, Debug, Default)]
+pub struct CacheAccess {
+    pub read: HashSet<String>,
+    pub written: Vec<(String, Arc<CachedCalc>)>,
+    own: HashSet<String>,
 }
 
 impl<'a, 't> Recalculator<'a, 't> {
@@ -115,6 +126,7 @@ impl<'a, 't> Recalculator<'a, 't> {
             ovr: Override::default(),
             cache: RefCell::new(HashMap::new()),
             setup: RefCell::new(None),
+            access: RefCell::new(CacheAccess::default()),
         }
     }
 
@@ -134,6 +146,11 @@ impl<'a, 't> Recalculator<'a, 't> {
 
     pub fn into_cache(self) -> Cache {
         self.cache.into_inner()
+    }
+
+    /// The cache, and how the calculations used it
+    pub fn into_parts(self) -> (Cache, CacheAccess) {
+        (self.cache.into_inner(), self.access.into_inner())
     }
 
     /// A calculation's setup, and the build after it: a copy of the
@@ -156,6 +173,10 @@ impl<'a, 't> Recalculator<'a, 't> {
 
 impl Recalc for Recalculator<'_, '_> {
     fn cached(&self, uuid: &str) -> Option<Arc<CachedCalc>> {
+        let mut a = self.access.borrow_mut();
+        if !a.own.contains(uuid) {
+            a.read.insert(uuid.to_string());
+        }
         self.cache.borrow().get(uuid).cloned()
     }
 
@@ -164,9 +185,11 @@ impl Recalc for Recalculator<'_, '_> {
     }
 
     fn store(&self, uuid: &str, calc: CachedCalc) {
-        self.cache
-            .borrow_mut()
-            .insert(uuid.to_string(), Arc::new(calc));
+        let calc = Arc::new(calc);
+        let mut a = self.access.borrow_mut();
+        a.own.insert(uuid.to_string());
+        a.written.push((uuid.to_string(), calc.clone()));
+        self.cache.borrow_mut().insert(uuid.to_string(), calc);
     }
 
     fn calculate(&self, uuid: &str, limited: &[String]) -> Result<()> {
