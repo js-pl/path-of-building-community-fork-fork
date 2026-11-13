@@ -152,9 +152,7 @@ fn typed_session_matches_translated() {
 
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
-const KNOWN_FALLBACKS: &[&str] = &[
-    "crafting a cluster jewel",
-];
+const KNOWN_FALLBACKS: &[&str] = &["crafting a cluster jewel"];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
 /// fallback so far: build, command and why

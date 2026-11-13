@@ -294,8 +294,12 @@ What remains for the full migration, in order:
    with `BuildModList` and the recalculation, of the class, ascendancy
    and bloodline drop-downs (with `IsClassConnected` and the class change
    popup, whose Continue `popupButton` and `closePopup` are typed),
-   `undo` (the active spec's `UndoHandler`; a spec with tattoos or
-   cluster jewel subgraphs falls back) and `newBuild`. The options'
+   `undo` (the active spec's `UndoHandler`, also with tattoos and
+   cluster jewel subgraphs: `RestoreUndoState` keeps the subgraphs, and
+   `ImportFromNodeList` allocates again every subgraph node
+   `BuildClusterJewelGraphs` ever allocated anew, `allocExtendedNodes`,
+   which upstream never empties; `tree_edits_match` undoes at random
+   too) and `newBuild`. The options'
    metadata comes from `Modules/ConfigOptions.lua` at build time
    (`engine::config_tab::ConfigVar` in the game data), with
    `data.enemyIsBossTooltip` evaluated from `Data.lua`.
@@ -308,8 +312,7 @@ What remains for the full migration, in order:
    opened keeps it, as upstream's popups belong to `main` (the
    dispatcher carries the typed popups over; a popup the translation
    opened while the build was on it is not carried). Saviour's mirage as
-   the main skill and undo on specs with tattoos or cluster jewel
-   subgraphs fall back.
+   the main skill falls back.
 
    The dispatcher records each request the typed engine gave to the
    translation while it held the build (`Dispatcher::fallbacks`, with
