@@ -270,11 +270,16 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
     let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
     if let Some(p) = state["ok"]["popups"].as_array().and_then(|p| p.first()) {
         let _ = p;
-        return if rng.below(2) == 0 {
-            json!({"cmd": "popupButton", "name": "confirm"})
-        } else {
-            json!({"cmd": "closePopup"})
+        return match rng.below(3) {
+            0 => json!({"cmd": "popupButton", "name": "confirm"}),
+            1 => json!({"cmd": "closePopup"}),
+            // A button the class change popup has without a name
+            _ => json!({"cmd": "popupButton", "name": "cancel"}),
         };
+    }
+    if rng.below(12) == 0 {
+        // No popup to press
+        return json!({"cmd": "popupButton", "name": "confirm"});
     }
     let vars: Vec<&J> = config["ok"]["sections"]
         .as_array()
@@ -362,10 +367,14 @@ fn config_edits_match(d: &mut Dispatcher) {
                 skipped.push(format!("{id}: {e}"));
                 break;
             }
+            if typed.get("error").is_some() {
+                // An error changes nothing: the translation's own answer
+                let tr = answer(d.translated_request(&r), "translated edit");
+                diff(&typed, &tr, &label, &mut out);
+            }
             let t = Instant::now();
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
-            let _ = typed;
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
             steps += 1;
         }
