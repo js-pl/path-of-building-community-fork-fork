@@ -164,6 +164,13 @@ What remains for the full migration, in order:
    to 1.7x per build and within noise over the corpus, for speculative
    runs and state matching in the Full DPS path (branch
    `claude/full-dps-threads`).
+   Comparing the gem dropdown found two engine gaps, fixed: Iron Grip and
+   Iron Will add the skill's own actor's strength damage bonus (a
+   minion's for a minion's skill), and the typeless `mod(name, nil, ...)`
+   of Corrupting Cry Support's stat map, which no query finds upstream, is
+   left out instead of failing every calculation with the support.
+   `tests/compare.rs` compares each gem candidate's whole player and
+   minion outputs with the translation's.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),

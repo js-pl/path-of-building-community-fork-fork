@@ -156,6 +156,11 @@ fn stat_map_from_lua(v: &Value) -> Result<StatMap> {
     let mut entries = Vec::new();
     let mut error = None;
     for e in array(v) {
+        // `mod(name, nil, ...)` (Corrupting Cry Support) makes a mod without
+        // a type, which no query finds: it adds nothing
+        if !get(&e, "name").is_nil() && get(&e, "type").is_nil() {
+            continue;
+        }
         let entry = if get(&e, "name").is_nil() {
             array(&e)
                 .iter()

@@ -203,6 +203,11 @@ fn power_sorts_match(d: &mut Dispatcher) {
         let t = Instant::now();
         let tr = answer(d.translated_request(&req), "translated gemList");
         t_tr += t.elapsed();
+        if let Ok(dir) = std::env::var("SESSION_DUMP") {
+            for (k, v) in [("typed", &typed), ("translated", &tr)] {
+                std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
+            }
+        }
         let mut out = Vec::new();
         diff(&typed, &tr, &format!("gemList {group}/{slot}"), &mut out);
         if !out.is_empty() {
