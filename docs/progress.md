@@ -74,6 +74,19 @@ State at the handoff:
   attribute nodes and a mastery (`tattoo_specs_match_upstream`, 10), and
   `tests/perform.rs` calculates the tattooed builds
   (`tattoos_match_upstream`).
+- Timeless jewels (types 1 to 6: Glorious Vanity, Lethal Pride, Brutal
+  Restraint, Militant Faith, Elegant Hubris, Heroic Tragedy): the legion
+  passives and `NodeIndexMapping` (`engine::timeless::Timeless`, made by
+  `gamedata::Source::timeless`), the look-up tables decompressed from the
+  submodule's `.zip` files when a build first needs them (a loader the
+  caller gives; without one a conquered node is `not ported`), and the
+  conquered nodes of `BuildAllDependsAndPaths` (replacements, additions,
+  rolled values, `ReconnectNodeToClassStart`). `timeless_specs_match_upstream`
+  and `timeless_match_upstream` socket each jewel and conqueror with a seed
+  of its own in generated corpus builds (39 specs, 1001 nodes replaced),
+  against the translation with `Inflate` installed (headless upstream has
+  none, so the oracle cannot run them). The Abyss jewels (types 7 to 11)
+  return `not ported`.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -90,9 +103,8 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. Timeless jewels (`conqueredBy`: the legion passives and the jewels'
-   look-up tables, read by the importer from the submodule), the party
-   tab, mirages of skills with minions. `CalcSections.lua` (which
+1. The Abyss timeless jewels, the party tab, mirages of skills with
+   minions. `CalcSections.lua` (which
    breakdown each cell shows) belongs to the session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
@@ -364,7 +376,10 @@ copying Lua tables).
 - `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
   given by the caller
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
-  skills, timeless jewel data (conquered nodes; abyss jewels)
+  skills, the Abyss timeless jewels, `limitDisabled` (a second
+  timeless jewel over the limit still conquers nodes typed; upstream
+  marks it on the shared item during a calculation and leaves it out of
+  the next `BuildAllDependsAndPaths`)
 - Passives granted only by the latest tree
 
 ## Not ported yet in `perform`
@@ -379,6 +394,24 @@ a skip:
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
+
+## Coverage
+
+`oracle/run.py coverage` over the corpus (luacov, lines missed of
+`Calc*.lua`): CalcTriggers 539 (42.8% hit), CalcOffence 1201, CalcPerform
+883, CalcDefence 504, CalcSetup 301, Calcs 156, CalcMirages 94,
+CalcActiveSkill 52, CalcSections 25, CalcTools 17, CalcBreakdown 15,
+CalcFormat 3; `target/oracle-coverage/uncovered.txt` lists them. The
+variant tests reach far more of CalcTriggers and CalcMirages than the
+corpus but run on the translation, not under luacov. Of `configTable`'s
+82 keys the trigger variants reach 63; not reached: `call to arms`,
+`cospri's malice`, `fissure`, `focus`, `foulborn kitava's thirst`,
+`ghostly artillery`, `hex on trap`, `hextouch`, `maloney's mechanism`,
+`manaforged arrows`, `mjolner`, `ngamahu's flame`, `nova`, `shockwave`,
+`void shockwave`, `supporttriggerfirespellonhit`, `trigger craft`,
+`vixen's entrapment`, `FieryImpactHeistMaceImplicit` (their sources: an
+item's crafted or enchanted trigger, a helmet enchant, a minion's
+trigger, or a source skill the templates lack).
 
 ## Next
 

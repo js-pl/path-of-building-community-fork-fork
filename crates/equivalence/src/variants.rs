@@ -396,3 +396,113 @@ pub fn tattoo_variants(data: &mut TypedData) -> Vec<(String, String)> {
     }
     out
 }
+
+/// Generated corpus builds with a timeless jewel of each kind and
+/// conqueror socketed in the allocated socket with the most allocated
+/// nodes in its radius, with a seed of their own; ids
+/// `timeless-<jewel>-<variant>-<template>`
+pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
+    const JEWELS: [&str; 6] = [
+        "Glorious Vanity",
+        "Lethal Pride",
+        "Brutal Restraint",
+        "Militant Faith",
+        "Elegant Hubris",
+        "Heroic Tragedy",
+    ];
+    let texts: Vec<String> = uniques()
+        .into_iter()
+        .filter(|t| JEWELS.contains(&t.lines().next().unwrap_or("")))
+        .collect();
+    let mut out = Vec::new();
+    for (n, (id, xml)) in corpus_builds().into_iter().enumerate() {
+        if !id.starts_with("gen-") || n % 15 != 0 {
+            continue;
+        }
+        let root = engine::xml::parse(&xml).unwrap();
+        data.load_tree(&root);
+        let Ok(build) = data.load_build(&root) else {
+            continue;
+        };
+        let spec = &build.spec;
+        let tree = spec.tree;
+        let in_radius = |s: u32| {
+            tree.node(s)
+                .and_then(|t| t.nodes_in_radius.as_ref())
+                .and_then(|r| r.get(2))
+                .map_or(0, |r| {
+                    r.iter().filter(|&&i| spec.alloc_nodes.contains(i)).count()
+                })
+        };
+        let Some(socket) = tree
+            .sockets
+            .iter()
+            .copied()
+            .filter(|&s| {
+                spec.alloc_nodes.contains(s)
+                    && tree.node(s).is_some_and(|t| t.expansion_jewel.is_none())
+            })
+            .max_by_key(|&s| in_radius(s))
+        else {
+            continue;
+        };
+        for text in &texts {
+            let name = text.lines().next().unwrap_or("");
+            let variants = text
+                .lines()
+                .filter(|l| l.starts_with("Variant:"))
+                .count()
+                .max(1);
+            for v in 1..=variants {
+                // A seed of its own within the range
+                let text = engine::pat::gsub_fn(text, "%((%d+)%-(%d+)%)", |c| {
+                    let (lo, hi): (u64, u64) = (c[0].parse().ok()?, c[1].parse().ok()?);
+                    let step = if hi > 100_000 { 20 } else { 1 };
+                    let k = (n as u64 * 977 + v as u64 * 131) % ((hi - lo) / step);
+                    Some((lo + k * step).to_string())
+                });
+                let Some(x) = with_socketed(&xml, &text, v, socket) else {
+                    continue;
+                };
+                let short: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+                out.push((format!("timeless-{short}-{v}-{id}"), x));
+            }
+        }
+    }
+    out
+}
+
+/// A build with a unique jewel of variant `variant` socketed in an
+/// allocated socket of its active spec
+fn with_socketed(xml: &str, text: &str, variant: usize, socket: u32) -> Option<String> {
+    let id = engine::pat::gmatch(xml, "<Item id=\"(%d+)\"")
+        .iter()
+        .filter_map(|c| c[0].parse::<u32>().ok())
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let at = xml.find("<ItemSet ")?;
+    let mut x = format!(
+        "{}<Item id=\"{id}\" variant=\"{variant}\">\nRarity: UNIQUE\n{text}\n</Item>\n{}",
+        &xml[..at],
+        &xml[at..]
+    );
+    let spec = x.find("<Spec ")?;
+    let spec_end = spec + x[spec..].find("</Spec>")?;
+    let tag = format!("nodeId=\"{socket}\"/>");
+    match x[spec..spec_end].find(&tag) {
+        Some(k) => {
+            let k = spec + k;
+            let start = x[..k].rfind("<Socket ")?;
+            x.replace_range(
+                start..k + tag.len(),
+                &format!("<Socket itemId=\"{id}\" {tag}"),
+            );
+        }
+        None => {
+            let s_at = spec + x[spec..spec_end].find("<Sockets>")? + 9;
+            x.insert_str(s_at, &format!("\n<Socket itemId=\"{id}\" {tag}"));
+        }
+    }
+    Some(x)
+}

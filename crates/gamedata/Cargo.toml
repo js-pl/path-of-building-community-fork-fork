@@ -11,3 +11,4 @@ publish.workspace = true
 lua.workspace = true
 importer.workspace = true
 engine.workspace = true
+miniz_oxide = "0.9"

@@ -149,6 +149,34 @@ impl Source {
         Ok(tree)
     }
 
+    /// The timeless jewels' data, their look-up tables read from the
+    /// source directory when first needed
+    pub fn timeless(&self, parser: &ModParser) -> Result<engine::timeless::Timeless> {
+        let mut im = importer::Importer::new(&self.src_dir);
+        let legion = im
+            .load1("Data/TimelessJewelData/LegionPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        let mapping = im
+            .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
+            .map_err(|e| e.to_string())?;
+        let dir = self.src_dir.join("Data/TimelessJewelData");
+        let loader = move |name: &str| -> Option<Vec<u8>> {
+            let mut packed = std::fs::read(dir.join(format!("{name}.zip"))).ok();
+            if packed.is_none() {
+                let mut parts = Vec::new();
+                for k in 0.. {
+                    match std::fs::read(dir.join(format!("{name}.zip.part{k}"))) {
+                        Ok(b) => parts.extend(b),
+                        Err(_) => break,
+                    }
+                }
+                packed = (!parts.is_empty()).then_some(parts);
+            }
+            miniz_oxide::inflate::decompress_to_vec_zlib(&packed?).ok()
+        };
+        engine::timeless::Timeless::from_lua(&legion, &mapping, parser, Box::new(loader))
+    }
+
     pub fn global(&self, name: &str) -> Value {
         self.globals.get_str(name)
     }

@@ -4,8 +4,7 @@
 //! The calculations' inputs, without the UI.
 //!
 //! The character level's auto mode sets the level after a calculation
-//! ([`Build::set_character_level`]). Not ported yet: timeless jewel data,
-//! notes, party and import sections, the Calcs tab's inputs other than the
+//! ([`Build::set_character_level`]). Not ported yet: notes, party and import sections, the Calcs tab's inputs other than the
 //! calculations'.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
@@ -119,6 +118,9 @@ pub struct LoadContext<'a> {
     /// `data.weaponTypeInfo[type].oneHand`
     pub one_hand: &'a dyn Fn(&str) -> Option<bool>,
     pub minions: &'a dyn Fn(&str) -> bool,
+    /// The timeless jewels' data, without which conquered nodes are not
+    /// ported
+    pub timeless: Option<Arc<crate::timeless::Timeless>>,
 }
 
 /// A loaded build: what the calculations read of it
@@ -170,6 +172,18 @@ impl Build<'_> {
         self.base_dbs = Default::default();
         Ok(())
     }
+}
+
+/// Whether a build file has a timeless jewel, whose nodes need the
+/// timeless jewels' data
+pub fn has_timeless_jewel(root: &Element) -> bool {
+    pob(root)
+        .and_then(|p| p.child("Items"))
+        .is_some_and(|items| {
+            items
+                .elements()
+                .any(|i| i.text().is_some_and(|t| t.contains("Timeless Jewel")))
+        })
 }
 
 /// The version of the active spec's tree, which loading the build needs
@@ -230,6 +244,7 @@ impl<'t> Build<'t> {
         let skills = pob.child("Skills").map(|x| Skills::load(x, ctx.skill_data));
         let calcs = pob.child("Calcs").map(CalcsInput::load).unwrap_or_default();
         let mut spec = PassiveSpec::new(tree, parser)?;
+        spec.timeless = ctx.timeless.clone();
         if let Some(s) = active_spec(root) {
             spec.load_with(s, Some(&items))?;
             spec.build_cluster_jewel_graphs(&items, ctx.items.data)?;

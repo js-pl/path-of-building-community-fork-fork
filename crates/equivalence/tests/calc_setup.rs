@@ -1287,6 +1287,7 @@ fn items_setup_matches_upstream() {
             socket_ids: &socket_ids,
             one_hand: &one_hand,
             minions: &|m: &str| setup_data.minions.contains_key(m),
+            timeless: None,
         };
         let mut typed_build = match engine::build::Build::load(&root, &load_ctx, tree, &parser) {
             Ok(b) => b,

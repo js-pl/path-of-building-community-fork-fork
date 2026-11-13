@@ -1394,7 +1394,7 @@ pub fn build_mod_list_for_node(
         typ: node.kind,
         mod_list: &own,
         is_tattoo: spec.is_tattoo(i),
-        conquered: false,
+        conquered: spec.nodes[i].conquered.is_some(),
     };
     // First pass: the jewels that change nodes
     for rad in rads.iter_mut() {

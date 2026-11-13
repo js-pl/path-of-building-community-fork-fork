@@ -309,3 +309,23 @@ pub fn with_group(xml: &str, attrs: &str, gems: &str) -> Option<String> {
         "mainSocketGroup=\"1\"",
     ))
 }
+
+/// `Inflate`, which the timeless jewels' data needs: zlib streams, as
+/// SimpleGraphic's (headless upstream has no implementation)
+pub fn install_inflate(host: &upstream::host::Host) {
+    host.env.set(
+        "Inflate",
+        lua::rt::func("Inflate", |a| {
+            let data = a
+                .first()
+                .map(|v| lua::to_string(v).as_bytes().to_vec())
+                .unwrap_or_default();
+            Ok(vec![
+                match miniz_oxide::inflate::decompress_to_vec_zlib(&data) {
+                    Ok(out) => Value::Str(out.as_slice().into()),
+                    Err(_) => Value::Nil,
+                },
+            ])
+        }),
+    );
+}

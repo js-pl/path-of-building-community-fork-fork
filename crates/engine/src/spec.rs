@@ -7,7 +7,8 @@
 //!
 //! Jewels that let nodes be allocated without a connection (Intuitive Leap
 //! and the like, Impossible Escape) and tattoos (`hashOverrides`) are
-//! ported. Not ported yet: timeless jewels (`conqueredBy`), Split
+//! ported, and so are timeless jewels' conquered nodes
+//! (`crate::timeless`) but the Abyss jewels'. Not ported yet: Split
 //! Personality's path, tree conversion and URLs.
 //!
 //! Upstream keeps the nodes, allocated nodes and mastery selections in
@@ -64,6 +65,10 @@ pub struct NodeStats {
     pub mod_list: Vec<Mod>,
 }
 
+/// An allocated jewel socket that changes paths or conquers nodes: its
+/// index, jewel, the ids in its radius and in its keystones' radii
+type RadiusJewel<'j> = (usize, &'j TreeJewel, LjMap<()>, Vec<LjMap<()>>);
+
 /// What a socketed jewel changes in the tree's paths: Intuitive Leap and
 /// the like, Impossible Escape
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -78,6 +83,8 @@ pub struct TreeJewel {
     pub impossible_escape: bool,
     /// `jewelData.impossibleEscapeKeystones`
     pub keystones: Vec<Arc<str>>,
+    /// A timeless jewel's `jewelData.conqueredBy`
+    pub conquest: Option<crate::timeless::Conquest>,
 }
 
 impl TreeJewel {
@@ -100,8 +107,13 @@ impl TreeJewel {
             keystone_only: truthy("intuitiveLeapKeystoneOnly"),
             impossible_escape: truthy("impossibleEscapeKeystone"),
             keystones,
+            conquest: crate::timeless::Conquest::of(jd),
         };
-        (j.intuitive_leap_like || j.impossible_escape || !j.keystones.is_empty()).then_some(j)
+        (j.intuitive_leap_like
+            || j.impossible_escape
+            || !j.keystones.is_empty()
+            || j.conquest.is_some())
+        .then_some(j)
     }
 }
 
@@ -133,6 +145,8 @@ pub struct SpecNode {
     /// The tattoo or timeless passive that replaces the node
     /// (`ReplaceNode`): its name, keystone mod and tattoo fields
     pub overlay: Option<Arc<tree::Overlay>>,
+    /// The timeless jewel that conquers the node (`conqueredBy`)
+    pub conquered: Option<crate::timeless::Conquest>,
     visited: bool,
 }
 
@@ -155,6 +169,7 @@ impl SpecNode {
             synth: Some(Arc::new(node)),
             intuitive: Vec::new(),
             overlay: None,
+            conquered: None,
             visited: false,
         }
     }
@@ -193,6 +208,8 @@ pub struct PassiveSpec<'t> {
     pub hash_overrides: BTreeMap<u32, Arc<tree::Overlay>>,
     /// `allocatedTattooTypes`: allocated tattoos by type
     pub allocated_tattoo_types: Vec<(Arc<str>, u32)>,
+    /// The timeless jewels' data, which conquered nodes need
+    pub timeless: Option<Arc<crate::timeless::Timeless>>,
     pub title: Option<String>,
     /// `clusterHashFormatVersion`: 1 for builds saved with legacy cluster
     /// node ids
@@ -229,6 +246,7 @@ impl<'t> PassiveSpec<'t> {
             tree_jewels: BTreeMap::new(),
             hash_overrides: BTreeMap::new(),
             allocated_tattoo_types: Vec::new(),
+            timeless: None,
             title: None,
             cluster_hash_format_version: 2.0,
             legacy_map: None,
@@ -261,6 +279,7 @@ impl<'t> PassiveSpec<'t> {
                     synth: None,
                     intuitive: Vec::new(),
                     overlay: None,
+                    conquered: None,
                     visited: false,
                 });
             }
@@ -285,7 +304,7 @@ impl<'t> PassiveSpec<'t> {
         }
     }
 
-    fn kind(&self, i: usize) -> NodeType {
+    pub(crate) fn kind(&self, i: usize) -> NodeType {
         self.tree_node(i).kind
     }
 
@@ -798,7 +817,7 @@ impl<'t> PassiveSpec<'t> {
     pub fn build_all_depends_and_paths(&mut self) -> Result<()> {
         // The allocated jewels that change paths, and the nodes in their
         // radius
-        let mut radius_jewels: Vec<(usize, &TreeJewel, LjMap<()>, Vec<LjMap<()>>)> = Vec::new();
+        let mut radius_jewels: Vec<RadiusJewel> = Vec::new();
         for (socket, j) in &self.tree_jewels {
             if j.radius_index.is_none() || !self.alloc_nodes.contains(*socket) {
                 continue;
@@ -814,7 +833,18 @@ impl<'t> PassiveSpec<'t> {
                 .collect();
             radius_jewels.push((si, j, self.radius_ids(*socket, j.radius_index), keystones));
         }
+        for (socket, j) in &self.tree_jewels {
+            if j.conquest
+                .as_ref()
+                .and_then(|c| c.jewel_type())
+                .is_some_and(|t| t >= 7)
+                && self.alloc_nodes.contains(*socket)
+            {
+                return Err("not ported: Abyss timeless jewels".into());
+            }
+        }
         let mut intuitive: Vec<(usize, Vec<usize>)> = Vec::new();
+        let mut conquered: Vec<(usize, crate::timeless::Conquest)> = Vec::new();
         for i in 0..self.nodes.len() {
             let kind = self.kind(i);
             if radius_jewels.is_empty()
@@ -825,12 +855,19 @@ impl<'t> PassiveSpec<'t> {
             }
             let id = self.nodes[i].id;
             let mut by = Vec::new();
+            let mut conquest = None;
             for (si, j, radius, keystones) in &radius_jewels {
                 if radius.contains(id)
                     && j.intuitive_leap_like
                     && !(j.keystone_only && kind != NodeType::Keystone)
                 {
                     by.push(*si);
+                }
+                if radius.contains(id)
+                    && let Some(c) = &j.conquest
+                    && c.jewel_type().is_none_or(|t| t < 7)
+                {
+                    conquest = Some(c.clone());
                 }
                 for k in keystones {
                     if k.contains(id) {
@@ -841,6 +878,9 @@ impl<'t> PassiveSpec<'t> {
             if !by.is_empty() {
                 intuitive.push((i, by));
             }
+            if let Some(c) = conquest {
+                conquered.push((i, c));
+            }
         }
         drop(radius_jewels);
         // Reset the nodes to the tree's
@@ -849,12 +889,16 @@ impl<'t> PassiveSpec<'t> {
             self.nodes[i].intuitive.clear();
             self.nodes[i].stats = None;
             self.nodes[i].overlay = None;
+            self.nodes[i].conquered = None;
             if self.nodes[i].alloc {
                 self.nodes[i].depends.push(i);
             }
         }
         for (i, by) in intuitive {
             self.nodes[i].intuitive = by;
+        }
+        for (i, c) in conquered {
+            self.nodes[i].conquered = Some(c);
         }
         // Tattoos replace their nodes
         for (id, o) in &self.hash_overrides {
@@ -868,6 +912,14 @@ impl<'t> PassiveSpec<'t> {
                     self.nodes[i].all_mastery_options = Some(false);
                 }
                 self.nodes[i].overlay = Some(o.clone());
+            }
+        }
+        // Timeless jewels replace their nodes or add to them
+        for i in 0..self.nodes.len() {
+            if let Some(c) = self.nodes[i].conquered.clone()
+                && self.kind(i) != NodeType::Socket
+            {
+                self.conquer(i, &c)?;
             }
         }
         // Selected mastery effects, and counts

@@ -434,11 +434,18 @@ fn tattoos_match_upstream() {
     run_builds(&equivalence::variants::tattoo_variants);
 }
 
+/// Timeless jewels (`equivalence::variants::timeless_variants`)
+#[test]
+fn timeless_match_upstream() {
+    run_builds(&equivalence::variants::timeless_variants);
+}
+
 fn run_builds(make: &dyn Fn(&mut TypedData) -> Vec<(String, String)>) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    equivalence::install_inflate(&host);
     let mut data = TypedData::load();
     // `SkillsTab:ProcessGemInstance` empties the shared cost of the level of
     // a triggered skill an item grants; the typed engine does within a

@@ -193,9 +193,9 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Data/StatDescriptions/variable_duration_skill_stat_descriptions.lua" = { status = "todo" }
 "Data/TattooPassives.lua" = { status = "data", port = "crates/engine/src/tree.rs crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/TimelessJewelData/AbyssNotableNames.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Data/TimelessJewelData/LegionPassives.lua" = { status = "todo" }
+"Data/TimelessJewelData/LegionPassives.lua" = { status = "data", port = "crates/engine/src/timeless.rs crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/TimelessJewelData/LegionTradeIds.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Data/TimelessJewelData/NodeIndexMapping.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Data/TimelessJewelData/NodeIndexMapping.lua" = { status = "data", port = "crates/importer crates/engine/src/timeless.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/TradeSiteStats.lua" = { status = "todo" }
 "Data/Uniques/Special/BoundByDestiny.lua" = { status = "todo" }
 "Data/Uniques/Special/Generated.lua" = { status = "todo" }
@@ -321,8 +321,8 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/ConfigVisibility.lua" = { status = "todo" }
 "Modules/Data.lua" = { status = "partial", port = "crates/engine/src/data.rs crates/importer/src/lib.rs crates/gamedata/src/data_lua.rs crates/engine/src/power.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/DataAbyssJewelLookUpTableHelper.lua" = { status = "todo" }
-"Modules/DataJewelFileLoader.lua" = { status = "todo" }
-"Modules/DataLegionLookUpTableHelper.lua" = { status = "todo" }
+"Modules/DataJewelFileLoader.lua" = { status = "ported", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/DataLegionLookUpTableHelper.lua" = { status = "partial", port = "crates/engine/src/timeless.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/ItemSlotHelper.lua" = { status = "todo" }
 "Modules/ItemTools.lua" = { status = "partial", port = "crates/engine/src/item_tools.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/Main.lua" = { status = "todo" }

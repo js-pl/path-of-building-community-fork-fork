@@ -360,14 +360,27 @@ fn jewel_specs_match_upstream() {
 /// with their builds
 #[test]
 fn tattoo_specs_match_upstream() {
+    variant_specs_match(&equivalence::variants::tattoo_variants);
+}
+
+/// Specs with timeless jewels (`equivalence::variants::timeless_variants`)
+#[test]
+fn timeless_specs_match_upstream() {
+    variant_specs_match(&equivalence::variants::timeless_variants);
+}
+
+fn variant_specs_match(
+    make: &dyn Fn(&mut equivalence::typed_build::TypedData) -> Vec<(String, String)>,
+) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
     let host = Host::new(Rc::new(Imported::new(upstream_src())));
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    equivalence::install_inflate(&host);
     let mut data = equivalence::typed_build::TypedData::load();
     let mut failures = Vec::new();
-    let mut compared = 0;
-    for (id, v) in equivalence::variants::tattoo_variants(&mut data) {
+    let (mut compared, mut changed) = (0, 0);
+    for (id, v) in make(&mut data) {
         if !id.contains(&filter) {
             continue;
         }
@@ -383,13 +396,19 @@ fn tattoo_specs_match_upstream() {
             }
         };
         compared += 1;
+        changed += typed
+            .spec
+            .nodes
+            .iter()
+            .filter(|n| n.conquered.is_some() && n.overlay.is_some())
+            .count();
         compare_spec(&typed.spec, &lua_spec, &mut |what| {
             if failures.len() < 60 {
                 failures.push(format!("{id}: {what}"));
             }
         });
     }
-    eprintln!("{compared} specs compared");
+    eprintln!("{compared} specs compared, {changed} nodes replaced by timeless jewels");
     assert!(compared > 0, "no spec compared");
     assert!(
         failures.is_empty(),
@@ -402,7 +421,7 @@ fn tattoo_specs_match_upstream() {
 /// Compares a typed spec with the translated one
 fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(String)) {
     // Allocated nodes, in pairs order
-    let lalloc: Vec<u32> = get(&lua_spec, "allocNodes")
+    let lalloc: Vec<u32> = get(lua_spec, "allocNodes")
         .as_table()
         .map(|t| t.entries())
         .unwrap_or_default()
@@ -420,7 +439,7 @@ fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(Strin
             lalloc.len()
         ));
     }
-    let lnodes = get(&lua_spec, "nodes");
+    let lnodes = get(lua_spec, "nodes");
     let ids = |v: &Value| -> Vec<u32> {
         v.as_table()
             .map(|t| t.array())
@@ -542,7 +561,7 @@ fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(Strin
         }
     }
     // Mastery selections and counts
-    let lsel: Vec<(u32, f64)> = get(&lua_spec, "masterySelections")
+    let lsel: Vec<(u32, f64)> = get(lua_spec, "masterySelections")
         .as_table()
         .map(|t| t.entries())
         .unwrap_or_default()
@@ -569,7 +588,7 @@ fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(Strin
             spec.allocated_mastery_type_count,
         ),
     ] {
-        let l = get(&lua_spec, field).as_number();
+        let l = get(lua_spec, field).as_number();
         if l != Some(t as f64) {
             fail(format!("{field} {t} != {l:?}"));
         }
@@ -578,7 +597,7 @@ fn compare_spec(spec: &PassiveSpec, lua_spec: &Value, fail: &mut dyn FnMut(Strin
         ("curClassId", spec.cur_class_id),
         ("curAscendClassId", spec.cur_ascend_class_id),
     ] {
-        let l = get(&lua_spec, field).as_number().map(|n| n as i64);
+        let l = get(lua_spec, field).as_number().map(|n| n as i64);
         if l != t {
             fail(format!("{field} {t:?} != {l:?}"));
         }
