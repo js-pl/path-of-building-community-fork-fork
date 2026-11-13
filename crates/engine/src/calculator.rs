@@ -127,7 +127,7 @@ impl<'a, 't> MiscCalculator<'a, 't> {
     /// false or build.viewMode == "TREE"`), the Full DPS is calculated again
     /// when the build has Full DPS skills
     pub fn calculate(&self, ovr: &Override, full_dps: bool) -> Result<CalcOutput> {
-        self.calculate_build(&self.build, ovr, full_dps)
+        self.calculate_on(&self.build, ovr, full_dps)
     }
 
     /// `calcFunc` with `override.spec`: the calculation on another spec
@@ -140,10 +140,12 @@ impl<'a, 't> MiscCalculator<'a, 't> {
     ) -> Result<CalcOutput> {
         let mut build = self.build.clone();
         build.spec = spec;
-        self.calculate_build(&build, ovr, full_dps)
+        self.calculate_on(&build, ovr, full_dps)
     }
 
-    fn calculate_build(
+    /// `calcFunc` on a copy of the build changed in ways [`Override`] does
+    /// not hold (an item outside the items tab), from the calculator's cache
+    pub fn calculate_on(
         &self,
         build: &Build<'t>,
         ovr: &Override,
