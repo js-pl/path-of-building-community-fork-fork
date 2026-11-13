@@ -99,12 +99,18 @@ State at the handoff:
   ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
   `timeless_specs_match_upstream` and `timeless_match_upstream` socket
   each jewel and conqueror with a seed of its own in generated corpus
-  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
-  replaced), against the translation with `Inflate` installed (headless
-  upstream has none, so the oracle cannot run them). The Abyss variants
-  run last: a conquered node's `setSource` rewrites the mod parser's
-  cached mods, which the legion keystones share, so a keystone conquered
-  later in the same translation names another node as its mods' source.
+  builds: every fifth build's socket with the most allocated nodes in
+  its radius (each jewel in all its variants, the legacy ones in every
+  third of those builds), and in every build each socket with allocated
+  keystones in its radius, with one legacy jewel in turn (113 specs,
+  3893 nodes replaced), against the translation with `Inflate` installed
+  (headless upstream has none, so the oracle cannot run them). A
+  conquered Necromantic Aegis no longer sends the shield's mods to the
+  minions (`env.allocNodes[45175].dn` is the spec's node). The Abyss
+  variants run last: a conquered node's `setSource` rewrites the mod
+  parser's cached mods, which the legion keystones share, so a keystone
+  conquered later in the same translation names another node as its
+  mods' source; `tests/spec.rs` aligns those sources.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -392,16 +398,18 @@ What remains for the full migration, in order:
    - Tooltips in the cases above that fall back.
    - Items and crafting: `displayItem`, `craftItem`,
      `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
-     popups, the unique and rare databases: `Data/Uniques/Special/Generated.lua`
-     and `Item:Craft` are not ported). `addItem`, `editItem`,
-     `setDisplayItem` and `saveDisplayItem` are typed
+     popups, the unique and rare databases:
+     `Data/Uniques/Special/Generated.lua` is not ported). `addItem`,
+     `editItem`, `setDisplayItem` and `saveDisplayItem` are typed
      (`session::typed::item_editor`: `AddItem` with its auto-equip,
      `CreateDisplayItemFromRaw`, `CopyAnointsAndEldritchImplicits`,
-     `AddDisplayItem`) and in `items_edits_match`; a crafted cluster
-     jewel in the editor (`UpdateClusterJewelControls` crafts it again)
-     and a Forbidden jewel whose counterpart is missing fall back. The
-     display item is held typed, so `displayItem` answers on the
-     translation after its replays.
+     `AddDisplayItem`, `SetDisplayItem` with the affix drop-downs'
+     lists, `UpdateAffixControl` without the sort by power, and
+     `UpdateClusterJewelControls`/`CraftClusterJewel`, which craft a
+     crafted cluster jewel again) and in `items_edits_match`.
+     `Item:Craft` is `engine::item_craft`. A Forbidden jewel whose
+     counterpart is missing falls back. The display item is held typed,
+     so `displayItem` answers on the translation after its replays.
    - Engine gaps that make a build fall back: none over the corpus.
      Combust (gen-0028), the character level's auto mode, tattoos and
      tree edits with Intuitive Leap no longer do; specs in the old URL

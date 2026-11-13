@@ -515,11 +515,11 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
         .collect();
     let (mut out, mut abyss_out) = (Vec::new(), Vec::new());
     for (n, (id, xml)) in corpus_builds().into_iter().enumerate() {
-        // The Abyss jewels, whose changes depend on the socket and the
-        // path to it, in three times as many builds
-        if !id.starts_with("gen-") || n % 5 != 0 {
+        // Every fifth build; the others only for their keystones below
+        if !id.starts_with("gen-") {
             continue;
         }
+        let sampled = n % 5 == 0;
         let root = engine::xml::parse(&xml).unwrap();
         data.load_tree(&root);
         let Ok(build) = data.load_build(&root) else {
@@ -535,7 +535,22 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
                     r.iter().filter(|&&i| spec.alloc_nodes.contains(i)).count()
                 })
         };
-        let Some(socket) = tree
+        let keystones_in_radius = |s: u32| {
+            tree.node(s)
+                .and_then(|t| t.nodes_in_radius.as_ref())
+                .and_then(|r| r.get(2))
+                .map_or(0, |r| {
+                    r.iter()
+                        .filter(|&&i| {
+                            spec.alloc_nodes.contains(i)
+                                && tree
+                                    .node(i)
+                                    .is_some_and(|t| t.kind == engine::tree::NodeType::Keystone)
+                        })
+                        .count()
+                })
+        };
+        let sockets: Vec<u32> = tree
             .sockets
             .iter()
             .copied()
@@ -543,35 +558,62 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
                 spec.alloc_nodes.contains(s)
                     && tree.node(s).is_some_and(|t| t.expansion_jewel.is_none())
             })
-            .max_by_key(|&s| in_radius(s))
-        else {
+            .collect();
+        // The socket with the most allocated nodes in its radius, each
+        // jewel in all its variants (the legacy ones in a third of the
+        // sampled builds); and in every build each socket with
+        // allocated keystones in its radius, whose conquest changes what
+        // the build's other parts see (Necromantic Aegis), with one
+        // legacy jewel in turn
+        let Some(&socket) = sockets.iter().max_by_key(|&&s| in_radius(s)) else {
             continue;
         };
+        // A build not sampled only with the legacy jewels conquering its
+        // keystones
+        let socket = sampled.then_some(socket);
+        let keystone_sockets: Vec<u32> = sockets
+            .iter()
+            .copied()
+            // where the legacy jewels are not placed already
+            .filter(|&s| !(Some(s) == socket && n % 15 == 0) && keystones_in_radius(s) > 0)
+            .collect();
         for text in &texts {
             let name = text.lines().next().unwrap_or("");
-            if n % 15 != 0 && JEWELS[..6].contains(&name) {
-                continue;
-            }
+            let legacy = JEWELS[..6].contains(&name);
+            let short: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
             let variants = text
                 .lines()
                 .filter(|l| l.starts_with("Variant:"))
                 .count()
                 .max(1);
-            for v in 1..=variants {
+            let mut place = |v: usize, socket: u32, suffix: &str| {
                 // A seed of its own within the range
                 let text = engine::pat::gsub_fn(text, "%((%d+)%-(%d+)%)", |c| {
                     let (lo, hi): (u64, u64) = (c[0].parse().ok()?, c[1].parse().ok()?);
                     let step = if hi > 100_000 { 20 } else { 1 };
-                    let k = (n as u64 * 977 + v as u64 * 131) % ((hi - lo) / step);
+                    let k =
+                        (n as u64 * 977 + v as u64 * 131 + u64::from(socket)) % ((hi - lo) / step);
                     Some((lo + k * step).to_string())
                 });
-                let Some(x) = with_socketed(&xml, &text, v, socket) else {
-                    continue;
-                };
-                let short: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-                let abyss = !JEWELS[..6].contains(&name);
-                (if abyss { &mut abyss_out } else { &mut out })
-                    .push((format!("timeless-{short}-{v}-{id}"), x));
+                if let Some(x) = with_socketed(&xml, &text, v, socket) {
+                    (if legacy { &mut out } else { &mut abyss_out })
+                        .push((format!("timeless-{short}-{v}{suffix}-{id}"), x));
+                }
+            };
+            if let Some(socket) = socket
+                && (!legacy || n % 15 == 0)
+            {
+                for v in 1..=variants {
+                    place(v, socket, "");
+                }
+            }
+            // One legacy jewel in each socket with keystones, in turn
+            if let Some(jx) = JEWELS[..6].iter().position(|j| *j == name) {
+                for (j, &k) in keystone_sockets.iter().enumerate() {
+                    if (j + n) % 6 == jx {
+                        place(1 + n / 6 % variants, k, &format!("-{k}"));
+                    }
+                }
             }
         }
     }
