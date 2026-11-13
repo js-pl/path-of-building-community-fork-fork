@@ -396,7 +396,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `AddItem(item, noAutoEquip)`: the item's id
-    fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
+    pub(super) fn add_item(&mut self, mut item: Item, no_auto_equip: bool) -> Result<f64> {
         let new = item.id.is_none();
         if new {
             let mut id = 1.0;
@@ -443,30 +443,17 @@ impl<'d> TypedSession<'d> {
     /// `AddDisplayItem()`
     fn add_display_item(&mut self) -> Result<()> {
         let item = self.display_item.take().ok_or("no item in the editor")?;
-        if let Some((_, other)) = FORBIDDEN
+        let old = item.id.and_then(|id| self.build.items.item(id)).cloned();
+        let other = FORBIDDEN
             .iter()
-            .find(|(t, _)| item.title.as_deref() == Some(t))
-        {
-            // `UpdateForbiddenJewelCounterpart` and
-            // `AddForbiddenJewelCounterpart` read the unique database
-            let variant = |i: &Item| {
-                let v = i.variant.filter(|v| *v >= 1.0)? as usize;
-                i.variant_list.as_ref()?.get(v - 1).cloned()
-            };
-            let name = variant(&item);
-            let old = item.id.and_then(|id| self.build.items.item(id));
-            let changed = old.is_some_and(|o| o.title == item.title && variant(o) != name);
-            let paired = self
-                .build
-                .items
-                .items
-                .values()
-                .any(|i| i.title.as_deref() == Some(other) && variant(i) == name);
-            if name.is_some() && (changed || !paired) {
-                return Err(format!("{NOT_PORTED}: the Forbidden jewels' counterparts"));
-            }
+            .find(|(t, _)| item.title.as_deref() == Some(*t))
+            .map(|(_, o)| *o);
+        let id = self.add_item(item, false)?;
+        if let Some(other) = other {
+            let item = self.build.items.item(id).unwrap().clone();
+            self.update_forbidden_counterpart(old.as_ref(), &item, other)?;
+            self.add_forbidden_counterpart(&item, other)?;
         }
-        self.add_item(item, false)?;
         self.items_changed()
     }
 

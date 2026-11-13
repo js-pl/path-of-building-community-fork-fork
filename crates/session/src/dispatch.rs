@@ -86,8 +86,19 @@ impl<'d> Dispatcher<'d> {
         self.typed.is_some()
     }
 
-    /// Answers a request on the translation, whatever is preferred
+    /// Answers a request on the translation, whatever is preferred. A save
+    /// the typed engine answered just before a save asked of the
+    /// translation is the same save: it is not replayed, so both have
+    /// saved (and re-parsed their items) as often.
     pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
+        let is_save = |r: &str| {
+            serde_json::from_str::<J>(r)
+                .ok()
+                .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
+        };
+        if is_save(json) && self.pending.last().is_some_and(|p| is_save(p)) {
+            self.pending.pop();
+        }
         self.sync()?
             .map_or_else(|| self.translated.request(json), Ok)
     }
@@ -257,6 +268,10 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.set_display_item(id, text.as_deref()))
             }
             "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
+            "itemDb" => {
+                let rare = req["kind"].as_str() == Some("rare");
+                self.typed.as_ref()?.item_db(rare).ok().map(ok)
+            }
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.select_item_set(id))

@@ -7,6 +7,7 @@ mod calcs;
 mod config;
 pub mod display_stats;
 mod geometry;
+mod item_db;
 mod item_editor;
 mod items;
 mod save;
@@ -50,6 +51,11 @@ pub struct TypedData {
     /// Makes the timeless jewels' data, once a build needs it
     timeless_source: Option<Box<TimelessSource>>,
     timeless: std::cell::OnceCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    /// The unique and rare item databases, once asked for
+    item_dbs: (
+        std::cell::OnceCell<item_db::ItemDb>,
+        std::cell::OnceCell<item_db::ItemDb>,
+    ),
 }
 
 pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
@@ -64,6 +70,7 @@ impl TypedData {
             source,
             timeless_source: None,
             timeless: Default::default(),
+            item_dbs: Default::default(),
         };
         let latest = data.tree(data.game.latest_tree_version())?;
         let socket_ids = latest

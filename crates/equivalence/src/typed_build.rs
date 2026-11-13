@@ -85,6 +85,7 @@ impl TypedData {
             config_vars: _,
             jewel_radius,
             tree_versions,
+            ..
         } = GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"));
         let parser = src.mod_parser().unwrap_or_else(|e| panic!("{e}"));
         let latest = tree_versions.last().cloned().unwrap_or_default();

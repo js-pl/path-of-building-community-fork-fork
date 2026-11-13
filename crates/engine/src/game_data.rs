@@ -23,6 +23,11 @@ pub struct GameData {
     pub jewel_radius: Vec<String>,
     /// `treeVersionList`, oldest first; the last is the latest
     pub tree_versions: Vec<String>,
+    /// `data.uniques`: each type's item texts, in `pairs` order, with the
+    /// uniques `Generated.lua` adds before a tree loads as `generated`
+    pub uniques: Vec<(String, Vec<String>)>,
+    /// `data.rares`
+    pub rares: Vec<String>,
 }
 
 crate::codec_struct!(GameData {
@@ -34,6 +39,8 @@ crate::codec_struct!(GameData {
     config_vars,
     jewel_radius,
     tree_versions,
+    uniques,
+    rares,
 });
 
 impl GameData {

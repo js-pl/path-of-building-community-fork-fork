@@ -60,6 +60,9 @@ pub struct Base {
     pub enchant: Option<String>,
     pub enchant_mod_types: Option<Vec<Vec<String>>>,
     pub cannot_be_anointed: bool,
+    /// The base's implicit lines, separated by newlines
+    pub implicit: Option<String>,
+    pub implicit_mod_types: Option<Vec<Vec<String>>>,
 }
 
 /// An affix or other item mod (`data.itemMods.<group>[id]`).
@@ -241,6 +244,19 @@ fn opt_string(v: &Value) -> Result<Option<String>> {
     }
 }
 
+/// `enchantModTypes` and `implicitModTypes`: each line's tags
+fn mod_types(x: &Value) -> Result<Option<Vec<Vec<String>>>> {
+    if x.is_nil() {
+        return Ok(None);
+    }
+    Ok(Some(
+        array(x)
+            .iter()
+            .map(|t| array(t).iter().map(string).collect())
+            .collect::<Result<_>>()?,
+    ))
+}
+
 fn key_string(k: &Key) -> Result<String> {
     match k {
         Key::Str(s) => Ok(s.to_str_lossy().into_owned()),
@@ -343,19 +359,9 @@ impl Base {
                 })
             },
             enchant: opt_string(&get(v, "enchant"))?,
-            enchant_mod_types: {
-                let x = get(v, "enchantModTypes");
-                if x.is_nil() {
-                    None
-                } else {
-                    Some(
-                        array(&x)
-                            .iter()
-                            .map(|t| array(t).iter().map(string).collect())
-                            .collect::<Result<_>>()?,
-                    )
-                }
-            },
+            enchant_mod_types: mod_types(&get(v, "enchantModTypes"))?,
+            implicit: opt_string(&get(v, "implicit"))?,
+            implicit_mod_types: mod_types(&get(v, "implicitModTypes"))?,
         })
     }
 }
@@ -601,6 +607,8 @@ crate::codec_struct!(Base {
     enchant,
     enchant_mod_types,
     cannot_be_anointed,
+    implicit,
+    implicit_mod_types,
 });
 crate::codec_struct!(Affix {
     id,

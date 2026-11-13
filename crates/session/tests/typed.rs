@@ -340,6 +340,9 @@ fn items_edits_match(d: &mut Dispatcher) {
         .unwrap_or(6);
     // Item texts of the builds so far, for adding and editing items
     let mut pool: Vec<J> = Vec::new();
+    let mut db_pool: Vec<J> = Vec::new();
+    // Forbidden Flame and Flesh, which bring their counterpart along
+    let mut forbidden: Vec<J> = Vec::new();
     for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
@@ -358,6 +361,26 @@ fn items_edits_match(d: &mut Dispatcher) {
             diff(&typed, &tr, &format!("{label} {r}"), out);
             typed
         };
+        if db_pool.is_empty() {
+            // The item databases, once: their uniques and templates also
+            // go in the pool, the Forbidden jewels always
+            for kind in ["unique", "rare"] {
+                let db = compare(
+                    d,
+                    &json!({"cmd": "itemDb", "kind": kind}),
+                    "itemDb",
+                    &mut out,
+                );
+                for (i, item) in db["ok"].as_array().into_iter().flatten().enumerate() {
+                    let name = item["name"].as_str().unwrap_or("");
+                    if name.starts_with("Forbidden Fl") {
+                        forbidden.push(item["raw"].clone());
+                    } else if i % 37 == 0 {
+                        db_pool.push(item["raw"].clone());
+                    }
+                }
+            }
+        }
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
         if let Some(a) = items["ok"]["items"].as_array() {
             pool.extend(a.iter().map(|i| i["raw"].clone()));
@@ -413,7 +436,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                     }
                 }
                 8 => {
-                    let text = &pool[rng.below(pool.len())];
+                    let text = if rng.below(3) == 0 && !db_pool.is_empty() {
+                        &db_pool[rng.below(db_pool.len())]
+                    } else if rng.below(4) == 0 && !forbidden.is_empty() {
+                        &forbidden[rng.below(forbidden.len())]
+                    } else {
+                        &pool[rng.below(pool.len())]
+                    };
                     match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
                         Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
                         None => json!({"cmd": "addItem", "text": text}),
