@@ -72,6 +72,20 @@ State at the handoff:
   gen-0004 (2618 nodes with power): typed 14 to 22 s with the build's
   own calculations, the translation 42 to 51 s (one thread, a loaded
   machine).
+- Item, gem and anoint power (`engine::compare`): the Items tab's item
+  database sort (`ItemDBControl:ListBuilder`), the Skills tab's gem
+  dropdown DPS sort (`GemSelectControl:DPSBuilder`) and the anoint popup
+  sort (`NotableDBControl:ListBuilder`) each run the build's calculator
+  over the candidates and sort by a power stat, like node power. A gem
+  swap changes the socket group, not a `CalcOverride`, so it runs on a
+  build of its own (`MiscCalculator::calculate_on`, the calculator's
+  cache reused). The candidates run on a thread pool (`engine::parallel`,
+  which node power now shares); results keep the candidates' order, so
+  they do not depend on the thread count. `tests/compare.rs` compares
+  each candidate's power with the translated `calcFunc`'s over sampled
+  corpus builds (6 items, 6 gems and 5 anoints a build), with the Lua
+  build out of `TREE` view mode so `useFullDPS` governs; the 4-thread
+  run equals the sequential one. Not wired into the typed session yet.
 - Jewels that let nodes be allocated without a connection (Intuitive
   Leap, Thread of Hope, Impossible Escape: `intuitiveLeapLikesAffecting`,
   the dependencies and paths around them) and tattoos (`hashOverrides`,
@@ -137,8 +151,10 @@ What remains for the full migration, in order:
    `rayon` pool (`power::node_power_with`: a recording pass lists them,
    the pool calculates them, the sequential pass combines them, so
    results do not depend on the thread count; `tests/fast_path.rs`
-   compares 1 and 4 threads with the sequential path). Then item, gem and
-   anoint comparisons on the calculator, and Full DPS skills on threads.
+   compares 1 and 4 threads with the sequential path).
+   Item, gem and anoint comparisons are on the calculator
+   (`engine::compare`, see Done); still to do: wiring them into the typed
+   session, and the Full DPS skills of one calculation on threads.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),
@@ -563,7 +579,8 @@ the main skill of a corpus build with fitting weapons (238 variants, about
 | `calcs.mirages`, `calcs.copyActiveSkill` | `calc_mirage.rs`: the copy is the main skill of a calculation of its own in `CALCULATOR` mode (`Recalc::mirage`), its mod list on snapshots of the database it comes from; a copy of a skill with a minion has a minion of its own, made on those databases (`calc_minion.rs`), whose output the copy's carries as `output.Minion`; General's Cry in `calc_offence.rs` |
 | `calcs.buildOutput` (`MAIN`, `CALCS`), `calcs.calcFullDPS` | `calcs.rs`: `build_outputs` from a loaded build, the Full DPS skills each calculated by itself and their rows sorted as the sidebar sorts them; a calculator's `Recalculator` recalculates where upstream's `CALCULATOR` mode does. The Calcs tab's calculation (`CalcMode::Calcs`: its own main skill, buff mode and gem selections, `BuffList`, `CombatList`, `CurseList`, `DisplayDamage`, ...) reuses the sidebar's Full DPS results and `env.multipliersUsed` |
 | `calcs.getMiscCalculator`, `CalcOverride` in `initEnv` | `calculator.rs`, `calc_override.rs` (the override and the allocation it gives) |
-| `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs` |
+| `CalcsTab:PowerBuilder`, `data.powerStatList` | `power.rs`; the candidates on a thread pool through `parallel.rs` |
+| `ItemDBControl:ListBuilder`, `GemSelectControl:DPSBuilder`, `NotableDBControl:ListBuilder` (the item, gem and anoint sorts) | `compare.rs`: the calculator over the candidates on a thread pool (`parallel.rs`); a gem swap runs on a build of its own (`MiscCalculator::calculate_on`) |
 | `CalcBreakdown.lua`, the calculations' `breakdown.*` | `breakdown.rs` (types and helpers); the breakdowns where each calculation writes them, into `Actor::breakdown` |
 
 Every skill with a minion has an actor of its own after the player and the
