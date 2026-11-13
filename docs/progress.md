@@ -696,7 +696,8 @@ trigger, or a source skill the templates lack).
 
 ## Next
 
-See the handoff above.
+See the handoff above, and [drop-translation.md](drop-translation.md) for
+how the translation can go and what the tests use as reference instead.
 
 ## Shipping the typed engine to the browser
 
