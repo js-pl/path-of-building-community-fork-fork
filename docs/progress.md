@@ -74,19 +74,27 @@ State at the handoff:
   attribute nodes and a mastery (`tattoo_specs_match_upstream`, 10), and
   `tests/perform.rs` calculates the tattooed builds
   (`tattoos_match_upstream`).
-- Timeless jewels (types 1 to 6: Glorious Vanity, Lethal Pride, Brutal
-  Restraint, Militant Faith, Elegant Hubris, Heroic Tragedy): the legion
-  passives and `NodeIndexMapping` (`engine::timeless::Timeless`, made by
-  `gamedata::Source::timeless`), the look-up tables decompressed from the
-  submodule's `.zip` files when a build first needs them (a loader the
-  caller gives; without one a conquered node is `not ported`), and the
-  conquered nodes of `BuildAllDependsAndPaths` (replacements, additions,
-  rolled values, `ReconnectNodeToClassStart`). `timeless_specs_match_upstream`
-  and `timeless_match_upstream` socket each jewel and conqueror with a seed
-  of its own in generated corpus builds (39 specs, 1001 nodes replaced),
-  against the translation with `Inflate` installed (headless upstream has
-  none, so the oracle cannot run them). The Abyss jewels (types 7 to 11)
-  return `not ported`.
+- Timeless jewels: types 1 to 6 (Glorious Vanity, Lethal Pride, Brutal
+  Restraint, Militant Faith, Elegant Hubris, Heroic Tragedy) and the
+  Abyss jewels (types 7 to 11: Tecrod, Ulaman, Kurgal, Amanamu and
+  Zorath's eye jewels): the legion passives and `NodeIndexMapping`
+  (`engine::timeless::Timeless`, made by `gamedata::Source::timeless`),
+  the look-up tables decompressed from the submodule's `.zip` files when
+  a build first needs them (a loader the caller gives; without one a
+  conquered node is `not ported`), and the conquered nodes of
+  `BuildAllDependsAndPaths` (replacements, additions, rolled values,
+  `ReconnectNodeToClassStart`). The Abyss jewels' tables are read by
+  socket, Zorath's by the nodes of the allocated path from its socket to
+  the class start (`GetShortestPathToClassStart`) and one node of every
+  ascendancy (`DataAbyssJewelLookUpTableHelper.lua`).
+  `timeless_specs_match_upstream` and `timeless_match_upstream` socket
+  each jewel and conqueror with a seed of its own in generated corpus
+  builds, the Abyss jewels in three times as many (69 specs, 2266 nodes
+  replaced), against the translation with `Inflate` installed (headless
+  upstream has none, so the oracle cannot run them). The Abyss variants
+  run last: a conquered node's `setSource` rewrites the mod parser's
+  cached mods, which the legion keystones share, so a keystone conquered
+  later in the same translation names another node as its mods' source.
 - Every trigger configuration of `configTable` is ported, with the
   helmet's Focus, Snipe, Manaforged Arrows, the uptime of Battlemage's and
   Infernal Cry, Kitava's Thirst (`minimumCostPerUse`) and the active
@@ -105,8 +113,7 @@ State at the handoff:
 
 What remains for the full migration, in order:
 
-1. The Abyss timeless jewels, the party tab, mirages of skills with
-   minions. `CalcSections.lua` (which
+1. The party tab, mirages of skills with minions. `CalcSections.lua` (which
    breakdown each cell shows) belongs to the session API.
 2. Variants of the Calcs tab's other minion and stage selections.
 3. The fast path of node power: candidates run on a base environment
@@ -444,7 +451,7 @@ copying Lua tables).
 - `override.spec` (another spec's jewels) and `override.extraJewelFuncs`
   given by the caller
 - Item warnings, superseded supports, gem requirements, `nameSpec` of item
-  skills, the Abyss timeless jewels, `limitDisabled` (a second
+  skills, `limitDisabled` (a second
   timeless jewel over the limit still conquers nodes typed; upstream
   marks it on the shared item during a calculation and leaves it out of
   the next `BuildAllDependsAndPaths`)
