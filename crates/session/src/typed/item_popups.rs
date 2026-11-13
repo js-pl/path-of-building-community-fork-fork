@@ -1,8 +1,8 @@
 //! The item editor's popups: `ItemsTab:CraftItem` (Craft Item: rarity,
 //! title, type and base) and `ItemsTab:EditDisplayItemText` (Edit Item
 //! Text) and `ItemsTab:EnchantDisplayItem` (Enchant Item, in
-//! `item_enchant.rs`), `ItemsTab:AnointDisplayItem` (Anoint Item, saved
-//! without a node), `ItemsTab:CorruptDisplayItem` (Corrupt Item, in
+//! `item_enchant.rs`), `ItemsTab:AnointDisplayItem` (Anoint Item, in
+//! `item_anoint.rs`), `ItemsTab:CorruptDisplayItem` (Corrupt Item, in
 //! `item_corrupt.rs`), as `lua/session.lua` shows them (`describePopups`) and drives them
 //! (`control` of `popup.*`, `popupButton`, `closePopup`).
 //!
@@ -49,10 +49,7 @@ pub enum ItemPopup {
         with_item: bool,
     },
     Enchant(Box<super::item_enchant::EnchantPopup>),
-    Anoint {
-        /// `self.anointEnchantSlot`
-        slot: usize,
-    },
+    Anoint(Box<super::item_anoint::AnointPopup>),
     Corrupt(Box<super::item_corrupt::CorruptPopup>),
 }
 
@@ -134,6 +131,13 @@ impl<'d> TypedSession<'d> {
         if req["click"].as_bool() == Some(true) {
             return self.item_popup_button(name);
         }
+        if let Some(ItemPopup::Anoint(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.anoint_popup_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::Anoint(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
         if let Some(ItemPopup::Corrupt(p)) = self.editor.popups.first() {
             let mut p = p.clone();
             let r = self.corrupt_popup_control(&mut p, name, req);
@@ -202,12 +206,11 @@ impl<'d> TypedSession<'d> {
                     self.editor.popups[0] = ItemPopup::Corrupt(p);
                 }
             }
-            (ItemPopup::Anoint { slot }, "save") => {
-                let item = self.anoint_item(slot)?;
-                self.set_display_item_value(Some(item))?;
+            (ItemPopup::Anoint(p), "save") => {
+                self.anoint_popup_save(&p)?;
                 self.close_item_popup();
             }
-            (ItemPopup::Anoint { .. }, "close") | (_, "cancel") => {
+            (ItemPopup::Anoint(_), "close") | (_, "cancel") => {
                 self.close_item_popup();
             }
             (
@@ -350,7 +353,7 @@ impl<'d> TypedSession<'d> {
     fn describe_item_popup(&self, popup: &ItemPopup) -> J {
         match popup {
             ItemPopup::Enchant(p) => self.describe_enchant_popup(p),
-            ItemPopup::Anoint { slot } => self.describe_anoint_popup(*slot),
+            ItemPopup::Anoint(p) => self.describe_anoint_popup(p),
             ItemPopup::Corrupt(p) => self.describe_corrupt_popup(p),
             ItemPopup::Craft {
                 rarity,

@@ -129,6 +129,8 @@ pub struct Node {
     /// The tooltip's `reminderText` and `flavourText` lines of the data
     pub reminder_text: Option<Vec<Arc<str>>>,
     pub flavour_text: Option<Vec<Arc<str>>>,
+    /// The oils that anoint the node (`recipe`)
+    pub recipe: Vec<Arc<str>>,
 }
 
 /// A node that replaces a tree node's stats: a tattoo
@@ -1001,6 +1003,7 @@ impl PassiveTree {
                 nodes_in_radius: None,
                 reminder_text: opt_texts(&get(nt, "reminderText"))?,
                 flavour_text: opt_texts(&get(nt, "flavourText"))?,
+                recipe: opt_texts(&get(nt, "recipe"))?.unwrap_or_default(),
             });
         }
 
@@ -1232,6 +1235,7 @@ crate::codec_struct!(Node {
     nodes_in_radius,
     reminder_text,
     flavour_text,
+    recipe,
 });
 crate::codec_struct!(Overlay {
     id,

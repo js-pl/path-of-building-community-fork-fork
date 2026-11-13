@@ -72,6 +72,11 @@ local function findControl(path)
 	local host, name = path:match("^(%a+)%.(.+)$")
 	local list = host and controlHosts()[host]
 	local control = list and list[name]
+	-- A control's own control: "popup.notableDB.search"
+	local outer, inner = (name or ""):match("^([^%.]+)%.(.+)$")
+	if not control and outer and list and list[outer] and list[outer].controls then
+		control = list[outer].controls[inner]
+	end
 	if not control then
 		error("no control " .. tostring(path))
 	end
@@ -118,9 +123,32 @@ local function describeControl(control)
 	return c
 end
 
+-- A list a coroutine builds as it draws (NotableDBControl), built now
+local function buildList(control)
+	if control.ListBuilder and (control.listBuildFlag or control.listOutputRevision ~= build().outputRevision) then
+		control.listBuildFlag = false
+		control.listBuilder = nil
+		control.listOutputRevision = build().outputRevision
+		local co = coroutine.create(control.ListBuilder)
+		while true do
+			local ok, err = coroutine.resume(co, control)
+			if not ok then
+				error(err, 0)
+			end
+			if coroutine.status(co) == "dead" then
+				break
+			end
+		end
+	end
+end
+
 function api.control(req)
 	local control = findControl(req.path)
-	if req.sel then
+	if req.sel and control.SelectIndex and not control.SetSel then
+		-- A row of a list
+		buildList(control)
+		control:SelectIndex(req.sel)
+	elseif req.sel then
 		control:SetSel(req.sel)
 	elseif req.text then
 		control:SetText(req.text, true)
@@ -162,7 +190,26 @@ local function layoutControls(controls, prefix, filter)
 		end
 		if type(name) == "string" and not labelOf and (not filter or filter(name, control)) and control.IsShown and control:IsShown() then
 			local cls = control._className
-			if cls == "DropDownControl" or cls == "EditControl" or cls == "ResizableEditControl" or cls == "CheckBoxControl"
+			if cls == "NotableDBControl" then
+				-- The list, its rows by name, and its own inputs
+				buildList(control)
+				local x, y = control:GetPos()
+				local d = describeControl(control)
+				d.list = arrayOf(control.list, function(node) return node.dn end)
+				for i, node in ipairs(control.list) do
+					if node == control.selValue then
+						d.sel = i
+					end
+				end
+				d.path = prefix .. name
+				d.x, d.y = x, y
+				t_insert(out, d)
+				for _, inner in ipairs(layoutControls(control.controls, prefix .. name .. ".")) do
+					local cx, cy = control.controls[inner.path:sub(#prefix + #name + 2)]:GetPos()
+					inner.x, inner.y = cx, cy
+					t_insert(out, inner)
+				end
+			elseif cls == "DropDownControl" or cls == "EditControl" or cls == "ResizableEditControl" or cls == "CheckBoxControl"
 				or cls == "ButtonControl" or cls == "SliderControl" or (cls == "LabelControl" and filter) then
 				local x, y = control:GetPos()
 				local d = describeControl(control)

@@ -1072,6 +1072,10 @@ fn items_edits_match(d: &mut Dispatcher) {
                                     "ButtonControl" => {
                                         json!({"cmd": "control", "path": c["path"], "click": true})
                                     }
+                                    "EditControl" => {
+                                        let text = ["", "life", "(fire|cold) damage", "energy", "z"][rng.below(5)];
+                                        json!({"cmd": "control", "path": c["path"], "text": text})
+                                    }
                                     _ => {
                                         let n = c["list"].as_array().map_or(1, Vec::len);
                                         json!({"cmd": "control", "path": c["path"], "sel": rng.below(n) + 1})
