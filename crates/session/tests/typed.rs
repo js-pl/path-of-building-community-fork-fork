@@ -174,7 +174,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     // radius data kept from earlier calculations, or errors on these
     "a jewel's attributes in radius",
     "a socket tooltip with nodes the calculation did not build",
-    "toggling a flask that is not in the build",
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",

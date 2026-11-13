@@ -985,9 +985,24 @@ impl<'d> TypedSession<'d> {
     /// The effective stats of a flask or tincture, and the stat
     /// differences of toggling it
     fn add_flask_differences(&self, tip: &mut Tooltip, item: &Item) -> Result<()> {
-        let id = item
-            .id
-            .ok_or_else(|| unported("toggling a flask that is not in the build"))?;
+        // `toggleFlask = item` with an item outside the build adds it: it
+        // joins a copy of the items tab under a free id
+        let mut with_item = None;
+        let id = match item.id.filter(|id| self.build.items.item(*id).is_some()) {
+            Some(id) => id,
+            None => {
+                let mut id = -1.0;
+                while self.build.items.item(id).is_some() {
+                    id -= 1.0;
+                }
+                let mut b = self.build.clone();
+                let mut it = item.clone();
+                it.id = Some(id);
+                b.items.items.insert(id as i64, std::sync::Arc::new(it));
+                with_item = Some(b);
+                id
+            }
+        };
         let base = item.base.as_ref().ok_or("no base")?;
         let sb = self.sidebar()?;
         let q = |how: &str, player: bool, name: &str| -> Result<f64> {
@@ -1318,7 +1333,10 @@ impl<'d> TypedSession<'d> {
         };
         let data = self.data.calc_data();
         let calc = MiscCalculator::new(&self.build, &data)?;
-        let o = calc.calculate(&ovr, true)?;
+        let o = match &with_item {
+            Some(b) => calc.calculate_on(b, &ovr, true)?,
+            None => calc.calculate(&ovr, true)?,
+        };
         let b = calc.base();
         let base = Outputs {
             player: &b.player,

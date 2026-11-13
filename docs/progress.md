@@ -350,15 +350,17 @@ What remains for the full migration, in order:
    `buildSpecForJewelComparison`: a copy of the spec with the jewel in
    the socket and its paths built again, which the calculator's
    calculation takes as `override.spec`
-   (`MiscCalculator::calculate_on_spec`). Upstream keeps `displayEffect`,
+   (`MiscCalculator::calculate_on_spec`). Toggling a previewed flask
+   or tincture that is not in the build (`toggleFlask = item`) adds it:
+   it joins a copy of the items tab under a free negative id
+   (`MiscCalculator::calculate_on`). Upstream keeps `displayEffect`,
    `displayGemList`, `finalModList` and `jewelRadiusData` on its objects
    across calculations; the typed tooltips read the sidebar's last
    calculation. Falling back: tattooed and conquered nodes, sockets
    whose radius has nodes the calculation did not build (upstream reads
    their stale `finalModList`, or fails), a radius jewel's "Attributes
    in Radius" (upstream's `jewelRadiusData` counts differently from the
-   typed radius data, e.g. 40 against 20 Str in gen-0029), toggling a
-   previewed flask, a mastery
+   typed radius data, e.g. 40 against 20 Str in gen-0029), a mastery
    tooltip with a popup open, the party view with imported data.
    The translated runtime's `%d` of `-2^63` printed two
    minus signs; it now prints LuaJIT's.
