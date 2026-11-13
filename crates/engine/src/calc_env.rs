@@ -360,8 +360,15 @@ fn init_env_pass(
         extra_jewel_funcs: &[],
     };
     let mut setup = calc_tree::setup(&player_db, &items_input, data.items)?;
-    // Energy Blade's weapons, where the calculations look items up
-    build.items.generated = setup.items.generated.clone();
+    // Energy Blade's weapons, where the calculations look items up; other
+    // generated items (a tooltip's foreign flask) stay
+    let mut generated = setup.items.generated.clone();
+    for (&id, item) in &build.items.generated {
+        if id != -1 && id != -2 {
+            generated.entry(id).or_insert_with(|| item.clone());
+        }
+    }
+    build.items.generated = generated;
     // The database moves on to the skills
     let mut player_db = std::mem::replace(&mut setup.mod_db, Store::db());
     // The granted skills' socket groups, which only the sidebar's

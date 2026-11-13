@@ -985,9 +985,10 @@ impl<'d> TypedSession<'d> {
     /// The effective stats of a flask or tincture, and the stat
     /// differences of toggling it
     fn add_flask_differences(&self, tip: &mut Tooltip, item: &Item) -> Result<()> {
-        let id = item
-            .id
-            .ok_or_else(|| unported("toggling a flask that is not in the build"))?;
+        // A flask not in the build (the item editor's, a preview) is
+        // toggled as itself, which upstream's calculation takes by
+        // identity: here under an id no item of the tab has
+        let id = item.id.unwrap_or(FOREIGN_ITEM_ID);
         let base = item.base.as_ref().ok_or("no base")?;
         let sb = self.sidebar()?;
         let q = |how: &str, player: bool, name: &str| -> Result<f64> {
@@ -1317,7 +1318,16 @@ impl<'d> TypedSession<'d> {
             (header, ovr)
         };
         let data = self.data.calc_data();
-        let calc = MiscCalculator::new(&self.build, &data)?;
+        let calc = if item.id.is_none() {
+            let mut build = self.build.clone();
+            build
+                .items
+                .generated
+                .insert(FOREIGN_ITEM_ID as i64, std::sync::Arc::new(item.clone()));
+            MiscCalculator::new(&build, &data)?
+        } else {
+            MiscCalculator::new(&self.build, &data)?
+        };
         let o = calc.calculate(&ovr, true)?;
         let b = calc.base();
         let base = Outputs {
@@ -1350,6 +1360,10 @@ impl<'d> TypedSession<'d> {
         Ok(out)
     }
 }
+
+/// The id a flask or tincture not in the build is toggled by: the items
+/// tab's generated items take negative ids from -1 on (Energy Blade)
+const FOREIGN_ITEM_ID: f64 = -100.0;
 
 /// Whether the item is a cluster jewel (`item.clusterJewel`)
 fn base_name_is_cluster(s: &TypedSession, item: &Item) -> bool {
