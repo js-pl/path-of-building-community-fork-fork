@@ -149,6 +149,7 @@ impl TypedData {
             } else {
                 None
             },
+            setup: &self.game.setup,
         };
         Build::load(root, &ctx, tree, &self.parser)
     }

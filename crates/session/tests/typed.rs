@@ -112,6 +112,9 @@ fn typed_session_matches_translated() {
     if run("items") {
         items_edits_match(&mut d);
     }
+    if run("party") {
+        party_match(data, &mut d);
+    }
 }
 
 /// Random sequences of item, set, spec, config set, level and socket
@@ -461,6 +464,309 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         times[0], times[1], times[2], times[3]
     );
     eprintln!("skipped {}:\n{}", skipped.len(), skipped.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// `<Import exportParty="true"/>`: the build exports its buffs
+fn with_export(xml: &str) -> String {
+    match xml.find("exportParty=\"false\"") {
+        Some(at) => format!(
+            "{}exportParty=\"true\"{}",
+            &xml[..at],
+            &xml[at + "exportParty=\"false\"".len()..]
+        ),
+        None if xml.contains("<Import/>") => {
+            xml.replace("<Import/>", "<Import exportParty=\"true\"/>")
+        }
+        None if xml.contains("<Import ") => {
+            xml.replacen("<Import ", "<Import exportParty=\"true\" ", 1)
+        }
+        None => xml.replace(
+            "</PathOfBuilding>",
+            "<Import exportParty=\"true\"/>\n</PathOfBuilding>",
+        ),
+    }
+}
+
+/// The build with these socket groups added after its others, each gem
+/// of a group at its natural maximum level and 20% quality
+fn with_groups(data: &TypedData, xml: &str, groups: &[&[&str]]) -> Option<String> {
+    let mut add = String::new();
+    for names in groups {
+        add.push_str("<Skill enabled=\"true\" label=\"Party\" includeInFullDPS=\"false\">\n");
+        for name in *names {
+            let gem = data
+                .game
+                .skills
+                .gems()
+                .iter()
+                .find(|g| g.name == *name)
+                .unwrap_or_else(|| panic!("no gem {name}"));
+            add.push_str(&format!(
+                "<Gem count=\"1\" enableGlobal1=\"true\" enableGlobal2=\"true\" enabled=\"true\" gemId=\"{}\" level=\"{}\" nameSpec=\"{}\" quality=\"20\" skillId=\"{}\" variantId=\"{}\"/>\n",
+                gem.game_id, gem.natural_max_level, gem.name, gem.id, gem.variant_id
+            ));
+        }
+        add.push_str("</Skill>\n");
+    }
+    let at = xml.find("</SkillSet>")?;
+    Some(format!("{}{add}{}", &xml[..at], &xml[at..]))
+}
+
+/// XML text content
+fn escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+/// The `ExportedBuffs` of a saved build, by name
+fn exported(xml: &str) -> Vec<(String, String)> {
+    let root = engine::xml::parse(xml).unwrap();
+    let party = root.child("PathOfBuilding").and_then(|p| p.child("Party"));
+    party
+        .iter()
+        .flat_map(|p| p.elements())
+        .filter(|e| e.elem == "ExportedBuffs")
+        .filter_map(|e| {
+            let text = e.children.iter().find_map(|c| match c {
+                engine::xml::Node::Text(t) => Some(t.clone()),
+                _ => None,
+            })?;
+            Some((e.attr("name")?.to_string(), text))
+        })
+        .collect()
+}
+
+/// The build with these party buffs imported (its Party tab replaced)
+fn with_party(xml: &str, buffs: &[(String, String)]) -> String {
+    let mut party =
+        String::from("<Party ShowAdvanceTools=\"false\" append=\"false\" destination=\"All\">\n");
+    for (name, text) in buffs {
+        party.push_str(&format!(
+            "<ImportedBuffs name=\"{name}\">{}</ImportedBuffs>\n",
+            escape(text)
+        ));
+    }
+    party.push_str("</Party>");
+    let start = xml.find("<Party ");
+    let end = start.and_then(|s| {
+        let rest = &xml[s..];
+        let close = rest.find('>')?;
+        if rest[..close].ends_with('/') {
+            Some(s + close + 1)
+        } else {
+            rest.find("</Party>").map(|e| s + e + "</Party>".len())
+        }
+    });
+    match (start, end) {
+        (Some(s), Some(e)) => format!("{}{party}{}", &xml[..s], &xml[e..]),
+        _ => xml.replace("</PathOfBuilding>", &format!("{party}\n</PathOfBuilding>")),
+    }
+}
+
+/// Compares saved files line by line. Upstream's `modLib.mergeKeystones`
+/// gives a keystone's shared mods the source of whatever else grants it,
+/// also the copies the tree added (see `align_keystone_sources`): an
+/// exported mod line that differs only by the typed source being the
+/// tree's is aligned. The number of lines so aligned.
+fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
+    let mut aligned = 0;
+    if typed.lines().count() != tr.lines().count() {
+        out.push("saveXml differs in its number of lines".into());
+        return 0;
+    }
+    for (a, b) in typed.lines().zip(tr.lines()) {
+        if a == b {
+            continue;
+        }
+        let (x, y): (Vec<&str>, Vec<&str>) = (a.split('|').collect(), b.split('|').collect());
+        let keystone = x.len() == y.len()
+            && x.len() > 2
+            && x[1].starts_with("Tree:")
+            && x.iter()
+                .zip(&y)
+                .enumerate()
+                .all(|(i, (u, v))| i == 1 || u == v);
+        if keystone {
+            aligned += 1;
+        } else {
+            out.push(format!(
+                "saveXml differs:\n  typed {a:?}\n  translated {b:?}"
+            ));
+            return aligned;
+        }
+    }
+    aligned
+}
+
+/// Party members' stats as a support build exports them, with every flag
+/// the calculations read of party members
+const PARTY_STATS: &str = "EnemyFireResistEqualToYours
+FireResist=40
+EnemyChaosResistEqualToYours
+ChaosResist=-30
+PartyMemberMaximumEnduranceChargesEqualToYours
+EnduranceChargesMax=6
+PartyMemberFortifyEqualToYours
+FortificationStacks=20
+MovementSpeedMod|percent|max=150
+Life=5000
+BlockChanceMax=80
+BlockChance=55
+MaxLifeLeechRatePercent=25
+EnergyShieldRecoveryCap=3000
+MainHand.CritChance=12.5";
+
+/// Every link skill's mods as a support build exports them
+const PARTY_LINKS: &str = "Destructive Link
+130
+1|Skill:DestructiveLink|MainHandCritIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Protective Link
+100
+1|Skill:ProtectiveLink|MaximumBlockAttackChanceIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+1|Skill:ProtectiveLink|BlockAttackChanceIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Soul Link
+110
+30|Skill:SoulLink|TakenFromParentESBeforeYou|BASE|-|-|type=GlobalEffect/effectType=Link
+---
+Vampiric Link
+100
+1|Skill:VampiricLink|MaximumLifeLeechIsEqualToParent|FLAG|-|-|type=GlobalEffect/effectType=Link
+---
+Flame Link
+100
+20|Skill:FlameLink|PhysicalDamageGainAsFire|BASE|-|-|type=GlobalEffect/effectType=Link,type=PerStat/actor=parent/div=100/stat=Life
+---";
+
+/// Socket groups that give a supporting build buffs to export: a link,
+/// an aura, a curse or mark, a warcry, by build
+const PARTY_GROUPS: [&[&[&str]]; 8] = [
+    &[&["Destructive Link"], &["Determination"], &["Despair"]],
+    &[&["Flame Link"], &["Pride"], &["Rallying Cry"]],
+    &[&["Protective Link"], &["Vaal Grace"], &["Assassin's Mark"]],
+    &[&["Intuitive Link"], &["Wrath"], &["Intimidating Cry"]],
+    &[&["Vampiric Link"], &["Malevolence"], &["Punishment"]],
+    &[&["Soul Link"], &["Purity of Elements"], &["Ancestral Cry"]],
+    &[&["Vaal Haste"], &["Haste"], &["Enfeeble"]],
+    &[],
+];
+
+/// The Party tab: corpus builds that export their buffs, some with
+/// socket groups added that give them buffs to export, and each corpus
+/// build with another's exported buffs imported as party members' give
+/// the translation's sidebar, outputs, Calcs tab and file.
+/// `PARTY_STEP=<n>` takes every nth build (default 2)
+fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
+    let step: usize = std::env::var("PARTY_STEP")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(2);
+    let builds: Vec<(String, String)> = corpus()
+        .into_iter()
+        .step_by(step)
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect();
+    let (mut failures, mut compared, mut skipped) = (Vec::new(), 0, Vec::new());
+    let mut aligned = 0;
+    let mut check = |d: &mut Dispatcher, id: &str, xml: &str, failures: &mut Vec<String>| {
+        // `PARTY_DUMP=<dir>` writes the builds there
+        if let Ok(dir) = std::env::var("PARTY_DUMP") {
+            std::fs::write(Path::new(&dir).join(format!("{id}.xml")), xml).unwrap();
+        }
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            let e = d.typed_error.clone().unwrap_or_default();
+            // Where the typed engine fails, upstream does
+            let tr = answer(d.translated_request(r#"{"cmd":"outputs"}"#), "translated");
+            if !e.starts_with("not ported") && tr.get("error").is_none() {
+                failures.push(format!("{id}: typed fails ({e}), the translation does not"));
+            }
+            skipped.push(format!("{id}: {e}"));
+            return None;
+        }
+        let mut out = Vec::new();
+        let typed: Vec<J> = ["state", "outputs"]
+            .iter()
+            .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
+            .collect();
+        answer(
+            d.translated_request(r#"{"cmd":"state"}"#),
+            "translated load",
+        );
+        for (c, t) in ["state", "outputs"].iter().zip(&typed) {
+            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
+            diff(t, &tr, c, &mut out);
+        }
+        if out.is_empty() {
+            let (_, o, _) = compare_calcs(data, d, id, &mut [Duration::ZERO; 2]);
+            out.extend(o);
+        }
+        let typed_save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+        let tr = answer(
+            d.translated_request(r#"{"cmd":"saveXml"}"#),
+            "translated save",
+        );
+        if out.is_empty() {
+            let a = typed_save["ok"]["xml"].as_str().unwrap_or("");
+            let b = tr["ok"]["xml"].as_str().unwrap_or("");
+            aligned += compare_party_saves(a, b, &mut out);
+        }
+        compared += 1;
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({n}):\n  {}", out.join("\n  ")));
+        }
+        tr["ok"]["xml"].as_str().map(String::from)
+    };
+    let mut exports: Vec<Vec<(String, String)>> = Vec::new();
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let groups = PARTY_GROUPS[k % PARTY_GROUPS.len()];
+        let xml = with_groups(data, &with_export(xml), groups).unwrap_or_else(|| with_export(xml));
+        let saved = check(d, &format!("{id}-export"), &xml, &mut failures);
+        exports.push(saved.map(|x| exported(&x)).unwrap_or_default());
+    }
+    let n = builds.len();
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let from = (k + 1) % n;
+        let buffs = &exports[from];
+        if buffs.is_empty() {
+            continue;
+        }
+        let xml = with_party(xml, buffs);
+        check(
+            d,
+            &format!("{id}-party-{}", builds[from].0),
+            &xml,
+            &mut failures,
+        );
+    }
+    // Party members' stats and every link's mods, written by hand
+    for (k, (id, xml)) in builds.iter().enumerate().step_by(4) {
+        let mut buffs = exports[(k + 2) % n].clone();
+        buffs.retain(|(name, _)| name != "PartyMemberStats" && name != "Link Skills");
+        buffs.push(("PartyMemberStats".into(), PARTY_STATS.into()));
+        buffs.push(("Link Skills".into(), PARTY_LINKS.into()));
+        let xml = with_party(xml, &buffs);
+        check(d, &format!("{id}-party-stats"), &xml, &mut failures);
+    }
+    eprintln!(
+        "{compared} party builds compared, {aligned} keystone sources aligned; skipped {}:\n{}",
+        skipped.len(),
+        skipped.join("\n")
+    );
     assert!(
         failures.is_empty(),
         "{} builds differ:\n{}",

@@ -92,6 +92,7 @@ struct BaseKey {
     config: Arc<ConfigTab>,
     mods: Arc<Vec<Mod>>,
     enemy_mods: Arc<Vec<Mod>>,
+    party: Arc<crate::party::Party>,
     /// The setup data, by address
     setup: usize,
     values: [u64; 5],
@@ -103,6 +104,7 @@ impl BaseKey {
         Arc::ptr_eq(&self.config, &o.config)
             && Arc::ptr_eq(&self.mods, &o.mods)
             && Arc::ptr_eq(&self.enemy_mods, &o.enemy_mods)
+            && Arc::ptr_eq(&self.party, &o.party)
             && self.setup == o.setup
             && self.values == o.values
             && self.mode == o.mode
@@ -131,6 +133,7 @@ impl BaseDbs {
             config: build.config.clone(),
             mods: build.config_mods.clone(),
             enemy_mods: build.config_enemy_mods.clone(),
+            party: build.party.clone(),
             setup: data.setup as *const SetupData as usize,
             values: [
                 s,
@@ -288,6 +291,7 @@ fn init_env_pass(
         config_input: &config,
         config_mods: &build.config_mods,
         config_enemy_mods: &build.config_enemy_mods,
+        party_enemy_mods: &build.party.enemy_mods,
         mode: base_mode,
     };
     let (player_base, enemy_base) = match cached.clone().flatten() {

@@ -164,6 +164,7 @@ impl TypedData {
             one_hand: &one_hand,
             minions: &minions,
             timeless: engine::build::has_timeless_jewel(root).then(|| self.timeless()),
+            setup: &self.setup,
         };
         engine::build::Build::load(root, &ctx, tree, &self.parser)
     }

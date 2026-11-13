@@ -69,6 +69,9 @@ pub struct BuildOutput {
     /// What the Calcs tab reads of its calculation besides the outputs
     /// (`CALCS` only)
     pub view: Option<Box<CalcsView>>,
+    /// What the build exports for its party (`partyTab.buffExports`),
+    /// when it does
+    pub buff_exports: Option<crate::party::BuffExports>,
 }
 
 /// The main skill of an actor of [`CalcsView`]
@@ -724,6 +727,7 @@ fn output_of(
         }
         CalcMode::Calculator => {}
     }
+    let buff_exports = p.buff_exports.take();
     let minion_actor = p.minion_actor();
     let mut view = match mode {
         CalcMode::Calcs => Some(Box::new(CalcsView::take(&mut p)?)),
@@ -755,6 +759,7 @@ fn output_of(
             minion_breakdown,
             sidebar,
             view,
+            buff_exports,
         },
         picked,
     ))
