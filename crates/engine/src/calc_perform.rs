@@ -611,7 +611,6 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         stores,
         actors,
         precision: input.data.items,
-        replaced: HashSet::new(),
     };
     let n = env.skills.active_skills.len();
     let mut p = Perform {

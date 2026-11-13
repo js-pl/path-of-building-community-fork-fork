@@ -164,8 +164,7 @@ What remains for the full migration, in order:
    mods; the test takes the typed source for such tree keystone rows (46
    rows over the corpus, counted). The session tests share one typed
    data and one translated session (`typed_session_matches_translated`,
-   about 3.5 GB). Not followed either: the slots of energy shield converted
-   to ward, whose `inc` upstream leaves nil (typed: `false`).
+   about 3.5 GB).
 
    Tree edits are typed (`session::typed::tree`): `clickNode`
    (`PassiveSpec:AllocNode` with its path, `DeallocNode` with its
@@ -203,20 +202,45 @@ What remains for the full migration, in order:
    `skills_edits_match`: random edit sequences (6 per build) give the
    translation's `skills`, `state`, `outputs`, `calcs` and controls after
    each step (358 edits: typed 4.8 s, translated 52 s with its replays).
-   Known: upstream's `calcFullDPS` calculates each Full DPS skill on the
-   environment the one before left (`calcs.perform(fullEnv, true)`), the
-   typed engine each afresh; adding a group to Full DPS in
-   3.13-dual-wield-cospris-coc gives a Full DPS 0.2 % apart, which the
-   test reports apart. Edits that make Saviour's mirage the main skill
+   After the sequence every group goes into Full DPS, one at a time.
+   `calcFullDPS` sets up on `specEnv`'s cached databases, which become
+   the parents of its environment's own (`Store::base`): `More` rounds
+   each store's product apart (Frost Bomb's Full DPS in
+   3.13-dual-wield-cospris-coc: `round(1.19 * 1.2) * 1.24` against the
+   main calculation's `round(1.19 * 1.2 * 1.24)`), and a `ReplaceMod` of
+   a base mod (`Multiplier:ImpaleStacks`, `MomentumStacks` from the
+   config) changes them for the skills after. Edits that make Saviour's mirage the main skill
    fall back (its gem level outputs are not ported).
+
+   Saving is typed (`session::typed::save`): `saveXml` and `saveCode`
+   are `buildMode:SaveDB` with every tab's `Save`, byte for byte the
+   translation's for 60 corpus builds (Saviour's mirage as the main skill
+   falls back), after the tree and skills edit sequences, and in both
+   round trips (a file saved by either loads in the other to the same
+   file, sidebar and outputs). `Item:BuildRaw` is `engine::item_raw`;
+   saving re-parses each item from it as `BuildAndParseRaw` does. What
+   the typed build does not hold (notes, party buffers, import, tree
+   view and timeless jewel settings, item set links, trade weights)
+   comes from the loaded file as the tabs' `Load` keeps it. Ported on
+   the way, as upstream leaves them nil: `includeInFullDPS` of a group
+   without it, `mainActiveSkill` of a group made in the session until
+   the calculation picks it (and its write-back of the clamped index;
+   the minions' `skillMinionSkill` and `skillMinionSkillCalcs` likewise
+   go back to the gems, the Calcs tab's from the sidebar's calculation,
+   which has the same minion skills),
+   `enableGlobal2` of the gems the calculations make,
+   `secondaryAscendClassId="nil"`. A build with exported party buffs
+   falls back. Typed saves take 0.2 to 1.5 s over the corpus (the first save
+   re-parses every item), the translation's 2.2 s; the browser's
+   background node power, which saves the build first, no longer
+   replays the typed edits on the translation (its load alone took
+   about 1.2 s per corpus build). `undo` is not ported.
 
    Still on the translation, before it can be dropped:
    - Edits on the typed model with a recalculation: `equipItem`,
      `selectItemSet`, `selectConfigSet`, `selectTreeSpec`, `control` of
      the class and level, config options and other tabs, `undo`,
      `newBuild`.
-   - Save: `saveXml`, `saveCode` (`buildMode:SaveDB` and every tab's
-     `Save`), equal to upstream's.
    - Read-only views: `tree`, `skills`, `copySocketGroup`,
      `gemList`, `items`, `itemDb`, `config`, `party`, `notes`,
      `controls` of other tabs.

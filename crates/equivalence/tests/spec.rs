@@ -170,7 +170,7 @@ fn specs_match_upstream() {
             spec.import_from_node_list(
                 num("classId"),
                 num("ascendClassId"),
-                num("secondaryAscendClassId"),
+                Some(num("secondaryAscendClassId")),
                 &hash_list,
                 &effects,
             )

@@ -25,7 +25,7 @@ const MOD_FLAG_SPELL: u32 = 0x2;
 const KEYWORD_FLAG_ATTACK: u32 = 0x10000;
 
 const DMG_TYPES: [&str; 5] = ["Physical", "Lightning", "Cold", "Fire", "Chaos"];
-const CATALYSTS: [&str; 12] = [
+pub const CATALYSTS: [&str; 12] = [
     "Abrasive",
     "Accelerating",
     "Dextral",
@@ -380,6 +380,9 @@ pub struct Item {
     pub implicit_mod_lines: Vec<ModLine>,
     pub explicit_mod_lines: Vec<ModLine>,
     pub crucible_mod_lines: Vec<ModLine>,
+    /// `baseLines`: the base lines of an item with variants, by base name
+    /// in insertion order
+    pub base_lines: Vec<ModLine>,
     pub has_mod_tags: bool,
 
     pub mod_source: String,
@@ -1032,6 +1035,7 @@ impl Item {
         self.implicit_mod_lines = vec![];
         self.explicit_mod_lines = vec![];
         self.crucible_mod_lines = vec![];
+        self.base_lines = vec![];
         self.advanced_copy = false;
         self.has_modifier_headers = false;
         self.mod_magnitude_mods = vec![];
@@ -1662,6 +1666,17 @@ impl Item {
             base_name = "Two-Toned Boots (Armour/Energy Shield)".into();
         }
         if let Some(base) = data.base(&base_name).cloned() {
+            let base_line = ModLine {
+                line: base_name.clone(),
+                variant_list: ml.variant_list.clone(),
+                version_list: ml.version_list.clone(),
+                variant_group_list: ml.variant_group_list.clone(),
+                ..ModLine::default()
+            };
+            match self.base_lines.iter_mut().find(|b| b.line == base_name) {
+                Some(b) => *b = base_line,
+                None => self.base_lines.push(base_line),
+            }
             if self.uses_variant_groups
                 && self.selected_version.is_none()
                 && let Some(v) = &self.version_list

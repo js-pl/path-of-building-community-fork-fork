@@ -119,15 +119,15 @@ fn compare_group(t: &SocketGroup, l: &Value, fail: &mut dyn FnMut(String)) {
     }
     for (field, tv) in [
         ("groupCount", t.group_count),
-        ("mainActiveSkill", Some(t.main_active_skill)),
-        ("mainActiveSkillCalcs", Some(t.main_active_skill_calcs)),
+        ("mainActiveSkill", t.main_active_skill),
+        ("mainActiveSkillCalcs", t.main_active_skill_calcs),
     ] {
         let lv = get(l, field).as_number();
         check(field, lv == tv, format!("{tv:?} != {lv:?}"));
     }
     for (field, tv) in [
         ("enabled", t.enabled),
-        ("includeInFullDPS", t.include_in_full_dps),
+        ("includeInFullDPS", t.include_in_full_dps == Some(true)),
     ] {
         let lv = get(l, field).truthy();
         check(field, lv == tv, format!("{tv} != {lv}"));

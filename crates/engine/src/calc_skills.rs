@@ -134,8 +134,6 @@ pub fn add_granted_groups(
                     enabled: true,
                     source: Some(skill.source.clone()),
                     slot: skill.slot_name.clone(),
-                    main_active_skill: 1.0,
-                    main_active_skill_calcs: 1.0,
                     ..SocketGroup::default()
                 });
                 groups.len() - 1
@@ -179,8 +177,6 @@ pub fn add_granted_groups(
                     enabled: true,
                     source: Some("Explode".into()),
                     no_supports: true,
-                    main_active_skill: 1.0,
-                    main_active_skill_calcs: 1.0,
                     ..SocketGroup::default()
                 });
                 groups.len() - 1
@@ -1251,11 +1247,14 @@ fn active_skills(
             }
             if gi + 1 == main_index && !group_skills[gi].is_empty() {
                 let n = group_skills[gi].len() as f64;
-                let i = n.min(if input.calcs {
-                    group.main_active_skill_calcs
-                } else {
-                    group.main_active_skill
-                }) as usize;
+                let i = n.min(
+                    if input.calcs {
+                        group.main_active_skill_calcs
+                    } else {
+                        group.main_active_skill
+                    }
+                    .unwrap_or(1.0),
+                ) as usize;
                 main_skill = group_skills[gi].get(i.saturating_sub(1)).copied();
             }
         }

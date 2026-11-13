@@ -86,6 +86,8 @@ impl TypedSession<'_> {
         };
         let main = sb.main_socket_group;
         let used = sb.slot_enabled.clone();
+        let counts: Vec<usize> = sb.groups.iter().map(Vec::len).collect();
+        let calcs_group = self.build.calcs.skill_number as usize;
         let Some(list) = self
             .build
             .skills
@@ -97,6 +99,17 @@ impl TypedSession<'_> {
         for (gi, g) in list.iter_mut().enumerate() {
             if all || gi + 1 == main || (g.enabled && used.get(gi).copied().unwrap_or(false)) {
                 g.display_label = Some(display_label(g));
+            }
+            // The calculations write back the main group's active skill
+            let n = counts.get(gi).copied().unwrap_or(0) as f64;
+            if n > 0.0 {
+                if gi + 1 == main {
+                    g.main_active_skill = Some(n.min(g.main_active_skill.unwrap_or(1.0)));
+                }
+                if gi + 1 == calcs_group {
+                    let v = g.main_active_skill_calcs.unwrap_or(1.0);
+                    g.main_active_skill_calcs = Some(n.min(v));
+                }
             }
         }
     }
@@ -119,7 +132,10 @@ impl TypedSession<'_> {
                     }
                 }
                 o.insert("enabled".into(), J::Bool(g.enabled));
-                o.insert("includeInFullDPS".into(), J::Bool(g.include_in_full_dps));
+                o.insert(
+                    "includeInFullDPS".into(),
+                    J::Bool(g.include_in_full_dps == Some(true)),
+                );
                 o.insert(
                     "gems".into(),
                     J::Array(g.gem_list.iter().map(gem_json).collect()),
@@ -234,7 +250,7 @@ impl TypedSession<'_> {
             g.enabled = v;
         }
         if let Some(v) = e.include_in_full_dps {
-            g.include_in_full_dps = v;
+            g.include_in_full_dps = Some(v);
         }
         if let Some(s) = e.slot {
             g.slot = (!s.is_empty()).then_some(s);
@@ -252,8 +268,6 @@ impl TypedSession<'_> {
         list.push(SocketGroup {
             label: Some(label.unwrap_or_default()),
             enabled: true,
-            main_active_skill: 1.0,
-            main_active_skill_calcs: 1.0,
             ..SocketGroup::default()
         });
         let n = list.len() as f64;
@@ -411,9 +425,9 @@ impl TypedSession<'_> {
                     let g = self.selected_group(calcs)?;
                     let g = self.group_mut(g)?;
                     if calcs {
-                        g.main_active_skill_calcs = i;
+                        g.main_active_skill_calcs = Some(i);
                     } else {
-                        g.main_active_skill = i;
+                        g.main_active_skill = Some(i);
                     }
                     self.rebuild()?;
                 }
@@ -534,7 +548,8 @@ impl TypedSession<'_> {
             group.main_active_skill_calcs
         } else {
             group.main_active_skill
-        };
+        }
+        .unwrap_or(1.0);
         let src = sb
             .groups
             .get(gi as usize - 1)

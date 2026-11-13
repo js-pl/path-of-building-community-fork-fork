@@ -15,15 +15,15 @@
 use crate::actor::OutVal;
 use crate::breakdown::{Breakdown, Breakdowns, ModEntry};
 use crate::build::Build;
-use crate::calc::{PLAYER, m_min};
+use crate::calc::{ENEMY, PLAYER, m_min};
 use crate::calc_cache::{Cache, Recalc, Recalculator, skill_uuid};
-use crate::calc_env::{CalcData, CalcMode, init_env, init_env_with};
+use crate::calc_env::{CalcData, CalcMode, Env, init_env, init_env_cached};
 use crate::calc_override::Override;
 use crate::calc_perform::BuffMap;
 use crate::calc_perform::{Perform, PerformInput, Result, perform};
 use crate::calc_setup::BuffMode;
 use crate::calc_skills::ActiveSkill;
-use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, StoreId, Sym, TagKind};
+use crate::mods::{Cfg, Mod, ModType, ModValue, Mods, Names, Store, StoreId, Sym, TagKind};
 use crate::skills::SocketGroup;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::sync::Arc;
@@ -276,12 +276,17 @@ pub fn calc_full_dps_with(
     let recalc = Recalculator::new(build, data, CalcMode::Calculator)
         .with_override(ovr)
         .with_cache(cache);
-    let setup = |b: &mut Build| init_env_with(b, data, CalcMode::Calculator, base, ovr);
+    let setup =
+        |b: &mut Build, bases| init_env_cached(b, data, CalcMode::Calculator, base, ovr, bases);
     // The setup does not depend on the main skill: each skill's
     // calculation starts from a copy of the first setup and the build it
     // leaves (`reuse_setup`), or sets up afresh
     let mut set_up = build.clone();
-    let first_env = setup(&mut set_up)?;
+    let first_env = setup(&mut set_up, None)?;
+    // `ReplaceMod` changes the shared base databases for the skills after
+    let base_of = |e: &Env| (e.player_db.base.clone(), e.enemy_db.base.clone());
+    let first_bases = base_of(&first_env);
+    let mut bases = first_bases.clone();
     let mut first = Some(first_env.clone());
     let reuse = crate::calc_env::reuse_setup();
     let list: Vec<(usize, f64)> = {
@@ -293,7 +298,7 @@ pub fn calc_full_dps_with(
             .filter(|(_, s)| {
                 s.group
                     .and_then(|g| env.groups.get(g))
-                    .is_some_and(|g| g.include_in_full_dps)
+                    .is_some_and(|g| g.include_in_full_dps == Some(true))
             })
             .filter_map(|(i, s)| match active_skill_count(s, &env.groups) {
                 (n, true) => Some((i, n)),
@@ -311,12 +316,18 @@ pub fn calc_full_dps_with(
     ]: [Best; 5] = Default::default();
     let (mut poison, mut impale, mut decay, mut dot, mut culling) = (0.0, 0.0, 0.0, 0.0, 0.0);
     for (i, mut count) in list {
+        let same = |a: &Option<Arc<Store>>, b: &Option<Arc<Store>>| match (a, b) {
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        };
+        let unchanged = same(&bases.0, &first_bases.0) && same(&bases.1, &first_bases.1);
         let (b, mut env) = match first.take() {
             Some(e) => (build.clone(), e),
-            None if reuse => (set_up.clone(), first_env.clone()),
+            None if reuse && unchanged => (set_up.clone(), first_env.clone()),
             None => {
                 let mut b = build.clone();
-                let e = setup(&mut b)?;
+                let given = bases.0.clone().zip(bases.1.clone());
+                let e = setup(&mut b, given)?;
                 (b, e)
             }
         };
@@ -326,6 +337,10 @@ pub fn calc_full_dps_with(
         input.skip_ehp = true;
         let mut p = perform(env, input)?;
         p.finish()?;
+        bases = (
+            p.c.store(p.c.db(PLAYER)).base.clone(),
+            p.c.store(p.c.db(ENEMY)).base.clone(),
+        );
         let name = p.skill_name(i).to_string();
         let mods = p.mods(i);
         let (part, trigger) = (mods.skill_part_name.clone(), mods.info_trigger.clone());
@@ -636,15 +651,53 @@ pub fn build_output(
     main: Option<&BuildOutput>,
 ) -> Result<BuildOutput> {
     let env = init_env(build, data, mode)?;
+    let out = output_of(build, data, mode, main, env)?;
+    // The minions' skill selections go back to the gems
+    if matches!(mode, CalcMode::Main | CalcMode::Calcs)
+        && let Some(list) = build
+            .skills
+            .as_mut()
+            .and_then(|s| s.socket_group_list_mut())
+    {
+        for (g, picked) in list.iter_mut().zip(&out.1) {
+            for (gem, (main, calcs)) in g.gem_list.iter_mut().zip(picked) {
+                gem.skill_minion_skill = *main;
+                gem.skill_minion_skill_calcs = *calcs;
+            }
+        }
+    }
+    Ok(out.0)
+}
+
+/// [`build_output`] after the setup, with the gems' minion skill
+/// selections the calculation leaves
+#[allow(clippy::type_complexity)]
+fn output_of(
+    build: &Build,
+    data: &CalcData,
+    mode: CalcMode,
+    main: Option<&BuildOutput>,
+    env: Env,
+) -> Result<(BuildOutput, Vec<Vec<(Option<f64>, Option<f64>)>>)> {
     // `calcFullDPS` sets up from this calculation's base databases
     let base = env.mode;
-    let build = &*build;
     let recalc = Recalculator::new(build, data, mode);
     let breakdown = matches!(mode, CalcMode::Main | CalcMode::Calcs);
     let mut input = PerformInput::new(build, data, breakdown)?;
     input.recalc = Some(&recalc);
     let mut p = perform(env, input)?;
     p.finish()?;
+    let picked = p
+        .env
+        .groups
+        .iter()
+        .map(|g| {
+            g.gem_list
+                .iter()
+                .map(|gem| (gem.skill_minion_skill, gem.skill_minion_skill_calcs))
+                .collect()
+        })
+        .collect();
     let full_dps = match main {
         Some(m) if base == BuffMode::new(Some("EFFECTIVE")) => m.full_dps.clone(),
         _ => calc_full_dps(build, data, base)?,
@@ -692,16 +745,19 @@ pub fn build_output(
     } else {
         std::mem::take(&mut player.output)
     };
-    Ok(BuildOutput {
-        player,
-        minion,
-        full_dps,
-        multipliers_used,
-        breakdown,
-        minion_breakdown,
-        sidebar,
-        view,
-    })
+    Ok((
+        BuildOutput {
+            player,
+            minion,
+            full_dps,
+            multipliers_used,
+            breakdown,
+            minion_breakdown,
+            sidebar,
+            view,
+        },
+        picked,
+    ))
 }
 
 /// What only the sidebar's calculation sets: the cost warnings, extra
