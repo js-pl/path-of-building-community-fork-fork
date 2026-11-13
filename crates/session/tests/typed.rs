@@ -169,7 +169,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "crafting a cluster jewel",
     // Tooltips (see docs/progress.md): upstream rebuilds the spec, reads
     // radius data kept from earlier calculations, or errors on these
-    "comparing a jewel that changes the tree",
     "a jewel's attributes in radius",
     "a socket tooltip with nodes the calculation did not build",
     "toggling a flask that is not in the build",
