@@ -948,6 +948,11 @@ impl Item {
         weight
     }
 
+    /// `GetModSpawnWeight(mod)`
+    pub fn spawn_weight(&self, m: &Affix) -> f64 {
+        self.mod_spawn_weight(m, &HashSet::new(), &HashSet::new(), None)
+    }
+
     /// `CanHaveMod(mod)`
     fn can_have_mod(&self, data: &ItemData, m: &Affix) -> bool {
         self.can_have_mod_with(data, m, &HashSet::new())
