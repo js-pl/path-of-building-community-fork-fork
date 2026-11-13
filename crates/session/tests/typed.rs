@@ -1131,7 +1131,16 @@ fn items_edits_match(d: &mut Dispatcher) {
                             .collect();
                         let popup =
                             pick(&mut rng, &J::Array(openers)).filter(|_| rng.below(3) == 0);
-                        let Some(c) = popup.or_else(|| pick(&mut rng, &J::Array(controls))) else {
+                        // The modifier sorting now and then too
+                        let sorting = controls
+                            .iter()
+                            .find(|c| c["path"] == "items.craftingSorting")
+                            .cloned()
+                            .filter(|_| rng.below(6) == 0);
+                        let Some(c) = popup
+                            .or(sorting)
+                            .or_else(|| pick(&mut rng, &J::Array(controls)))
+                        else {
                             break;
                         };
                         let path = c["path"].clone();
