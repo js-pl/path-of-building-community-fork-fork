@@ -60,6 +60,9 @@ pub struct Base {
     pub enchant: Option<String>,
     pub enchant_mod_types: Option<Vec<Vec<String>>>,
     pub cannot_be_anointed: bool,
+    /// The base's implicit lines, separated by newlines
+    pub implicit: Option<String>,
+    pub implicit_mod_types: Option<Vec<Vec<String>>>,
     /// The tooltip's flavour text (`flavourText`)
     pub flavour_text: Option<Vec<String>>,
 }
@@ -155,6 +158,8 @@ pub struct RareLikeUnique {
     pub suffix_limit: f64,
     pub ignore_mod_type: bool,
     pub allow_duplicate_groups: bool,
+    /// Whether it takes custom modifiers (`supportsCustomModifiers`)
+    pub supports_custom_modifiers: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -245,6 +250,19 @@ fn opt_string(v: &Value) -> Result<Option<String>> {
     } else {
         string(v).map(Some)
     }
+}
+
+/// `enchantModTypes` and `implicitModTypes`: each line's tags
+fn mod_types(x: &Value) -> Result<Option<Vec<Vec<String>>>> {
+    if x.is_nil() {
+        return Ok(None);
+    }
+    Ok(Some(
+        array(x)
+            .iter()
+            .map(|t| array(t).iter().map(string).collect())
+            .collect::<Result<_>>()?,
+    ))
 }
 
 fn key_string(k: &Key) -> Result<String> {
@@ -350,19 +368,9 @@ impl Base {
                 })
             },
             enchant: opt_string(&get(v, "enchant"))?,
-            enchant_mod_types: {
-                let x = get(v, "enchantModTypes");
-                if x.is_nil() {
-                    None
-                } else {
-                    Some(
-                        array(&x)
-                            .iter()
-                            .map(|t| array(t).iter().map(string).collect())
-                            .collect::<Result<_>>()?,
-                    )
-                }
-            },
+            enchant_mod_types: mod_types(&get(v, "enchantModTypes"))?,
+            implicit: opt_string(&get(v, "implicit"))?,
+            implicit_mod_types: mod_types(&get(v, "implicitModTypes"))?,
         })
     }
 }
@@ -445,6 +453,7 @@ impl ItemData {
                     suffix_limit: number(&get(&v, "suffixLimit"))?,
                     ignore_mod_type: get(&v, "ignoreModType").truthy(),
                     allow_duplicate_groups: get(&v, "allowDuplicateGroups").truthy(),
+                    supports_custom_modifiers: get(&v, "supportsCustomModifiers").truthy(),
                 },
             );
         }
@@ -623,6 +632,8 @@ crate::codec_struct!(Base {
     enchant,
     enchant_mod_types,
     cannot_be_anointed,
+    implicit,
+    implicit_mod_types,
     flavour_text,
 });
 crate::codec_struct!(Affix {
@@ -723,6 +734,7 @@ impl Codec for ItemData {
             u.suffix_limit.put(w);
             u.ignore_mod_type.put(w);
             u.allow_duplicate_groups.put(w);
+            u.supports_custom_modifiers.put(w);
         }
         self.bases.put(w);
         self.foulborn_map.put(w);
@@ -787,6 +799,7 @@ impl Codec for ItemData {
                     suffix_limit: Codec::get(r)?,
                     ignore_mod_type: Codec::get(r)?,
                     allow_duplicate_groups: Codec::get(r)?,
+                    supports_custom_modifiers: Codec::get(r)?,
                 },
             );
         }

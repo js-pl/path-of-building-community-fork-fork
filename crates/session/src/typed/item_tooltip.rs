@@ -586,7 +586,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `itemLib.formatModLine(modLine)`
-    fn format_mod_line(&self, ml: &ModLine) -> Result<Option<String>> {
+    pub(super) fn format_mod_line(&self, ml: &ModLine) -> Result<Option<String>> {
         let line = if ml.range.is_some() || ml.corrupted_range.is_some() {
             let range = engine::item_tools::Range::One(ml.range.unwrap_or(0.5));
             engine::item_tools::apply_range(
