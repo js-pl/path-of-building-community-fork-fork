@@ -358,10 +358,11 @@ What remains for the full migration, in order:
    across calculations; the typed tooltips read the sidebar's last
    calculation. Falling back: tattooed and conquered nodes, sockets
    whose radius has nodes the calculation did not build (upstream reads
-   their stale `finalModList`, or fails), a radius jewel's "Attributes
-   in Radius" (upstream's `jewelRadiusData` counts differently from the
-   typed radius data, e.g. 40 against 20 Str in gen-0029), a mastery
-   tooltip with a popup open, the party view with imported data.
+   their stale `finalModList`, or fails), a mastery tooltip with a
+   popup open, the party view with imported data. A radius jewel's
+   "Attributes in Radius" is the data of its last radius function, as
+   each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
+   40 Str in gen-0029).
    The translated runtime's `%d` of `-2^63` printed two
    minus signs; it now prints LuaJIT's.
 
