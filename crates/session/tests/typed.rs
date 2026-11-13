@@ -157,7 +157,7 @@ fn typed_session_matches_translated() {
 const KNOWN_FALLBACKS: &[&str] = &[
     "copying a gem without a level, quality or quality id",
     "undo with tattoos or cluster jewels",
-    "crafting a cluster jewel",
+    "specs on another tree version",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
