@@ -6,6 +6,7 @@
 mod calcs;
 pub mod display_stats;
 mod geometry;
+mod item_editor;
 mod items;
 mod save;
 mod sets;
@@ -202,6 +203,8 @@ pub struct TypedSession<'d> {
     item_keys: lua::ljtab::LjMap<()>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
+    /// `ItemsTab.displayItem`: the item in the editor
+    display_item: Option<engine::item::Item>,
 }
 
 impl<'d> TypedSession<'d> {
@@ -232,6 +235,7 @@ impl<'d> TypedSession<'d> {
             other_specs: Vec::new(),
             item_keys: Default::default(),
             socket_labels: HashMap::new(),
+            display_item: None,
             root,
         };
         s.load_specs()?;

@@ -297,9 +297,18 @@ What remains for the full migration, in order:
    - Tooltips: `nodeTooltip`, `itemTooltip`, `socketGroupTooltip`,
      `previewItem` (the `Tooltip` lines of `PassiveTreeView`,
      `ItemsTab:AddItemTooltip`, `SkillsTab:AddSocketGroupTooltip`).
-   - Items and crafting: `addItem`, `editItem`, `displayItem`,
-     `setDisplayItem`, `craftItem`, `saveDisplayItem`, `setNotes`,
-     `popupButton`, `closePopup` (the item editor's controls, popups).
+   - Items and crafting: `displayItem`, `craftItem`, `setNotes`,
+     `popupButton`, `closePopup`, `itemDb` (the item editor's controls,
+     popups, the unique and rare databases: `Data/Uniques/Special/Generated.lua`
+     and `Item:Craft` are not ported). `addItem`, `editItem`,
+     `setDisplayItem` and `saveDisplayItem` are typed
+     (`session::typed::item_editor`: `AddItem` with its auto-equip,
+     `CreateDisplayItemFromRaw`, `CopyAnointsAndEldritchImplicits`,
+     `AddDisplayItem`) and in `items_edits_match`; a crafted cluster
+     jewel in the editor (`UpdateClusterJewelControls` crafts it again)
+     and a Forbidden jewel whose counterpart is missing fall back. The
+     display item is held typed, so `displayItem` answers on the
+     translation after its replays.
    - Engine gaps that make a build fall back: Combust's trigger
      (gen-0028), tree edits with Intuitive
      Leap and the like, tattoos, specs in the URL format only, exported

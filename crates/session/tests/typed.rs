@@ -154,8 +154,9 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 }
 
 /// Random sequences of item, set, spec, config set, level and socket
-/// group copy edits give the translation's items, skills, sidebar,
-/// outputs and specs after each step, and its file at the end
+/// group copy edits, items added, edited and saved from the editor give
+/// the translation's items, skills, sidebar, outputs and specs after each
+/// step, and its file at the end
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
@@ -163,6 +164,8 @@ fn items_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
+    // Item texts of the builds so far, for adding and editing items
+    let mut pool: Vec<J> = Vec::new();
     for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
@@ -182,6 +185,9 @@ fn items_edits_match(d: &mut Dispatcher) {
             typed
         };
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
+        if let Some(a) = items["ok"]["items"].as_array() {
+            pool.extend(a.iter().map(|i| i["raw"].clone()));
+        }
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -202,7 +208,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let groups = answer(d.request(r#"{"cmd":"skills"}"#), "skills")["ok"]["groups"]
                 .as_array()
                 .map_or(0, Vec::len);
-            let req = match rng.below(8) {
+            let req = match rng.below(12) {
                 0 | 1 if !slots.is_empty() => {
                     let slot = &slots[rng.below(slots.len())];
                     let item = pick(&mut rng, &slot["candidates"])
@@ -231,6 +237,30 @@ fn items_edits_match(d: &mut Dispatcher) {
                         Some(t) => json!({"cmd": "pasteSocketGroup", "text": t}),
                         None => continue,
                     }
+                }
+                8 => {
+                    let text = &pool[rng.below(pool.len())];
+                    match pick(&mut rng, &J::Array(slots.clone())).filter(|_| rng.below(2) == 0) {
+                        Some(slot) => json!({"cmd": "addItem", "text": text, "slot": slot["name"]}),
+                        None => json!({"cmd": "addItem", "text": text}),
+                    }
+                }
+                9 => match pick(&mut rng, &items["ok"]["items"]) {
+                    Some(i) => {
+                        let text = &pool[rng.below(pool.len())];
+                        json!({"cmd": "editItem", "id": i["id"], "text": text})
+                    }
+                    None => continue,
+                },
+                10 | 11 => {
+                    let open = match pick(&mut rng, &items["ok"]["items"]) {
+                        Some(i) if rng.below(2) == 0 => {
+                            json!({"cmd": "setDisplayItem", "id": i["id"]})
+                        }
+                        _ => json!({"cmd": "setDisplayItem", "text": pool[rng.below(pool.len())]}),
+                    };
+                    compare(d, &open, &format!("step {step}"), &mut out);
+                    json!({"cmd": "saveDisplayItem"})
                 }
                 _ => {
                     let text = ["1", "50", "100", "150", "", "37"][rng.below(6)];
