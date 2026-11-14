@@ -5602,6 +5602,25 @@ fn skills_sockets_match() {
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 
+/// `gemList`s that fail upstream, by build: the candidate gem and the error.
+/// Upstream's `hasGlobalEffect` of a skill is set the first time a stat of
+/// the skill with a `GlobalEffect` mod is looked up in `data.skillStatMap`
+/// (`skillStatMapMeta`), so a Vaal transfigured gem's base skill (Cleave of
+/// Rage: `gain_x_rage_on_attack_hit`) is an active skill in the first
+/// `initEnv` that sees it and no longer in later ones without
+/// `enableGlobal2`. Here the base skill is the main skill, triggered by
+/// General's Cry; `calcs.mirages` sets it up again in a new environment
+/// (`calcs.buildActiveSkill`), which no longer has it, so nothing is
+/// cached and `GlobalCache.cachedData[mode][uuid]` is indexed nil. In the
+/// application the DPS sort's coroutine dies silently and leaves the gem
+/// data in the slot. The typed engine takes `hasGlobalEffect` as the data
+/// loads it, as upstream's first calculation of a skill does, and answers.
+const UPSTREAM_GEM_LIST_FAILS: &[(&str, &str, &str)] = &[(
+    "3.13-generals-perforate-zerker",
+    "Vaal Cleave of Rage",
+    "attempt to index a nil value",
+)];
+
 /// Choosing gems by name in the Skills tab's gem slots, in the typed session
 /// as in the translated one: exact names, prefixes, initials, tags, no
 /// match, the slot after the last gem, and a name after a gem list
@@ -5610,6 +5629,7 @@ fn skills_gem_select_match() {
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
     let mut out = Vec::new();
+    let mut upstream_fails = Vec::new();
     let parts = ["Name", "Level", "Quality", "Enable", "Count", "ErrMsg"];
     let paths: Vec<String> = (1..=7)
         .flat_map(|i| parts.iter().map(move |p| format!("skills.gemSlot{i}{p}")))
@@ -5687,10 +5707,25 @@ fn skills_gem_select_match() {
             answer(d.request(&r.to_string()), "typed"),
             answer(d.translated_request(&r.to_string()), "translated"),
         );
-        // A candidate's calculation can fail upstream, which leaves its gem
-        // in the slot; the typed calculation does not fail
         if tr.get("error").is_some() {
-            eprintln!("{id}: gemList failed in the translation: {}", tr["error"]);
+            // Only the documented upstream failure: its calculation leaves
+            // the candidate's gem data in the translation's slot, so the
+            // build's remaining steps cannot be compared
+            match UPSTREAM_GEM_LIST_FAILS.iter().find(|(b, _, _)| *b == id) {
+                Some(&(_, gem, error)) if tr["error"] == error => {
+                    let has = t["ok"]["gems"]
+                        .as_array()
+                        .is_some_and(|g| g.iter().any(|x| x["name"] == gem));
+                    if t.get("error").is_some() || !has {
+                        out.push(format!("{id} {r}: typed {t} without {gem}"));
+                    }
+                    upstream_fails.push(id.clone());
+                }
+                _ => out.push(format!(
+                    "{id} {r}: translated {tr}, typed {}",
+                    truncate(&t.to_string())
+                )),
+            }
             continue;
         }
         diff(&t, &tr, &format!("{id} {r}"), &mut out);
@@ -5703,5 +5738,10 @@ fn skills_gem_select_match() {
         }
         compare_saves(&mut d, &id, &mut out);
     }
+    let expected: Vec<String> = UPSTREAM_GEM_LIST_FAILS
+        .iter()
+        .map(|(b, _, _)| b.to_string())
+        .collect();
+    assert_eq!(upstream_fails, expected, "the gem lists that fail upstream");
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
