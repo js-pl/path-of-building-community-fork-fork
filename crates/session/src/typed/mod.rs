@@ -25,6 +25,7 @@ mod item_popups;
 mod item_sets;
 mod item_tooltip;
 mod items;
+mod items_tab_controls;
 mod list_order;
 mod loadouts;
 mod node_tooltip;
@@ -400,6 +401,7 @@ impl<'d> TypedSession<'d> {
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {
                     self.shared_list_control_json(p).ok()?
                 }
