@@ -19,11 +19,46 @@ use serde_json::{Map, Value as J, json};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-impl TypedSession<'_> {
+impl<'d> TypedSession<'d> {
     /// `gemList` of a group's gem slot (both 1-based; the slot after the
     /// last adds a gem): the gems of its dropdown in their order, each
     /// with its DPS in the slot and whether it supports the group's skills
-    pub fn gem_select_list(&self, group: f64, slot: f64) -> Result<J> {
+    pub fn gem_select_list(&mut self, group: f64, slot: f64) -> Result<J> {
+        let (out, last) = self.gem_select_rows(group, slot)?;
+        // `CalcOutputWithThisGem` puts back only the slot's gem data and
+        // level: the selections each candidate's calculation wrote on the
+        // gems (`skillMinion`, ...) stay, the last one's in the end
+        if let Some(mut b) = last {
+            let calc_data = self.data.calc_data();
+            init_env(&mut b, &calc_data, CalcMode::Calculator)?;
+            let (g, k) = (group as usize - 1, slot as usize - 1);
+            let mut list = b
+                .skills
+                .as_ref()
+                .map(|s| s.socket_group_list().to_vec())
+                .unwrap_or_default();
+            let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
+            let own = tab.socket_group_list_mut().ok_or("no socket groups")?;
+            match own[g].gem_list.get(k) {
+                Some(old) => {
+                    let gem = &mut list[g].gem_list[k];
+                    gem.gem = old.gem.clone();
+                    gem.level = old.level;
+                }
+                None => list[g].gem_list.truncate(k),
+            }
+            *own = list;
+        }
+        Ok(out)
+    }
+
+    /// The rows of `gemList`, and the build the last pending gem's
+    /// calculation ran on
+    fn gem_select_rows(
+        &self,
+        group: f64,
+        slot: f64,
+    ) -> Result<(J, Option<engine::build::Build<'d>>)> {
         let opts = &self.gem_options;
         let skills_tab = self.build.skills.as_ref().ok_or("no skills tab")?;
         let groups = skills_tab.socket_group_list();
@@ -152,6 +187,7 @@ impl TypedSession<'_> {
                 GemCandidate { build: b }
             })
             .collect();
+        let last = cands.last().map(|c| c.build.clone());
         let powers = compare::gem_power(&calc, cands, opts.field, full_dps, Threads::available());
         let mut dps: std::collections::HashMap<&str, f64> = std::collections::HashMap::new();
         for (gem, p) in pending.iter().zip(powers) {
@@ -201,6 +237,6 @@ impl TypedSession<'_> {
                 J::Object(o)
             })
             .collect();
-        Ok(json!({ "baseDps": num(base), "gems": rows }))
+        Ok((json!({ "baseDps": num(base), "gems": rows }), last))
     }
 }

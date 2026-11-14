@@ -656,9 +656,15 @@ What remains for the full migration, in order:
      level (with its entries' tooltips) and quality, the support gem
      filter and legacy gems, kept as session state that the gem list
      reads and the build saves (a value no entry has keeps the entry
-     selected, as upstream's `SelByValue` does). Upstream's gem list DPS
-     calculation leaves `skillMinion` on the group's gems, which the
-     typed gem list does not.
+     selected, as upstream's `SelByValue` does). A gem slot's gem list
+     (`gemList` with a group) is an edit: upstream's DPS loop puts back
+     only the slot's gem data and level, so the selections the last
+     pending gem's calculation wrote (`skillMinion`, ...) stay on the
+     gems, and the save shows them. The typed list takes the gems in data
+     order, the order of a fresh gem table; `pairs` over the slot's table
+     is random in LuaJIT, and in the translation keeps the order of an
+     earlier fill, so after the options widen the list the last gem can
+     differ.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor

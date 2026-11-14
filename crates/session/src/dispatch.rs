@@ -156,7 +156,9 @@ impl<'d> Dispatcher<'d> {
     /// Answers a request on the translation, whatever is preferred. A save
     /// the typed engine answered just before a save asked of the
     /// translation is the same save: it is not replayed, so both have
-    /// saved (and re-parsed their items) as often.
+    /// saved (and re-parsed their items) as often. So is a gem slot's
+    /// list asked again just after, whose calculations leave selections
+    /// on the gems.
     #[cfg(feature = "translation")]
     pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
         let is_save = |r: &str| {
@@ -164,7 +166,14 @@ impl<'d> Dispatcher<'d> {
                 .ok()
                 .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
         };
-        if is_save(json) && self.pending.last().is_some_and(|p| is_save(p)) {
+        let is_gem_list = |r: &str| {
+            serde_json::from_str::<J>(r)
+                .ok()
+                .is_some_and(|r| r["cmd"] == "gemList" && !r["group"].is_null())
+        };
+        if (is_save(json) && self.pending.last().is_some_and(|p| is_save(p)))
+            || (is_gem_list(json) && self.pending.last().is_some_and(|p| p == json))
+        {
             self.pending.pop();
         }
         self.sync()?
@@ -218,12 +227,14 @@ impl<'d> Dispatcher<'d> {
     }
 
     fn fallback(&mut self, json: &str) -> Result<String, String> {
-        let cmd = serde_json::from_str::<J>(json)
-            .ok()
-            .and_then(|r| r["cmd"].as_str().map(String::from));
+        let req = serde_json::from_str::<J>(json).unwrap_or_default();
+        let cmd = req["cmd"].as_str().map(String::from);
         #[cfg(feature = "translation")]
         if let Some(translated) = &self.translated {
-            if !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
+            // A gem slot's list leaves its calculations' selections on the
+            // gems
+            let gem_slot = cmd.as_deref() == Some("gemList") && !req["group"].is_null();
+            if gem_slot || !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
                 self.typed = None;
                 self.shared_known = false;
             }
@@ -292,10 +303,8 @@ impl<'d> Dispatcher<'d> {
             "resetTree" => self.edit(json, |s| s.reset_tree()),
             "skills" => view(&mut self.typed_error, self.typed.as_ref()?.skills()),
             "gemList" => match (req["group"].as_f64(), req["slot"].as_f64()) {
-                (Some(g), Some(k)) => view(
-                    &mut self.typed_error,
-                    self.typed.as_ref()?.gem_select_list(g, k),
-                ),
+                // Its calculations leave selections on the gems
+                (Some(g), Some(k)) => self.edit(json, |s| s.gem_select_list(g, k)),
                 _ => Some(ok(self.typed.as_ref()?.gem_list())),
             },
             "setMainSocketGroup" => {

@@ -4681,8 +4681,15 @@ fn skills_controls_match() {
         ] {
             step(&mut d, r, &mut out);
         }
-        // Saved and loaded again (before a gem list: its DPS calculation
-        // upstream leaves `skillMinion` on the group's gems)
+        // A gem list (its calculations leave selections on the gems), then
+        // saved and loaded again
+        gem_list(&mut d, "options", &mut out);
+        compare_views(
+            &mut d,
+            &["state", "skills"],
+            &format!("{id} gem list"),
+            &mut out,
+        );
         compare_saves(&mut d, &id, &mut out);
         let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
         let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
@@ -4692,7 +4699,6 @@ fn skills_controls_match() {
         );
         assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
         check(&mut d, "reloaded", &mut out);
-        gem_list(&mut d, "options", &mut out);
         for r in [
             json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": true}),
             json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 20}),
@@ -4705,6 +4711,9 @@ fn skills_controls_match() {
         ] {
             step(&mut d, r, &mut out);
         }
+        // Not saved: which gem the list calculates last (whose selections
+        // stay) is `pairs` order over the slot's gem table, which keeps the
+        // order of an earlier, wider fill (random in LuaJIT)
         gem_list(&mut d, "options changed", &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
