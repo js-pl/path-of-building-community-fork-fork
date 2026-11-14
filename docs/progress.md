@@ -582,10 +582,19 @@ What remains for the full migration, in order:
      tree's or poeskilltree's format, its version validated as
      `validateTreeVersion` does (`treeVersions`' numbers and links are
      game data now), decoded into a new spec that becomes the active one,
-     or the message `DecodeURL` returns for a broken one; the active
-     spec's link (`EncodeURL` with its version's prefix). PoEURL links,
-     shrinking and poeplanner's format need the network or are not ported
-     (`tree_links_import_and_export`, and the popup driver). Rows dragged
+     or the message `DecodeURL` returns for a broken one; poeplanner's
+     format (`DecodePoePlannerURL`: little endian, `poePlannerVersions`
+     as game data); the active spec's link (`EncodeURL` with its
+     version's prefix). A link's masteries take their lines at once, as
+     `AllocateMasteryEffects` sets the node's; one whose effect the tree
+     lacks deallocates its node, and one on a node the tree lacks (an
+     old tree's link) is a third failure of upstream's own: it indexes
+     nil and leaves its session broken, so the typed session falls back
+     with `(upstream fails)`. PoEURL links and shrinking start a
+     download, which the session has none of: their button is disabled
+     with its message, as upstream leaves it (`tree_links_import_and_export`,
+     the build's own trees in both formats with their masteries, and the
+     popup driver). Rows dragged
      within a list reorder it (`control` with `sel` and `moveTo`, which
      the translated session runs as ListControl's drop on a mutable
      list does, `session::typed::list_order`): the item list while
@@ -615,8 +624,9 @@ What remains for the full migration, in order:
      Guardian's Weapon). They outlive the
      build: a typed session hands them to the next build it loads, and
      after the translation held a build the next typed session reads
-     them from it (`sharedLists`: each item's text and quality, the
-     sets' slots in `pairs` order; `shared_lists_survive_a_fallback`).
+     them from it (`sharedLists`, a view of both sessions: each item's
+     text and quality, the sets' slots in `pairs` order;
+     `shared_lists_survive_a_fallback`).
      A shared set dragged into the build gives its items ids in the
      `pairs` order of its slot names, which the session's tables keep in
      the order they were set (LuaJIT's string hashes are seeded, so

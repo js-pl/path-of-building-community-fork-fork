@@ -121,6 +121,41 @@ impl<'d> TypedSession<'d> {
         self.shared = prev.shared.clone();
     }
 
+    /// `sharedLists`: each shared item's text and quality, the shared
+    /// sets' slots in `pairs` order
+    pub fn shared_lists(&self) -> Result<J> {
+        let shared = self.shared()?;
+        let item = |i: &Item| {
+            let mut o = json!({ "raw": i.raw });
+            if let Some(q) = i.quality {
+                o["quality"] = super::num(q);
+            }
+            o
+        };
+        let sets: Vec<J> = shared
+            .sets
+            .iter()
+            .map(|s| {
+                let slots: Vec<J> = s
+                    .slots
+                    .iter()
+                    .map(|(slot, i)| {
+                        let mut o = item(i);
+                        o["slot"] = json!(slot);
+                        o
+                    })
+                    .collect();
+                let mut o = json!({ "slots": slots });
+                if let Some(t) = &s.title {
+                    o["title"] = json!(t);
+                }
+                o
+            })
+            .collect();
+        let items: Vec<J> = shared.items.iter().map(|i| item(i)).collect();
+        Ok(json!({ "items": items, "sets": sets }))
+    }
+
     /// The shared lists the translation held (its `sharedLists`)
     pub fn set_shared(&mut self, v: &J) -> Result<()> {
         let item = |v: &J| -> Result<Arc<Item>> {

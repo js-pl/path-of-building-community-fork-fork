@@ -110,6 +110,24 @@ impl Source {
             .collect()
     }
 
+    /// `poePlannerVersions` of `GameVersions.lua`, by number
+    pub fn poe_planner_versions(&self) -> Result<Vec<(f64, String)>> {
+        let mut im = self.importer();
+        im.load("GameVersions", vec![]).map_err(|e| e.to_string())?;
+        let all = im.global("poePlannerVersions");
+        let all = all.as_table().ok_or("no poePlannerVersions")?;
+        let mut out: Vec<(f64, String)> = all
+            .borrow()
+            .iter()
+            .filter_map(|(k, v)| match k {
+                Key::Int(n) => Some((n as f64, v.as_str()?.to_str_lossy().into_owned())),
+                _ => None,
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.total_cmp(&b.0));
+        Ok(out)
+    }
+
     /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
     /// data: its functions are ported by name in `engine::config`
     pub fn option_defaults(&self) -> Result<Vec<OptionDefault>> {
@@ -267,6 +285,7 @@ impl Source {
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_version_info: self.tree_version_info(&versions)?,
+            poe_planner_versions: self.poe_planner_versions()?,
             tree_versions: versions,
             uniques: self.uniques()?,
             rares: self.rares()?,
