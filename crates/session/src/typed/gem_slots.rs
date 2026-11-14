@@ -376,6 +376,97 @@ impl<'d> TypedSession<'d> {
         Ok(tip.json())
     }
 
+    /// `controlTooltip` of a slot's quality box: what 20% quality gives
+    /// the gem's skills (their quality stats' descriptions), and the
+    /// stats with the gem at 20 quality
+    pub fn gem_slot_quality_tooltip(&self, path: &str) -> Result<J> {
+        let (i, _) = parse(path).ok_or("no gem slot")?;
+        let mut tip = super::tooltip::Tooltip::default();
+        let Some(uid) = self.display_group else {
+            return Err(format!(
+                "{}attempt to index a nil value",
+                super::UPSTREAM_ERROR
+            ));
+        };
+        let groups = self.groups();
+        let Some(row) = groups.iter().position(|g| g.uid.0 == uid) else {
+            return Err(format!(
+                "{NOT_PORTED}: the tooltip of a group no longer in the list"
+            ));
+        };
+        let Some(gem) = groups[row].gem_list.get(i - 1) else {
+            return Ok(tip.json());
+        };
+        let cc = super::tooltip::cc;
+        let data = &self.data.game.skills;
+        let descriptions = &self.data.game.stat_descriptions;
+        let add_quality = |tip: &mut super::tooltip::Tooltip,
+                           e: &engine::skill_data::GrantedEffect|
+         -> Result<()> {
+            tip.add_line(18.0, &format!("{}{}", cc("GEM"), e.name));
+            tip.add_line(16.0, &format!("{}At +20% Quality:", cc("NORMAL")));
+            let scope = e.stat_description_scope.as_deref().unwrap_or("");
+            for (stat, per) in &e.quality_stats {
+                let lines = descriptions
+                    .describe(stat, per * 20.0, scope)
+                    .map_err(|why| format!("{NOT_PORTED}: {why}"))?;
+                for line in lines {
+                    if e.stat_map.contains_key(stat) || data.skill_stat_map.contains_key(stat) {
+                        tip.add_line(16.0, &format!("{}{line}", cc("MAGIC")));
+                    } else {
+                        tip.add_line(
+                            16.0,
+                            &format!("{}{line} ^8(Not supported in PoB yet)", cc("UNSUPPORTED")),
+                        );
+                    }
+                }
+            }
+            tip.add_separator(10.0);
+            Ok(())
+        };
+        if let Some(d) = &gem.gem {
+            if !d.granted_effect.quality_stats.is_empty() {
+                add_quality(&mut tip, &d.granted_effect)?;
+            }
+            if let Some(e) = d
+                .secondary_granted_effect
+                .as_ref()
+                .filter(|e| !e.quality_stats.is_empty())
+            {
+                add_quality(&mut tip, e)?;
+            }
+        }
+        let mut b = self.build.clone();
+        if let Some(g) = b
+            .skills
+            .as_mut()
+            .and_then(|s| s.socket_group_list_mut())
+            .and_then(|l| l.get_mut(row))
+        {
+            g.gem_list[i - 1].quality = Some(20.0);
+        }
+        let calc_data = self.data.calc_data();
+        let none = engine::calc_override::Override::default();
+        let calc = engine::calculator::MiscCalculator::new(&self.build, &calc_data)?;
+        // `calcFunc()`: the Full DPS too
+        let o = calc.calculate_on(&b, &none, true)?;
+        let base = calc.base();
+        self.add_stat_compares(
+            &mut tip,
+            &super::tooltip::Outputs {
+                player: &base.player,
+                minion: base.minion.as_ref(),
+            },
+            &super::tooltip::Outputs {
+                player: &o.player,
+                minion: o.minion.as_ref(),
+            },
+            "^7Setting to 20 quality will give you:",
+            None,
+        )?;
+        Ok(tip.json())
+    }
+
     /// `controlTooltip` of a slot's count: what it is for
     pub fn gem_slot_count_tooltip(&self) -> J {
         let mut tip = super::tooltip::Tooltip::default();

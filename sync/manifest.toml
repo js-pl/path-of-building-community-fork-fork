@@ -329,7 +329,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Modules/ModParser.lua" = { status = "ported", port = "crates/engine/src/mod_parser crates/importer/src/mod_parser.rs crates/gamedata/src/mod_parser.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/ModTools.lua" = { status = "partial", port = "crates/lua/src/modlib.rs crates/engine/src/mod_parser/ctx.rs crates/engine/src/party.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/PantheonTools.lua" = { status = "ported", port = "crates/engine/src/calc_setup.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/StatDescriber.lua" = { status = "partial", port = "crates/gamedata/src/uniques.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/StatDescriber.lua" = { status = "partial", port = "crates/gamedata/src/uniques.rs crates/engine/src/stat_describer.rs", note = "describeStats of one stat (the Skills tab's quality tooltip), with the descriptions of the gems' quality stats only; display_indexable_non_active_support stays unported", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/ToastNotification.lua" = { status = "todo" }
 "Modules/Utils.lua" = { status = "todo" }
 "TreeData/2_6/tree.lua" = { status = "todo" }

@@ -783,9 +783,11 @@ What remains for the full migration, in order:
      (`GemSelectControl`), typing in the slot after the last gem (which
      adds one) is ported apart; the enabled box's tooltip compares the
      stats with the gem toggled. The quality box's tooltip describes the
-     gem's quality stats (`describeStats`, `Modules/StatDescriber.lua`
-     with `Data/StatDescriptions`), which the typed engine does not have
-     yet, and stays on the translation.
+     gem's quality stats at 20% (`describeStats`,
+     `engine::stat_describer`, with the descriptions of the gems' quality
+     stats that gamedata takes from `Data/StatDescriptions` in their
+     skills' scopes and the scopes' parents) and compares the stats at 20
+     quality (`skills_quality_tooltips_match`).
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

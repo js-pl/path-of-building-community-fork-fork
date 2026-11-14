@@ -5991,9 +5991,9 @@ fn skills_hover_keys_match() {
                 &format!("{id} {label}"),
                 out,
             );
-            for i in 1..=3 {
+            for (i, part) in (1..=3).flat_map(|i| [(i, "Enable"), (i, "Quality")]) {
                 let r =
-                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Enable")});
+                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}{part}")});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
                     answer(d.translated_request(&r.to_string()), "translated"),
@@ -6220,5 +6220,60 @@ fn build_buttons_match() {
         typed(&mut d, json!({"cmd": "popupButton", "name": "close"}));
         assert_eq!(state(&mut d)["popups"], json!([]));
     }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The gem slots' quality tooltips (the gems' quality stats described,
+/// `describeStats`) of every gem of a few builds, in the typed session as
+/// in the translated one
+#[test]
+fn skills_quality_tooltips_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut count = 0;
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 6 == 1)
+        .map(|(_, b)| b)
+        .take(8)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for (k, g) in groups.iter().enumerate() {
+            if !g["source"].is_null() {
+                continue;
+            }
+            let r = json!({"cmd": "control", "path": "skills.groupList", "sel": k + 1});
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let n = g["gems"].as_array().map_or(0, Vec::len);
+            for i in 1..=n {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Quality")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                if let Some(e) = d.typed_error.take() {
+                    out.push(format!("{id} group {} {r}: fell back: {e}", k + 1));
+                }
+                diff(&t, &tr, &format!("{id} group {} {r}", k + 1), &mut out);
+                count += 1;
+            }
+        }
+    }
+    eprintln!("{count} quality tooltips compared");
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
