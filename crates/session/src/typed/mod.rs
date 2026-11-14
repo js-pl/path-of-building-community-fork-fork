@@ -313,6 +313,8 @@ pub struct TypedSession<'d> {
     party_laid_out: std::cell::Cell<bool>,
     /// The Party tab once its controls changed it
     party_tab: Option<party_tab::PartyTab>,
+    /// The Configuration tab's search and Show All Configurations
+    config_ui: config::ConfigUi,
     /// The Tree tab's search, heat map and power report
     tree_tab: tree_tab::TreeTab,
     /// The item editor's controls
@@ -365,6 +367,7 @@ impl<'d> TypedSession<'d> {
             party_laid_out: Default::default(),
             party_tab: None,
             tree_tab: tree_tab::TreeTab::load(&root),
+            config_ui: Default::default(),
             editor: Default::default(),
             item_db_lists: Default::default(),
             select_db: 1,

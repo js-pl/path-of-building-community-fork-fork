@@ -981,6 +981,28 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .iter()
         .flat_map(|s| s["vars"].as_array().unwrap())
         .collect();
+    if rng.below(5) == 0 {
+        // The tab's search, Show All Configurations and the set
+        // drop-down, which the tab fills when it draws
+        return match rng.below(4) {
+            0 | 1 => {
+                let s = [
+                    "",
+                    "life",
+                    "enemy",
+                    "is the",
+                    "%",
+                    "[",
+                    "  ",
+                    "(burning|shocked)",
+                    "x^7y",
+                ][rng.below(9)];
+                json!({"cmd": "control", "path": "configTab.search", "text": s})
+            }
+            2 => json!({"cmd": "control", "path": "configTab.toggleConfigs", "click": true}),
+            _ => json!({"cmd": "control", "path": "configTab.setSelect", "sel": rng.below(3) + 1}),
+        };
+    }
     match rng.below(10) {
         0 | 1 => {
             let path = [
@@ -999,6 +1021,8 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             let id = &sets[rng.below(sets.len())]["id"];
             json!({"cmd": "selectConfigSet", "id": id})
         }
+        // A search that hides every option: cleared
+        _ if vars.is_empty() => json!({"cmd": "control", "path": "configTab.search", "text": ""}),
         _ => {
             let v = vars[rng.below(vars.len())];
             let path = format!("config.{}", v["var"].as_str().unwrap());

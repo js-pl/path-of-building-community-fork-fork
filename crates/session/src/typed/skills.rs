@@ -437,6 +437,9 @@ impl TypedSession<'_> {
             ("config", var) => return self.config_control(var, req),
             ("party", name) => return self.party_control(name, req),
             ("tree", name) => return self.tree_control(name, req),
+            ("configTab", name) if name != "setManage" => {
+                return self.config_tab_control(name, req);
+            }
             ("skills", "groupList") if super::list_order::move_to(req).is_some() => {
                 return self.move_socket_group(req);
             }

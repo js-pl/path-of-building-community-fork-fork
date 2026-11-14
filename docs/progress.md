@@ -447,7 +447,16 @@ What remains for the full migration, in order:
    (in the `tree` phase) changes them at random on every fourth build and
    compares the sidebar, outputs, tooltips, node power and the saved
    file. Reset, version conversion, spec conversion and Find Timeless
-   Jewel (popups) stay on the translation. A radius jewel's
+   Jewel (popups) stay on the translation. The Configuration tab's search
+   and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
+   an option shows when its label matches the search (magic characters
+   escaped, `string.matchOrPattern`) and its rules pass, or Show All is on
+   and `configVisibility.isShowAllExcluded` keeps it (`ifOption`,
+   `ifSkill...`, `legacy`, "recently" and the like in the label); the set
+   drop-down is filled only when the tab draws, so selecting in it headless
+   changes nothing. `config_edits_match` mixes them into its edits. The
+   custom modifier groups' controls (`customModsAddBlock`, the blocks)
+   stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
