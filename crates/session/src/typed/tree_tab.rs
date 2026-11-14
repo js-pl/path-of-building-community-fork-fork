@@ -35,6 +35,15 @@ pub(super) struct TreeTab {
     pub power_report: bool,
     /// `versionSelect.selIndex`, 1-based (the latest version at first)
     pub version_sel: usize,
+    /// `build.timelessData`
+    pub timeless: super::timeless_search::TimelessData,
+    /// Find Timeless Jewel's trade choices the tab remembers:
+    /// `selectedRealmIndex`, `tradeTypeIndex` and `lastSearchMore`
+    pub realm: Option<usize>,
+    pub trade_type: Option<usize>,
+    pub search_more: bool,
+    /// `allocatedNodesInRadiusCount`
+    pub allocated_in_radius: std::cell::Cell<usize>,
 }
 
 impl TreeTab {
@@ -51,6 +60,7 @@ impl TreeTab {
             search,
             depth_sel: 1,
             version_sel: versions,
+            timeless: super::timeless_search::TimelessData::load(root),
             ..TreeTab::default()
         }
     }
@@ -127,6 +137,9 @@ impl TypedSession<'_> {
                 let latest = self.latest_for_spec();
                 self.convert_to_version(&latest, false, true, false)?;
             }
+            ("findTimelessJewel", None, None, None) if req["click"].as_bool() == Some(true) => {
+                self.open_find_timeless()?;
+            }
             ("specConvertAll", None, None, None) if req["click"].as_bool() == Some(true) => {
                 let latest = self.latest_for_spec();
                 self.open_tree_popup(ItemPopup::ConvertAll(latest))?;
@@ -189,7 +202,7 @@ impl TypedSession<'_> {
     }
 
     /// `main:OpenPopup` of one of the tab's popups, in front
-    fn open_tree_popup(&mut self, popup: ItemPopup) -> Result<()> {
+    pub(super) fn open_tree_popup(&mut self, popup: ItemPopup) -> Result<()> {
         if self.class_popups_open() > 0 {
             return Err(format!(
                 "{NOT_PORTED}: a tree popup with a class change popup open"

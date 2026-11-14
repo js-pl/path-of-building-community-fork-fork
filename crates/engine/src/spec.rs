@@ -1018,6 +1018,16 @@ impl<'t> PassiveSpec<'t> {
             .clone()
     }
 
+    /// `curAscendClassName`: the current ascendancy's name
+    pub fn ascend_class_name(&self) -> Option<Arc<str>> {
+        Some(
+            self.ascend_class(self.cur_ascend_class_id?)
+                .ok()?
+                .name
+                .clone(),
+        )
+    }
+
     /// The current class's ascendancies (`curClass.classes`)
     pub fn ascend_classes(&self) -> Vec<(i64, &'t tree::Ascendancy)> {
         self.cur_class_id

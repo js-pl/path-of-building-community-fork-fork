@@ -161,9 +161,12 @@ fn legion_node(v: &Value, parser: &ModParser) -> Result<LegionNode> {
 impl Timeless {
     /// The data of `LegionPassives` and `NodeIndexMapping`, with the
     /// legion passives' stats processed
+    /// `abyss_names` is `data.abyssNotableNames`, which names the Abyss
+    /// additions the game only numbers (`PassiveTree`'s constructor)
     pub fn from_lua(
         legion: &Value,
         mapping: &Value,
+        abyss_names: &Value,
         parser: &ModParser,
         loader: Box<Loader>,
     ) -> Result<Timeless> {
@@ -204,9 +207,26 @@ impl Timeless {
                 }
             }
         }
+        let mut additions = list("additions")?;
+        for a in &mut additions {
+            if crate::pat::is_match(&a.node.id, "^abyss_.+_notable_%d+$")
+                && crate::pat::is_match(&a.node.dn, "^Notable %d+$")
+            {
+                let named = a
+                    .sorted_stats
+                    .first()
+                    .map(|k| get(abyss_names, k))
+                    .filter(|v| !matches!(v, Value::Nil));
+                let dn = match named {
+                    Some(v) => text(&v)?,
+                    None => a.node.sd.first().cloned().unwrap_or_else(|| "".into()),
+                };
+                Arc::make_mut(&mut a.node).dn = dn;
+            }
+        }
         Ok(Timeless {
             nodes: list("nodes")?,
-            additions: list("additions")?,
+            additions,
             node_ids,
             size: number(&get(mapping, "size"))? as usize,
             size_notable: number(&get(mapping, "sizeNotable"))? as usize,

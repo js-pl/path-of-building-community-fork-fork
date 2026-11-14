@@ -84,6 +84,14 @@ fn unordered(v: &mut J) {
                 {
                     *x = J::String(xml);
                 }
+                // LuaJIT names what it indexed; the translation does not
+                if k == "error"
+                    && let J::String(e) = x
+                    && let Some(i) = e.find("attempt to index ")
+                    && e.ends_with("(a nil value)")
+                {
+                    *e = format!("{}attempt to index a nil value", &e[..i]);
+                }
                 unordered(x);
                 if (k == "rows" || k == "connectors")
                     && let J::Array(a) = x
@@ -5018,6 +5026,157 @@ fn spectre_library_match() {
             json!({"cmd": "closePopup"}),
         ] {
             step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Find a Timeless Jewel in the typed session as in the translated one:
+/// the popup's settings, the node lists the sliders and the node
+/// drop-down write, the protected notables, the trade choices, Reset, the
+/// tooltips, the build's `timelessData` saved and kept for the next opening
+#[test]
+fn find_timeless_jewel_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 29 == 7 || id == "gen-0016")
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    let tooltips = [
+        ("socketFilter", None),
+        ("socketAllocate", None),
+        ("socketFilterAdditionalDistance", None),
+        ("nodeSlider", None),
+        ("nodeSlider2", None),
+        ("nodeSlider3", None),
+        ("nodeSelect", Some(2)),
+        ("nodeSelect", Some(7)),
+        ("nodeSelect", None),
+        ("fallbackWeightsButton", None),
+        ("totalMinimumWeight", None),
+        ("searchListButton", None),
+        ("searchListFallbackButton", None),
+        ("searchTradeButton", None),
+        ("jewelSelect", Some(3)),
+        ("conquerorSelect", Some(1)),
+        ("conquerorSelect", None),
+        ("abyssAscendancySelect", Some(1)),
+        ("abyssAscendancySelect", None),
+    ];
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            compare_views(d, &["state"], &format!("{id} {label}"), out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_none_or(|p| p.is_empty()) {
+                return;
+            }
+            for (path, index) in tooltips {
+                let mut r = json!({"cmd": "controlTooltip", "path": format!("popup.{path}")});
+                if let Some(i) = index {
+                    r["index"] = json!(i);
+                }
+                let (mut t, mut tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                if oracle() {
+                    unordered(&mut t);
+                    unordered(&mut tr);
+                }
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let open = json!({"cmd": "control", "path": "tree.findTimelessJewel", "click": true});
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let steps = [
+            open.clone(),
+            c("jewelSelect", json!({"sel": 2})),
+            c("conquerorSelect", json!({"sel": 3})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("nodeSlider", json!({"val": 0.5})),
+            c("nodeSelect", json!({"sel": 5})),
+            c("nodeSlider2", json!({"val": 0.3})),
+            c("nodeSlider3", json!({"val": 0.2})),
+            c("nodeSlider3", json!({"val": 1})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("nodeSelect", json!({"sel": 9})),
+            c("jewelSelect", json!({"sel": 4})),
+            c("devotionSelect1", json!({"sel": 5})),
+            c("devotionSelect2", json!({"sel": 17})),
+            c("socketSelect", json!({"sel": 3})),
+            c("socketFilter", json!({"state": true})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("socketSelect", json!({"sel": 7})),
+            c("socketFilterAdditionalDistance", json!({"val": 0.35})),
+            c("socketAllocate", json!({"state": true})),
+            c("fallbackWeightsList", json!({"sel": 3})),
+            c("totalMinimumWeight", json!({"text": "12"})),
+            button("searchListFallbackButton"),
+            c("nodeSelect", json!({"sel": 7})),
+            c("nodeSlider", json!({"val": 0.9})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("searchListFallback", json!({"text": "a, 1, 2, 3\nb"})),
+            button("searchListButton"),
+            c(
+                "searchList",
+                json!({"text": "templar_notable_x, required, 0, required"}),
+            ),
+            c("nodeSlider3", json!({"val": 0.5})),
+            c("jewelSelect", json!({"sel": 11})),
+            c("abyssAscendancySelect", json!({"sel": 3})),
+            c("nodeSelect", json!({"sel": 4})),
+            c("abyssAscendancySelect", json!({"sel": 2})),
+            c("socketSelect", json!({"sel": 2})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("realmSelection", json!({"sel": 2})),
+            c("tradeTypeSelection", json!({"sel": 4})),
+            c("searchMore", json!({"state": true})),
+            c("searchTradeLeagueSelect", json!({"sel": 2})),
+            c("jewelSelect", json!({"sel": 7})),
+            c("nodeSelect", json!({"sel": 3})),
+            button("closeButton"),
+            open.clone(),
+            c("socketFilter", json!({"state": false})),
+            button("resetButton"),
+            c("jewelSelect", json!({"sel": 1})),
+            c("nodeSelect", json!({"sel": 3})),
+            json!({"cmd": "closePopup"}),
+            open,
+            json!({"cmd": "closePopup"}),
+        ];
+        for r in steps {
+            // A protection checkbox only when the socket has one
+            if r["path"] == "popup.protectAllocatedBox1" {
+                let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                let shown = state["ok"]["popups"][0]["controls"]
+                    .as_array()
+                    .is_some_and(|c| c.iter().any(|c| c["path"] == r["path"]));
+                if !shown {
+                    continue;
+                }
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(&mut d, &r.to_string(), &mut out);
         }
         compare_saves(&mut d, &id, &mut out);
     }

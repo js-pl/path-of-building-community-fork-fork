@@ -458,7 +458,19 @@ What remains for the full migration, in order:
    version drop-down), Convert to the latest version and Convert all
    (each spec on another version in turn, then the active one again), the
    "Tree Converted" message; `tree_controls_match` presses their buttons
-   at random. Find Timeless Jewel stays on the translation. Node power of
+   at random. Find Timeless Jewel's settings are typed
+   (`typed/timeless_search.rs`): the build's `timelessData` (loaded,
+   saved, kept for the next opening), jewel type, conqueror, socket (its
+   list by nearest keystone), the socket filter with its node distance and
+   the protected notables, devotion and Abyss ascendancy choices, the node
+   weight sliders and node drop-down writing the desired and fallback
+   lists, the lists' edit boxes, Reset, the trade choices the tab
+   remembers, and the tooltips; `find_timeless_jewel_match` drives them on
+   three builds. Search, Generate (fallback weights), the trade URL and the
+   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
+   notable, a protected notable) stay on the translation. Upstream names
+   the Abyss additions the game only numbers (`data.abyssNotableNames`,
+   `PassiveTree`); the typed timeless data does too. Node power of
    another ascendancy's notables differs on a General's Cry build
    converted to a newer tree (3.13 Generals Perforate Zerker, Master
    Distiller and Ngamahu, Flame's Advance: offence 0 upstream); the sidebar
