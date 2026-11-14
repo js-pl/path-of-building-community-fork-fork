@@ -658,7 +658,11 @@ impl<'d> TypedSession<'d> {
                 ("currency", "^xAA9E82"),
                 ("prophecy", "^xB54BFF"),
             ] {
-                t = engine::pat::gsub(&t, &format!("{kind}{{([^}}]+)}}"), &format!("{color}%1{SOURCE}"));
+                t = engine::pat::gsub(
+                    &t,
+                    &format!("{kind}{{([^}}]+)}}"),
+                    &format!("{color}%1{SOURCE}"),
+                );
             }
             t
         };

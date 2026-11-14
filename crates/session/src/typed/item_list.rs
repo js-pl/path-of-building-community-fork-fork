@@ -30,7 +30,13 @@ pub struct ItemList {
 }
 
 /// The paths of the list and its inputs
-const INPUTS: [&str; 5] = ["loadoutFilter", "sort", "deleteUnused", "deleteAll", "delete"];
+const INPUTS: [&str; 5] = [
+    "loadoutFilter",
+    "sort",
+    "deleteUnused",
+    "deleteAll",
+    "delete",
+];
 
 fn parse(path: &str) -> Option<Option<&str>> {
     let rest = path.strip_prefix("items.itemList")?;
@@ -138,14 +144,20 @@ impl<'d> TypedSession<'d> {
             (titles, links)
         }
         let item_sets = tab.item_set_order_list.iter().map(|id| {
-            let t = tab.item_sets.get(&(*id as i64)).and_then(|s| s.title.as_deref());
+            let t = tab
+                .item_sets
+                .get(&(*id as i64))
+                .and_then(|s| s.title.as_deref());
             (*id, t)
         });
         let (item_titles, item_links) = identify(item_sets);
         let (skill_titles, skill_links, one_skill) = match &self.build.skills {
             Some(s) => {
                 let sets = s.skill_set_order_list.iter().map(|id| {
-                    let t = s.skill_sets.get(&(*id as i64)).and_then(|s| s.title.as_deref());
+                    let t = s
+                        .skill_sets
+                        .get(&(*id as i64))
+                        .and_then(|s| s.title.as_deref());
                     (*id, t)
                 });
                 let (t, l) = identify(sets);
@@ -155,7 +167,10 @@ impl<'d> TypedSession<'d> {
         };
         let config = &self.build.config;
         let sets = config.config_set_order_list.iter().map(|id| {
-            let t = config.config_sets.get(&(*id as i64)).and_then(|s| s.title.as_deref());
+            let t = config
+                .config_sets
+                .get(&(*id as i64))
+                .and_then(|s| s.title.as_deref());
             (*id, t)
         });
         let (config_titles, config_links) = identify(sets);
@@ -386,11 +401,13 @@ impl<'d> TypedSession<'d> {
                         .and_then(|s| tab.item_sets.get(&(s as i64)))
                         .is_some_and(|s| s.slots.values().any(|e| e.sel_item_id == *id));
                     in_set
-                        || spec.and_then(|i| self.spec_entry(i)).is_some_and(|(_, _, sp)| {
-                            sp.jewels
-                                .iter()
-                                .any(|(n, j)| *j == *id && sp.alloc_nodes.contains(*n))
-                        })
+                        || spec
+                            .and_then(|i| self.spec_entry(i))
+                            .is_some_and(|(_, _, sp)| {
+                                sp.jewels
+                                    .iter()
+                                    .any(|(n, j)| *j == *id && sp.alloc_nodes.contains(*n))
+                            })
                 };
                 if keep {
                     list.push(*id);
@@ -638,9 +655,8 @@ impl<'d> TypedSession<'d> {
                 "{name} is currently equipped in an Abyssal Socket in set '{set}'."
             ))
         } else {
-            self.find_socketed_jewel(id, true).map(|tree| {
-                format!("{name} is currently equipped in passive tree '{tree}'.")
-            })
+            self.find_socketed_jewel(id, true)
+                .map(|tree| format!("{name} is currently equipped in passive tree '{tree}'."))
         };
         match msg {
             Some(m) => self.open_confirm(
@@ -769,7 +785,8 @@ impl<'d> TypedSession<'d> {
         for i in 0..self.build.items.ordered_slots.len() {
             self.set_sel_item(i, 0.0)?;
         }
-        let specs = std::iter::once(&mut self.build.spec).chain(self.other_specs.iter_mut().flatten());
+        let specs =
+            std::iter::once(&mut self.build.spec).chain(self.other_specs.iter_mut().flatten());
         for spec in specs {
             if spec.jewels.values().any(|j| *j != 0.0) {
                 let spec = std::sync::Arc::make_mut(spec);

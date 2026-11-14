@@ -442,11 +442,7 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_mut()?.item_db_tooltip(&path, index),
                 )
             }
-            "controlTooltip"
-                if req["path"]
-                    .as_str()
-                    .is_some_and(|p| p == "items.itemList") =>
-            {
+            "controlTooltip" if req["path"].as_str().is_some_and(|p| p == "items.itemList") => {
                 let index = req["index"].as_f64();
                 view(
                     &mut self.typed_error,
