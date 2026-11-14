@@ -5066,3 +5066,112 @@ fn skills_group_list_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The Skills tab's controls of the shown socket group, in the typed
+/// session as in the translated one: each row shown in turn, the slot
+/// drop-down's tooltips, and edits of the label, slot, enabled, Full DPS
+/// and an item's group's count
+#[test]
+fn skills_group_detail_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupLabel",
+        "skills.groupSlot",
+        "skills.groupEnabled",
+        "skills.includeInFullDPS",
+        "skills.groupCount",
+        "skills.sourceNote",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 11 == 3 || id.contains("mirage"))
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for index in 0..=15 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.groupSlot", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for k in 1..=groups.len() {
+            step(&mut d, c("groupList", json!({"sel": k})), &mut out);
+        }
+        // An item's group, if there is one
+        if let Some(k) = groups.iter().position(|g| g["source"].is_string()) {
+            for r in [
+                c("groupList", json!({"sel": k + 1})),
+                c("groupCount", json!({"text": "3"})),
+                c("groupCount", json!({"text": "x"})),
+                c("groupEnabled", json!({"state": false})),
+            ] {
+                step(&mut d, r, &mut out);
+            }
+        }
+        for r in [
+            c("groupList", json!({"sel": 2})),
+            c("groupLabel", json!({"text": "Renamed"})),
+            c("groupLabel", json!({"text": ""})),
+            c("groupEnabled", json!({"state": false})),
+            c("includeInFullDPS", json!({"state": true})),
+            c("groupEnabled", json!({"state": true})),
+            c("groupSlot", json!({"sel": 6})),
+            c("groupSlot", json!({"sel": 99})),
+            c("groupSlot", json!({"sel": 1})),
+            c("groupList", json!({"sel": 1, "moveTo": 3})),
+            c("groupLabel", json!({"text": "Moved"})),
+            c("groupList.new", json!({"click": true})),
+            c("groupSlot", json!({"sel": 11})),
+            c("groupList", json!({"sel": 1})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

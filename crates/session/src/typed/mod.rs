@@ -9,6 +9,7 @@ mod config;
 pub mod display_stats;
 mod gem_select;
 mod geometry;
+mod group_detail;
 mod group_list;
 mod item_add_implicit;
 mod item_add_modifier;
@@ -317,6 +318,8 @@ pub struct TypedSession<'d> {
     display_group: Option<u64>,
     /// The socket group list's selection
     group_sel: group_list::GroupSel,
+    /// The shown group's controls
+    detail: group_detail::DetailControls,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
     /// Whether the Party tab was laid out since the build loaded: its
@@ -377,6 +380,7 @@ impl<'d> TypedSession<'d> {
             gem_options: skills_controls::GemOptions::load(None, None),
             display_group: None,
             group_sel: Default::default(),
+            detail: Default::default(),
             display_item: None,
             party_laid_out: Default::default(),
             party_tab: None,
@@ -433,6 +437,7 @@ impl<'d> TypedSession<'d> {
                 },
                 ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
                 ("skills", _) if Self::is_group_list_control(p) => self.group_list_json(p)?,
+                ("skills", _) if Self::is_group_detail_control(p) => self.group_detail_json(p)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
                 ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {
