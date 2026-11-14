@@ -774,7 +774,10 @@ trigger, or a source skill the templates lack).
 ## Next
 
 See the handoff above, and [drop-translation.md](drop-translation.md) for
-how the translation can go and what the tests use as reference instead.
+how the translation can go and what the tests use as reference instead
+(option C: step 1, typed-only by default, is done; step 2, the oracle
+session `oracle/session.lua` with `SESSION_REFERENCE=oracle`, is under way
+and its differences from the translation are listed there).
 
 ## Shipping the typed engine to the browser
 
