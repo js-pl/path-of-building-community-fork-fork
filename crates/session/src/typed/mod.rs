@@ -3,6 +3,7 @@
 //! ported so far answered from it with the JSON the translated session
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
+mod build_controls;
 mod calcs;
 mod config;
 pub mod display_stats;
@@ -398,6 +399,7 @@ impl<'d> TypedSession<'d> {
         for p in paths {
             let c = match p.split_once('.')? {
                 ("calcs", name) => self.calcs_control(name)?,
+                ("build", _) if Self::is_build_control(p) => self.build_control_json(p)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,

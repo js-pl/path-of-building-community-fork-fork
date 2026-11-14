@@ -646,12 +646,26 @@ impl<'d> TypedSession<'d> {
         if kind != SetKind::Item {
             return Ok(tip.json());
         }
-        self.update_sockets();
-        let tab = &self.build.items;
         let id = index
             .filter(|i| *i >= 1.0 && i.fract() == 0.0)
-            .and_then(|i| tab.item_set_order_list.get(i as usize - 1).copied());
-        if let Some(set) = id.and_then(|id| tab.item_sets.get(&(id as i64))) {
+            .and_then(|i| {
+                self.build
+                    .items
+                    .item_set_order_list
+                    .get(i as usize - 1)
+                    .copied()
+            });
+        if let Some(id) = id {
+            self.add_item_set_tooltip(&mut tip, id);
+        }
+        Ok(tip.json())
+    }
+
+    /// `ItemsTab:AddItemSetTooltip(tooltip, itemSet)`: each slot's item
+    pub(super) fn add_item_set_tooltip(&mut self, tip: &mut Tooltip, id: f64) {
+        self.update_sockets();
+        let tab = &self.build.items;
+        if let Some(set) = tab.item_sets.get(&(id as i64)) {
             for s in tab.ordered_slots.iter().filter(|s| s.node_id.is_none()) {
                 let sel = set.slots.get(&s.slot_name).map_or(0.0, |e| e.sel_item_id);
                 if let Some(item) = tab.item(sel) {
@@ -667,6 +681,5 @@ impl<'d> TypedSession<'d> {
                 }
             }
         }
-        Ok(tip.json())
     }
 }

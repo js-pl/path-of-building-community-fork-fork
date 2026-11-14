@@ -49,7 +49,7 @@ fn plain_find(s: &str, p: &str) -> bool {
 
 impl<'d> TypedSession<'d> {
     /// The drop-down's list: the loadouts between upstream's entries
-    fn loadout_list(&self) -> Vec<String> {
+    pub(super) fn loadout_list(&self) -> Vec<String> {
         let mut list = vec![META[0].to_string()];
         list.extend(self.loadout.synced.list.iter().cloned());
         list.extend(META[1..].iter().map(|s| s.to_string()));
@@ -136,6 +136,20 @@ impl<'d> TypedSession<'d> {
         self.loadout_set_sel(1)
     }
 
+    /// `control` of the drop-down: `SetSel(sel)`, then one calculation
+    pub(super) fn select_loadout(&mut self, sel: f64) -> Result<()> {
+        let n = self.loadout_list().len();
+        let sel = sel.min(n as f64).max(1.0) as usize;
+        self.loadout.depth += 1;
+        let r = self.loadout_set_sel(sel);
+        self.loadout.depth -= 1;
+        r?;
+        if self.loadout.rebuild_pending {
+            self.rebuild()?;
+        }
+        Ok(())
+    }
+
     /// `buildLoadouts:SetSel(sel)`: its `selFunc` on a change
     fn loadout_set_sel(&mut self, sel: usize) -> Result<()> {
         let list = self.loadout_list();
@@ -155,6 +169,11 @@ impl<'d> TypedSession<'d> {
         }
         if value == META[3] {
             self.sync_loadouts()?;
+            return self.loadout_set_sel(1);
+        }
+        if value == META[2] {
+            // New Loadout: its name popup, the drop-down back to its title
+            self.open_new_loadout();
             return self.loadout_set_sel(1);
         }
         if META.contains(&value) {

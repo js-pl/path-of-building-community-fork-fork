@@ -297,7 +297,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "LaunchInstall.lua" = { status = "skip", reason = "desktop launcher and updater" }
 "LaunchServer.lua" = { status = "skip", reason = "desktop launcher and updater" }
 "Modules/AddImplicitPopup.lua" = { status = "ported", port = "crates/session/src/typed/item_add_implicit.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/Build.lua" = { status = "partial", port = "crates/session/lua/session.lua crates/session/src/typed/sidebar.rs web/src/ui/Sidebar.tsx crates/engine/src/build.rs crates/engine/src/sidebar.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/config.rs crates/session/src/typed/undo.rs crates/session/src/typed/tooltip.rs crates/session/src/typed/item_list.rs crates/session/src/typed/loadouts.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/Build.lua" = { status = "partial", port = "crates/session/lua/session.lua crates/session/src/typed/sidebar.rs web/src/ui/Sidebar.tsx crates/engine/src/build.rs crates/engine/src/sidebar.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/config.rs crates/session/src/typed/undo.rs crates/session/src/typed/tooltip.rs crates/session/src/typed/item_list.rs crates/session/src/typed/loadouts.rs crates/session/src/typed/build_controls.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/BuildDisplayStats.lua" = { status = "ported", port = "crates/session/src/typed/display_stats.rs crates/session/build.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/BuildList.lua" = { status = "todo" }
 "Modules/BuildListHelpers.lua" = { status = "todo" }
