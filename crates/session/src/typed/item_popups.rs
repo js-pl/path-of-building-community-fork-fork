@@ -73,6 +73,8 @@ pub enum ItemPopup {
     ConvertVersion(String),
     /// `TreeTab:OpenVersionConvertAllPopup(version)`
     ConvertAll(String),
+    /// `TreeTab:FindTimelessJewel()`
+    FindTimeless(Box<super::timeless_search::FindTimeless>),
     /// `main:OpenMessagePopup(title, msg)`: the message's lines and Ok
     Message {
         title: String,
@@ -261,6 +263,13 @@ impl<'d> TypedSession<'d> {
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
+        if let Some(ItemPopup::FindTimeless(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.find_timeless_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::FindTimeless(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
         if let Some(ItemPopup::NewLoadout(p)) = self.editor.popups.first() {
             let mut p = p.clone();
             let r = self.new_loadout_control(&mut p, name, req);
@@ -442,6 +451,14 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::ConvertAll(v), "convert") => {
                 self.convert_all_to_version(&v)?;
                 self.close_item_popup();
+            }
+            (ItemPopup::FindTimeless(mut p), name) => {
+                let closes = self.find_timeless_button(&mut p, name)?;
+                if closes {
+                    self.close_item_popup();
+                } else {
+                    self.editor.popups[0] = ItemPopup::FindTimeless(p);
+                }
             }
             (ItemPopup::Message { .. }, "close") => {
                 self.close_item_popup();
@@ -674,6 +691,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::NewLoadout(p) => self.describe_new_loadout(p),
             ItemPopup::SpectreLibrary(p) => self.describe_spectre_library(p),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
+            ItemPopup::FindTimeless(p) => self.describe_find_timeless(p),
             ItemPopup::ResetTree => json!({
                 "title": "Reset Tree/Tattoos",
                 "lines": [],

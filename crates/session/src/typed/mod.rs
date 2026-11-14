@@ -46,6 +46,7 @@ mod skills_sockets;
 mod slot_drops;
 mod spec_sets;
 mod spectre_library;
+mod timeless_search;
 pub mod tooltip;
 mod tree;
 mod tree_import;

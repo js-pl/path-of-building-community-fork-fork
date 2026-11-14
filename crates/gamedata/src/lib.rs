@@ -233,11 +233,14 @@ impl Source {
         let mapping = im
             .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
             .map_err(|e| e.to_string())?;
+        let names = im
+            .load1("Data/TimelessJewelData/AbyssNotableNames", vec![])
+            .map_err(|e| e.to_string())?;
         let src_dir = self.src_dir.clone();
         let loader = move |name: &str| -> Option<Vec<u8>> {
             miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
         };
-        engine::timeless::Timeless::from_lua(&legion, &mapping, parser, Box::new(loader))
+        engine::timeless::Timeless::from_lua(&legion, &mapping, &names, parser, Box::new(loader))
     }
 
     pub fn global(&self, name: &str) -> Value {

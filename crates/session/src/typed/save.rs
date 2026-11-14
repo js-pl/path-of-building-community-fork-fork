@@ -300,49 +300,20 @@ impl TypedSession<'_> {
                 }
             }
         }
-        let t = self.section("Build").and_then(|b| b.child("TimelessData"));
-        let attr = |k: &str| t.and_then(|t| t.attr(k));
-        let num_attr = |k: &str| attr(k).and_then(pat::to_number);
-        let mut tl = X::new("TimelessData")
-            .a("jewelTypeId", num_attr("jewelTypeId").map(n))
-            .a("conquerorTypeId", num_attr("conquerorTypeId").map(n))
-            .a(
-                "devotionVariant1",
-                n(num_attr("devotionVariant1").unwrap_or(1.0)),
-            )
-            .a(
-                "devotionVariant2",
-                n(num_attr("devotionVariant2").unwrap_or(1.0)),
-            )
-            .a("jewelSocketId", num_attr("jewelSocketId").map(n))
-            .a(
-                "fallbackWeightModeIdx",
-                num_attr("fallbackWeightModeIdx").map(n),
-            );
-        if t.is_some() {
-            tl = tl
-                .a(
-                    "socketFilter",
-                    (attr("socketFilter") == Some("true")).then(|| "true".into()),
-                )
-                .a(
-                    "socketAllocate",
-                    (attr("socketAllocate") == Some("true")).then(|| "true".into()),
-                )
-                .a(
-                    "socketFilterDistance",
-                    n(num_attr("socketFilterDistance").unwrap_or(0.0)),
-                )
-                .a("searchList", attr("searchList").map(String::from))
-                .a(
-                    "searchListFallback",
-                    attr("searchListFallback").map(String::from),
-                );
-        } else {
-            tl = tl
-                .a("searchList", String::new())
-                .a("searchListFallback", String::new());
-        }
+        // `timelessData`, as `buildMode:Save` writes it
+        let t = &self.tree_tab.timeless;
+        let tl = X::new("TimelessData")
+            .a("jewelTypeId", t.jewel_type.map(n))
+            .a("conquerorTypeId", t.conqueror.map(n))
+            .a("devotionVariant1", n(t.devotion[0]))
+            .a("devotionVariant2", n(t.devotion[1]))
+            .a("jewelSocketId", t.socket.map(n))
+            .a("fallbackWeightModeIdx", t.fallback_mode.map(n))
+            .a("socketFilter", t.socket_filter.then(|| "true".into()))
+            .a("socketAllocate", t.socket_allocate.then(|| "true".into()))
+            .a("socketFilterDistance", t.socket_filter_distance.map(n))
+            .a("searchList", t.search_list.clone())
+            .a("searchListFallback", t.search_list_fallback.clone());
         x.push(tl);
         Ok(x)
     }
