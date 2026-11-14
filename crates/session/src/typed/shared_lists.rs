@@ -109,6 +109,8 @@ impl<'d> TypedSession<'d> {
     pub fn shared_list_control_json(&self, path: &str) -> Result<J> {
         let shared = self.shared()?;
         let sel = self.shared_sel;
+        // Anchored below Craft item..., shown while the editor is empty
+        let shown = !self.has_display_item();
         Ok(if path == "items.sharedItemList" {
             let rows: Vec<J> = shared
                 .items
@@ -122,7 +124,7 @@ impl<'d> TypedSession<'d> {
                 })
                 .collect();
             let mut o = json!({
-                "class": "SharedItemListControl", "enabled": true, "shown": true,
+                "class": "SharedItemListControl", "enabled": true, "shown": shown,
                 "label": "^7Shared items:", "list": rows,
             });
             if let Some(i) = sel.row() {
@@ -131,7 +133,7 @@ impl<'d> TypedSession<'d> {
             o
         } else {
             json!({
-                "class": "ButtonControl", "enabled": sel.value, "shown": true, "label": "Delete",
+                "class": "ButtonControl", "enabled": sel.value, "shown": shown, "label": "Delete",
             })
         })
     }
