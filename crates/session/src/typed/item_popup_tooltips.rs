@@ -52,8 +52,9 @@ impl<'d> TypedSession<'d> {
             rep_item: Some((slot.clone(), Some(item))),
             ..Override::default()
         };
-        let base = calc.calculate(&rep(display.clone()), false)?;
-        let new = calc.calculate(&rep(item), false)?;
+        // `calcFunc(override)`: `useFullDPS` nil calculates the Full DPS
+        let base = calc.calculate(&rep(display.clone()), true)?;
+        let new = calc.calculate(&rep(item), true)?;
         self.add_stat_compares(
             tip,
             &Outputs {

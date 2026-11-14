@@ -483,6 +483,32 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 }
             }
         }
+        // The tattooed spec copied in Manage Passive Trees, then switched to
+        if xml.contains("<Override ") {
+            let specs = answer(d.request(r#"{"cmd":"treeSpecs"}"#), "treeSpecs");
+            let active = specs["ok"]["active"].clone();
+            for r in [
+                json!({"cmd": "control", "path": "items.specButton", "click": true}),
+                json!({"cmd": "control", "path": "popup.1", "sel": active, "click": true}),
+                json!({"cmd": "control", "path": "popup.1.copy", "click": true}),
+                json!({"cmd": "popupButton", "name": "save"}),
+            ] {
+                answer(d.request(&r.to_string()), "copy tree");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            let n = specs["ok"]["list"].as_array().map_or(1, Vec::len) + 1;
+            let r = json!({"cmd": "selectTreeSpec", "index": n}).to_string();
+            answer(d.request(&r), "selectTreeSpec");
+            compare_views(
+                d,
+                &["treeSpecs", "treeState", "state", "outputs"],
+                &format!("{id} tattooed copy"),
+                &mut out,
+            );
+            compare_saves(d, &format!("{id} tattooed copy"), &mut out);
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
+            assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+        }
         if !out.is_empty() {
             let n = out.len();
             out.truncate(4);
@@ -611,10 +637,6 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "upstream fails too",
     // A fractional enemy level, which upstream's accuracy sums fail on
     "an enemy level without a monster accuracy",
-    // `pairs` of a shared set's slot names orders its items' new ids
-    "a shared item set of several items dragged into the build",
-    // The translation's shared lists once it held a build
-    "the shared lists after a fallback",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
@@ -1226,6 +1248,28 @@ fn items_edits_match(d: &mut Dispatcher) {
                 }
             }
         }
+        if seed(&id).is_multiple_of(3) {
+            // The active item set shared, the shared set (of several
+            // items) dragged back into the build, and both lists reordered
+            for r in [
+                json!({"cmd": "control", "path": "items.setManage", "click": true}),
+                json!({"cmd": "control", "path": "popup.setList", "sel": 1, "dragTo": "popup.sharedList"}),
+                json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "dragTo": "popup.setList"}),
+                json!({"cmd": "control", "path": "popup.setList", "sel": 1, "moveTo": 3}),
+                json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "moveTo": 3}),
+                json!({"cmd": "closePopup"}),
+            ] {
+                log.push(r.to_string());
+                answer(d.request(&r.to_string()), "shared sets");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+                compare_views(
+                    d,
+                    &["state", "items"],
+                    &format!("shared sets {r}"),
+                    &mut out,
+                );
+            }
+        }
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
         if let Some(a) = items["ok"]["items"].as_array() {
             pool.extend(a.iter().map(|i| i["raw"].clone()));
@@ -1560,6 +1604,20 @@ fn items_edits_match(d: &mut Dispatcher) {
                             .as_array()
                             .map_or(0, Vec::len);
                         let r = match rng.below(15) {
+                            13 if rng.below(3) == 0 => {
+                                // A row of the item list or the shared item
+                                // list dragged within its list
+                                let (src, n) = if rng.below(2) == 0 {
+                                    ("items.itemList", rows)
+                                } else {
+                                    ("items.sharedItemList", shared)
+                                };
+                                if n == 0 {
+                                    continue;
+                                }
+                                *popup_inputs.entry(format!("move {src}")).or_default() += 1;
+                                json!({"cmd": "control", "path": src, "sel": rng.below(n) + 1, "moveTo": rng.below(n + 1) + 1})
+                            }
                             13 => {
                                 // A row dragged between the item list, the
                                 // databases and the shared item list
@@ -1982,6 +2040,19 @@ fn drive_popups(
                             "popup.setList"
                         };
                         json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "dragTo": dst})
+                    }
+                    // A row dragged within a mutable list
+                    3 if n > 0
+                        && matches!(
+                            class,
+                            "ItemSetListControl"
+                                | "SkillSetListControl"
+                                | "ConfigSetListControl"
+                                | "PassiveSpecListControl"
+                                | "SharedItemSetListControl"
+                        ) =>
+                    {
+                        json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "moveTo": rng.below(n + 1) + 1})
                     }
                     _ if n > 0 => {
                         let mut r = json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "click": true});
@@ -3290,6 +3361,10 @@ fn skills_edits_match(d: &mut Dispatcher) {
                 8 => {
                     json!({"cmd": "addSocketGroup", "label": if rng.below(2) == 0 { "" } else { "New" }})
                 }
+                9 if groups.len() > 1 && rng.below(2) == 0 => {
+                    // A group dragged within the skills tab's list
+                    json!({"cmd": "control", "path": "skills.groupList", "sel": g, "moveTo": rng.below(n + 1) + 1})
+                }
                 9 if groups.len() > 1 => json!({"cmd": "removeSocketGroup", "index": g}),
                 10 => json!({"cmd": "control", "path": "build.mainSkill", "sel": rng.below(3) + 1}),
                 _ => {
@@ -3436,4 +3511,70 @@ fn replay_sequence() {
             }
         }
     }
+}
+
+/// The shared item list and item sets outlive a build the translation held:
+/// the next typed session reads them from it
+#[test]
+fn shared_lists_survive_a_fallback() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let builds: Vec<String> = corpus()
+        .into_iter()
+        .take(2)
+        .map(|(_, p)| std::fs::read_to_string(p).unwrap())
+        .collect();
+    let load = |d: &mut Dispatcher, xml: &str| {
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "load: {:?}", d.typed_error);
+    };
+    load(&mut d, &builds[0]);
+    for r in [
+        json!({"cmd": "control", "path": "items.setManage", "click": true}),
+        json!({"cmd": "control", "path": "popup.setList", "sel": 1, "dragTo": "popup.sharedList"}),
+        json!({"cmd": "closePopup"}),
+        json!({"cmd": "control", "path": "items.itemList", "sel": 1, "dragTo": "items.sharedItemList"}),
+        json!({"cmd": "control", "path": "items.itemList", "sel": 2, "dragTo": "items.sharedItemList"}),
+    ] {
+        answer(d.request(&r.to_string()), "shared");
+        assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
+    }
+    // A key the typed session does not have: the translation holds the build
+    let r = json!({"cmd": "control", "path": "items.sharedItemList", "key": "F2"});
+    answer(d.request(&r.to_string()), "fallback");
+    assert!(!d.typed_active());
+    load(&mut d, &builds[1]);
+    let mut out = Vec::new();
+    let shared = json!({"cmd": "controls", "paths": ["items.sharedItemList"]}).to_string();
+    let (t, tr) = (
+        answer(d.request(&shared), "typed"),
+        answer(d.translated_request(&shared), "translated"),
+    );
+    assert!(
+        t["ok"]["items.sharedItemList"]["list"]
+            .as_array()
+            .is_some_and(|l| l.len() == 2),
+        "{t}"
+    );
+    diff(&t, &tr, "shared items", &mut out);
+    for r in [
+        json!({"cmd": "controlTooltip", "path": "items.sharedItemList", "index": 2}),
+        json!({"cmd": "control", "path": "items.setManage", "click": true}),
+        json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "dragTo": "popup.setList"}),
+        json!({"cmd": "closePopup"}),
+        json!({"cmd": "control", "path": "items.sharedItemList", "sel": 2, "dragTo": "items.itemList"}),
+    ] {
+        let t = answer(d.request(&r.to_string()), "typed");
+        assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
+        if r["cmd"] == "controlTooltip" {
+            let tr = answer(d.translated_request(&r.to_string()), "translated");
+            diff(&t, &tr, &r.to_string(), &mut out);
+        }
+        compare_views(&mut d, &["state", "items"], &r.to_string(), &mut out);
+    }
+    compare_saves(&mut d, "shared", &mut out);
+    assert!(out.is_empty(), "{}", out.join("\n"));
 }

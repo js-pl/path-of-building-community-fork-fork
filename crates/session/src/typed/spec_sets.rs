@@ -204,7 +204,17 @@ impl<'d> TypedSession<'d> {
         let missing = || "attempt to index a nil value".to_string();
         match (name, click) {
             ("1", _) => {
-                if let Some(sel) = req["sel"].as_f64() {
+                if let (Some(sel), Some(to)) =
+                    (req["sel"].as_f64(), super::list_order::move_to(req))
+                {
+                    if !(sel >= 1.0 && sel.fract() == 0.0 && (sel as usize) <= count) {
+                        return Ok(());
+                    }
+                    p.sel = Some(sel as usize);
+                    if self.move_spec(sel as usize, to)? {
+                        p.sel = None;
+                    }
+                } else if let Some(sel) = req["sel"].as_f64() {
                     // `SelectIndex`: a missing row leaves `selIndex`
                     if !(sel >= 1.0 && sel.fract() == 0.0 && (sel as usize) <= count) {
                         return Ok(());
@@ -247,9 +257,6 @@ impl<'d> TypedSession<'d> {
                 // `CreateUndoState` reads no bloodline, so the copy has none
                 let i = p.sel.ok_or_else(missing)?;
                 let src = self.spec_list()[i - 1];
-                if !src.hash_overrides.is_empty() {
-                    return Err(format!("{NOT_PORTED}: copying a tree with tattoos"));
-                }
                 let (Some(class), Some(ascend)) = (src.cur_class_id, src.cur_ascend_class_id)
                 else {
                     return Err(format!("{NOT_PORTED}: copying a tree without a class"));
@@ -265,6 +272,8 @@ impl<'d> TypedSession<'d> {
                 let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
                 spec.title = title;
                 spec.jewels = jewels;
+                // The undo state's `hashOverrides`, the same tattoos
+                spec.hash_overrides = src.hash_overrides.clone();
                 spec.import_from_node_list(class, ascend, None, &hash_list, &masteries)?;
                 spec.build_cluster_jewel_graphs(&self.build.items, &self.data.game.items)?;
                 self.pending_spec = Some(Arc::new(spec));
@@ -306,6 +315,41 @@ impl<'d> TypedSession<'d> {
 
     /// The confirmation's Delete: the spec out of the list, and the one
     /// before it active if it was
+    /// Spec `sel` dragged to before row `to`; `OnOrderChange` finds the
+    /// active spec again and syncs the loadouts. Whether the order changed
+    fn move_spec(&mut self, sel: usize, to: f64) -> Result<bool> {
+        let mut order: Vec<usize> = (1..=self.spec_list().len()).collect();
+        if super::list_order::move_row(&mut order, sel, to)?.is_none() {
+            return Ok(false);
+        }
+        // `order[new - 1]` is the old position of the spec now at `new`
+        if !self.other_specs.is_empty() {
+            let specs = std::mem::take(&mut self.other_specs);
+            let mut specs: Vec<_> = specs.into_iter().map(Some).collect();
+            self.other_specs = order
+                .iter()
+                .map(|&old| specs[old - 1].take().unwrap_or(None))
+                .collect();
+            let titles = std::mem::take(&mut self.specs.1);
+            self.specs.1 = order.iter().map(|&old| titles[old - 1].clone()).collect();
+            let undo = std::mem::take(&mut self.undo);
+            self.undo = undo
+                .into_iter()
+                .filter_map(|(k, v)| {
+                    let new = order.iter().position(|&old| old == k)?;
+                    Some((new + 1, v))
+                })
+                .collect();
+            let active = self.specs.0;
+            if let Some(new) = order.iter().position(|&old| old == active) {
+                self.specs.0 = new + 1;
+            }
+        }
+        self.ui.unsaved = true;
+        self.sync_loadouts_and_rebuild()?;
+        Ok(true)
+    }
+
     pub(super) fn confirm_delete_spec(&mut self, index: usize) -> Result<()> {
         let n = self.spec_list().len();
         if index < 1 || index > n || self.other_specs.is_empty() {

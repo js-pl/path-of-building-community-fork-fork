@@ -101,6 +101,7 @@ impl<'d> TypedSession<'d> {
 
     /// `PopulateSlots()`
     pub(super) fn populate_slots(&mut self) {
+        self.unlisted_items.clear();
         let info = &self.data.game.setup.weapon_type_info;
         let one_hand = |t: &str| info.get(t).map(|w| w.one_hand);
         let b = &mut self.build;
@@ -161,6 +162,7 @@ impl<'d> TypedSession<'d> {
                 let candidates: Vec<J> = self
                     .item_keys
                     .iter()
+                    .filter(|(id, _)| !self.unlisted_items.contains(&(*id as f64)))
                     .filter_map(|(id, _)| tab.item(id as f64))
                     .filter(|i| self.valid_for_slot(i, name))
                     .filter_map(|i| i.id.map(num))

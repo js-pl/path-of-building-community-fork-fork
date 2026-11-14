@@ -981,7 +981,21 @@ fn save_spec(spec: &engine::spec::PassiveSpec) -> X {
         }
     }
     x.push(sockets);
-    x.push(X::new("Overrides"));
+    // The tattoos, by node id
+    let mut overrides = X::new("Overrides");
+    for (id, o) in &spec.hash_overrides {
+        let opt = |v: &Option<std::sync::Arc<str>>| v.as_deref().unwrap_or("nil").to_string();
+        let mut x = X::new("Override")
+            .a("nodeId", id.to_string())
+            .a("icon", opt(&o.icon))
+            .a("activeEffectImage", opt(&o.active_effect_image))
+            .a("dn", o.dn.to_string());
+        for line in &o.sd {
+            x.text(line.to_string());
+        }
+        overrides.push(x);
+    }
+    x.push(overrides);
     x
 }
 
