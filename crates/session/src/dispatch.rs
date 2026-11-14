@@ -332,6 +332,14 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
+                    .is_some_and(TypedSession::is_item_list_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_list_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
                     .is_some_and(TypedSession::is_item_db_control) =>
             {
                 let req = req.clone();
@@ -422,6 +430,17 @@ impl<'d> Dispatcher<'d> {
             }
             "craftItem" => self.edit(json, |s| s.craft_item()),
             "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p == "items.itemList") =>
+            {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_list_tooltip(index),
+                )
+            }
             "controlTooltip" if self.typed.as_ref()?.has_item_popup() => {
                 let path = req["path"].as_str()?.to_string();
                 let index = req["index"].as_f64();
