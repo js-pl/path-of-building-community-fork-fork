@@ -153,6 +153,10 @@ end
 -- A list a coroutine builds as it draws (NotableDBControl, ItemDBControl),
 -- built now
 function buildList(control)
+	-- The Items tab updates its sockets as it draws
+	if control._className == "ItemListControl" or control._className == "ItemDBControl" then
+		build().itemsTab:UpdateSockets()
+	end
 	-- The item list updates as it draws
 	if control._className == "ItemListControl" then
 		local outputRevision = control.itemsTab.build.outputRevision

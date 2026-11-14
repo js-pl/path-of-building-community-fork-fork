@@ -138,7 +138,7 @@ pub(super) fn verify_range(range: f64, index: usize, mods: &[String], affixes: &
 }
 
 /// `forbiddenJewelCounterpart`
-const FORBIDDEN: [(&str, &str); 2] = [
+pub(super) const FORBIDDEN: [(&str, &str); 2] = [
     ("Forbidden Flame", "Forbidden Flesh"),
     ("Forbidden Flesh", "Forbidden Flame"),
 ];

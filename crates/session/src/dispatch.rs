@@ -433,6 +433,18 @@ impl<'d> Dispatcher<'d> {
             "controlTooltip"
                 if req["path"]
                     .as_str()
+                    .is_some_and(|p| p == "items.uniqueDB" || p == "items.rareDB") =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_db_tooltip(&path, index),
+                )
+            }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
                     .is_some_and(|p| p == "items.itemList") =>
             {
                 let index = req["index"].as_f64();

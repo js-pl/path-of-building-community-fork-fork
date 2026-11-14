@@ -1445,7 +1445,30 @@ fn items_edits_match(d: &mut Dispatcher) {
                             *popup_inputs.entry("items.itemList tooltip".into()).or_default() += 1;
                         }
                         let click = |path: &str| json!({"cmd": "control", "path": path, "click": true});
-                        let r = match rng.below(10) {
+                        let r = match rng.below(12) {
+                            10 | 11 => {
+                                // A row of an item database
+                                let db = if rng.below(2) == 0 { "items.uniqueDB" } else { "items.rareDB" };
+                                let c = compare(d, &json!({"cmd": "controls", "paths": [db]}), &label, &mut out);
+                                let n = c["ok"][db]["list"].as_array().map_or(0, Vec::len);
+                                if n == 0 {
+                                    continue;
+                                }
+                                let index = rng.below(n) + 1;
+                                if rng.below(3) == 0 {
+                                    let req = json!({"cmd": "controlTooltip", "path": db, "index": index});
+                                    compare(d, &req, &label, &mut out);
+                                    *popup_inputs.entry(format!("{db} tooltip")).or_default() += 1;
+                                }
+                                let mut r = json!({"cmd": "control", "path": db, "sel": index, "click": true});
+                                if rng.below(2) == 0 {
+                                    r["ctrl"] = json!(true);
+                                    r["shift"] = json!(rng.below(2) == 0);
+                                } else {
+                                    r["doubleClick"] = json!(true);
+                                }
+                                r
+                            }
                             0..=3 if rows > 0 => {
                                 let mut r = json!({"cmd": "control", "path": "items.itemList", "sel": rng.below(rows) + 1});
                                 match rng.below(4) {
