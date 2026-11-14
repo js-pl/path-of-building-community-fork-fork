@@ -11,7 +11,7 @@ use super::{Result, TypedSession};
 use engine::actor::OutVal;
 use engine::config::Val;
 use engine::pat::{self, num};
-use engine::xml::{Element, Node};
+use engine::xml::Element;
 use std::collections::BTreeMap;
 
 /// An element under construction: attributes left out when `None`
@@ -142,14 +142,6 @@ fn same(a: &Val, b: &Val) -> bool {
     }
 }
 
-/// The text children of an element, joined as upstream keeps the first
-fn first_text(e: &Element) -> Option<&str> {
-    e.children.iter().find_map(|c| match c {
-        Node::Text(t) => Some(t.as_str()),
-        Node::Element(_) => None,
-    })
-}
-
 const PARTY_BUFFS: [&str; 7] = [
     "PartyMemberStats",
     "Aura",
@@ -188,7 +180,7 @@ impl TypedSession<'_> {
         root.push(self.save_import());
         root.push(self.save_items()?);
         root.push(self.save_notes());
-        root.push(self.save_party(&exported));
+        root.push(self.save_party(&exported)?);
         root.push(self.save_skills());
         root.push(self.save_tree()?);
         root.push(self.save_tree_view());
@@ -692,44 +684,19 @@ impl TypedSession<'_> {
         x
     }
 
-    fn save_party(&self, exported: &[(&str, String)]) -> X {
-        let p = self.section("Party");
-        let mut bufs: BTreeMap<&str, &str> = BTreeMap::new();
-        for e in p.iter().flat_map(|p| p.elements()) {
-            if e.elem == "ImportedBuffs"
-                && let Some(name) = e.attr("name")
-                && PARTY_BUFFS.contains(&name)
-            {
-                bufs.insert(name, first_text(e).unwrap_or(""));
-            }
-        }
-        let attr = |k: &str| p.and_then(|p| p.attr(k));
-        let destination = attr("destination")
-            .filter(|d| {
-                [
-                    "All",
-                    "Party Member Stats",
-                    "Aura",
-                    "Curse",
-                    "Warcry Skills",
-                    "Link Skills",
-                    "EnemyConditions",
-                    "EnemyMods",
-                ]
-                .contains(d)
-            })
-            .unwrap_or("All");
+    fn save_party(&self, exported: &[(&str, String)]) -> Result<X> {
+        let tab = self.party_tab()?;
         let mut x = X::new("Party")
-            .a("destination", destination.to_string())
-            .a("append", b(attr("append") == Some("true")))
             .a(
-                "ShowAdvanceTools",
-                b(attr("ShowAdvanceTools") == Some("true")),
-            );
-        for name in PARTY_BUFFS {
-            if let Some(t) = bufs.get(name).filter(|t| !t.is_empty()) {
+                "destination",
+                super::party::DESTINATIONS[tab.dest].to_string(),
+            )
+            .a("append", b(tab.append))
+            .a("ShowAdvanceTools", b(tab.advanced));
+        for (name, t) in PARTY_BUFFS.iter().zip(&tab.bufs) {
+            if !t.is_empty() {
                 let mut c = X::new("ImportedBuffs").a("name", name.to_string());
-                c.text(*t);
+                c.text(t);
                 x.push(c);
             }
         }
@@ -738,7 +705,7 @@ impl TypedSession<'_> {
             c.text(t);
             x.push(c);
         }
-        x
+        Ok(x)
     }
 
     fn save_skills(&self) -> X {
