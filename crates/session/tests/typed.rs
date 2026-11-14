@@ -506,6 +506,8 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 &mut out,
             );
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
+            assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
         }
         if !out.is_empty() {
             let n = out.len();
@@ -1244,6 +1246,28 @@ fn items_edits_match(d: &mut Dispatcher) {
                         db_pool.push(item["raw"].clone());
                     }
                 }
+            }
+        }
+        if seed(&id).is_multiple_of(3) {
+            // The active item set shared, the shared set (of several
+            // items) dragged back into the build, and both lists reordered
+            for r in [
+                json!({"cmd": "control", "path": "items.setManage", "click": true}),
+                json!({"cmd": "control", "path": "popup.setList", "sel": 1, "dragTo": "popup.sharedList"}),
+                json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "dragTo": "popup.setList"}),
+                json!({"cmd": "control", "path": "popup.setList", "sel": 1, "moveTo": 3}),
+                json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "moveTo": 3}),
+                json!({"cmd": "closePopup"}),
+            ] {
+                log.push(r.to_string());
+                answer(d.request(&r.to_string()), "shared sets");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+                compare_views(
+                    d,
+                    &["state", "items"],
+                    &format!("shared sets {r}"),
+                    &mut out,
+                );
             }
         }
         let mut items = compare(d, &json!({"cmd": "items"}), "start", &mut out);
@@ -3487,4 +3511,70 @@ fn replay_sequence() {
             }
         }
     }
+}
+
+/// The shared item list and item sets outlive a build the translation held:
+/// the next typed session reads them from it
+#[test]
+fn shared_lists_survive_a_fallback() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let builds: Vec<String> = corpus()
+        .into_iter()
+        .take(2)
+        .map(|(_, p)| std::fs::read_to_string(p).unwrap())
+        .collect();
+    let load = |d: &mut Dispatcher, xml: &str| {
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "load: {:?}", d.typed_error);
+    };
+    load(&mut d, &builds[0]);
+    for r in [
+        json!({"cmd": "control", "path": "items.setManage", "click": true}),
+        json!({"cmd": "control", "path": "popup.setList", "sel": 1, "dragTo": "popup.sharedList"}),
+        json!({"cmd": "closePopup"}),
+        json!({"cmd": "control", "path": "items.itemList", "sel": 1, "dragTo": "items.sharedItemList"}),
+        json!({"cmd": "control", "path": "items.itemList", "sel": 2, "dragTo": "items.sharedItemList"}),
+    ] {
+        answer(d.request(&r.to_string()), "shared");
+        assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
+    }
+    // A key the typed session does not have: the translation holds the build
+    let r = json!({"cmd": "control", "path": "items.sharedItemList", "key": "F2"});
+    answer(d.request(&r.to_string()), "fallback");
+    assert!(!d.typed_active());
+    load(&mut d, &builds[1]);
+    let mut out = Vec::new();
+    let shared = json!({"cmd": "controls", "paths": ["items.sharedItemList"]}).to_string();
+    let (t, tr) = (
+        answer(d.request(&shared), "typed"),
+        answer(d.translated_request(&shared), "translated"),
+    );
+    assert!(
+        t["ok"]["items.sharedItemList"]["list"]
+            .as_array()
+            .is_some_and(|l| l.len() == 2),
+        "{t}"
+    );
+    diff(&t, &tr, "shared items", &mut out);
+    for r in [
+        json!({"cmd": "controlTooltip", "path": "items.sharedItemList", "index": 2}),
+        json!({"cmd": "control", "path": "items.setManage", "click": true}),
+        json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "dragTo": "popup.setList"}),
+        json!({"cmd": "closePopup"}),
+        json!({"cmd": "control", "path": "items.sharedItemList", "sel": 2, "dragTo": "items.itemList"}),
+    ] {
+        let t = answer(d.request(&r.to_string()), "typed");
+        assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
+        if r["cmd"] == "controlTooltip" {
+            let tr = answer(d.translated_request(&r.to_string()), "translated");
+            diff(&t, &tr, &r.to_string(), &mut out);
+        }
+        compare_views(&mut d, &["state", "items"], &r.to_string(), &mut out);
+    }
+    compare_saves(&mut d, "shared", &mut out);
+    assert!(out.is_empty(), "{}", out.join("\n"));
 }

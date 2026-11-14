@@ -520,6 +520,8 @@ impl<'d> TypedSession<'d> {
             let mut new = self.item_from_raw(&item.raw)?;
             new.normalise_quality();
             let item_id = self.add_item(new, true)?;
+            // No `PopulateSlots`: the slots' lists do not offer it yet
+            self.unlisted_items.push(item_id);
             if let Some(e) = self
                 .build
                 .items

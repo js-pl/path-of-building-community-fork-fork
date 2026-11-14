@@ -74,6 +74,26 @@ pub struct Dispatcher<'d> {
     shared_known: bool,
 }
 
+/// Whether a request may change what outlives the build: a popup (opened
+/// by a click, used or closed) or the shared item lists
+#[cfg(feature = "translation")]
+fn outlives_build(json: &str) -> bool {
+    let Ok(r) = serde_json::from_str::<J>(json) else {
+        return true;
+    };
+    let path = r["path"].as_str().unwrap_or("");
+    match r["cmd"].as_str() {
+        Some("closePopup" | "popupButton") => true,
+        Some("control") => {
+            path.starts_with("popup.")
+                || path.starts_with("items.sharedItemList")
+                || r["click"] == json!(true)
+                || r["dragTo"].is_string()
+        }
+        _ => false,
+    }
+}
+
 fn ok(v: J) -> String {
     json!({ "ok": v }).to_string()
 }
@@ -661,9 +681,14 @@ impl<'d> Dispatcher<'d> {
                     }
                 }
                 self.typed = Some(s);
-                // A load replaces whatever the queued requests did
+                // A load replaces whatever the queued requests did to the
+                // build; the popups and the shared lists outlive it, so
+                // requests that may have changed them reach the translation
                 #[cfg(feature = "translation")]
                 if self.translated.is_some() {
+                    if self.pending.iter().any(|r| outlives_build(r)) {
+                        let _ = self.sync();
+                    }
                     self.pending = vec![json.to_string()];
                 }
                 let _ = json;

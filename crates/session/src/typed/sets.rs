@@ -39,6 +39,10 @@ impl TypedSession<'_> {
         }
         self.sync_loadouts()?;
         self.rebuild()?;
+        // Manage Passive Trees marks the active spec
+        if !self.editor.popups.is_empty() {
+            self.refresh_item_popups();
+        }
         Ok(json!([]))
     }
 

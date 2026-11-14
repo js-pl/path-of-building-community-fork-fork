@@ -410,7 +410,9 @@ impl<'d> TypedSession<'d> {
                 rep_item: Some((slot.clone(), Some(item))),
                 ..Default::default()
             };
-            let p = stat.value(&calc.calculate(&ovr, false)?);
+            // `calcFunc(override)`: Full DPS too, which only its stat reads
+            let full_dps = stat.stat.as_deref() == Some("FullDPS");
+            let p = stat.value(&calc.calculate(&ovr, full_dps)?);
             cache.insert(id.to_string(), p);
             Ok(p)
         };

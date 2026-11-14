@@ -538,7 +538,9 @@ What remains for the full migration, in order:
      translated session's `api.controlTooltip`): the hover tooltip of a
      popup's drop-down entry or button (`tooltipFunc`,
      `AddModComparisonTooltip`, the enchanted, anointed or saved item's
-     `AddItemTooltip`, a notable's anoint comparison). Upstream caches
+     `AddItemTooltip`, a notable's anoint comparison; their calculations
+     include the Full DPS, as `calcFunc(override)` without `useFullDPS`
+     does, and a power sort's only when it sorts by Full DPS). Upstream caches
      applied enemy modifiers by identity, so a flask's copy in the editor
      applies its `EnemyModifier`s again (`apply_enemy_modifiers` counts
      equal mods). A rebuild of cluster subgraphs that shared an id
@@ -598,11 +600,14 @@ What remains for the full migration, in order:
      build: a typed session hands them to the next build it loads, and
      after the translation held a build the next typed session reads
      them from it (`sharedLists`: each item's text and quality, the
-     sets' slots in `pairs` order). A shared set dragged into the build
-     gives its items ids in the `pairs` order of its slot names, which
-     the session's tables keep in the order they were set (LuaJIT's
-     string hashes are seeded, so upstream's own order is not
-     reproducible). All in `items_edits_match`, with
+     sets' slots in `pairs` order; `shared_lists_survive_a_fallback`).
+     A shared set dragged into the build gives its items ids in the
+     `pairs` order of its slot names, which the session's tables keep in
+     the order they were set (LuaJIT's string hashes are seeded, so
+     upstream's own order is not reproducible), and the slots do not
+     offer its items until they are populated again (no
+     `PopulateSlots`). All in `items_edits_match` (a third of the builds
+     share their active set, drag it back and reorder both lists), with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
@@ -615,7 +620,12 @@ What remains for the full migration, in order:
      them apart). The display item
      is held typed, so `displayItem` answers on the translation after
      its replays. A load with an item popup open falls back (the
-     popup's buttons act on the tab it came from). Ported on the way:
+     popup's buttons act on the tab it came from). A load drops the
+     requests queued for the translation, except that the popups and
+     the shared lists outlive the build: queued requests that may have
+     changed them (a click, a drag, a popup's input, button or close)
+     are replayed first. A spec's tattoos are saved (`<Overrides>`, as
+     `PassiveSpec:Save` writes them). Ported on the way:
      `initEnv`'s write-back of the clamped `build.mainSocketGroup` (an
      item granting the main socket group replaced).
    - Cluster subgraph id collision (`PassiveSpec:BuildSubgraph`): a

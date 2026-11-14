@@ -279,6 +279,9 @@ pub struct TypedSession<'d> {
     other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
     /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
     item_keys: lua::ljtab::LjMap<()>,
+    /// Items added since the slots' lists were last populated, which
+    /// those lists (`slot.items`) do not offer yet
+    unlisted_items: Vec<f64>,
     /// The shared item list and item sets (`None`: the translation's)
     shared: Option<shared_lists::SharedLists>,
     /// The shared item list's selection
@@ -339,6 +342,7 @@ impl<'d> TypedSession<'d> {
             show_minion_set: false,
             other_specs: Vec::new(),
             item_keys: Default::default(),
+            unlisted_items: Vec::new(),
             shared: Some(Default::default()),
             shared_sel: Default::default(),
             loadout: Default::default(),
