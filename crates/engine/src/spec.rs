@@ -1124,7 +1124,7 @@ impl<'t> PassiveSpec<'t> {
 
     /// The ids of the nodes in a radius of a tree node, in upstream's
     /// `pairs` order over `nodesInRadius[radiusIndex]`
-    fn radius_ids(&self, id: u32, radius: Option<usize>) -> LjMap<()> {
+    pub fn radius_ids(&self, id: u32, radius: Option<usize>) -> LjMap<()> {
         let mut out = LjMap::default();
         let list = radius
             .and_then(|r| r.checked_sub(1))

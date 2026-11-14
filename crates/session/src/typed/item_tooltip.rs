@@ -938,7 +938,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `ItemsTab:AddItemStatDifferences`
-    fn add_item_stat_differences(
+    pub(super) fn add_item_stat_differences(
         &self,
         tip: &mut Tooltip,
         item: &Item,
