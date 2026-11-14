@@ -473,9 +473,10 @@ What remains for the full migration, in order:
    components): the desired and
    fallback rows read as weights (required, minimum, the totals, protected
    notables), each seed scored from the jewel's look-up table on the
-   socket's notables, the seeds scored on `engine::parallel` (each on its
-   own; Militant Faith's Devotion total, which upstream adds the first
-   time a seed keeps a protected notable, is found first), the results by
+   socket's notables, one seed after the other (on `engine::parallel`
+   a search took longer for types 1 to 6 on 4 cores, the look-up table
+   reads sharing a lock; only the Abyss search gained, 4.8 s to 1.4 s on
+   one socket), the results by
    total weight (the radius and the seeds kept in LuaJIT's `pairs` order,
    so ties come out the same), All
    Sockets, and the results list: rows, selection, each row's tooltip (the

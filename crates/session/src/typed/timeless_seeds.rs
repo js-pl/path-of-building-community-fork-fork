@@ -100,6 +100,9 @@ impl Cell {
     }
 }
 
+/// A seed's weight, its matches by desired node and whether it is dropped
+type Scored = (f64, Vec<(String, Matched)>, bool);
+
 /// `searchSingleSocket`'s outcome
 struct SocketSearch {
     /// Seeds left, with their matches by desired node id, in `pairs` order
@@ -339,14 +342,11 @@ impl<'d> TypedSession<'d> {
         }
         let targets: Vec<(u32, bool)> = targets.iter().map(|(id, _)| (id, protected(id))).collect();
         // Militant Faith adds a Devotion total the first time a seed keeps
-        // a protected notable; seeds before that one score without it
+        // a protected notable: where, by seed and target
         let base = desired.clone();
         let mut with_total = desired.clone();
-        let mut added_at: Option<(f64, usize)> = None;
-        if jewel == 4
-            && !base.iter().any(|d| d.id == "totalStat")
-            && targets.iter().any(|(_, p)| *p)
-        {
+        let adds_total = jewel == 4 && !base.iter().any(|d| d.id == "totalStat");
+        if adds_total {
             with_total.push(Desired {
                 id: "totalStat".into(),
                 weight: 0.1,
@@ -354,31 +354,11 @@ impl<'d> TypedSession<'d> {
                 display: "Devotion".into(),
                 idx: desired_idx + 1,
             });
-            'seeds: for &seed in &seeds {
-                for (pos, &(target, protected)) in targets.iter().enumerate() {
-                    if !protected {
-                        continue;
-                    }
-                    let lut = t.read_lut(seed, target, jewel)?;
-                    match lut.first() {
-                        None => continue,
-                        Some(&v) if v >= ADDITIONS => continue 'seeds,
-                        Some(_) => {
-                            added_at = Some((seed, pos));
-                            break 'seeds;
-                        }
-                    }
-                }
-            }
         }
-        let desired = if added_at.is_some() {
-            with_total.clone()
-        } else {
-            base.clone()
-        };
+        let added_at: std::cell::Cell<Option<(f64, usize)>> = std::cell::Cell::new(None);
         // The desired nodes at a target of a seed
         let desired_at = |seed: f64, pos: usize| -> &Vec<Desired> {
-            match added_at {
+            match added_at.get() {
                 Some((s, p)) if seed > s || (seed == s && pos >= p) => &with_total,
                 _ => &base,
             }
@@ -398,7 +378,7 @@ impl<'d> TypedSession<'d> {
         };
         // Each seed on its own: its weight, its matches and whether it is
         // dropped
-        let score = |seed: f64| -> Result<(f64, Vec<(String, Matched)>, bool)> {
+        let score = |seed: f64| -> Result<Scored> {
             let mut weight = 0.0;
             let mut list: Vec<(String, Matched)> = Vec::new();
             let mut dropped = false;
@@ -483,6 +463,9 @@ impl<'d> TypedSession<'d> {
                     dropped = true;
                     break;
                 }
+                if adds_total && is_protected && added_at.get().is_none() {
+                    added_at.set(Some((seed, pos)));
+                }
                 let desired = desired_at(seed, pos);
                 let has_total = desired.iter().any(|d| d.id == "totalStat");
                 let cur = if lut[0] >= ADDITIONS && !is_protected {
@@ -563,15 +546,10 @@ impl<'d> TypedSession<'d> {
             }
             Ok((weight, list, dropped))
         };
-        let scored = engine::parallel::map(
-            seeds.clone(),
-            engine::parallel::Threads::available(),
-            |seed| score(seed),
-        );
         let mut results: LjMap<Vec<(String, Matched)>> = LjMap::default();
         let mut weights: LjMap<f64> = LjMap::default();
-        for (seed, r) in seeds.into_iter().zip(scored) {
-            let (weight, list, dropped) = r?;
+        for seed in seeds {
+            let (weight, list, dropped) = score(seed)?;
             let key = seed as u32;
             weights.insert(key, weight);
             // `resultNodes[curSeed] = { }`, then nil for a seed dropped
@@ -580,6 +558,11 @@ impl<'d> TypedSession<'d> {
                 results.remove(key);
             }
         }
+        let desired = if added_at.get().is_some() {
+            with_total
+        } else {
+            base
+        };
         Ok(Some(SocketSearch {
             results,
             weights,
