@@ -54,7 +54,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/PartyTab.lua" = { status = "partial", port = "crates/engine/src/party.rs crates/engine/src/build.rs crates/session/src/typed/save.rs crates/session/src/typed/party.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveMasteryControl.lua" = { status = "todo" }
 "Classes/PassiveSpec.lua" = { status = "partial", port = "crates/engine/src/spec.rs crates/engine/src/spec_cluster.rs crates/session/src/typed/save.rs crates/session/src/typed/undo.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/PassiveSpecListControl.lua" = { status = "todo" }
+"Classes/PassiveSpecListControl.lua" = { status = "partial", port = "crates/session/src/typed/spec_sets.rs crates/session/lua/session.lua", note = "the Manage Passive Trees popup: rows, selection, a double click to activate, Copy, New, Rename and F2 with the name popup, Delete with its confirmation; dragging to reorder and the Items tab drop-down stay on the translation", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveTree.lua" = { status = "partial", port = "crates/engine/src/tree.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveTreeView.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx crates/session/src/typed/tree.rs crates/session/src/typed/geometry.rs crates/session/src/typed/save.rs crates/session/src/typed/node_tooltip.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PathControl.lua" = { status = "todo" }
@@ -297,7 +297,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "LaunchInstall.lua" = { status = "skip", reason = "desktop launcher and updater" }
 "LaunchServer.lua" = { status = "skip", reason = "desktop launcher and updater" }
 "Modules/AddImplicitPopup.lua" = { status = "ported", port = "crates/session/src/typed/item_add_implicit.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Modules/Build.lua" = { status = "partial", port = "crates/session/lua/session.lua crates/session/src/typed/sidebar.rs web/src/ui/Sidebar.tsx crates/engine/src/build.rs crates/engine/src/sidebar.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/config.rs crates/session/src/typed/undo.rs crates/session/src/typed/tooltip.rs crates/session/src/typed/item_list.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Modules/Build.lua" = { status = "partial", port = "crates/session/lua/session.lua crates/session/src/typed/sidebar.rs web/src/ui/Sidebar.tsx crates/engine/src/build.rs crates/engine/src/sidebar.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/config.rs crates/session/src/typed/undo.rs crates/session/src/typed/tooltip.rs crates/session/src/typed/item_list.rs crates/session/src/typed/loadouts.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/BuildDisplayStats.lua" = { status = "ported", port = "crates/session/src/typed/display_stats.rs crates/session/build.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Modules/BuildList.lua" = { status = "todo" }
 "Modules/BuildListHelpers.lua" = { status = "todo" }

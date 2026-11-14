@@ -565,7 +565,19 @@ What remains for the full migration, in order:
      `noRecurse`). The translated session lays out a popup's lists with
      their own buttons, and unnamed lists by their index. A fractional
      enemy level (the config edit "3.5") falls back: upstream's
-     `monsterAccuracyTable[3.5]` is nil and its calculation fails. All in `items_edits_match`, with
+     `monsterAccuracyTable[3.5]` is nil and its calculation fails.
+     Manage Passive Trees (`session::typed::spec_sets`, the Items tab's
+     `specButton`): the specs' list (unnamed, `popup.1`) with a double
+     click to activate a spec, Copy (a new spec restored from the
+     selected one's undo state, without its bloodline as upstream's
+     `CreateUndoState` reads none), New (the latest tree with the build's
+     classes), Rename and F2 with the name popup, Delete with its
+     confirmation; the undo states move with the specs. The build's
+     loadouts (`session::typed::loadouts`): `buildMode:SyncLoadouts`
+     after loading and after every switch, rename, addition or deletion
+     of a set or spec, its drop-down's selection, and the sets a changed
+     selection switches to (a new spec named as the active one's
+     loadout activates it), calculated once per request. All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
