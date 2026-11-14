@@ -704,8 +704,17 @@ What remains for the full migration, in order:
      one), enabled, Full DPS, an item's group's count and the note on its
      source. Upstream sets their texts and states only when it shows a
      group and when they are edited, so they are kept as such. The
-     imbued support, the sockets line with Optimise Sockets and the gem
-     slots stay on the translation.
+     imbued support and the sockets line with Optimise Sockets stay on
+     the translation.
+     The shown group's gem slots (`session::typed::gem_slots`,
+     `skills_gem_slots_match`): the slots the tab has made so far (it
+     makes them as groups need them and keeps them), their texts and
+     states as a group is shown and as they are edited, the count's
+     tooltip, a gem's level, quality, enabled box, count and Vaal skill
+     boxes, and deleting gems. Choosing a gem by name
+     (`GemSelectControl`), typing in the slot after the last gem (which
+     adds one) and the quality and enabled boxes' tooltips stay on the
+     translation.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

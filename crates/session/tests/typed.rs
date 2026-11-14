@@ -5229,3 +5229,135 @@ fn skills_group_detail_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The Skills tab's gem slots, in the typed session as in the translated
+/// one: their texts and states as groups are shown, the count's tooltip,
+/// and edits of a gem's level, quality, enabled box, count and Vaal
+/// skill boxes, and deleting gems
+#[test]
+fn skills_gem_slots_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let parts = [
+        "Delete",
+        "Name",
+        "Level",
+        "Quality",
+        "Enable",
+        "Count",
+        "ErrMsg",
+        "EnableGlobal1",
+        "EnableGlobal2",
+    ];
+    let paths: Vec<String> = (1..=8)
+        .flat_map(|i| parts.iter().map(move |p| format!("skills.gemSlot{i}{p}")))
+        .collect();
+    // gen-0030 has a Vaal gem
+    let mut builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 11 == 5)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    builds.extend(corpus().into_iter().filter(|(id, _)| id == "gen-0030"));
+    assert_eq!(builds.len(), 4);
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for i in 1..=3 {
+                let r = json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Count")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for k in 1..=groups.len().min(6) {
+            step(&mut d, c("groupList", json!({"sel": k})), &mut out);
+        }
+        // A Vaal gem's boxes
+        let vaal = groups.iter().enumerate().find_map(|(k, g)| {
+            g["gems"]
+                .as_array()?
+                .iter()
+                .position(|gem| gem["name"].as_str().is_some_and(|n| n.starts_with("Vaal")))
+                .map(|s| (k + 1, s + 1))
+        });
+        if let Some((k, s)) = vaal {
+            for r in [
+                c("groupList", json!({"sel": k})),
+                c(&format!("gemSlot{s}EnableGlobal1"), json!({"state": false})),
+                c(&format!("gemSlot{s}EnableGlobal2"), json!({"state": false})),
+                c(&format!("gemSlot{s}Enable"), json!({"state": false})),
+                c(&format!("gemSlot{s}EnableGlobal1"), json!({"state": true})),
+            ] {
+                step(&mut d, r, &mut out);
+            }
+        }
+        // The largest group of linked gems
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        let n = groups[k]["gems"].as_array().map_or(0, Vec::len);
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c("gemSlot1Level", json!({"text": "15"})),
+            c("gemSlot1Level", json!({"text": "x"})),
+            c("gemSlot2Quality", json!({"text": "7"})),
+            c("gemSlot2Quality", json!({"text": ""})),
+            c("gemSlot1Enable", json!({"state": false})),
+            c("gemSlot1Enable", json!({"state": true})),
+            c("gemSlot1Count", json!({"text": "3"})),
+            c("gemSlot1Count", json!({"text": "abc"})),
+            c(&format!("gemSlot{}Delete", n + 1), json!({"click": true})),
+            c("gemSlot1Delete", json!({"click": true})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

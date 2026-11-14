@@ -50,6 +50,8 @@ pub struct DetailControls {
     enabled: bool,
     full_dps: bool,
     count: String,
+    /// The gem slots' texts and states
+    pub gem_slots: super::gem_slots::GemSlots,
 }
 
 impl Default for DetailControls {
@@ -60,6 +62,7 @@ impl Default for DetailControls {
             enabled: false,
             full_dps: false,
             count: String::new(),
+            gem_slots: Default::default(),
         }
     }
 }
@@ -68,6 +71,7 @@ impl DetailControls {
     /// What `SetDisplayGroup(group)` sets them to; a slot no row has
     /// keeps the row selected (`SelByValue`)
     pub fn show(&mut self, g: &SocketGroup) {
+        self.gem_slots.show(g);
         // `SetText(socketGroup.label)`: `tostring`, "nil" without one
         self.label = g.label.clone().unwrap_or_else(|| "nil".into());
         if let Some(i) = SLOTS.iter().position(|s| s.1 == g.slot.as_deref()) {
