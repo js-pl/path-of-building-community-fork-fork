@@ -528,8 +528,8 @@ impl TypedSession<'_> {
             .is_none_or(|v| v == "true");
         // Without an `Items` section `ItemsTab:Load` leaves it nil
         let second = match xml {
-            Some(_) => b(active.use_second_weapon_set),
-            None => "nil".to_string(),
+            Some(_) if !active.second_unset => b(active.use_second_weapon_set),
+            _ => "nil".to_string(),
         };
         let mut x = X::new("Items")
             .a("activeItemSet", n(tab.active_item_set_id))
@@ -602,8 +602,8 @@ impl TypedSession<'_> {
                 .a(
                     "useSecondWeaponSet",
                     match xml {
-                        Some(_) => b(set.use_second_weapon_set),
-                        None => "nil".to_string(),
+                        Some(_) if !set.second_unset => b(set.use_second_weapon_set),
+                        _ => "nil".to_string(),
                     },
                 );
             for slot in &tab.ordered_slots {

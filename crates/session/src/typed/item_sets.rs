@@ -10,7 +10,6 @@
 use super::item_popups::{Deletion, ItemPopup};
 use super::tooltip::Tooltip;
 use super::{NOT_PORTED, Result, TypedSession, num};
-use engine::items_tab::{ItemSet, SlotSelection};
 use serde_json::{Value as J, json};
 
 /// The popup's lists' selections (`selIndex`, `selValue`)
@@ -195,23 +194,8 @@ impl<'d> TypedSession<'d> {
             "setList.new" if click => {
                 // `NewItemSet()`: every slot but the sockets empty
                 let id = self.free_set_id();
-                let slots = self
-                    .build
-                    .items
-                    .ordered_slots
-                    .iter()
-                    .filter(|s| s.node_id.is_none())
-                    .map(|s| (s.slot_name.clone(), SlotSelection::default()))
-                    .collect();
-                self.build.items.item_sets.insert(
-                    id as i64,
-                    ItemSet {
-                        id,
-                        title: None,
-                        use_second_weapon_set: false,
-                        slots,
-                    },
-                );
+                let set = self.build.items.new_item_set(id);
+                self.build.items.item_sets.insert(id as i64, set);
                 self.open_rename_set(id, true);
             }
             "setList.copy" if click => {
