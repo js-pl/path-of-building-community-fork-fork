@@ -709,30 +709,10 @@ impl TypedSession<'_> {
     }
 
     fn save_skills(&self) -> X {
-        let xml = self.section("Skills");
-        let attr = |k: &str| xml.and_then(|s| s.attr(k));
         let Some(skills) = &self.build.skills else {
             return X::new("Skills");
         };
-        let show = attr("showSupportGemTypes")
-            .filter(|v| ["ALL", "NORMAL", "EXCEPTIONAL"].contains(v))
-            .unwrap_or("ALL");
-        let field = attr("sortGemsByDPSField")
-            .filter(|v| {
-                [
-                    "FullDPS",
-                    "CombinedDPS",
-                    "TotalDPS",
-                    "AverageDamage",
-                    "TotalDot",
-                    "BleedDPS",
-                    "IgniteDPS",
-                    "TotalPoisonDPS",
-                    "TotalEHP",
-                ]
-                .contains(v)
-            })
-            .unwrap_or("CombinedDPS");
+        let o = &self.gem_options;
         let mut x = X::new("Skills")
             .a("activeSkillSet", n(skills.active_skill_set_id))
             .a(
@@ -747,13 +727,10 @@ impl TypedSession<'_> {
                     n(skills.default_gem_quality)
                 },
             )
-            .a(
-                "sortGemsByDPS",
-                b(attr("sortGemsByDPS").is_none_or(|v| v == "true")),
-            )
-            .a("showSupportGemTypes", show.to_string())
-            .a("sortGemsByDPSField", field.to_string())
-            .a("showLegacyGems", b(attr("showLegacyGems") == Some("true")));
+            .a("sortGemsByDPS", b(o.sort_by_dps))
+            .a("showSupportGemTypes", o.show.to_string())
+            .a("sortGemsByDPSField", o.field.to_string())
+            .a("showLegacyGems", b(o.show_legacy));
         for id in &skills.skill_set_order_list {
             let Some(set) = skills.skill_sets.get(&(*id as i64)) else {
                 continue;

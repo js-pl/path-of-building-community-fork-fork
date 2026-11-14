@@ -108,6 +108,8 @@ impl TypedSession<'_> {
         std::sync::Arc::make_mut(&mut s.build.spec).cur_secondary_ascend_class_id = None;
         s.ui.unsaved = false;
         s.gem_quality_nil = true;
+        // Its skills tab never loaded: the quality box is empty
+        s.gem_options = super::skills_controls::GemOptions::load(None, None);
         Ok(s)
     }
 }

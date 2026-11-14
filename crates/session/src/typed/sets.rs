@@ -85,6 +85,7 @@ impl TypedSession<'_> {
         let level = pat::to_number(text).unwrap_or(1.0).clamp(1.0, 100.0);
         self.build.info.character_level = level;
         self.build.info.character_level_auto_mode = false;
+        self.controls.level_scaling_label = Some("Manual");
         self.build
             .build_config_mods(&self.data.game.config, &self.data.parser)?;
         self.config_mods_built();

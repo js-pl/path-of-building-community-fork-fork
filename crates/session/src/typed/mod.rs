@@ -3,6 +3,7 @@
 //! ported so far answered from it with the JSON the translated session
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
+mod build_controls;
 mod calcs;
 mod config;
 pub mod display_stats;
@@ -37,6 +38,7 @@ mod sets;
 mod shared_lists;
 mod sidebar;
 mod skills;
+mod skills_controls;
 mod slot_drops;
 mod spec_sets;
 pub mod tooltip;
@@ -307,6 +309,8 @@ pub struct TypedSession<'d> {
     undo: HashMap<usize, Vec<undo::UndoState>>,
     /// A new build's skills tab, whose default gem quality is nil
     gem_quality_nil: bool,
+    /// The Skills tab's gem options
+    gem_options: skills_controls::GemOptions,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
     /// Whether the Party tab was laid out since the build loaded: its
@@ -314,6 +318,8 @@ pub struct TypedSession<'d> {
     party_laid_out: std::cell::Cell<bool>,
     /// The Party tab once its controls changed it
     party_tab: Option<party_tab::PartyTab>,
+    /// The Configuration tab's search and Show All Configurations
+    config_ui: config::ConfigUi,
     /// The Tree tab's search, heat map and power report
     tree_tab: tree_tab::TreeTab,
     /// The item editor's controls
@@ -362,10 +368,12 @@ impl<'d> TypedSession<'d> {
             class_popups: Vec::new(),
             undo: HashMap::new(),
             gem_quality_nil: false,
+            gem_options: skills_controls::GemOptions::load(None, None),
             display_item: None,
             party_laid_out: Default::default(),
             party_tab: None,
             tree_tab: tree_tab::TreeTab::load(&root, data.game.tree_versions.len()),
+            config_ui: Default::default(),
             editor: Default::default(),
             item_db_lists: Default::default(),
             select_db: 1,
@@ -379,6 +387,10 @@ impl<'d> TypedSession<'d> {
         {
             s.update_config_controls();
         }
+        s.gem_options = skills_controls::GemOptions::load(
+            s.section("Skills"),
+            s.build.skills.as_ref().map(|k| k.default_gem_quality),
+        );
         s.config_mods_built();
         s.clamp_main_socket_group();
         s.load_specs()?;
@@ -402,8 +414,10 @@ impl<'d> TypedSession<'d> {
         for p in paths {
             let c = match p.split_once('.')? {
                 ("calcs", name) => self.calcs_control(name)?,
+                ("build", _) if Self::is_build_control(p) => self.build_control_json(p)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
+                ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
                 ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {

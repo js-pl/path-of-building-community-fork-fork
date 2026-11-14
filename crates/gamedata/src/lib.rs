@@ -110,6 +110,20 @@ impl Source {
             .collect()
     }
 
+    /// `data.monsterExperienceLevelMap`
+    pub fn monster_experience_levels(&self) -> Result<Vec<f64>> {
+        let map = self.data.get_str("monsterExperienceLevelMap");
+        map.as_table()
+            .ok_or("no monsterExperienceLevelMap")?
+            .array()
+            .iter()
+            .map(|v| {
+                v.as_number()
+                    .ok_or_else(|| "a level that is no number".to_string())
+            })
+            .collect()
+    }
+
     /// `poePlannerVersions` of `GameVersions.lua`, by number
     pub fn poe_planner_versions(&self) -> Result<Vec<(f64, String)>> {
         let mut im = self.importer();
@@ -286,6 +300,7 @@ impl Source {
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_version_info: self.tree_version_info(&versions)?,
             poe_planner_versions: self.poe_planner_versions()?,
+            monster_experience_levels: self.monster_experience_levels()?,
             tree_versions: versions,
             uniques: self.uniques()?,
             rares: self.rares()?,

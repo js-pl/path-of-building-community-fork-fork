@@ -459,7 +459,16 @@ What remains for the full migration, in order:
    converted to a newer tree (3.13 Generals Perforate Zerker, Master
    Distiller and Ngamahu, Flame's Advance: offence 0 upstream); the sidebar
    and outputs agree, so `tree_controls_match` compares node power before
-   the first conversion. To find out. A radius jewel's
+   the first conversion. To find out. The Configuration tab's search
+   and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
+   an option shows when its label matches the search (magic characters
+   escaped, `string.matchOrPattern`) and its rules pass, or Show All is on
+   and `configVisibility.isShowAllExcluded` keeps it (`ifOption`,
+   `ifSkill...`, `legacy`, "recently" and the like in the label); the set
+   drop-down is filled only when the tab draws, so selecting in it headless
+   changes nothing. `config_edits_match` mixes them into its edits. The
+   custom modifier groups' controls (`customModsAddBlock`, the blocks)
+   stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -652,6 +661,31 @@ What remains for the full migration, in order:
      custom... (Edit Item Text, empty without an item), and the Manage...
      buttons' descriptions. Trade for these items and Buy similar query
      the trade site and stay on the translation.
+     The build's own controls (`session::typed::build_controls`,
+     `build_controls_match`): the view mode buttons, the loadouts
+     drop-down with New Loadout's name popup (a latest-tree spec and an
+     item, skill and config set named after it), the level scaling
+     button (auto mode re-estimates the level and rebuilds again when it
+     changes), the tooltips of the level box (experience multiplier by
+     area level, from `data.monsterExperienceLevelMap`, which gamedata
+     now derives), the main socket group and the minion drop-down, and
+     the descriptions of Back, Save, Save As and Manage Spectres....
+     Their clicks (and Help >>) stay unported.
+     The Skills tab's set drop-down and gem options
+     (`session::typed::skills_controls`, `skills_controls_match`): the
+     skill set drop-down, Sort gems by DPS and its stat, the default gem
+     level (with its entries' tooltips) and quality, the support gem
+     filter and legacy gems, kept as session state that the gem list
+     reads and the build saves (a value no entry has keeps the entry
+     selected, as upstream's `SelByValue` does). A gem slot's gem list
+     (`gemList` with a group) is an edit: upstream's DPS loop puts back
+     only the slot's gem data and level, so the selections the last
+     pending gem's calculation wrote (`skillMinion`, ...) stay on the
+     gems, and the save shows them. The typed list takes the gems in data
+     order, the order of a fresh gem table; `pairs` over the slot's table
+     is random in LuaJIT, and in the translation keeps the order of an
+     earlier fill, so after the options widen the list the last gem can
+     differ.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor

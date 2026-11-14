@@ -981,6 +981,28 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .iter()
         .flat_map(|s| s["vars"].as_array().unwrap())
         .collect();
+    if rng.below(5) == 0 {
+        // The tab's search, Show All Configurations and the set
+        // drop-down, which the tab fills when it draws
+        return match rng.below(4) {
+            0 | 1 => {
+                let s = [
+                    "",
+                    "life",
+                    "enemy",
+                    "is the",
+                    "%",
+                    "[",
+                    "  ",
+                    "(burning|shocked)",
+                    "x^7y",
+                ][rng.below(9)];
+                json!({"cmd": "control", "path": "configTab.search", "text": s})
+            }
+            2 => json!({"cmd": "control", "path": "configTab.toggleConfigs", "click": true}),
+            _ => json!({"cmd": "control", "path": "configTab.setSelect", "sel": rng.below(3) + 1}),
+        };
+    }
     match rng.below(10) {
         0 | 1 => {
             let path = [
@@ -999,6 +1021,8 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             let id = &sets[rng.below(sets.len())]["id"];
             json!({"cmd": "selectConfigSet", "id": id})
         }
+        // A search that hides every option: cleared
+        _ if vars.is_empty() => json!({"cmd": "control", "path": "configTab.search", "text": ""}),
         _ => {
             let v = vars[rng.below(vars.len())];
             let path = format!("config.{}", v["var"].as_str().unwrap());
@@ -4465,6 +4489,318 @@ fn items_tab_controls_match() {
             diff(&t, &tr, &format!("{id} {r}"), &mut out);
         }
         compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The build's own controls: their descriptions, the level box's, main
+/// socket group's and minion drop-down's tooltips, level scaling, the view
+/// modes, and each entry of the loadouts drop-down (New Loadout's popup
+/// saved), on a few builds and gen-0006's Animate Guardian's Weapon
+#[test]
+fn build_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut paths: Vec<String> = [
+        "buildLoadouts",
+        "levelScalingButton",
+        "back",
+        "save",
+        "saveAs",
+        "mainSkillMinionLibrary",
+        "modeImport",
+        "modeNotes",
+        "modeConfig",
+        "modeTree",
+        "modeSkills",
+        "modeItems",
+        "modeCalcs",
+        "modeParty",
+        "modeCompare",
+    ]
+    .iter()
+    .map(|p| format!("build.{p}"))
+    .collect();
+    paths.push("build.mainSkillMinion".into());
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 13 == 0 || id == "gen-0006")
+        .map(|(_, b)| b)
+        .take(6)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
+            for (path, n) in [
+                ("build.characterLevel", 1),
+                ("build.mainSocketGroup", 12),
+                ("build.mainSkillMinion", 3),
+            ] {
+                for index in 1..=n {
+                    let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
+                    let (t, tr) = (
+                        answer(d.request(&r.to_string()), "typed"),
+                        answer(d.translated_request(&r.to_string()), "translated"),
+                    );
+                    diff(&t, &tr, &format!("{id} {label} {r}"), out);
+                }
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        check(&mut d, "load", &mut out);
+        if id == "gen-0006" {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|g| g.to_string().contains("Animate Guardian"))
+                .unwrap()
+                + 1;
+            step(
+                &mut d,
+                json!({"cmd": "setMainSocketGroup", "index": group}),
+                &mut out,
+            );
+        }
+        for r in [
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "96"}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        for m in [
+            "Import", "Notes", "Config", "Skills", "Items", "Calcs", "Party", "Compare", "Tree",
+        ] {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": format!("build.mode{m}"), "click": true}),
+                &mut out,
+            );
+        }
+        // Each loadout entry but Help, New Loadout's popup saved
+        let c = answer(
+            d.request(&json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string()),
+            "controls",
+        );
+        let list: Vec<String> = c["ok"]["build.buildLoadouts"]["list"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect();
+        for (k, entry) in list.iter().enumerate() {
+            if entry.contains("Help") {
+                continue;
+            }
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "build.buildLoadouts", "sel": k + 1}),
+                &mut out,
+            );
+            if entry.contains("New Loadout") {
+                step(
+                    &mut d,
+                    json!({"cmd": "control", "path": "popup.edit", "text": format!("Loadout {k}")}),
+                    &mut out,
+                );
+                step(
+                    &mut d,
+                    json!({"cmd": "popupButton", "name": "save"}),
+                    &mut out,
+                );
+                // The new loadout picked, if it is listed
+                let c = answer(
+                    d.request(
+                        &json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string(),
+                    ),
+                    "controls",
+                );
+                let name = format!("Loadout {k}");
+                let at = c["ok"]["build.buildLoadouts"]["list"]
+                    .as_array()
+                    .and_then(|l| l.iter().position(|v| v.as_str() == Some(&name)));
+                if let Some(at) = at {
+                    step(
+                        &mut d,
+                        json!({"cmd": "control", "path": "build.buildLoadouts", "sel": at + 1}),
+                        &mut out,
+                    );
+                }
+            }
+        }
+        // Whatever popup is left, closed
+        while answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+            .as_array()
+            .is_some_and(|p| !p.is_empty())
+        {
+            step(&mut d, json!({"cmd": "closePopup"}), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+        // The file saved with the level's auto mode on, loaded again
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        compare_views(
+            &mut d,
+            &["state", "outputs"],
+            &format!("{id} reloaded"),
+            &mut out,
+        );
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's set drop-down and gem options, in the typed session
+/// as in the translated one: their descriptions, the default level's
+/// tooltips, the gem list they change, the save, and a reload
+#[test]
+fn skills_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths: Vec<String> = [
+        "setSelect",
+        "setManage",
+        "sortGemsByDPS",
+        "sortGemsByDPSFieldControl",
+        "defaultLevel",
+        "defaultQuality",
+        "showSupportGemTypes",
+        "showLegacyGems",
+    ]
+    .iter()
+    .map(|p| format!("skills.{p}"))
+    .collect();
+    let mut builds: Vec<(String, Option<PathBuf>)> = vec![("new".into(), None)];
+    builds.extend(
+        corpus()
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| i % 17 == 0)
+            .map(|(_, (id, p))| (id, Some(p)))
+            .take(4),
+    );
+    for (id, path) in builds {
+        match path {
+            Some(path) => {
+                let xml = std::fs::read_to_string(path).unwrap();
+                answer(
+                    d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+                    "load",
+                );
+            }
+            None => {
+                answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+            }
+        }
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "skills"], &format!("{id} {label}"), out);
+            for index in 0..=6 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.defaultLevel", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        // The gem list of the slot after the main group's last gem
+        let gem_list = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["mainSocketGroup"].as_f64().unwrap_or(1.0);
+            let Some(gems) = skills["ok"]["groups"][group as usize - 1]["gems"].as_array() else {
+                return;
+            };
+            let r = json!({"cmd": "gemList", "group": group, "slot": gems.len() + 1});
+            let (t, tr) = (
+                answer(d.request(&r.to_string()), "typed"),
+                answer(d.translated_request(&r.to_string()), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} {r}"), out);
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": false}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 3}),
+            json!({"cmd": "control", "path": "skills.showLegacyGems", "state": true}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "15"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // A gem list (its calculations leave selections on the gems), then
+        // saved and loaded again
+        gem_list(&mut d, "options", &mut out);
+        compare_views(
+            &mut d,
+            &["state", "skills"],
+            &format!("{id} gem list"),
+            &mut out,
+        );
+        compare_saves(&mut d, &id, &mut out);
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        check(&mut d, "reloaded", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": true}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 20}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 0}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "abc"}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "30"}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 1}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // Not saved: which gem the list calculates last (whose selections
+        // stay) is `pairs` order over the slot's gem table, which keeps the
+        // order of an earlier, wider fill (random in LuaJIT)
+        gem_list(&mut d, "options changed", &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

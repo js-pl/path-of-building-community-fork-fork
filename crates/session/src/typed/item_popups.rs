@@ -64,6 +64,7 @@ pub enum ItemPopup {
     RenameSpec(Box<super::spec_sets::RenameSpec>),
     RenameSet(Box<super::item_sets::RenameSet>),
     ImportTree(Box<super::tree_import::ImportTree>),
+    NewLoadout(Box<super::build_controls::NewLoadout>),
     ExportTree(Box<super::tree_import::ExportTree>),
     /// The Tree tab's Reset Tree/Tattoos
     ResetTree,
@@ -240,6 +241,13 @@ impl<'d> TypedSession<'d> {
             let mut p = p.clone();
             let r = self.rename_set_control(&mut p, name, req);
             self.editor.popups[0] = ItemPopup::RenameSet(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::NewLoadout(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.new_loadout_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::NewLoadout(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -470,6 +478,11 @@ impl<'d> TypedSession<'d> {
                 self.export_tree_shrink(&mut p);
                 self.editor.popups[0] = ItemPopup::ExportTree(p);
             }
+            (ItemPopup::NewLoadout(p), "save") => {
+                // The sets added, then `main:ClosePopup()`
+                self.new_loadout_save(&p)?;
+                self.close_item_popup();
+            }
             (ItemPopup::ImportTree(mut p), "import") => {
                 let closes = self.import_tree(&mut p)?;
                 if closes {
@@ -636,6 +649,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::RenameShared(p) => self.describe_rename_shared(p),
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::ImportTree(p) => self.describe_import_tree(p),
+            ItemPopup::NewLoadout(p) => self.describe_new_loadout(p),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
             ItemPopup::ResetTree => json!({
                 "title": "Reset Tree/Tattoos",
