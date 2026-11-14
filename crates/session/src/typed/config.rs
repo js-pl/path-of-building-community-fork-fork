@@ -298,12 +298,52 @@ impl TypedSession<'_> {
 
     /// The option control's `shown`
     fn config_shown(&self, v: &ConfigVar) -> Result<bool> {
-        let inner = self.config_rules_pass(v)?;
+        if !self.config_search_match(v) {
+            return Ok(false);
+        }
+        // `isShowAllConfig`: Show All Configurations overrides the rules
+        let show_all = self.config_ui.show_all && !show_all_excluded(v);
+        let inner = self.config_rules_pass(v)? || show_all;
         Ok(if v.hide_if_invalid {
             inner
         } else {
             inner || v.var.as_deref().is_some_and(|var| self.config_changed(var))
         })
+    }
+
+    /// `searchMatch`: the option's label against the tab's search, its
+    /// magic characters escaped (`string.matchOrPattern`)
+    fn config_search_match(&self, v: &ConfigVar) -> bool {
+        let search = engine::pat::gsub(
+            &engine::pat::lower(&self.config_ui.search),
+            "[%-%.%+%[%]%$%^%%%?%*]",
+            "%%%0",
+        );
+        if !engine::pat::is_match(&search, "%S") {
+            return true;
+        }
+        let label = engine::pat::lower(&strip_escapes(v.label.as_deref().unwrap_or("")));
+        engine::pat::match_or_pattern(&label, &search).unwrap_or(false)
+    }
+
+    /// A `configTab.<name>` control changed as `api.control` changes it
+    pub(super) fn config_tab_control(&mut self, name: &str, req: &J) -> Result<J> {
+        let text = req.get("text").and_then(J::as_str);
+        let click = req.get("click").and_then(J::as_bool) == Some(true);
+        match (name, req.get("sel").and_then(J::as_f64), text) {
+            ("search", None, Some(t)) => {
+                self.config_ui.search = t.to_string();
+                self.update_config_controls();
+            }
+            ("toggleConfigs", None, None) if click => {
+                self.config_ui.show_all = !self.config_ui.show_all;
+            }
+            // The set drop-down gets its list when the tab draws: headless
+            // it is empty, and selecting in it changes nothing
+            ("setSelect", Some(_), None) => {}
+            _ => return Err(format!("{}: control configTab.{name}", super::NOT_PORTED)),
+        }
+        Ok(json!([]))
     }
 
     /// The option control's `tooltipText()`
@@ -628,4 +668,42 @@ impl TypedSession<'_> {
         }
         json!([])
     }
+}
+
+/// The Configuration tab's search and Show All Configurations
+#[derive(Clone, Debug, Default)]
+pub(super) struct ConfigUi {
+    pub search: String,
+    pub show_all: bool,
+}
+
+/// `StripEscapes`: colour codes out
+fn strip_escapes(s: &str) -> String {
+    engine::pat::gsub(&engine::pat::gsub(s, "%^%d", ""), "%^x%x%x%x%x%x%x", "")
+}
+
+/// `configVisibility.isShowAllExcluded`: options Show All Configurations
+/// leaves hidden
+fn show_all_excluded(v: &ConfigVar) -> bool {
+    if v.legacy
+        || v.rules.iter().any(|(r, _)| {
+            matches!(
+                r.as_str(),
+                "ifOption" | "ifSkill" | "ifSkillData" | "ifSkillFlag"
+            )
+        })
+    {
+        return true;
+    }
+    let label = engine::pat::lower(v.label.as_deref().unwrap_or(""));
+    [
+        "recently",
+        "in the last",
+        "in the past",
+        "in last",
+        "in past",
+        "pvp",
+    ]
+    .iter()
+    .any(|kw| engine::pat::find(&label, kw).is_some())
 }
