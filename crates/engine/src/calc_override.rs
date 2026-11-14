@@ -112,6 +112,35 @@ pub fn tree_node(spec: &PassiveSpec, id: u32) -> Option<SpecNode> {
     Some(SpecNode::synthetic(spec.tree.node(id)?.clone(), vec![]))
 }
 
+/// A node of its own with only these mods, as the nodes Find Timeless
+/// Jewel weighs (`{ id = ..., modList = ... }`, of no type)
+pub fn mod_list_node(spec: &PassiveSpec, mods: Vec<Mod>) -> Option<SpecNode> {
+    let mut n = spec.tree.nodes.first()?.clone();
+    n.id = u32::MAX;
+    n.dn = "".into();
+    n.sd.clear();
+    n.kind = NodeType::Normal;
+    n.ascendancy_name = None;
+    n.class_start_index = None;
+    n.group = None;
+    n.x = None;
+    n.y = None;
+    n.linked_id.clear();
+    n.passive_points_granted = 0.0;
+    n.is_mastery = false;
+    n.is_multiple_choice = false;
+    n.is_multiple_choice_option = false;
+    n.is_ascendancy_start = false;
+    n.charm_socket = false;
+    n.expansion_jewel = None;
+    n.mastery_effects.clear();
+    n.mods.clear();
+    n.mod_list = mods;
+    n.keystone_mod = None;
+    n.nodes_in_radius = None;
+    Some(SpecNode::synthetic(n, vec![]))
+}
+
 /// The allocated nodes of a calculation (`env.allocNodes` before the
 /// granted passives) and their counts
 #[derive(Clone, Debug)]

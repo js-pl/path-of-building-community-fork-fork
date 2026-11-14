@@ -478,12 +478,21 @@ What remains for the full migration, in order:
    `timeless_search_match` searches each jewel type on two builds. Upstream
    fails on a required weight before a minimum given as text (it compares
    the text with a number); the typed search fails the same way.
-   Generate (fallback weights), the Abyss search, the trade URL and the
-   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
+   Generate is typed (`setupFallbackWeights`): each passive of the jewel
+   type added to the calculator as a node of its own
+   (`calc_override::mod_list_node`), weighed by what it adds to the
+   fallback mode's stat, written to the fallback list; a line the parser
+   does not know weighs nothing (`AddList(nil)`). Generate on passives
+   with several stats (Glorious Vanity's, the Abyss jewels', which
+   upstream describes with `describeStats`), the Abyss search, the trade
+   URL and the tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
    notable, a protected notable) stay on the translation, and so does
    Militant Faith's item while a devotion variant is Any (upstream picks
-   one at random). Against the oracle, a row tooltip's node names are
-   compared unordered (the `pairs` order of the tree data's string keys).
+   one at random). Against the oracle, a row tooltip's node names and the
+   results list are compared unordered (the `pairs` order of the tree
+   data's string keys orders the radius, and with it the order weights
+   add up in, so totals that tie on one side differ in the last bit on
+   the other).
    Upstream names the Abyss additions the game only numbers
    (`data.abyssNotableNames`, `PassiveTree`); the typed timeless data does
    too. Two engine fixes came out of a General's Cry
