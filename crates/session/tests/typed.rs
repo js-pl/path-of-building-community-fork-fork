@@ -611,6 +611,10 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "upstream fails too",
     // A fractional enemy level, which upstream's accuracy sums fail on
     "an enemy level without a monster accuracy",
+    // `pairs` of a shared set's slot names orders its items' new ids
+    "a shared item set of several items dragged into the build",
+    // The translation's shared lists once it held a build
+    "the shared lists after a fallback",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
