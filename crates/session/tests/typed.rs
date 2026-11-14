@@ -609,6 +609,8 @@ const KNOWN_FALLBACKS: &[&str] = &[
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
+    // A fractional enemy level, which upstream's accuracy sums fail on
+    "an enemy level without a monster accuracy",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
@@ -1016,6 +1018,28 @@ fn config_edits_match(d: &mut Dispatcher) {
             if !out.is_empty() {
                 break;
             }
+            let open = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+                .as_array()
+                .is_some_and(|p| !p.is_empty());
+            if !open && rng.below(8) == 0 {
+                // Manage Config Sets: sets copied,
+                // added, renamed, deleted and switched between edits
+                let r = json!({"cmd": "control", "path": "configTab.setManage", "click": true});
+                answer(d.request(&r.to_string()), "manage");
+                let label = format!("step {step} config sets");
+                let (mut log, mut counts) = (Vec::new(), Default::default());
+                if !d.typed_active()
+                    || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut counts)
+                {
+                    let e = d.typed_error.clone().unwrap_or_default();
+                    skipped.push(format!("{id}: {e}"));
+                    break;
+                }
+                answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+                compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+                steps += 1;
+                continue;
+            }
             let req = config_edit(d, &mut rng);
             let label = format!("step {step} {req}");
             if std::env::var("SESSION_DUMP").is_ok() {
@@ -1029,6 +1053,12 @@ fn config_edits_match(d: &mut Dispatcher) {
                 let e = d.typed_error.clone().unwrap_or_default();
                 assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
                 skipped.push(format!("{id}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's failure leaves its session broken: a
+                    // fresh one for the builds after
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
                 break;
             }
             if typed.get("error").is_some() {
@@ -1522,9 +1552,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                             |path: &str| json!({"cmd": "control", "path": path, "click": true});
                         let r = match rng.below(13) {
                             12 => {
-                                // Manage Item Sets
-                                let r = json!({"cmd": "control", "path": "items.setManage", "click": true}).to_string();
-                                *popup_inputs.entry("items.setManage".into()).or_default() += 1;
+                                // Manage Item, Skill or Config Sets
+                                let path =
+                                    ["items.setManage", "skills.setManage", "configTab.setManage"]
+                                        [rng.below(3)];
+                                let r = json!({"cmd": "control", "path": path, "click": true})
+                                    .to_string();
+                                *popup_inputs.entry(path.into()).or_default() += 1;
                                 answer(d.request(&r), "manage");
                                 log.push(r);
                                 if !d.typed_active()

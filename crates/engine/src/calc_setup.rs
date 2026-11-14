@@ -1292,7 +1292,10 @@ pub fn base_dbs(d: &SetupData, parser: &ModParser, b: &BaseInput) -> Result<(Sto
     } else {
         None
     };
-    let accuracy = accuracy.ok_or("no monster accuracy for the enemy level")?;
+    // `monsterAccuracyTable[enemyLevel]` is nil for a fractional level
+    // (the edit takes "3.5"): upstream's sums of the enemy's accuracy fail
+    let accuracy =
+        accuracy.ok_or("not ported: an enemy level without a monster accuracy (upstream fails)")?;
     enemy.add(Mod::new("Accuracy", ModType::Base, accuracy, Some("Base")));
     enemy.add(
         Mod::new(

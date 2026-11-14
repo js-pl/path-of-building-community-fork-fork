@@ -58,7 +58,7 @@ pub enum ItemPopup {
     AddModifier(Box<super::item_add_modifier::AddModifierPopup>),
     Crucible(Box<super::item_crucible::CruciblePopup>),
     /// Manage Item Sets, and the name popup of a set
-    ManageItemSets(Box<super::item_sets::ManageItemSets>),
+    ManageSets(Box<super::item_sets::ManageSets>),
     RenameSet(Box<super::item_sets::RenameSet>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
@@ -73,8 +73,9 @@ pub enum ItemPopup {
 pub enum Deletion {
     Item(f64),
     AllItems,
-    /// The item set at this index of the list
-    ItemSet {
+    /// The set at this index of its list
+    Set {
+        kind: super::item_sets::SetKind,
         index: usize,
         id: f64,
     },
@@ -155,24 +156,22 @@ impl<'d> TypedSession<'d> {
     pub fn item_popup_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let name = path.strip_prefix("popup.").unwrap_or(path);
-        let list_click = matches!(
-            self.editor.popups.first(),
-            Some(ItemPopup::ManageItemSets(_))
-        ) && (name.starts_with("setList") || name.starts_with("sharedList"));
+        let list_click = matches!(self.editor.popups.first(), Some(ItemPopup::ManageSets(m))
+            if name.split('.').next() == Some(m.kind_list()) || name.starts_with("sharedList"));
         if req["click"].as_bool() == Some(true) && !list_click {
             return self.item_popup_button(name);
         }
-        if let Some(ItemPopup::ManageItemSets(p)) = self.editor.popups.first() {
+        if let Some(ItemPopup::ManageSets(p)) = self.editor.popups.first() {
             let mut p = p.clone();
-            let r = self.manage_item_sets_control(&mut p, name, req);
+            let r = self.manage_sets_control(&mut p, name, req);
             // The name popup or a confirmation may have opened in front
             if let Some(i) = self
                 .editor
                 .popups
                 .iter()
-                .position(|x| matches!(x, ItemPopup::ManageItemSets(_)))
+                .position(|x| matches!(x, ItemPopup::ManageSets(_)))
             {
-                self.editor.popups[i] = ItemPopup::ManageItemSets(p);
+                self.editor.popups[i] = ItemPopup::ManageSets(p);
             }
             self.refresh_item_popups();
             return r.map(|_| json!([]));
@@ -344,7 +343,7 @@ impl<'d> TypedSession<'d> {
                 self.set_display_item_id(id);
                 self.close_item_popup();
             }
-            (ItemPopup::ManageItemSets(_), "close") => {
+            (ItemPopup::ManageSets(_), "close") => {
                 self.close_item_popup();
             }
             (ItemPopup::RenameSet(p), "save") => {
@@ -487,7 +486,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::AddImplicit(p) => self.describe_add_implicit_popup(p),
             ItemPopup::AddModifier(p) => self.describe_add_modifier_popup(p),
             ItemPopup::Crucible(p) => self.describe_crucible_popup(p),
-            ItemPopup::ManageItemSets(p) => self.describe_manage_item_sets(p),
+            ItemPopup::ManageSets(p) => self.describe_manage_sets(p),
             ItemPopup::RenameSet(p) => self.describe_rename_set(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,

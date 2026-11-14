@@ -23,7 +23,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/CompareEntry.lua" = { status = "todo" }
 "Classes/ComparePowerReportListControl.lua" = { status = "todo" }
 "Classes/CompareTab.lua" = { status = "todo" }
-"Classes/ConfigSetListControl.lua" = { status = "todo" }
+"Classes/ConfigSetListControl.lua" = { status = "partial", port = "crates/session/src/typed/item_sets.rs crates/session/lua/session.lua", note = "the Manage Config Sets popup: rows, selection, a double click to activate, Copy, New, Rename and F2 with the name popup, Delete with its confirmation; dragging to reorder stays on the translation", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/ConfigTab.lua" = { status = "partial", port = "web/src/ui/ConfigTab.tsx crates/engine/src/config.rs crates/engine/src/config_tab.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/config.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/Control.lua" = { status = "todo" }
 "Classes/ControlHost.lua" = { status = "todo" }
@@ -70,7 +70,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/SharedItemListControl.lua" = { status = "todo" }
 "Classes/SharedItemSetListControl.lua" = { status = "partial", port = "crates/session/src/typed/item_sets.rs", note = "listed empty in Manage Item Sets: only dragging fills it", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/SkillListControl.lua" = { status = "todo" }
-"Classes/SkillSetListControl.lua" = { status = "todo" }
+"Classes/SkillSetListControl.lua" = { status = "partial", port = "crates/session/src/typed/item_sets.rs crates/session/lua/session.lua", note = "the Manage Skill Sets popup: rows, selection, a double click to activate, Copy, New, Rename and F2 with the name popup, Delete with its confirmation; dragging to reorder stays on the translation", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/SkillsTab.lua" = { status = "partial", port = "web/src/ui/SkillsTab.tsx crates/engine/src/skills.rs crates/session/src/typed/skills.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/tooltip.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/SliderControl.lua" = { status = "todo" }
 "Classes/TextListControl.lua" = { status = "todo" }

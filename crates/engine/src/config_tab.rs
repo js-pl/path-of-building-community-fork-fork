@@ -106,7 +106,7 @@ fn default_block() -> CustomBlock {
 
 impl ConfigTab {
     /// `NewConfigSet(id, title)`
-    fn new_set(&mut self, id: f64, title: Option<&str>, defaults: &[OptionDefault]) {
+    pub fn new_set(&mut self, id: f64, title: Option<&str>, defaults: &[OptionDefault]) {
         let mut set = ConfigSet {
             id,
             title: title.map(String::from),

@@ -277,7 +277,7 @@ impl Skills {
     }
 
     /// `NewSkillSet(id)`
-    fn new_skill_set(&mut self, id: f64) {
+    pub fn new_skill_set(&mut self, id: f64) {
         self.skill_sets.insert(
             Skills::key(id),
             SkillSet {

@@ -332,10 +332,10 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
-                    .is_some_and(TypedSession::is_item_set_control) =>
+                    .is_some_and(TypedSession::is_set_manage_control) =>
             {
                 let req = req.clone();
-                self.edit(json, |s| s.item_set_control(&req))
+                self.edit(json, |s| s.set_manage_control(&req))
             }
             "control"
                 if req["path"]
