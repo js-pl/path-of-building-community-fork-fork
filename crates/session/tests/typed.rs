@@ -1527,7 +1527,16 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 *popup_inputs.entry("items.setManage".into()).or_default() += 1;
                                 answer(d.request(&r), "manage");
                                 log.push(r);
-                                if !d.typed_active() || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut popup_inputs) {
+                                if !d.typed_active()
+                                    || drive_popups(
+                                        d,
+                                        &mut rng,
+                                        &label,
+                                        &mut log,
+                                        &mut out,
+                                        &mut popup_inputs,
+                                    )
+                                {
                                     fell_back = true;
                                     break;
                                 }
@@ -1829,17 +1838,25 @@ fn drive_popups(
             let c = &inputs[rng.below(inputs.len())];
             let path = c["path"].clone();
             let class = c["class"].as_str().unwrap_or("");
-            let key = format!("{title}: {}", c["path"].as_str().or(c["name"].as_str()).unwrap_or(""));
+            let key = format!(
+                "{title}: {}",
+                c["path"].as_str().or(c["name"].as_str()).unwrap_or("")
+            );
             *counts.entry(key).or_default() += 1;
             if class.ends_with("ListControl") {
                 let n = c["list"].as_array().map_or(0, Vec::len);
                 if n > 0 && rng.below(4) == 0 {
-                    let req = json!({"cmd": "controlTooltip", "path": path, "index": rng.below(n) + 1});
+                    let req =
+                        json!({"cmd": "controlTooltip", "path": path, "index": rng.below(n) + 1});
                     cmp(d, &req, out);
                 }
                 match rng.below(6) {
-                    0 if c["sel"].is_number() => json!({"cmd": "control", "path": path, "key": "DELETE"}),
-                    1 if c["sel"].is_number() => json!({"cmd": "control", "path": path, "key": "F2"}),
+                    0 if c["sel"].is_number() => {
+                        json!({"cmd": "control", "path": path, "key": "DELETE"})
+                    }
+                    1 if c["sel"].is_number() => {
+                        json!({"cmd": "control", "path": path, "key": "F2"})
+                    }
                     _ if n > 0 => {
                         let mut r = json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "click": true});
                         if rng.below(2) == 0 {

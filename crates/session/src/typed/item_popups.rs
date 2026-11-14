@@ -74,7 +74,10 @@ pub enum Deletion {
     Item(f64),
     AllItems,
     /// The item set at this index of the list
-    ItemSet { index: usize, id: f64 },
+    ItemSet {
+        index: usize,
+        id: f64,
+    },
 }
 
 /// `DropDownControl:SetSel(sel)`: the new selection, clamped to the list,
@@ -152,8 +155,10 @@ impl<'d> TypedSession<'d> {
     pub fn item_popup_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let name = path.strip_prefix("popup.").unwrap_or(path);
-        let list_click = matches!(self.editor.popups.first(), Some(ItemPopup::ManageItemSets(_)))
-            && (name.starts_with("setList") || name.starts_with("sharedList"));
+        let list_click = matches!(
+            self.editor.popups.first(),
+            Some(ItemPopup::ManageItemSets(_))
+        ) && (name.starts_with("setList") || name.starts_with("sharedList"));
         if req["click"].as_bool() == Some(true) && !list_click {
             return self.item_popup_button(name);
         }

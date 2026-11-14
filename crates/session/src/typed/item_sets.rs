@@ -78,9 +78,7 @@ impl<'d> TypedSession<'d> {
             })
             .collect();
         let selected = p.sel_value.is_some();
-        let button = |path: &str, label: &str, enabled: bool| {
-            json!({ "class": "ButtonControl", "enabled": enabled, "label": label, "path": path, "shown": true })
-        };
+        let button = |path: &str, label: &str, enabled: bool| json!({ "class": "ButtonControl", "enabled": enabled, "label": label, "path": path, "shown": true });
         let mut list = json!({
             "class": "ItemSetListControl", "enabled": true, "list": rows,
             "path": "popup.setList", "shown": true,
@@ -277,7 +275,12 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `control` of the name popup's edit
-    pub(super) fn rename_set_control(&mut self, p: &mut RenameSet, name: &str, req: &J) -> Result<()> {
+    pub(super) fn rename_set_control(
+        &mut self,
+        p: &mut RenameSet,
+        name: &str,
+        req: &J,
+    ) -> Result<()> {
         match (name, req["text"].as_str()) {
             ("edit", Some(t)) => {
                 // `SetText(text, true)` neither filters nor limits
