@@ -554,7 +554,13 @@ What remains for the full migration, in order:
      (edited), and their tooltips with a database item's source. The
      translated session's `control` clicks any list's row
      (`SelectIndex`, then `OnSelClick` with the keys held) and
-     `describeControl` lists any list's rows. All in `items_edits_match`, with
+     `describeControl` lists any list's rows. Manage Item Sets
+     (`session::typed::item_sets`, `items.setManage`): the sets' list with
+     a double click to activate a set, Copy, New, Rename (and F2) with the
+     name popup, Delete with its confirmation, and a row's tooltip
+     (`AddItemSetTooltip`); the shared list beside it is empty, as only
+     dragging fills it. The translated session lays out a popup's lists
+     with their own buttons. All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

@@ -56,6 +56,7 @@ local function controlHosts()
 		skills = b.skillsTab.controls,
 		items = b.itemsTab.controls,
 		config = b.configTab.varControls,
+		configTab = b.configTab.controls,
 		party = b.partyTab.controls,
 		calcs = { },
 		popup = main.popups[1] and main.popups[1].controls or { },
@@ -71,18 +72,22 @@ end
 local function findControl(path)
 	local host, name = path:match("^(%a+)%.(.+)$")
 	local list = host and controlHosts()[host]
-	local control = list and list[name]
+	-- A control without a name by its index: "popup.1"
+	local function at(t, key)
+		return t[key] or t[tonumber(key)]
+	end
+	local control = list and at(list, name)
 	-- A control's own control: "popup.notableDB.search"
 	local outer, inner = (name or ""):match("^([^%.]+)%.(.+)$")
-	if not control and outer and list and list[outer] and list[outer].controls then
-		control = list[outer].controls[inner]
+	if not control and outer and list and at(list, outer) and at(list, outer).controls then
+		control = at(list, outer).controls[inner]
 	end
 	if not control then
 		error("no control " .. tostring(path))
 	end
 	-- An item database's leagues and item types, which its first draw
 	-- loads
-	local db = control._className == "ItemDBControl" and control or (outer and list[outer])
+	local db = control._className == "ItemDBControl" and control or (outer and at(list, outer))
 	if db and db._className == "ItemDBControl" and not db.leaguesAndTypesLoaded then
 		db:LoadLeaguesAndTypes()
 	end
@@ -268,14 +273,21 @@ local function layoutControls(controls, prefix, filter)
 	-- labels (the Party tab's notes wrap when their width is first asked),
 	-- so the order must not depend on the string hash
 	local names = { }
-	for name in pairs(controls) do
+	local byName = { }
+	for name, control in pairs(controls) do
 		if type(name) == "string" then
 			t_insert(names, name)
+			byName[name] = control
+		elseif type(name) == "number" and type(control) == "table" and control.SelectIndex and control.GetRowValue then
+			-- A list without a name (the Manage Skill Sets popup's), by
+			-- its index
+			t_insert(names, tostring(name))
+			byName[tostring(name)] = control
 		end
 	end
 	table.sort(names)
 	for _, name in ipairs(names) do
-		local control = controls[name]
+		local control = byName[name]
 		-- Labels of other controls go with them
 		local labelOf = type(name) == "string" and control._className == "LabelControl" and controls[(name:gsub("Label(%d*)$", "%1"))]
 		if labelOf == control then
