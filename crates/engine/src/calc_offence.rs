@@ -3590,6 +3590,7 @@ impl<'a> Perform<'a> {
                 None => self.env.skills.active_skills[main].skill_types.insert(t),
                 Some(k) => self.minion_skills[k].skill_types.insert(t),
             };
+            self.mods_mut(main).add_skill_type(t);
         }
         self.set_skill_cond(main, "usedByMirage", true);
         let cached = self

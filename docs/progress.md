@@ -458,12 +458,12 @@ What remains for the full migration, in order:
    version drop-down), Convert to the latest version and Convert all
    (each spec on another version in turn, then the active one again), the
    "Tree Converted" message; `tree_controls_match` presses their buttons
-   at random. Find Timeless Jewel stays on the translation. Node power of
-   another ascendancy's notables differs on a General's Cry build
-   converted to a newer tree (3.13 Generals Perforate Zerker, Master
-   Distiller and Ngamahu, Flame's Advance: offence 0 upstream); the sidebar
-   and outputs agree, so `tree_controls_match` compares node power before
-   the first conversion. To find out. The Configuration tab's search
+   at random, and compares node power after them. Find Timeless Jewel
+   stays on the translation. Two engine fixes came out of a General's Cry
+   build converted to a newer tree: the skill types General's Cry adds to
+   its main skill reach the skill's cfgs (upstream's `skillCfg.skillTypes`
+   is the skill's table), and a socket in a cluster jewel's subgraph has
+   no radius (`env.spec.nodes[id]`, not the tree's proxy). The Configuration tab's search
    and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
    an option shows when its label matches the search (magic characters
    escaped, `string.matchOrPattern`) and its rules pass, or Show All is on

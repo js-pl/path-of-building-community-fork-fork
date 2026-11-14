@@ -91,6 +91,21 @@ pub struct SkillMods {
     pub named_cfgs: Vec<(String, Cfg)>,
 }
 
+impl SkillMods {
+    /// `activeSkill.skillTypes[t] = true` after the mod lists: upstream's
+    /// cfgs share the skill's `skillTypes` table, so their queries see it
+    pub fn add_skill_type(&mut self, t: i64) {
+        let cfgs = std::iter::once(&mut self.skill_cfg)
+            .chain(self.weapon_cfgs.iter_mut().flatten())
+            .chain(self.named_cfgs.iter_mut().map(|(_, c)| c));
+        for c in cfgs {
+            if let Some(types) = &mut c.skill_types {
+                types.insert(t);
+            }
+        }
+    }
+}
+
 /// What building the mod lists needs
 pub struct ModsInput<'a> {
     pub setup: &'a SetupData,
