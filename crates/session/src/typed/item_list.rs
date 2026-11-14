@@ -83,7 +83,7 @@ impl<'d> TypedSession<'d> {
         } else {
             &**self.other_specs.get(i - 1)?.as_ref()?
         };
-        Some((title, spec.tree.version.clone(), spec))
+        Some((title, spec.tree.version.to_string(), spec))
     }
 
     fn spec_count(&self) -> usize {
