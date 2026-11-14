@@ -609,6 +609,8 @@ const KNOWN_FALLBACKS: &[&str] = &[
     // Party builds upstream fails on as well (`party_match` checks that
     // the translation fails on them too)
     "upstream fails too",
+    // A fractional enemy level, which upstream's accuracy sums fail on
+    "an enemy level without a monster accuracy",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
@@ -1051,6 +1053,12 @@ fn config_edits_match(d: &mut Dispatcher) {
                 let e = d.typed_error.clone().unwrap_or_default();
                 assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
                 skipped.push(format!("{id}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's failure leaves its session broken: a
+                    // fresh one for the builds after
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
                 break;
             }
             if typed.get("error").is_some() {
