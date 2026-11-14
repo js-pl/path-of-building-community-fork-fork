@@ -611,6 +611,18 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_ref()?.gem_slot_enable_tooltip(&path),
                 )
             }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_quality_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_slot_quality_tooltip(&path),
+                )
+            }
             "controlTooltip" if req["path"].as_str() == Some("skills.groupSlot") => {
                 let index = req["index"].as_f64();
                 view(

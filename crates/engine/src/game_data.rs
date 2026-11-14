@@ -30,6 +30,8 @@ pub struct GameData {
     /// `data.monsterExperienceLevelMap`: each area level's effective
     /// monster level for experience
     pub monster_experience_levels: Vec<f64>,
+    /// The descriptions of the gems' quality stats
+    pub stat_descriptions: crate::stat_describer::StatDescriptions,
     /// `data.uniques`: each type's item texts, in `pairs` order, with the
     /// uniques `Generated.lua` adds before a tree loads as `generated`
     pub uniques: Vec<(String, Vec<String>)>,
@@ -84,6 +86,7 @@ crate::codec_struct!(GameData {
     tree_version_info,
     poe_planner_versions,
     monster_experience_levels,
+    stat_descriptions,
     uniques,
     rares,
     item_base_lists,

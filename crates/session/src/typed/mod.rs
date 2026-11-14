@@ -638,3 +638,8 @@ pub fn gem_slots_count_path(path: &str) -> bool {
 pub fn gem_slots_enable_path(path: &str) -> bool {
     gem_slots::parse(path).is_some_and(|(_, part)| part == "Enable")
 }
+
+/// Whether a path is a gem slot's quality box (`skills.gemSlot<i>Quality`)
+pub fn gem_slots_quality_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Quality")
+}
