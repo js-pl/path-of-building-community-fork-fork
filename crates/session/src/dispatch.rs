@@ -410,6 +410,14 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
+                    .is_some_and(TypedSession::is_gem_slot_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.gem_slot_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
                     .is_some_and(TypedSession::is_group_detail_control) =>
             {
                 let req = req.clone();
@@ -574,6 +582,14 @@ impl<'d> Dispatcher<'d> {
                     &mut self.typed_error,
                     self.typed.as_mut()?.build_control_tooltip(&path, index),
                 )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_count_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                Some(ok(self.typed.as_ref()?.gem_slot_count_tooltip()))
             }
             "controlTooltip" if req["path"].as_str() == Some("skills.groupSlot") => {
                 let index = req["index"].as_f64();

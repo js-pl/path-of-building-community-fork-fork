@@ -8,6 +8,7 @@ mod calcs;
 mod config;
 pub mod display_stats;
 mod gem_select;
+mod gem_slots;
 mod geometry;
 mod group_detail;
 mod group_list;
@@ -438,6 +439,11 @@ impl<'d> TypedSession<'d> {
                 ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
                 ("skills", _) if Self::is_group_list_control(p) => self.group_list_json(p)?,
                 ("skills", _) if Self::is_group_detail_control(p) => self.group_detail_json(p)?,
+                // A slot the tab has not made is no control
+                ("skills", _) if Self::is_gem_slot_control(p) && !self.gem_slot_exists(p) => {
+                    continue;
+                }
+                ("skills", _) if Self::is_gem_slot_control(p) => self.gem_slot_json(p)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
                 ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {
@@ -615,4 +621,9 @@ impl<'d> TypedSession<'d> {
             .collect();
         Ok(json!({ "combined": combined, "max": object(max), "nodes": object(nodes) }))
     }
+}
+
+/// Whether a path is a gem slot's count (`skills.gemSlot<i>Count`)
+pub fn gem_slots_count_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Count")
 }
