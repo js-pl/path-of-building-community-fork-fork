@@ -1651,17 +1651,37 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 if n == 0 {
                                     continue;
                                 }
-                                let target_len = if dst == "items.itemList" {
-                                    rows
+                                // Or onto a shown slot, or the minion drop-down
+                                if rng.below(3) == 0 {
+                                    let dst = match rng.below(6) {
+                                        0 => "build.mainSkillMinion".to_string(),
+                                        _ if !slots.is_empty() => format!(
+                                            "slots.{}",
+                                            slots[rng.below(slots.len())]["name"]
+                                                .as_str()
+                                                .unwrap_or("")
+                                        ),
+                                        _ => continue,
+                                    };
+                                    *popup_inputs
+                                        .entry(format!("drag {src} {}", &dst[..5]))
+                                        .or_default() += 1;
+                                    json!({"cmd": "control", "path": src, "sel": rng.below(n) + 1, "dragTo": dst})
                                 } else {
-                                    shared
-                                };
-                                let mut r = json!({"cmd": "control", "path": src, "sel": rng.below(n) + 1, "dragTo": dst});
-                                if rng.below(2) == 0 {
-                                    r["at"] = json!(rng.below(target_len + 1) + 1);
+                                    let target_len = if dst == "items.itemList" {
+                                        rows
+                                    } else {
+                                        shared
+                                    };
+                                    let mut r = json!({"cmd": "control", "path": src, "sel": rng.below(n) + 1, "dragTo": dst});
+                                    if rng.below(2) == 0 {
+                                        r["at"] = json!(rng.below(target_len + 1) + 1);
+                                    }
+                                    *popup_inputs
+                                        .entry(format!("drag {src} {dst}"))
+                                        .or_default() += 1;
+                                    r
                                 }
-                                *popup_inputs.entry(format!("drag {src} {dst}")).or_default() += 1;
-                                r
                             }
                             14 if shared > 0 => {
                                 // The shared item list: a row's tooltip,
@@ -3713,5 +3733,123 @@ fn tree_links_import_and_export() {
         }
         compare_saves(&mut d, &id, &mut out);
     }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Items dropped on the item slots and on the minion drop-down while it
+/// shows an item set (Animate Guardian's Weapon's), from the item list,
+/// the databases and the shared item list
+#[test]
+fn items_dropped_on_slots_and_minion_sets() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let Some((id, path)) = corpus().into_iter().find(|(id, _)| id == "gen-0006") else {
+        return;
+    };
+    let xml = std::fs::read_to_string(path).unwrap();
+    answer(
+        d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+        "load",
+    );
+    let mut out = Vec::new();
+    let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+        answer(d.request(&r.to_string()), "typed");
+        assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+        compare_views(d, &["state", "items", "outputs"], &format!("{id} {r}"), out);
+    };
+    // A second item set, and the Animate Guardian's Weapon group as the
+    // main one, its minion on the second set
+    step(
+        &mut d,
+        json!({"cmd": "control", "path": "items.setManage", "click": true}),
+        &mut out,
+    );
+    step(
+        &mut d,
+        json!({"cmd": "control", "path": "popup.setList.new", "click": true}),
+        &mut out,
+    );
+    step(
+        &mut d,
+        json!({"cmd": "popupButton", "name": "save"}),
+        &mut out,
+    );
+    step(&mut d, json!({"cmd": "closePopup"}), &mut out);
+    let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+    let group = skills["ok"]["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|g| g.to_string().contains("Animate Guardian"))
+        .expect("an Animate Guardian's Weapon group")
+        + 1;
+    step(
+        &mut d,
+        json!({"cmd": "setMainSocketGroup", "index": group}),
+        &mut out,
+    );
+    let rows = |d: &mut Dispatcher, path: &str| {
+        let c = answer(
+            d.request(&json!({"cmd": "controls", "paths": [path]}).to_string()),
+            "controls",
+        );
+        c["ok"][path]["list"].as_array().map_or(0, Vec::len)
+    };
+    for sel in [1, 2] {
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": "build.mainSkillMinion", "sel": sel}),
+            &mut out,
+        );
+        // Each row of the item list, and some weapons of the databases
+        for k in 1..=rows(&mut d, "items.itemList") {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "items.itemList", "sel": k, "dragTo": "build.mainSkillMinion"}),
+                &mut out,
+            );
+        }
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": "items.uniqueDB.type", "sel": 4}),
+            &mut out,
+        );
+        for k in [1, 5, 9] {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "items.uniqueDB", "sel": k, "dragTo": "build.mainSkillMinion"}),
+                &mut out,
+            );
+        }
+    }
+    // Onto the slots: each shown slot gets a row of each list
+    let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+    let slots: Vec<String> = items["ok"]["slots"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["shown"] == true)
+        .filter_map(|s| s["name"].as_str().map(String::from))
+        .collect();
+    step(
+        &mut d,
+        json!({"cmd": "control", "path": "items.itemList", "sel": 1, "dragTo": "items.sharedItemList"}),
+        &mut out,
+    );
+    for (k, slot) in slots.iter().enumerate() {
+        let src = [
+            "items.itemList",
+            "items.uniqueDB",
+            "items.rareDB",
+            "items.sharedItemList",
+        ][k % 4];
+        let n = rows(&mut d, src).max(1);
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": src, "sel": k % n + 1, "dragTo": format!("slots.{slot}")}),
+            &mut out,
+        );
+    }
+    compare_saves(&mut d, &id, &mut out);
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

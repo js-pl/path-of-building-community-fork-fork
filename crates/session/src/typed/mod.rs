@@ -35,6 +35,7 @@ mod sets;
 mod shared_lists;
 mod sidebar;
 mod skills;
+mod slot_drops;
 mod spec_sets;
 pub mod tooltip;
 mod tree;

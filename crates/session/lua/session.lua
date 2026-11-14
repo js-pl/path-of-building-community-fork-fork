@@ -55,6 +55,8 @@ local function controlHosts()
 		tree = b.treeTab.controls,
 		skills = b.skillsTab.controls,
 		items = b.itemsTab.controls,
+		-- The item slots, as drag targets: "slots.Weapon 1"
+		slots = b.itemsTab.slots,
 		config = b.configTab.varControls,
 		configTab = b.configTab.controls,
 		party = b.partyTab.controls,

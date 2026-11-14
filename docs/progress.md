@@ -605,7 +605,14 @@ What remains for the full migration, in order:
      their popups, row tooltips, and drags (`control` with `dragTo` and
      `at`, which the translated session runs as ListControl's drop does)
      between the item list, the databases and the shared list, and
-     between the build's and the shared item sets. They outlive the
+     between the build's and the shared item sets. Items dropped on an
+     item slot (`slots.<name>`, `session::typed::slot_drops`: the slot
+     takes the build's item, or a copy of another list's with its
+     quality normalised, if it fits) or on the sidebar's minion
+     drop-down while it shows an item set (`EquipItemInSet` into that
+     set, for the slots the main skill's minion uses;
+     `items_dropped_on_slots_and_minion_sets` on gen-0006's Animate
+     Guardian's Weapon). They outlive the
      build: a typed session hands them to the next build it loads, and
      after the translation held a build the next typed session reads
      them from it (`sharedLists`: each item's text and quality, the
