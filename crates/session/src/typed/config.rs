@@ -107,6 +107,7 @@ impl TypedSession<'_> {
 
     /// `ConfigTab:UpdateControls()`: the controls show the active set
     pub(super) fn update_config_controls(&mut self) {
+        self.update_custom_mods_controls();
         let set = self.build.config.active();
         let mut c = std::mem::take(&mut self.config_controls);
         for v in &self.data.game.config_vars {
@@ -326,10 +327,204 @@ impl TypedSession<'_> {
         engine::pat::match_or_pattern(&label, &search).unwrap_or(false)
     }
 
+    /// `UpdateCustomModsControls`: a new control per group of the active
+    /// set, after the ones made before
+    fn update_custom_mods_controls(&mut self) {
+        let n = self.build.config.active().custom_mods.len().max(1);
+        let next = self.config_ui.blocks.1;
+        self.config_ui.blocks = (next, next + n);
+    }
+
+    /// The group a `configTab.<index>` control shows, if it is shown
+    fn custom_block(&self, index: &str) -> Result<usize> {
+        let i: usize = index
+            .parse()
+            .map_err(|_| format!("no control configTab.{index}"))?;
+        let (start, next) = self.config_ui.blocks;
+        if i >= start && i < next {
+            return Ok(i - start);
+        }
+        Err(format!(
+            "{}: a hidden custom modifier group's control configTab.{index}",
+            super::NOT_PORTED
+        ))
+    }
+
+    /// A custom modifier group changed: `AddUndoState`, `BuildModList`,
+    /// `buildFlag`
+    fn custom_mods_changed(&mut self) -> Result<()> {
+        self.build
+            .build_config_mods(&self.data.game.config, &self.data.parser)?;
+        self.config_mods_built();
+        self.rebuild()
+    }
+
+    /// `controls` of a custom modifier group (`configTab.<index>`) or one
+    /// of its controls: `Some(None)` for one upstream does not have (which
+    /// `controls` leaves out), `None` for a hidden group's
+    pub(super) fn custom_block_json(&self, name: &str) -> Option<Option<J>> {
+        let index = name.split('.').next().unwrap_or(name);
+        match index.parse::<usize>() {
+            Ok(i) => {
+                let (start, next) = self.config_ui.blocks;
+                if i >= next {
+                    return Some(None);
+                }
+                // An option's control, or a hidden group's
+                if i < start {
+                    return None;
+                }
+            }
+            // The tab's other controls are the translation's
+            Err(_) if name != "customModsAddBlock" => return None,
+            Err(_) => {}
+        }
+        Some(self.custom_block_json_shown(name))
+    }
+
+    fn custom_block_json_shown(&self, name: &str) -> Option<J> {
+        if name == "customModsAddBlock" {
+            return Some(json!({
+                "class": "ButtonControl", "enabled": true, "shown": true,
+                "label": "^7Add Mod Group",
+            }));
+        }
+        let (index, inner) = match name.split_once('.') {
+            Some((i, c)) => (i, Some(c)),
+            None => (name, None),
+        };
+        let b = self.custom_block(index).ok()?;
+        let block = self.build.config.active().custom_mods.get(b)?;
+        let common = |class: &str| json!({ "class": class, "enabled": true, "shown": true });
+        let mut d = match inner {
+            None => common("CustomModBlockControl"),
+            Some("deleteBtn") => common("ButtonControl"),
+            Some("addModBtn") => common("ButtonControl"),
+            Some("titleEdit") => common("EditControl"),
+            Some("enableCheck") => common("CheckBoxControl"),
+            Some("textEdit") => common("ResizableEditControl"),
+            _ => return None,
+        };
+        match inner {
+            Some("deleteBtn") => d["label"] = json!("^1X"),
+            Some("addModBtn") => d["label"] = json!("^7Add Mod"),
+            Some("titleEdit") => d["text"] = json!(block.title.clone().unwrap_or_default()),
+            Some("enableCheck") => {
+                d["label"] = json!("");
+                d["state"] = json!(block.enabled);
+            }
+            Some("textEdit") => {
+                d["text"] = json!(block.text);
+                d["multiline"] = json!(true);
+            }
+            _ => {}
+        }
+        Some(d)
+    }
+
+    /// `controlTooltip` of a custom modifier group's control: the enable
+    /// box compares the stats with the group toggled; the others have none
+    pub fn custom_block_tooltip(&mut self, name: &str) -> Result<J> {
+        let (index, inner) = name
+            .split_once('.')
+            .ok_or_else(|| format!("{}: control configTab.{name}", super::NOT_PORTED))?;
+        let b = self.custom_block(index)?;
+        if inner != "enableCheck" {
+            return Ok(json!({ "lines": [] }));
+        }
+        let mut tip = super::tooltip::Tooltip::default();
+        let cur = self
+            .build
+            .config
+            .active()
+            .custom_mods
+            .get(b)
+            .ok_or("no custom modifier group")?
+            .enabled;
+        let mut other = self.build.clone();
+        let config = std::sync::Arc::make_mut(&mut other.config);
+        config.active_mut().custom_mods[b].enabled = !cur;
+        other.build_config_mods(&self.data.game.config, &self.data.parser)?;
+        let data = self.data.calc_data();
+        let none = engine::calc_override::Override::default();
+        // `calcFunc()`: the Full DPS too
+        let base =
+            engine::calculator::MiscCalculator::new(&self.build, &data)?.calculate(&none, true)?;
+        let new = engine::calculator::MiscCalculator::new(&other, &data)?.calculate(&none, true)?;
+        let header = if cur {
+            "^7Disabling this group will give you:"
+        } else {
+            "^7Enabling this group will give you:"
+        };
+        self.add_stat_compares(
+            &mut tip,
+            &super::tooltip::Outputs {
+                player: &base.player,
+                minion: base.minion.as_ref(),
+            },
+            &super::tooltip::Outputs {
+                player: &new.player,
+                minion: new.minion.as_ref(),
+            },
+            header,
+            None,
+        )?;
+        // Its two `BuildModList`s run the options' functions, whose
+        // placeholders notify their controls, which set `buildFlag`: the
+        // frame calculates again, leaving the unsaved flag
+        self.build
+            .build_config_mods(&self.data.game.config, &self.data.parser)?;
+        self.config_mods_built();
+        if !self.build.config_state.placeholders_set.is_empty() {
+            let unsaved = self.ui.unsaved;
+            self.rebuild()?;
+            self.ui.unsaved = unsaved;
+        }
+        Ok(tip.json())
+    }
+
     /// A `configTab.<name>` control changed as `api.control` changes it
     pub(super) fn config_tab_control(&mut self, name: &str, req: &J) -> Result<J> {
         let text = req.get("text").and_then(J::as_str);
         let click = req.get("click").and_then(J::as_bool) == Some(true);
+        if name == "customModsAddBlock" && click {
+            let config = std::sync::Arc::make_mut(&mut self.build.config);
+            let list = &mut config.active_mut().custom_mods;
+            let title = format!("Group {}", list.len() + 1);
+            list.push(engine::config::CustomBlock {
+                title: Some(title),
+                enabled: true,
+                text: String::new(),
+            });
+            self.update_custom_mods_controls();
+            self.custom_mods_changed()?;
+            return Ok(json!([]));
+        }
+        if let Some((index, inner)) = name.split_once('.') {
+            let b = self.custom_block(index)?;
+            let state = req.get("state").and_then(J::as_bool);
+            let config = std::sync::Arc::make_mut(&mut self.build.config);
+            let list = &mut config.active_mut().custom_mods;
+            match (inner, text, state) {
+                ("deleteBtn", None, None) if click => {
+                    list.remove(b);
+                    if list.is_empty() {
+                        list.push(engine::config::CustomBlock {
+                            title: Some("Default".into()),
+                            enabled: true,
+                            text: String::new(),
+                        });
+                    }
+                    self.update_custom_mods_controls();
+                }
+                ("titleEdit", Some(t), None) => list[b].title = Some(t.to_string()),
+                ("textEdit", Some(t), None) => list[b].text = t.to_string(),
+                ("enableCheck", None, Some(s)) => list[b].enabled = s,
+                _ => return Err(format!("{}: control configTab.{name}", super::NOT_PORTED)),
+            }
+            self.custom_mods_changed()?;
+            return Ok(json!([]));
+        }
         match (name, req.get("sel").and_then(J::as_f64), text) {
             ("search", None, Some(t)) => {
                 self.config_ui.search = t.to_string();
@@ -670,11 +865,38 @@ impl TypedSession<'_> {
     }
 }
 
-/// The Configuration tab's search and Show All Configurations
+/// The Configuration tab's search and Show All Configurations, and where
+/// the custom modifier groups' controls are in `configTab.controls`
 #[derive(Clone, Debug, Default)]
 pub(super) struct ConfigUi {
     pub search: String,
     pub show_all: bool,
+    /// The index of the shown groups' first control and the next free
+    /// index: each `UpdateCustomModsControls` appends a control per group
+    /// (the old ones stay, hidden)
+    pub blocks: (usize, usize),
+}
+
+impl ConfigUi {
+    /// The tab as its constructor leaves it: the controls of the options
+    /// (two per section, one per option and its label), then the first
+    /// set's one group
+    pub fn new(vars: &[ConfigVar]) -> ConfigUi {
+        let base: usize = vars
+            .iter()
+            .map(|v| {
+                if v.section.is_some() {
+                    2
+                } else {
+                    1 + usize::from(v.label.is_some() && v.kind.as_deref() != Some("check"))
+                }
+            })
+            .sum();
+        ConfigUi {
+            blocks: (base + 1, base + 2),
+            ..ConfigUi::default()
+        }
+    }
 }
 
 /// `StripEscapes`: colour codes out

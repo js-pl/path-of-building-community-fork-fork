@@ -467,8 +467,16 @@ What remains for the full migration, in order:
    `ifSkill...`, `legacy`, "recently" and the like in the label); the set
    drop-down is filled only when the tab draws, so selecting in it headless
    changes nothing. `config_edits_match` mixes them into its edits. The
-   custom modifier groups' controls (`customModsAddBlock`, the blocks)
-   stay on the translation. A radius jewel's
+   custom modifier groups' controls are typed too: Add Mod Group and each
+   shown group's title, enable box, text and delete button, its
+   `controls` and the enable box's tooltip (the stats with the group
+   toggled; its two `BuildModList`s set `buildFlag` through the options'
+   notified placeholders, so the frame calculates again). The groups'
+   controls are `configTab.<index>`, after every control the tab made: two
+   per section, one per option and its label, then each
+   `UpdateCustomModsControls` appends one per group of the active set (the
+   old ones stay, hidden; `ConfigUi::blocks`). Add Mod (its mod browser)
+   and the hidden groups' controls stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
