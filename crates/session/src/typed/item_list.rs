@@ -547,14 +547,14 @@ impl<'d> TypedSession<'d> {
             Some(name) if req["click"].as_bool() == Some(true) => match name {
                 "sort" => self.sort_item_list()?,
                 "deleteUnused" => self.delete_unused_items()?,
-                "deleteAll" => {
-                    if !self.list_of(&self.editor.list.borrow()).is_empty() {
-                        self.open_confirm(
-                            "Delete All",
-                            "Are you sure you want to delete all items in this build?",
-                            ConfirmAction::DeleteAll,
-                        );
-                    }
+                "deleteAll" => self.open_confirm(
+                    "Delete All",
+                    "Are you sure you want to delete all items in this build?",
+                    ConfirmAction::DeleteAll,
+                ),
+                // `OnSelDelete(nil, nil)` indexes the missing item
+                _ if self.editor.list.borrow().sel_value.is_none() => {
+                    return Err("attempt to index a nil value".into());
                 }
                 _ => self.item_list_delete_selected()?,
             },

@@ -1490,7 +1490,10 @@ fn items_edits_match(d: &mut Dispatcher) {
                             6 => click("items.itemList.sort"),
                             7 => click("items.itemList.deleteUnused"),
                             8 => click("items.itemList.deleteAll"),
-                            _ if rng.below(2) == 0 => click("items.itemList.delete"),
+                            // A disabled button cannot be clicked
+                            _ if c["ok"]["items.itemList.delete"]["enabled"] == true && rng.below(2) == 0 => {
+                                click("items.itemList.delete")
+                            }
                             _ => json!({"cmd": "control", "path": "items.itemList", "key": "DELETE"}),
                         };
                         let key = r["path"].as_str().unwrap_or("").to_string()

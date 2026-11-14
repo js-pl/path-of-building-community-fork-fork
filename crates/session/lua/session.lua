@@ -156,6 +156,9 @@ function buildList(control)
 	-- The Items tab updates its sockets as it draws
 	if control._className == "ItemListControl" or control._className == "ItemDBControl" then
 		build().itemsTab:UpdateSockets()
+		-- The tab's bottom, which its draw sets and the databases' heights
+		-- (scrolling a selected row into view) read
+		build().itemsTab.maxY = build().itemsTab.maxY or 1e9
 	end
 	-- The item list updates as it draws
 	if control._className == "ItemListControl" then
