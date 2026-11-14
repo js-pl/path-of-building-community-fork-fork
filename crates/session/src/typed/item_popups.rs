@@ -57,6 +57,19 @@ pub enum ItemPopup {
     AddImplicit(Box<super::item_add_implicit::AddImplicitPopup>),
     AddModifier(Box<super::item_add_modifier::AddModifierPopup>),
     Crucible(Box<super::item_crucible::CruciblePopup>),
+    /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
+    Confirm {
+        title: String,
+        lines: Vec<String>,
+        action: ConfirmAction,
+    },
+}
+
+/// What a confirmation's Delete does
+#[derive(Clone, Debug)]
+pub enum ConfirmAction {
+    DeleteItem(f64),
+    DeleteAll,
 }
 
 /// `DropDownControl:SetSel(sel)`: the new selection, clamped to the list,
@@ -293,6 +306,11 @@ impl<'d> TypedSession<'d> {
                 self.set_display_item_id(id);
                 self.close_item_popup();
             }
+            (ItemPopup::Confirm { action, .. }, "confirm") => {
+                // `main:ClosePopup()`, then `onConfirm()`
+                self.close_item_popup();
+                self.confirm_action(&action)?;
+            }
             (_, name) => return Err(format!("no popup button {name}")),
         }
         self.refresh_item_popups();
@@ -423,6 +441,12 @@ impl<'d> TypedSession<'d> {
             ItemPopup::AddImplicit(p) => self.describe_add_implicit_popup(p),
             ItemPopup::AddModifier(p) => self.describe_add_modifier_popup(p),
             ItemPopup::Crucible(p) => self.describe_crucible_popup(p),
+            ItemPopup::Confirm { title, lines, .. } => json!({
+                "title": title,
+                "lines": lines,
+                "buttons": [{ "name": "confirm", "label": "Delete", "enabled": true }],
+                "controls": [],
+            }),
             ItemPopup::Craft {
                 rarity,
                 title,

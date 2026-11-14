@@ -1487,6 +1487,156 @@ fn items_edits_match(d: &mut Dispatcher) {
                         json!({"cmd": "saveDisplayItem"})
                     }
                 }
+                7 => {
+                    // The item list: rows selected, clicked (Ctrl to equip,
+                    // twice to edit), filtered, sorted and deleted, a
+                    // confirmation answered
+                    let paths = [
+                        "items.itemList",
+                        "items.itemList.loadoutFilter",
+                        "items.itemList.sort",
+                        "items.itemList.deleteUnused",
+                        "items.itemList.deleteAll",
+                        "items.itemList.delete",
+                    ];
+                    let view = json!({"cmd": "controls", "paths": paths});
+                    let mut fell_back = false;
+                    for _ in 0..rng.below(4) + 1 {
+                        let label = format!("step {step} item list");
+                        let c = compare(d, &view, &label, &mut out);
+                        let rows = c["ok"]["items.itemList"]["list"]
+                            .as_array()
+                            .map_or(0, Vec::len);
+                        let filters = c["ok"]["items.itemList.loadoutFilter"]["list"]
+                            .as_array()
+                            .map_or(1, Vec::len);
+                        if rows > 0 && rng.below(3) == 0 {
+                            let index = rng.below(rows) + 1;
+                            let req = json!({"cmd": "controlTooltip", "path": "items.itemList", "index": index});
+                            compare(d, &req, &label, &mut out);
+                            *popup_inputs
+                                .entry("items.itemList tooltip".into())
+                                .or_default() += 1;
+                        }
+                        let click =
+                            |path: &str| json!({"cmd": "control", "path": path, "click": true});
+                        let r = match rng.below(12) {
+                            10 | 11 => {
+                                // A row of an item database
+                                let db = if rng.below(2) == 0 {
+                                    "items.uniqueDB"
+                                } else {
+                                    "items.rareDB"
+                                };
+                                let c = compare(
+                                    d,
+                                    &json!({"cmd": "controls", "paths": [db]}),
+                                    &label,
+                                    &mut out,
+                                );
+                                let n = c["ok"][db]["list"].as_array().map_or(0, Vec::len);
+                                if n == 0 {
+                                    continue;
+                                }
+                                let index = rng.below(n) + 1;
+                                if rng.below(3) == 0 {
+                                    let req = json!({"cmd": "controlTooltip", "path": db, "index": index});
+                                    compare(d, &req, &label, &mut out);
+                                    *popup_inputs.entry(format!("{db} tooltip")).or_default() += 1;
+                                }
+                                let mut r = json!({"cmd": "control", "path": db, "sel": index, "click": true});
+                                if rng.below(2) == 0 {
+                                    r["ctrl"] = json!(true);
+                                    r["shift"] = json!(rng.below(2) == 0);
+                                } else {
+                                    r["doubleClick"] = json!(true);
+                                }
+                                r
+                            }
+                            0..=3 if rows > 0 => {
+                                let mut r = json!({"cmd": "control", "path": "items.itemList", "sel": rng.below(rows) + 1});
+                                match rng.below(4) {
+                                    0 => {
+                                        r["click"] = json!(true);
+                                        r["doubleClick"] = json!(true);
+                                    }
+                                    1 => {
+                                        r["click"] = json!(true);
+                                        r["ctrl"] = json!(true);
+                                        r["shift"] = json!(rng.below(2) == 0);
+                                    }
+                                    2 => r["click"] = json!(true),
+                                    _ => {}
+                                }
+                                r
+                            }
+                            4 | 5 => {
+                                json!({"cmd": "control", "path": "items.itemList.loadoutFilter", "sel": rng.below(filters) + 1})
+                            }
+                            6 => click("items.itemList.sort"),
+                            7 => click("items.itemList.deleteUnused"),
+                            8 => click("items.itemList.deleteAll"),
+                            // A disabled button cannot be clicked
+                            _ if c["ok"]["items.itemList.delete"]["enabled"] == true
+                                && rng.below(2) == 0 =>
+                            {
+                                click("items.itemList.delete")
+                            }
+                            _ => {
+                                json!({"cmd": "control", "path": "items.itemList", "key": "DELETE"})
+                            }
+                        };
+                        let key = r["path"].as_str().unwrap_or("").to_string()
+                            + if r["doubleClick"] == true {
+                                " double"
+                            } else if r["ctrl"] == true {
+                                " ctrl"
+                            } else {
+                                ""
+                            };
+                        *popup_inputs.entry(key).or_default() += 1;
+                        let r = r.to_string();
+                        answer(d.request(&r), "item list");
+                        log.push(r.clone());
+                        if !d.typed_active() {
+                            fell_back = true;
+                            break;
+                        }
+                        let label = format!("step {step} {r}");
+                        let st = compare(d, &json!({"cmd": "state"}), &label, &mut out);
+                        let title = st["ok"]["popups"][0]["title"].as_str().unwrap_or("");
+                        if title == "Delete Item" || title == "Delete All" {
+                            let confirm =
+                                rng.below(3) != 0 && (title == "Delete Item" || rng.below(2) == 0);
+                            let r = if confirm {
+                                json!({"cmd": "popupButton", "name": "confirm"})
+                            } else {
+                                json!({"cmd": "closePopup"})
+                            }
+                            .to_string();
+                            *popup_inputs
+                                .entry(format!("{title} confirm {confirm}"))
+                                .or_default() += 1;
+                            answer(d.request(&r), "confirmation");
+                            log.push(r.clone());
+                            if !d.typed_active() {
+                                fell_back = true;
+                                break;
+                            }
+                            compare(
+                                d,
+                                &json!({"cmd": "state"}),
+                                &format!("step {step} {r}"),
+                                &mut out,
+                            );
+                        }
+                        compare_display(d, &label, &log, &mut out);
+                    }
+                    if !fell_back {
+                        compare(d, &view, &format!("step {step} item list end"), &mut out);
+                    }
+                    json!({"cmd": "state"})
+                }
                 12 => {
                     // Craft Item: random choices, Create or Cancel, the
                     // text editor of a unique, then the item saved

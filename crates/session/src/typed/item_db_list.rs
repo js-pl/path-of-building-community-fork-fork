@@ -225,6 +225,16 @@ impl TypedSession<'_> {
             set_sel(&mut self.select_db, s, SELECT_DB.len());
             return Ok(json!([]));
         }
+        if let (None, Some(s)) = (input, sel) {
+            if self.class_popups_open() > 0 {
+                return Err(format!(
+                    "{}: the item database with a class change popup open",
+                    super::NOT_PORTED
+                ));
+            }
+            self.item_db_select(rare, s, req)?;
+            return Ok(json!([]));
+        }
         let (leagues, types) = self.db_lists(rare)?;
         let l = &mut self.item_db_lists[rare as usize];
         match (input, sel, text) {
@@ -436,6 +446,31 @@ impl TypedSession<'_> {
     /// `ListBuilder()`: the rows of the list, each item's name and, sorted
     /// by a stat, its power
     fn item_db_rows(&self, rare: bool) -> Result<Vec<J>> {
+        let by_stat = self.item_db_sort_stat(rare).is_some();
+        Ok(self
+            .item_db_list(rare)?
+            .iter()
+            .map(|(item, power)| {
+                let mut o = Map::new();
+                o.insert("name".into(), json!(item.name));
+                if by_stat {
+                    o.insert("power".into(), num(*power));
+                }
+                J::Object(o)
+            })
+            .collect())
+    }
+
+    /// The sort's stat (the rare list has no sort control)
+    fn item_db_sort_stat(&self, rare: bool) -> Option<PowerStat> {
+        (!rare)
+            .then(|| sort_list().into_iter().nth(self.db_list(rare).sort - 1))
+            .flatten()
+            .and_then(|(_, s)| s)
+    }
+
+    /// The list's items in its order, with their power by the sort's stat
+    fn item_db_list(&self, rare: bool) -> Result<Vec<(Arc<Item>, f64)>> {
         let db = if rare {
             self.data.rare_db()?
         } else {
@@ -447,11 +482,7 @@ impl TypedSession<'_> {
             .filter(|i| self.item_db_matches(rare, i, &leagues, &types))
             .map(|i| (i, f64::NEG_INFINITY))
             .collect();
-        // The rare list has no sort control: by name
-        let stat = (!rare)
-            .then(|| sort_list().into_iter().nth(self.db_list(rare).sort - 1))
-            .flatten()
-            .and_then(|(_, s)| s);
+        let stat = self.item_db_sort_stat(rare);
         if let Some(stat) = &stat {
             let info = &self.data.game.setup.weapon_type_info;
             let one_hand = |t: &str| info.get(t).map(|w| w.one_hand);
@@ -502,16 +533,91 @@ impl TypedSession<'_> {
             }
             name(a.0) < name(b.0)
         });
-        Ok(list
-            .iter()
-            .map(|(item, power)| {
-                let mut o = Map::new();
-                o.insert("name".into(), json!(item.name));
-                if by_stat {
-                    o.insert("power".into(), num(*power));
+        Ok(list.into_iter().map(|(i, p)| (i.clone(), p)).collect())
+    }
+
+    /// A row's item (1-based)
+    fn item_db_row(&self, rare: bool, index: Option<f64>) -> Result<Option<Arc<Item>>> {
+        let Some(i) = index.filter(|i| *i >= 1.0 && i.fract() == 0.0) else {
+            return Ok(None);
+        };
+        Ok(self
+            .item_db_list(rare)?
+            .get(i as usize - 1)
+            .map(|(item, _)| item.clone()))
+    }
+
+    /// `SelectIndex(sel)`, then `OnSelClick` for a click: Ctrl adds the
+    /// item and equips it, a double click opens it in the editor
+    fn item_db_select(&mut self, rare: bool, sel: f64, req: &J) -> Result<()> {
+        let Some(item) = self.item_db_row(rare, Some(sel))? else {
+            return Ok(());
+        };
+        if req["click"].as_bool() != Some(true) {
+            return Ok(());
+        }
+        let ctrl = req["ctrl"].as_bool().unwrap_or(false);
+        let shift = req["shift"].as_bool().unwrap_or(false);
+        if ctrl {
+            let mut new = Item::new(&self.data.item_context(), &item.raw, None, false)?;
+            if new.base.is_none() {
+                return Err(format!("{}: an item without a base", super::NOT_PORTED));
+            }
+            new.normalise_quality();
+            let id = self.add_item(new, true)?;
+            let new = self.build.items.item(id).ok_or("no item")?.clone();
+            let mut name = new.primary_slot();
+            let tab = &self.build.items;
+            if let Some(i) = tab.ordered_slots.iter().position(|s| s.slot_name == name) {
+                if tab.ordered_slots[i].weapon_set == Some(1)
+                    && tab.active_item_set().use_second_weapon_set
+                {
+                    name += " Swap";
                 }
-                J::Object(o)
-            })
-            .collect())
+                if shift {
+                    let alt = name.replace('1', "2");
+                    if self.valid_for_slot(&new, &alt) {
+                        name = alt;
+                    }
+                }
+                let i = self
+                    .build
+                    .items
+                    .ordered_slots
+                    .iter()
+                    .position(|s| s.slot_name == name)
+                    .ok_or("attempt to index a nil value")?;
+                self.set_sel_item(i, id)?;
+            }
+            let other = super::item_editor::FORBIDDEN
+                .iter()
+                .find(|(t, _)| new.title.as_deref() == Some(*t))
+                .map(|(_, o)| *o);
+            if let Some(other) = other {
+                self.add_forbidden_counterpart(&new, other)?;
+            }
+            self.populate_slots();
+            self.rebuild()?;
+        } else if req["doubleClick"].as_bool() == Some(true) {
+            self.display_item_from_raw(&item.raw, true)?;
+        }
+        Ok(())
+    }
+
+    /// `controlTooltip` of a row: `AddValueTooltip`
+    pub fn item_db_tooltip(&mut self, path: &str, index: Option<f64>) -> Result<J> {
+        let (rare, input) = parse(path).ok_or("no control")?;
+        if input.is_some() {
+            return Ok(super::tooltip::Tooltip::default().json());
+        }
+        self.update_sockets();
+        let mut tip = super::tooltip::Tooltip::default();
+        let popups = self.ui.popups.as_array().map_or(0, Vec::len);
+        if popups == 0
+            && let Some(item) = self.item_db_row(rare, index)?
+        {
+            self.add_item_tooltip_mode(&mut tip, &item, None, true)?;
+        }
+        Ok(tip.json())
     }
 }

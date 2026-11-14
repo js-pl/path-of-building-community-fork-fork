@@ -142,9 +142,9 @@ fn translate_orbit_index(src: i64, src_n: i64, dest_n: i64) -> i64 {
     table.get(src as usize).copied().unwrap_or(0)
 }
 
-/// A rebuild after two subgraphs shared an id: upstream fails it
-/// (`Entrance for subGraph not linked to parent socket???`) and leaves the
-/// spec broken, which the typed spec doesn't model
+/// Two subgraphs that shared an id: upstream's next build of subgraphs
+/// fails (`Entrance for subGraph not linked to parent socket???`), also a
+/// later build's load, which the typed spec doesn't model
 pub const SUB_GRAPH_COLLISION: &str =
     "not ported: rebuilding cluster subgraphs that shared an id (upstream fails)";
 
@@ -304,7 +304,13 @@ impl<'t> PassiveSpec<'t> {
             n.linked.retain(|&j| j < base);
         }
         self.sub_graphs.clear();
-        self.build_cluster_jewel_graphs(tab, data)
+        self.build_cluster_jewel_graphs(tab, data)?;
+        // Upstream's shared tree data is left broken by the collision: its
+        // next build of the subgraphs fails, in this build or the next
+        if self.sub_graph_collision {
+            return Err(SUB_GRAPH_COLLISION.into());
+        }
+        Ok(())
     }
 
     /// `ApplyLegacyClusterNodeRemap()`

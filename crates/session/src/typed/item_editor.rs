@@ -40,6 +40,8 @@ pub struct Editor {
     pub range_val: Option<f64>,
     /// `craftingSorting`'s selection, 0-based (0: Default)
     pub crafting_sort: usize,
+    /// The Items tab's list of items, which drawing it updates
+    pub list: std::cell::RefCell<super::item_list::ItemList>,
 }
 
 /// `sortingOptions`: Default, then the power stats for items but Name
@@ -136,7 +138,7 @@ pub(super) fn verify_range(range: f64, index: usize, mods: &[String], affixes: &
 }
 
 /// `forbiddenJewelCounterpart`
-const FORBIDDEN: [(&str, &str); 2] = [
+pub(super) const FORBIDDEN: [(&str, &str); 2] = [
     ("Forbidden Flame", "Forbidden Flesh"),
     ("Forbidden Flesh", "Forbidden Flame"),
 ];

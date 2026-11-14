@@ -648,8 +648,32 @@ impl<'d> TypedSession<'d> {
         if let Some(l) = &item.league {
             tip.add_line(BIG, &format!("^xFF5555Exclusive to: {l}"));
         }
-        if item.unreleased || item.source.is_some() || !item.upgrade_paths.is_empty() {
-            return Err(unported("a database item's source"));
+        const SOURCE: &str = "^x88FFFF";
+        // `FormatItemSource(text)`
+        let format = |text: &str| {
+            let mut t = text.to_string();
+            for (kind, color) in [
+                ("unique", "^xAF6025"),
+                ("normal", "^xC8C8C8"),
+                ("currency", "^xAA9E82"),
+                ("prophecy", "^xB54BFF"),
+            ] {
+                t = engine::pat::gsub(
+                    &t,
+                    &format!("{kind}{{([^}}]+)}}"),
+                    &format!("{color}%1{SOURCE}"),
+                );
+            }
+            t
+        };
+        if item.unreleased {
+            tip.add_line(BIG, "^xDD0022Not yet available");
+        }
+        if let Some(src) = &item.source {
+            tip.add_line(BIG, &format!("{SOURCE}Source: {}", format(src)));
+        }
+        for path in &item.upgrade_paths {
+            tip.add_line(BIG, &format!("{SOURCE}{}", format(path)));
         }
         tip.add_separator(10.0);
         Ok(())

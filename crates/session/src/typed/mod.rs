@@ -19,6 +19,7 @@ mod item_display;
 mod item_editor;
 mod item_editor_controls;
 mod item_enchant;
+mod item_list;
 mod item_popup_tooltips;
 mod item_popups;
 mod item_tooltip;
@@ -370,6 +371,9 @@ impl<'d> TypedSession<'d> {
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                ("items", _) if Self::is_item_list_control(p) => {
+                    self.item_list_control_json(p).ok()?
+                }
                 // An input the database's list does not have (the rare
                 // one's sort), which upstream leaves out
                 ("items", name) if name.starts_with("uniqueDB.") || name.starts_with("rareDB.") => {

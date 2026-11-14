@@ -119,6 +119,15 @@ local function describeControl(control)
 		c.val = control.val
 	elseif control._className == "LabelControl" then
 		c.label = control:GetProperty("label")
+	elseif control.SelectIndex and control.GetRowValue and control._className ~= "ItemDBControl" and control._className ~= "NotableDBControl" then
+		-- A list's rows by their first column, and its selection
+		buildList(control)
+		local list = { }
+		for i, value in ipairs(control.list) do
+			list[i] = tostring(control:GetRowValue(1, i, value) or "")
+		end
+		c.list = arrayOf(list, function(v) return v end)
+		c.sel = control.selValue ~= nil and control.selIndex or nil
 	elseif control._className == "ItemDBControl" then
 		-- The items the filters let through, in the sort's order, each with
 		-- its power by the sort's stat
@@ -144,6 +153,21 @@ end
 -- A list a coroutine builds as it draws (NotableDBControl, ItemDBControl),
 -- built now
 function buildList(control)
+	-- The Items tab updates its sockets as it draws
+	if control._className == "ItemListControl" or control._className == "ItemDBControl" then
+		build().itemsTab:UpdateSockets()
+		-- The tab's bottom, which its draw sets and the databases' heights
+		-- (scrolling a selected row into view) read
+		build().itemsTab.maxY = build().itemsTab.maxY or 1e9
+	end
+	-- The item list updates as it draws
+	if control._className == "ItemListControl" then
+		local outputRevision = control.itemsTab.build.outputRevision
+		if control:UpdateLoadoutList() or outputRevision ~= control.lastOutputRevision then
+			control.lastOutputRevision = outputRevision
+			control:UpdateList()
+		end
+	end
 	if control.ListBuilder and (control.listBuildFlag or control.listOutputRevision ~= build().outputRevision) then
 		control.listBuildFlag = false
 		control.listBuilder = nil
@@ -164,9 +188,26 @@ end
 function api.control(req)
 	local control = findControl(req.path)
 	if req.sel and control.SelectIndex and not control.SetSel then
-		-- A row of a list
+		-- A row of a list, clicked with the keys held as ListControl's
+		-- left button does
 		buildList(control)
-		control:SelectIndex(req.sel)
+		if control:SelectIndex(req.sel) and req.click and control.OnSelClick then
+			local isKeyDown = IsKeyDown
+			IsKeyDown = function(key)
+				return (key == "CTRL" and req.ctrl) or (key == "SHIFT" and req.shift) or false
+			end
+			local ok, err = pcall(control.OnSelClick, control, control.selIndex, control.selValue, req.doubleClick)
+			IsKeyDown = isKeyDown
+			if not ok then
+				error(err, 0)
+			end
+		end
+	elseif req.key and control.SelectIndex then
+		-- A key on a list's selected row
+		buildList(control)
+		if req.key == "DELETE" and control.selValue and control.OnSelDelete then
+			control:OnSelDelete(control.selIndex, control.selValue)
+		end
 	elseif req.sel then
 		control:SetSel(req.sel)
 	elseif req.text then
@@ -189,7 +230,7 @@ end
 function api.controlTooltip(req)
 	local control = findControl(req.path)
 	local tooltip = newTooltip()
-	if control.ListBuilder then
+	if control.ListBuilder or (control.SelectIndex and control.AddValueTooltip) then
 		buildList(control)
 		local node = control.list[req.index]
 		if node and control.AddValueTooltip then

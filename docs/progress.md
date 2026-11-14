@@ -542,7 +542,19 @@ What remains for the full migration, in order:
      applied enemy modifiers by identity, so a flask's copy in the editor
      applies its `EnemyModifier`s again (`apply_enemy_modifiers` counts
      equal mods). A rebuild of cluster subgraphs that shared an id
-     (upstream asserts) falls back. All in `items_edits_match`, with
+     (upstream asserts, and its shared tree data stays broken for the
+     builds after) falls back on the edit that makes it. The Items tab's
+     item list (`session::typed::item_list`, `ItemListControl` as
+     `items.itemList` and its inputs): its rows and selection as drawing
+     updates them, a row's click with Ctrl (equip) or twice (edit), the
+     loadout filter (with `buildMode:SyncLoadouts`'s loadouts), Sort, Del
+     Unused, Del All and Delete with their confirmations, and a row's
+     tooltip; the item databases' rows (`items.uniqueDB`,
+     `items.rareDB`): a click with Ctrl (added and equipped) or twice
+     (edited), and their tooltips with a database item's source. The
+     translated session's `control` clicks any list's row
+     (`SelectIndex`, then `OnSelClick` with the keys held) and
+     `describeControl` lists any list's rows. All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
