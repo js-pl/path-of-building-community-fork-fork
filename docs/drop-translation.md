@@ -1,6 +1,7 @@
 # Dropping the translation
 
-Status: proposal, nothing removed yet. The goal in
+Status: option C accepted; step 1 done (the browser build and `pob serve`
+are typed-only by default), nothing removed yet. The goal in
 [design.md](design.md#mirroring-upstream) is that `crates/upstream`, `luagen`
 and the Lua runtime go, the oracle stays the only reference, and Lua is left
 in the importer and the oracle. This note lists what still depends on them
@@ -11,9 +12,9 @@ and how the tests keep a reference without them.
 | Code | Uses | Shipped? |
 | --- | --- | --- |
 | `crates/upstream` | upstream's whole program translated by `luagen` in its build script, plus the headless host | only through the features below |
-| `crates/session`, feature `translation` (default) | `translated.rs`, `lua/session.lua` (translated too), the dispatcher's fallback and replay (`Dispatcher::fallbacks`, `pending`) | native CLI and the default wasm build |
-| `crates/wasm`, feature `translation` (default) | `session/translation` | `web/scripts/build-wasm.mjs` without `--typed` (80 MB, 15 MB gzipped, against 8.2 MB, 2 MB) |
-| `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve`, `--typed`) |
+| `crates/session`, feature `translation` (default; `wasm` turns it off) | `translated.rs`, `lua/session.lua` (translated too), the dispatcher's fallback and replay (`Dispatcher::fallbacks`, `pending`) | native CLI (`pob serve --typed`, `--translated`) and the wasm build with `--translation` |
+| `crates/wasm`, feature `translation` (not default) | `session/translation` | `web/scripts/build-wasm.mjs --translation` (80 MB, 15 MB gzipped, against 8.2 MB, 2 MB typed) |
+| `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve --typed`, `--translated`, `bundle --lua`, `bench`) |
 | `crates/equivalence` | `upstream`; `bridge.rs` converts the translated program's stores into typed ones | tests only |
 | `crates/importer::luagen` | the translator (1.9k lines), run by `crates/upstream/build.rs` | build only |
 | `crates/lua` | interpreter (parser, `env`, `rt`, `gc`, 6.4k lines) **and** library pieces: Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | the library pieces are in the typed engine and ship |
@@ -24,8 +25,9 @@ The typed session no longer falls back for anything the session and
 equivalence tests exercise (`KNOWN_FALLBACKS` holds only cases where upstream
 itself fails or the translation carries another build's shared state), and CI
 already lints `session` and `wasm` with `--no-default-features`. So shipping
-without the translation needs no engine work: make `--typed` the default of
-`build-wasm.mjs` and `translation` a non-default feature.
+without the translation needed no engine work: `build-wasm.mjs` builds the
+typed engine unless given `--translation`, and `translation` is not a
+default feature of `wasm`.
 
 Dropping the Lua runtime entirely is a different matter: the engine needs
 the library pieces (they are how it reproduces upstream's string patterns,
@@ -127,10 +129,12 @@ and commits or uploads the transcripts; nothing has to translate.
 
 ### C. Both, in steps (recommended)
 
-1. **Now: ship without the translation.** `build-wasm.mjs --typed` and a
-   typed-only native CLI become the defaults; `translation` stops being a
-   default feature of `session` and `wasm`. Nothing is removed; the tests keep
-   the translation as a dev-dependency (option A). Low risk: CI already checks
+1. **Now: ship without the translation (done).** `build-wasm.mjs` and
+   `pob serve` are typed-only unless given `--translation` (`--typed`,
+   `--translated` for `pob serve`); `translation` is not a default feature of
+   `wasm`. It stays a default of `session`, which is not shipped on its own
+   (`wasm` turns its defaults off) and whose tests and CLI need it. Nothing is
+   removed; the tests keep the translation (option A). Low risk: CI checks
    the typed-only build, and the session tests record every fallback.
 2. **Next: an oracle session.** Write the JSON-lines driver for `session.lua`
    on LuaJIT, run it beside the translation, and compare the two on the
