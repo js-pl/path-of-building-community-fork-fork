@@ -28,6 +28,31 @@ pub struct SlotTexts {
     global1: bool,
     global2: bool,
     count: String,
+    /// The name box's list was dropped (`dropped`), and its sort cache
+    dropped: bool,
+    cache: Option<SortCache>,
+}
+
+/// What the name box's sort cache was made for (`UpdateSortCache` keeps it
+/// while they stay)
+#[derive(Clone, Debug, PartialEq)]
+pub struct CacheKey {
+    group: u64,
+    gem: Option<(Option<String>, String)>,
+    revision: f64,
+    show: &'static str,
+    legacy: bool,
+    quality: Option<f64>,
+    level: engine::skills::DefaultGemLevel,
+    char_level: Option<f64>,
+    field: &'static str,
+}
+
+/// The name box's sort cache: its gems in `BuildList("")`'s order
+#[derive(Clone, Debug)]
+pub struct SortCache {
+    key: CacheKey,
+    order: Vec<String>,
 }
 
 /// The slots made so far: the tab makes the first
@@ -203,6 +228,9 @@ impl<'d> TypedSession<'d> {
         if i > self.detail.gem_slots.0.len() {
             return unported();
         }
+        if part == "Name" {
+            return self.gem_name_control(uid, i, req);
+        }
         let text = req["text"].as_str();
         let state = req["state"].as_bool();
         let click = req["click"].as_bool() == Some(true);
@@ -302,5 +330,192 @@ impl<'d> TypedSession<'d> {
             tip.add_line(16.0, l);
         }
         tip.json()
+    }
+}
+
+/// `BuildList(buf)`'s first gem, of the gems in `BuildList("")`'s order:
+/// names that are the search, are its initials, start with it, contain
+/// it, each round with the gems of the search's tag; `None` when nothing
+/// matches, `Err` for a search that is no pattern
+fn first_match(
+    data: &engine::skill_data::SkillData,
+    order: &[String],
+    buf: &str,
+) -> std::result::Result<Option<String>, String> {
+    if buf.is_empty() {
+        return Ok(order.first().cloned());
+    }
+    let lower = engine::pat::lower(buf);
+    let tag = match lower.as_str() {
+        "active" => "grants_active_skill",
+        "int" => "intelligence",
+        "str" => "strength",
+        "dex" => "dexterity",
+        t => t,
+    }
+    .to_string();
+    let patterns = [
+        format!("^ {lower}$"),
+        format!("^{}$", engine::pat::gsub(&lower, "%a", " %0%%l+")),
+        format!("^ {lower}"),
+        lower.clone(),
+    ];
+    for p in &patterns {
+        for id in order {
+            let Some(gem) = data.gem(id) else {
+                continue;
+            };
+            let name = format!(" {}", engine::pat::lower(&gem.name));
+            if engine::pat::try_find(&name, p)?.is_some() || gem.tags.contains(&tag) {
+                return Ok(Some(id.clone()));
+            }
+        }
+    }
+    Ok(None)
+}
+
+impl<'d> TypedSession<'d> {
+    /// The name box's sort cache key for the shown group's slot
+    fn gem_cache_key(&self, uid: u64, i: usize) -> Option<CacheKey> {
+        let g = self.groups().iter().find(|g| g.uid.0 == uid)?;
+        let tab = self.build.skills.as_ref()?;
+        let o = &self.gem_options;
+        let char_level = (tab.default_gem_level == engine::skills::DefaultGemLevel::CharacterLevel)
+            .then_some(self.build.info.character_level);
+        Some(CacheKey {
+            group: uid,
+            gem: g
+                .gem_list
+                .get(i - 1)
+                .map(|gem| (gem.gem_id.clone(), gem.name_spec.clone())),
+            revision: self.ui.output_revision,
+            show: o.show,
+            legacy: o.show_legacy,
+            quality: (!self.gem_quality_nil).then_some(tab.default_gem_quality),
+            level: tab.default_gem_level,
+            char_level,
+            field: o.field,
+        })
+    }
+
+    /// `gemList` on a slot: `SetDisplayGroup(group)`, the slot's box gets
+    /// a new sort cache with the gems' DPS, then the shown group again
+    pub(super) fn gem_list_shown(&mut self, group: f64, slot: f64, order: Vec<String>) {
+        let prev = self.display_group;
+        let row = group as usize - 1;
+        self.set_display_group(Some(row));
+        let uid = self.display_group;
+        let i = slot as usize;
+        if let Some(key) = uid.and_then(|u| self.gem_cache_key(u, i))
+            && let Some(s) = self.detail.gem_slots.0.get_mut(i - 1)
+        {
+            s.cache = Some(SortCache { key, order });
+        }
+        match prev.and_then(|u| self.group_row(u)) {
+            Some(r) => self.set_display_group(Some(r)),
+            None => self.display_group = prev,
+        }
+    }
+
+    /// The name box's text: the list drops (a new sort cache unless the
+    /// one it has still holds), the first gem the text finds is chosen,
+    /// and the slot's gem changes to it (`gemChangeFunc`, which
+    /// calculates only when the text is the gem's name)
+    fn gem_name_control(&mut self, uid: u64, i: usize, req: &J) -> Result<J> {
+        let unported = |why: &str| Err(format!("{NOT_PORTED}: a gem name {why}"));
+        let Some(text) = req["text"].as_str() else {
+            return unported("without a text");
+        };
+        if text.contains(':') {
+            return unported("with tags");
+        }
+        let key = self.gem_cache_key(uid, i).ok_or("no group")?;
+        let slot = &self.detail.gem_slots.0[i - 1];
+        let cache = match (&slot.cache, slot.dropped) {
+            (Some(c), true) => c.clone(),
+            (None, true) => return unported("in a list dropped without a cache"),
+            (Some(c), false) if c.key == key => c.clone(),
+            _ => {
+                let row = self.group_row(uid).ok_or("no group")?;
+                let (_, _, order) = self.gem_select_rows((row + 1) as f64, i as f64, false)?;
+                SortCache { key, order }
+            }
+        };
+        let data = &self.data.game.skills;
+        let first = match first_match(data, &cache.order, text) {
+            Ok(f) => f,
+            Err(_) => return unported("that is no pattern"),
+        };
+        let s = &mut self.detail.gem_slots.0[i - 1];
+        s.name = text.to_string();
+        s.dropped = true;
+        s.cache = Some(cache);
+        let gem = first.as_ref().and_then(|id| data.gem(id));
+        let matches = gem.is_some_and(|g| engine::pat::lower(&g.name) == engine::pat::lower(text));
+        let gem_id = gem
+            .filter(|_| engine::pat::is_match(text, "%S"))
+            .map(|g| g.id.clone());
+        // `gemChangeFunc(gemId, addUndo, focusLost, bufMatchesGem)`
+        let char_level = self.build.info.character_level;
+        let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
+        let default_level = tab.default_gem_level;
+        let quality = if self.gem_quality_nil {
+            0.0
+        } else {
+            tab.default_gem_quality
+        };
+        let g = tab
+            .socket_group_list_mut()
+            .and_then(|l| l.iter_mut().find(|g| g.uid.0 == uid))
+            .ok_or("no group")?;
+        let s = &mut self.detail.gem_slots.0[i - 1];
+        if i > g.gem_list.len() {
+            let Some(_) = &gem_id else {
+                return Ok(json!([]));
+            };
+            if i > g.gem_list.len() + 1 {
+                return unported("past the slot after the last gem");
+            }
+            g.gem_list.push(GemInstance {
+                name_spec: String::new(),
+                level: Some(1.0),
+                quality: Some(quality),
+                enabled: true,
+                enable_global1: true,
+                enable_global2: true,
+                count: Some(1.0),
+                new: true,
+                ..GemInstance::default()
+            });
+            s.level = "1".into();
+            s.quality = lua_num(quality);
+            s.enabled = true;
+            s.global1 = true;
+            s.global2 = true;
+            s.count = "1".into();
+        } else if gem_id == g.gem_list[i - 1].gem_id {
+            if matches {
+                self.rebuild()?;
+            }
+            return Ok(json!([]));
+        }
+        let gem = &mut g.gem_list[i - 1];
+        gem.gem_id = gem_id;
+        gem.skill_id = None;
+        process_socket_group(g, data);
+        let gem = &mut g.gem_list[i - 1];
+        // `ProcessGemLevel(gemInstance.gemData)` fails without data
+        let Some(d) = gem.gem.clone() else {
+            return unported("without gem data");
+        };
+        let level = process_gem_level(&d, false, default_level, char_level);
+        gem.level = Some(level);
+        gem.natural_max_level = Some(level);
+        s.level = lua_num(level);
+        s.count = lua_num(gem.count.unwrap_or(1.0));
+        if matches {
+            self.rebuild()?;
+        }
+        Ok(json!([]))
     }
 }

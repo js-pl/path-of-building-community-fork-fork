@@ -5442,3 +5442,107 @@ fn skills_sockets_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// Choosing gems by name in the Skills tab's gem slots, in the typed session
+/// as in the translated one: exact names, prefixes, initials, tags, no
+/// match, the slot after the last gem, and a name after a gem list
+#[test]
+fn skills_gem_select_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let parts = ["Name", "Level", "Quality", "Enable", "Count", "ErrMsg"];
+    let paths: Vec<String> = (1..=7)
+        .flat_map(|i| parts.iter().map(move |p| format!("skills.gemSlot{i}{p}")))
+        .collect();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 13 == 2)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        let n = groups[k]["gems"].as_array().map_or(0, Vec::len);
+        let name = |i: usize| format!("gemSlot{i}Name");
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c(&name(1), json!({"text": "fireball"})),
+            c(&name(1), json!({"text": "Arc"})),
+            c(&name(2), json!({"text": "ctf"})),
+            c(&name(2), json!({"text": "fire"})),
+            c(&name(2), json!({"text": "added lig"})),
+            c(&name(n + 1), json!({"text": "Faster Attacks"})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+            c(&name(n + 2), json!({"text": "melee"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // A name chosen after the slot's gem list, sorted by DPS
+        let r = json!({"cmd": "gemList", "group": k + 1, "slot": 3});
+        let (t, tr) = (
+            answer(d.request(&r.to_string()), "typed"),
+            answer(d.translated_request(&r.to_string()), "translated"),
+        );
+        // A candidate's calculation can fail upstream, which leaves its gem
+        // in the slot; the typed calculation does not fail
+        if tr.get("error").is_some() {
+            eprintln!("{id}: gemList failed in the translation: {}", tr["error"]);
+            continue;
+        }
+        diff(&t, &tr, &format!("{id} {r}"), &mut out);
+        check(&mut d, "gem list", &mut out);
+        for r in [
+            c(&name(3), json!({"text": "support"})),
+            c(&name(3), json!({"text": "a"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
