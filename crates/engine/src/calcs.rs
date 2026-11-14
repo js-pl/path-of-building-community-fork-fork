@@ -325,7 +325,9 @@ pub fn calc_full_dps_with(
         };
         let unchanged = same(&bases.0, &first_bases.0) && same(&bases.1, &first_bases.1);
         let (b, mut env) = match first.take() {
-            Some(e) => (build.clone(), e),
+            // The build the first setup left: it holds the override's
+            // items (`REP_ITEM_ID`) that the skill's lookups find
+            Some(e) => (set_up.clone(), e),
             None if reuse && unchanged => (set_up.clone(), first_env.clone()),
             None => {
                 let mut b = build.clone();
