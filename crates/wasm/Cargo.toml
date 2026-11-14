@@ -11,10 +11,11 @@ publish.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["translation"]
+default = []
 # Commands the typed engine does not have yet fall back to upstream's
-# translated program; without it they are "not ported" errors and the
-# module holds neither the translation nor the Lua runtime
+# translated program; without it (the default, as the browser ships it) they
+# are "not ported" errors and the module holds neither the translation nor
+# the Lua runtime
 translation = ["session/translation"]
 
 [dependencies]

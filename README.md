@@ -48,10 +48,10 @@ The web app (needs `rustup target add wasm32-unknown-unknown` and Node 22):
 ```sh
 cd web
 npm install
-npm run build:wasm   # public/engine.wasm
+npm run build:wasm   # public/engine.wasm, the typed engine (--translation: with upstream's translated program)
 npm run build:data   # public/data, generated from the submodule, never committed
 npm run dev
-npm test             # the wasm engine against the native one (cargo build --release -p cli first)
+npm test             # the wasm engine against the translation (cargo build --release -p cli first)
 ```
 
 ## License

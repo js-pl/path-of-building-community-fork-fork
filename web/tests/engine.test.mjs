@@ -1,7 +1,7 @@
 // The browser engine (public/engine.wasm with public/data, see
 // scripts/build-wasm.mjs and scripts/build-data.mjs) run under Node: it
-// starts, loads a corpus build, and gives the same sidebar as the native
-// engine (`pob serve`). Built without the translation (--typed), commands
+// starts, loads a corpus build, and gives the same sidebar as upstream's
+// translated program (`pob serve --translated`). Built without the translation (--typed), commands
 // the typed engine does not have are "not ported" errors.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -58,7 +58,7 @@ async function engine() {
 }
 
 function native(reqs) {
-  const out = execFileSync(join(root, "target/release/pob"), ["serve"], { input: reqs.map((r) => JSON.stringify(r)).join("\n") + "\n", maxBuffer: 1 << 28 });
+  const out = execFileSync(join(root, "target/release/pob"), ["serve", "--translated"], { input: reqs.map((r) => JSON.stringify(r)).join("\n") + "\n", maxBuffer: 1 << 28 });
   return out.toString().trim().split("\n").map((l) => JSON.parse(l));
 }
 

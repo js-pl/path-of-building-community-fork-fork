@@ -110,9 +110,10 @@ web/ (TypeScript, Preact)               crates/
   running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.
-  The cargo feature `translation` (on by default in `session` and `wasm`)
-  links the translated program as the fallback of commands the typed
-  engine does not have; built without it (`build-wasm.mjs --typed`), the
+  The cargo feature `translation` (off by default in `wasm`, on in
+  `session` for the CLI and the tests) links the translated program as the
+  fallback of commands the typed engine does not have
+  (`build-wasm.mjs --translation`); built without it, as shipped, the
   module holds neither the translation nor the Lua runtime's interpreter,
   and those commands are `not ported: <cmd>` errors.
 - **Workers.** One engine instance per worker, communicating by messages: a
