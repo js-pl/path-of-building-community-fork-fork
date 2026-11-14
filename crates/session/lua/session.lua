@@ -220,7 +220,19 @@ end
 -- the label upstream draws next to each
 local function layoutControls(controls, prefix, filter)
 	local out = { }
-	for name, control in pairs(controls) do
+	-- By name, not in `pairs` order: positioning a control runs the size
+	-- functions of the controls it is anchored to, which can change their
+	-- labels (the Party tab's notes wrap when their width is first asked),
+	-- so the order must not depend on the string hash
+	local names = { }
+	for name in pairs(controls) do
+		if type(name) == "string" then
+			t_insert(names, name)
+		end
+	end
+	table.sort(names)
+	for _, name in ipairs(names) do
+		local control = controls[name]
 		-- Labels of other controls go with them
 		local labelOf = type(name) == "string" and control._className == "LabelControl" and controls[(name:gsub("Label(%d*)$", "%1"))]
 		if labelOf == control then
@@ -263,7 +275,8 @@ local function layoutControls(controls, prefix, filter)
 	end
 	table.sort(out, function(a, b)
 		if a.y ~= b.y then return a.y < b.y end
-		return a.x < b.x
+		if a.x ~= b.x then return a.x < b.x end
+		return a.path < b.path
 	end)
 	for _, d in ipairs(out) do
 		d.x, d.y = nil, nil

@@ -195,16 +195,18 @@ of them, so each difference is one between the translation and LuaJIT):
   oracle's LuaJIT has to run with a fixed seed and the typed engine learn
   LuaJIT's string order; unordered comparison is the practical option,
   since table keys hash by address.
-- **The Party view's help label** is wrapped word by word on LuaJIT and not
-  on the translation: `layoutControls` in `session.lua` iterates the
-  controls with `pairs` and reads a label before positioning the controls
-  anchored to it, whose position runs the label's width function, which
-  wraps it. Our session script's bug, not upstream's: lay the controls out
-  before describing them.
+- **The Party view's help label** was wrapped word by word on LuaJIT and
+  not on the translation: `layoutControls` in `session.lua` iterated the
+  controls with `pairs`, and positioning a control runs the size functions
+  of those it is anchored to, which wrap the label. Our session script's
+  bug, fixed: it goes through the controls by name and breaks ties of
+  position by path. The Party view now agrees but for the enemy modifiers
+  label's order.
 - **Build codes:** zlib and miniz compress differently; compare decoded
   codes.
 - **To investigate:** the party phase's stats with imported party members
   (sidebar and `Ignite*` outputs differ on a few builds), a gem's DPS in
-  one `gemList` sort, and a transfigured gem name after `saveDisplayItem`
-  (`Vaal Righteous Fire` against `... of Arcane Devotion`); each may be
+  one `gemList` sort, and transfigured gem names (`Vaal Righteous Fire`
+  against `... of Arcane Devotion` after `saveDisplayItem`, `Explosive
+  Trap` against `... of Shrapnel` as a breakdown row's source); each may be
   order-dependent too.
