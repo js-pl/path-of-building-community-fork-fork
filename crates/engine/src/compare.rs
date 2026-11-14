@@ -22,13 +22,16 @@ use crate::power::PowerStat;
 /// each item's slots (`{ repSlotName, repItem }`, or `{ toggleFlask }` /
 /// `{ toggleTincture }`), in the order the tree's slots list them. An item
 /// that fits no slot keeps `-inf`, as upstream's `-math.huge` does.
+/// `full_dps` is `useFullDPS ~= false or build.viewMode == "TREE"` of
+/// `calcFunc`, with the sort's `useFullDPS = stat == "FullDPS"`
+/// ([`uses_full_dps`]).
 pub fn item_power(
     calc: &MiscCalculator,
     items: Vec<Vec<Override>>,
     stat: &PowerStat,
+    full_dps: bool,
     threads: Threads,
 ) -> Vec<Result<f64>> {
-    let full_dps = is_full_dps(stat);
     parallel::map(items, threads, |slots| {
         let mut best = f64::NEG_INFINITY;
         for ovr in slots {
@@ -71,13 +74,15 @@ pub struct GemCandidate<'t> {
 /// `TotalDPS`, ...), when swapped into the display socket group. A gem swap
 /// changes the socket group, not something a `CalcOverride` expresses, so
 /// each candidate is a build of its own ([`MiscCalculator::calculate_on`]).
+/// `full_dps` is `useFullDPS ~= false or build.viewMode == "TREE"` of
+/// `calcFunc`, with `useFullDPS = field == "FullDPS"`.
 pub fn gem_power(
     calc: &MiscCalculator,
     cands: Vec<GemCandidate>,
     field: &str,
+    full_dps: bool,
     threads: Threads,
 ) -> Vec<Result<f64>> {
-    let full_dps = field == "FullDPS";
     parallel::map(cands, threads, |cand| {
         let out = calc.calculate_on(&cand.build, &Override::default(), full_dps)?;
         Ok(gem_dps(&out, field))
@@ -90,15 +95,14 @@ pub fn base_gem_dps(calc: &MiscCalculator, field: &str) -> f64 {
     gem_dps(calc.base(), field)
 }
 
-/// Whether the stat needs Full DPS recalculated (`useFullDPS = stat ==
-/// "FullDPS"` of the item and gem sorts)
-fn is_full_dps(stat: &PowerStat) -> bool {
+/// The item sort's `useFullDPS`: whether the stat is Full DPS
+pub fn uses_full_dps(stat: &PowerStat) -> bool {
     stat.stat.as_deref() == Some("FullDPS")
 }
 
 /// `(dpsField == "FullDPS" and output[dpsField]) or (output.Minion and
 /// output.Minion.CombinedDPS) or output[dpsField] or 0`
-fn gem_dps(out: &CalcOutput, field: &str) -> f64 {
+pub fn gem_dps(out: &CalcOutput, field: &str) -> f64 {
     if field == "FullDPS"
         && let Some(v) = out.num(field)
     {

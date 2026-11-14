@@ -363,8 +363,8 @@ impl<'a> Perform<'a> {
         let cfg = self.cfg(i);
         let spell = self.mf("Spell");
         let attack = self.mf("Attack");
-        // Add addition stat bonuses
-        let str_bonus = self.str_dmg_bonus.unwrap_or(0.0);
+        // Add addition stat bonuses: the skill's own actor's
+        let str_bonus = self.str_dmg_bonus.get(&actor).copied().unwrap_or(0.0);
         if self.c.flag(list, None, &["IronGrip"])? {
             let flags = attack | self.mf("Projectile");
             self.c.add(

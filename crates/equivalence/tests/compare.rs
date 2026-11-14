@@ -209,8 +209,20 @@ fn item_power_matches_upstream() {
                     .collect()
             })
             .collect();
-        let seq = compare::item_power(&calc, overrides.clone(), &stat, Threads::Sequential);
-        let par = compare::item_power(&calc, overrides, &stat, Threads::Pool(4));
+        let seq = compare::item_power(
+            &calc,
+            overrides.clone(),
+            &stat,
+            compare::uses_full_dps(&stat),
+            Threads::Sequential,
+        );
+        let par = compare::item_power(
+            &calc,
+            overrides,
+            &stat,
+            compare::uses_full_dps(&stat),
+            Threads::Pool(4),
+        );
 
         let mut typed = BTreeMap::new();
         let mut want = BTreeMap::new();
@@ -268,6 +280,8 @@ const SUPPORTS: &[&str] = &[
     "Faster Casting",
     "Elemental Focus",
     "Increased Area of Effect",
+    "Iron Grip",
+    "Corrupting Cry",
 ];
 
 #[test]
@@ -375,8 +389,20 @@ fn gem_power_matches_upstream() {
         }
         let full_dps = field == "FullDPS";
 
-        let seq = compare::gem_power(&calc, typed_slice(&typed_cands), field, Threads::Sequential);
-        let par = compare::gem_power(&calc, typed_slice(&typed_cands), field, Threads::Pool(4));
+        let seq = compare::gem_power(
+            &calc,
+            typed_slice(&typed_cands),
+            field,
+            full_dps,
+            Threads::Sequential,
+        );
+        let par = compare::gem_power(
+            &calc,
+            typed_slice(&typed_cands),
+            field,
+            full_dps,
+            Threads::Pool(4),
+        );
 
         // Lua: swap each gem into the main group and read the field
         let lsg = get(&lskills, "socketGroupList");
@@ -416,6 +442,30 @@ fn gem_power_matches_upstream() {
             };
             gl.set(Value::Number(idx), Value::Nil);
             want.insert(key, number(gem_field(&out, field)));
+            // The whole output of the calculation with the gem
+            if let Ok(o) = calc.calculate_on(&typed_cands[i].build, &Override::default(), full_dps)
+            {
+                let mut f = Vec::new();
+                equivalence::outputs::compare(
+                    &format!("gem {i} output"),
+                    &equivalence::outputs::typed_outputs(&o.player),
+                    &equivalence::outputs::lua_outputs(&out),
+                    &mut f,
+                );
+                let lm = get(&out, "Minion");
+                match (&o.minion, lm.is_nil()) {
+                    (None, true) => {}
+                    (Some(m), false) => equivalence::outputs::compare(
+                        &format!("gem {i} minion output"),
+                        &equivalence::outputs::typed_outputs(m),
+                        &equivalence::outputs::lua_outputs(&lm),
+                        &mut f,
+                    ),
+                    (m, _) => f.push(format!("gem {i}: typed minion {}", m.is_some())),
+                }
+                f.truncate(10);
+                failures.extend(f.into_iter().map(|f| format!("{id}: {f}")));
+            }
         }
         gems_compared += want.len();
         let mut fail = Vec::new();

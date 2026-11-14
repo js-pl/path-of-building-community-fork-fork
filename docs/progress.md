@@ -153,8 +153,30 @@ What remains for the full migration, in order:
    results do not depend on the thread count; `tests/fast_path.rs`
    compares 1 and 4 threads with the sequential path).
    Item, gem and anoint comparisons are on the calculator
-   (`engine::compare`, see Done); still to do: wiring them into the typed
-   session, and the Full DPS skills of one calculation on threads.
+   (`engine::compare`, see Done); the typed session sorts the anoint
+   popup and the Skills tab's gem dropdown (`gemList` of a group's gem
+   slot, `session::typed::gem_select`) and the Items tab's item databases
+   (`controls` of `items.uniqueDB`, `items.rareDB` and their inputs:
+   `ItemDBControl`'s filters, list and sort by a stat, a database flask
+   or tincture toggled through `Override::toggle_item`, the leagues and
+   item types `LoadLeaguesAndTypes` adds when the list is first used, and
+   `items.selectDB`, which list shows; `session::typed::item_db_list`)
+   with them; the session test's `power`
+   phase compares them. The Full DPS skills of one calculation on threads were
+   tried (#100, closed) and are not worth it at current pass times: each
+   skill calculated ahead from the first setup and taken only where the
+   skills before it left the same base databases and cache, identical
+   results, but a Full DPS pass takes 5 to 45 ms and the gain was 0.85x
+   to 1.7x per build and within noise over the corpus, for speculative
+   runs and state matching in the Full DPS path (branch
+   `claude/full-dps-threads`).
+   Comparing the gem dropdown found two engine gaps, fixed: Iron Grip and
+   Iron Will add the skill's own actor's strength damage bonus (a
+   minion's for a minion's skill), and the typeless `mod(name, nil, ...)`
+   of Corrupting Cry Support's stat map, which no query finds upstream, is
+   left out instead of failing every calculation with the support.
+   `tests/compare.rs` compares each gem candidate's whole player and
+   minion outputs with the translation's.
 4. `Data.lua` into the importer, so no Lua runs at load: `crates/gamedata`
    makes the typed data at build time (`engine::game_data::GameData` and
    one `PassiveTree` per tree version, in `engine::codec`'s binary form),

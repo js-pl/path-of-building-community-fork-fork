@@ -80,6 +80,12 @@ local function findControl(path)
 	if not control then
 		error("no control " .. tostring(path))
 	end
+	-- An item database's leagues and item types, which its first draw
+	-- loads
+	local db = control._className == "ItemDBControl" and control or (outer and list[outer])
+	if db and db._className == "ItemDBControl" and not db.leaguesAndTypesLoaded then
+		db:LoadLeaguesAndTypes()
+	end
 	return control
 end
 
@@ -89,6 +95,9 @@ local function listLabel(value)
 	end
 	return tostring(value)
 end
+
+-- Builds a list control's list now (defined below)
+local buildList
 
 local function describeControl(control)
 	local c = { class = control._className }
@@ -110,6 +119,15 @@ local function describeControl(control)
 		c.val = control.val
 	elseif control._className == "LabelControl" then
 		c.label = control:GetProperty("label")
+	elseif control._className == "ItemDBControl" then
+		-- The items the filters let through, in the sort's order, each with
+		-- its power by the sort's stat
+		-- Drawing the tab updates the jewel sockets' activity first
+		build().itemsTab:UpdateSockets()
+		buildList(control)
+		c.list = arrayOf(control.list, function(item)
+			return { name = item.name, power = control.sortDetail and control.sortDetail.stat and item.measuredPower or nil }
+		end)
 	end
 	local label = control.label
 	if type(label) == "string" and c.label == nil then
@@ -123,8 +141,9 @@ local function describeControl(control)
 	return c
 end
 
--- A list a coroutine builds as it draws (NotableDBControl), built now
-local function buildList(control)
+-- A list a coroutine builds as it draws (NotableDBControl, ItemDBControl),
+-- built now
+function buildList(control)
 	if control.ListBuilder and (control.listBuildFlag or control.listOutputRevision ~= build().outputRevision) then
 		control.listBuildFlag = false
 		control.listBuilder = nil
@@ -845,7 +864,51 @@ function api.removeGem(req)
 end
 
 -- Gem names for the gem picker, as GemSelectControl lists them
-function api.gemList()
+-- A gem slot's dropdown (GemSelectControl) of a socket group: its gems in
+-- their order, each with its DPS in the slot (DPSBuilder) and whether it
+-- supports the group's skills
+local function gemSelectList(req)
+	local tab = build().skillsTab
+	local group = tab.socketGroupList[req.group]
+	if not group then
+		error("no socket group " .. tostring(req.group))
+	end
+	local prev = tab.displayGroup
+	tab:SetDisplayGroup(group)
+	local slot = tab.gemSlots[req.slot]
+	if not slot then
+		error("no gem slot " .. tostring(req.slot))
+	end
+	local control = slot.nameSpec
+	control.sortCache = nil
+	control:UpdateSortCache()
+	control:BuildList("")
+	control:DPSBuilder()
+	local cache = control.sortCache
+	local gems = { }
+	for _, gemId in ipairs(control.list) do
+		local gem = control.gems[gemId]
+		if gem then
+			t_insert(gems, {
+				id = gem.id,
+				name = gem.name,
+				dps = cache.dps[gemId],
+				canSupport = cache.canSupport[gemId] and true or false,
+			})
+		end
+	end
+	if prev then
+		tab:SetDisplayGroup(prev)
+	else
+		tab.displayGroup = nil
+	end
+	return { baseDps = cache.baseDPS, gems = setmetatable(gems, { __jsontype = "array" }) }
+end
+
+function api.gemList(req)
+	if req and req.group and req.slot then
+		return gemSelectList(req)
+	end
 	local out = { }
 	for _, gem in pairs(build().data.gems) do
 		if not gem.grantedEffect.unsupported then

@@ -161,7 +161,7 @@ const PARTY_BUFFS: [&str; 7] = [
 ];
 
 impl TypedSession<'_> {
-    fn section(&self, name: &str) -> Option<&Element> {
+    pub(super) fn section(&self, name: &str) -> Option<&Element> {
         self.root.child("PathOfBuilding")?.child(name)
     }
 

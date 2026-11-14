@@ -6,7 +6,7 @@
 
 use crate::build::Build;
 use crate::calc_items::{EnergyBlade, ItemsInput};
-use crate::calc_override::{Allocation, Override, REP_ITEM_ID};
+use crate::calc_override::{Allocation, Override, REP_ITEM_ID, TOGGLE_ITEM_ID};
 use crate::calc_setup::{self, BaseInput, BuffMode, SetupData};
 use crate::calc_skill_mods::{self, ModsInput};
 use crate::calc_skills::{self, SkillsInput, SkillsSetup};
@@ -235,6 +235,14 @@ fn init_env_for(
             .items
             .items
             .insert(REP_ITEM_ID, std::sync::Arc::new(item));
+    }
+    if let Some(item) = &ovr.toggle_item {
+        let mut item = item.clone();
+        item.id = Some(TOGGLE_ITEM_ID as f64);
+        build
+            .items
+            .items
+            .insert(TOGGLE_ITEM_ID, std::sync::Arc::new(item));
     }
     match init_env_pass(build, data, calc_mode, base, ovr, false, cached.clone())? {
         Some(env) => Ok(env),

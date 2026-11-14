@@ -86,7 +86,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 12] = [
+const PHASES: [(&str, usize); 13] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -99,6 +99,7 @@ const PHASES: [(&str, usize); 12] = [
     ("party", 2),
     ("new", 1),
     ("overlays", 2),
+    ("power", 2),
 ];
 
 /// The typed engine's commands against the translated session's: the
@@ -159,10 +160,140 @@ fn typed_session_matches_translated() {
         "overlays" => overlays_match(data, &mut d),
         "party" => party_match(data, &mut d),
         "new" => new_build_matches(&mut d),
+        "power" => power_sorts_match(&mut d),
         _ => panic!("unknown phase {phase}"),
     }
     at_build(&mut d, "");
     report_fallbacks(phase);
+}
+
+/// The Skills tab's gem dropdown sorted by DPS (`gemList` of a group's
+/// gem slot: `GemSelectControl`'s list, each gem's DPS in the slot) and the
+/// Items tab's item databases (`controls` of `items.uniqueDB` sorted by a
+/// stat and searched, its inputs, `items.rareDB` searched) give the
+/// translation's, on every eighth corpus build
+fn power_sorts_match(d: &mut Dispatcher) {
+    let (mut failures, mut compared, mut items_compared) = (Vec::new(), 0, 0);
+    let (mut t_typed, mut t_tr) = (Duration::ZERO, Duration::ZERO);
+    let builds: Vec<_> = corpus().into_iter().step_by(8).collect();
+    for (n, (id, path)) in mine(builds).into_iter().enumerate() {
+        at_build(d, &id);
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let group = skills["ok"]["mainSocketGroup"].as_f64().unwrap_or(1.0);
+        let gems = skills["ok"]["groups"][group as usize - 1]["gems"]
+            .as_array()
+            .map_or(0, Vec::len);
+        let slot = if n % 2 == 0 && gems >= 2 { 2 } else { gems + 1 };
+        let req = json!({"cmd": "gemList", "group": group, "slot": slot}).to_string();
+        d.typed_error = None;
+        let t = Instant::now();
+        let typed = answer(d.request(&req), "typed gemList");
+        t_typed += t.elapsed();
+        if let Some(e) = d.typed_error.take() {
+            failures.push(format!("{id}: gemList fell back: {e}"));
+            continue;
+        }
+        let t = Instant::now();
+        let tr = answer(d.translated_request(&req), "translated gemList");
+        t_tr += t.elapsed();
+        if let Ok(dir) = std::env::var("SESSION_DUMP") {
+            for (k, v) in [("typed", &typed), ("translated", &tr)] {
+                std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
+            }
+        }
+        let mut out = Vec::new();
+        diff(&typed, &tr, &format!("gemList {group}/{slot}"), &mut out);
+        if !out.is_empty() {
+            let n = out.len();
+            out.truncate(10);
+            failures.push(format!("{id}: {n} differences\n    {}", out.join("\n    ")));
+        }
+        compared += 1;
+        // The unique database sorted by a stat, its search limiting it to a
+        // few items (one a flask), and the rare one searched
+        const SEARCHES: [&str; 6] = ["kaom", "atziri", "doryani", "lioneye", "berek", "rigwald"];
+        const SORTS: [usize; 5] = [3, 12, 2, 15, 1];
+        let edits = [
+            json!({"cmd": "control", "path": "items.uniqueDB.search", "text": SEARCHES[n % SEARCHES.len()]}),
+            json!({"cmd": "control", "path": "items.uniqueDB.sort", "sel": SORTS[n % SORTS.len()]}),
+            json!({"cmd": "control", "path": "items.rareDB.search", "text": "amulet"}),
+            // An item type and a league `LoadLeaguesAndTypes` adds
+            json!({"cmd": "control", "path": "items.uniqueDB.type", "sel": if n % 4 == 1 { 6 + n % 7 } else { 1 }}),
+            json!({"cmd": "control", "path": "items.uniqueDB.league", "sel": if n % 3 == 2 { 3 + n % 5 } else { 1 }}),
+            json!({"cmd": "control", "path": "items.rareDB.type", "sel": 6 + n % 9}),
+        ];
+        for e in &edits {
+            let r = answer(d.request(&e.to_string()), "item db control");
+            if let Some(err) = d.typed_error.take() {
+                failures.push(format!("{id}: {e}: fell back: {err}"));
+            }
+            assert!(r.get("error").is_none(), "{id}: {e}: {r}");
+        }
+        let paths = [
+            "items.uniqueDB",
+            "items.rareDB",
+            "items.uniqueDB.sort",
+            "items.uniqueDB.search",
+            "items.uniqueDB.slot",
+            "items.uniqueDB.type",
+            "items.uniqueDB.league",
+            "items.uniqueDB.requirement",
+            "items.uniqueDB.obtainable",
+            "items.uniqueDB.searchMode",
+            "items.rareDB.search",
+            "items.rareDB.sort",
+            "items.rareDB.type",
+            "items.selectDB",
+        ];
+        let req = json!({"cmd": "controls", "paths": paths}).to_string();
+        // Then with the rare templates selected
+        for (k, select) in [None, Some(2)].into_iter().enumerate() {
+            if let Some(sel) = select {
+                let e = json!({"cmd": "control", "path": "items.selectDB", "sel": sel});
+                answer(d.request(&e.to_string()), "selectDB");
+                if let Some(err) = d.typed_error.take() {
+                    failures.push(format!("{id}: selectDB fell back: {err}"));
+                }
+            }
+            let t = Instant::now();
+            let typed = answer(d.request(&req), "typed item db");
+            t_typed += t.elapsed();
+            if let Some(e) = d.typed_error.take() {
+                failures.push(format!("{id}: item db fell back: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&req), "translated item db");
+            t_tr += t.elapsed();
+            let mut out = Vec::new();
+            diff(&typed, &tr, &format!("itemDb {k}"), &mut out);
+            if !out.is_empty() {
+                let n = out.len();
+                out.truncate(10);
+                failures.push(format!(
+                    "{id}: {n} item db differences\n    {}",
+                    out.join("\n    ")
+                ));
+            }
+            if k == 0 {
+                items_compared += typed["ok"]["items.uniqueDB"]["list"]
+                    .as_array()
+                    .map_or(0, Vec::len);
+            }
+        }
+    }
+    eprintln!(
+        "{compared} gem lists and item databases compared ({items_compared} unique rows): typed {t_typed:.1?}, translated {t_tr:.1?}"
+    );
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 /// Node tooltips of tattooed nodes and of the nodes timeless jewels
