@@ -1036,6 +1036,48 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .flat_map(|s| s["vars"].as_array().unwrap())
         .collect();
     if rng.below(5) == 0 {
+        // The custom modifier groups: the shown ones' controls (found by
+        // asking the translation, as their indices follow every control
+        // the tab made), a new group
+        let paths: Vec<String> = (1000..1200)
+            .map(|n| format!("configTab.{n}.textEdit"))
+            .collect();
+        let tr = answer(
+            d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+            "translated controls",
+        );
+        let shown: Vec<String> = tr["ok"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .filter(|(_, c)| c["shown"] == J::Bool(true))
+                    .map(|(p, _)| p.trim_end_matches(".textEdit").to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if shown.is_empty() || rng.below(5) == 0 {
+            return json!({"cmd": "control", "path": "configTab.customModsAddBlock", "click": true});
+        }
+        let b = &shown[rng.below(shown.len())];
+        let texts = [
+            "",
+            "10% increased Damage",
+            "+50 to maximum Life\nAdds 1 to 2 Fire Damage",
+            "nonsense line",
+        ];
+        return match rng.below(5) {
+            0 => json!({"cmd": "control", "path": format!("{b}.deleteBtn"), "click": true}),
+            1 => json!({"cmd": "control", "path": format!("{b}.titleEdit"), "text": "Renamed"}),
+            2 => {
+                json!({"cmd": "control", "path": format!("{b}.enableCheck"), "state": rng.below(2) == 0})
+            }
+            3 => json!({"cmd": "controlTooltip", "path": format!("{b}.enableCheck")}),
+            _ => {
+                json!({"cmd": "control", "path": format!("{b}.textEdit"), "text": texts[rng.below(texts.len())]})
+            }
+        };
+    }
+    if rng.below(5) == 0 {
         // The tab's search, Show All Configurations and the set
         // drop-down, which the tab fills when it draws
         return match rng.below(4) {
@@ -1095,6 +1137,34 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             }
         }
     }
+}
+
+/// `controls` of the shown custom modifier groups and Add Mod Group
+fn compare_custom_mod_groups(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    let paths: Vec<String> = (1000..1200).map(|n| format!("configTab.{n}")).collect();
+    let tr = answer(
+        d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+        "translated controls",
+    );
+    let mut paths = vec!["configTab.customModsAddBlock".to_string()];
+    for (p, c) in tr["ok"].as_object().into_iter().flatten() {
+        if c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl" {
+            paths.push(p.clone());
+            for inner in [
+                "textEdit",
+                "titleEdit",
+                "enableCheck",
+                "deleteBtn",
+                "addModBtn",
+            ] {
+                paths.push(format!("{p}.{inner}"));
+            }
+        }
+    }
+    let q = json!({"cmd": "controls", "paths": paths}).to_string();
+    let t = answer(d.request(&q), "typed controls");
+    let tr = answer(d.translated_request(&q), "translated controls");
+    diff(&t, &tr, &format!("{label} custom modifier groups"), out);
 }
 
 /// Random sequences of Configuration tab edits, class changes and undo
@@ -1168,8 +1238,9 @@ fn config_edits_match(d: &mut Dispatcher) {
                 }
                 break;
             }
-            if typed.get("error").is_some() {
-                // An error changes nothing: the translation's own answer
+            if typed.get("error").is_some() || req["cmd"] == "controlTooltip" {
+                // An error changes nothing, nor does a tooltip: the
+                // translation's own answer
                 let tr = answer(d.translated_request(&r), "translated edit");
                 diff(&typed, &tr, &label, &mut out);
             }
@@ -1177,6 +1248,7 @@ fn config_edits_match(d: &mut Dispatcher) {
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            compare_custom_mod_groups(d, &label, &mut out);
             // An allocated mastery's tooltip with the class change popup
             // open compares reallocating it
             let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
@@ -4944,6 +5016,103 @@ fn spectre_library_match() {
             json!({"cmd": "popupButton", "name": "cancel"}),
             c("build.mainSkillMinionLibrary", json!({"click": true})),
             json!({"cmd": "closePopup"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's socket group list, in the typed session as in the
+/// translated one: rows, selection, rows' tooltips, New, Delete with its
+/// confirmation, the Delete key, Delete All and reordering
+#[test]
+fn skills_group_list_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupList",
+        "skills.groupList.new",
+        "skills.groupList.delete",
+        "skills.groupList.deleteAll",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 11 == 3)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            let n = t["ok"]["skills.groupList"]["list"]
+                .as_array()
+                .map_or(0, Vec::len);
+            for index in 0..=n + 1 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.groupList", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |v: J| {
+            let mut r = json!({"cmd": "control", "path": "skills.groupList"});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            c(json!({"sel": 2})),
+            c(json!({"sel": 99})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"sel": 1, "moveTo": 4})),
+            c(json!({"sel": 3, "moveTo": 1})),
+            c(json!({"sel": 2})),
+            c(json!({"path": "skills.groupList.delete", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"sel": 1})),
+            c(json!({"key": "DELETE"})),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "pasteSocketGroup", "text": "Label: Pasted\r\nFireball 20/0 Default  1\r\n"}),
+            c(json!({"sel": 1, "click": true})),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "closePopup"}),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"path": "skills.groupList.new", "click": true})),
         ] {
             step(&mut d, r, &mut out);
         }

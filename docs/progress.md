@@ -471,8 +471,16 @@ What remains for the full migration, in order:
    `ifSkill...`, `legacy`, "recently" and the like in the label); the set
    drop-down is filled only when the tab draws, so selecting in it headless
    changes nothing. `config_edits_match` mixes them into its edits. The
-   custom modifier groups' controls (`customModsAddBlock`, the blocks)
-   stay on the translation. A radius jewel's
+   custom modifier groups' controls are typed too: Add Mod Group and each
+   shown group's title, enable box, text and delete button, its
+   `controls` and the enable box's tooltip (the stats with the group
+   toggled; its two `BuildModList`s set `buildFlag` through the options'
+   notified placeholders, so the frame calculates again). The groups'
+   controls are `configTab.<index>`, after every control the tab made: two
+   per section, one per option and its label, then each
+   `UpdateCustomModsControls` appends one per group of the active set (the
+   old ones stay, hidden; `ConfigUi::blocks`). Add Mod (its mod browser)
+   and the hidden groups' controls stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -680,6 +688,16 @@ What remains for the full migration, in order:
      by name, the search by names, skills or both, the rows' tooltips,
      adding (Add, a double click, a drag), reordering, Remove and Delete,
      and Save.
+     The Skills tab's socket group list (`session::typed::group_list`,
+     `skills_group_list_match`): rows (labels with their gem colours,
+     disabled, active and Full DPS marks), the selection, which shows the
+     group (`SetDisplayGroup`), the rows' tooltips (empty for a group the
+     sidebar's calculation never listed), New, Delete with its
+     confirmation (an empty group goes at once), the Delete key and
+     Delete All. Upstream holds the shown group and the selection by
+     reference; socket groups carry an identity (`GroupUid`, which clones
+     keep and equality ignores) for them. Every rebuild clamps the Calcs
+     tab's skill to the list, as the Calcs tab's calculation does.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem
