@@ -13,7 +13,7 @@ mod uniques;
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
 use engine::config_tab::OptionDefault;
-use engine::game_data::GameData;
+use engine::game_data::{GameData, TreeVersion};
 use engine::item_data::ItemData;
 use engine::mod_parser::{ModParser, ParserData};
 use engine::skill_data::SkillData;
@@ -76,6 +76,38 @@ impl Source {
             return Err("treeVersionList is empty".into());
         }
         Ok(versions)
+    }
+
+    /// `treeVersions` of `GameVersions.lua`: each version's display, number
+    /// and link prefix
+    pub fn tree_version_info(&self, versions: &[String]) -> Result<Vec<TreeVersion>> {
+        let mut im = self.importer();
+        im.load("GameVersions", vec![]).map_err(|e| e.to_string())?;
+        let all = im.global("treeVersions");
+        let all = all.as_table().ok_or("no treeVersions")?;
+        versions
+            .iter()
+            .map(|v| {
+                let t = all.get_str(v);
+                let t = t
+                    .as_table()
+                    .ok_or_else(|| format!("no treeVersions[{v}]"))?;
+                let s = |k: &str| {
+                    t.get_str(k)
+                        .as_str()
+                        .map(|s| s.to_str_lossy().into_owned())
+                        .ok_or_else(|| format!("treeVersions[{v}].{k}"))
+                };
+                Ok(TreeVersion {
+                    display: s("display")?,
+                    num: t
+                        .get_str("num")
+                        .as_number()
+                        .ok_or_else(|| format!("treeVersions[{v}].num"))?,
+                    url: s("url")?,
+                })
+            })
+            .collect()
     }
 
     /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
@@ -234,6 +266,7 @@ impl Source {
             option_defaults: self.option_defaults()?,
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
+            tree_version_info: self.tree_version_info(&versions)?,
             tree_versions: versions,
             uniques: self.uniques()?,
             rares: self.rares()?,

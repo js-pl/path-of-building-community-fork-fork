@@ -2004,8 +2004,14 @@ fn drive_popups(
                 .into_iter()
                 .filter(|c| c["enabled"] == true)
                 .collect();
-            for b in &buttons {
+            for b in buttons.iter().filter(|b| *b != "shrink") {
                 inputs.push(json!({"class": "PopupButton", "name": b}));
+            }
+            if title == "Manage Passive Trees" {
+                // Import Tree, Export Tree and Done have no name
+                for k in 2..=4 {
+                    inputs.push(json!({"class": "ButtonControl", "path": format!("popup.{k}")}));
+                }
             }
             if inputs.is_empty() {
                 continue;
@@ -2067,6 +2073,8 @@ fn drive_popups(
                 json!({"cmd": "popupButton", "name": c["name"]})
             } else if class == "ButtonControl" {
                 json!({"cmd": "control", "path": path, "click": true})
+            } else if class == "EditControl" && title == "Import Tree" && path == "popup.edit" {
+                json!({"cmd": "control", "path": path, "text": tree_link(d, rng)})
             } else if class == "EditControl" {
                 let text = ["New set", "", " ", "Alt {1}", "Default", "Copy"][rng.below(6)];
                 json!({"cmd": "control", "path": path, "text": text})
@@ -2335,6 +2343,45 @@ fn specs_as_urls(xml: &str) -> String {
 }
 
 /// Standard base64 with padding
+/// A tree link for Import Tree: the build's allocated nodes under another
+/// class, on one of the sites and versions the popup reads, or a broken one
+fn tree_link(d: &mut Dispatcher, rng: &mut Lcg) -> String {
+    let st = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+    let nodes: Vec<u64> = st["ok"]["alloc"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(J::as_u64)
+        .filter(|n| *n < 65536)
+        .take(40)
+        .collect();
+    let (version, class) = match rng.below(8) {
+        0 => (7, 1),
+        1 => (6, 9),
+        k => (if k == 2 { 4 } else { 6 }, rng.below(7) as u8),
+    };
+    let mut b: Vec<u8> = vec![0, 0, 0, version, class, rng.below(4) as u8];
+    b.push(nodes.len() as u8);
+    for n in &nodes {
+        b.push((n / 256) as u8);
+        b.push((n % 256) as u8);
+    }
+    b.extend([0, 0]);
+    let code = base64(&b).replace('+', "-").replace('/', "_");
+    let prefix = [
+        "https://www.pathofexile.com/passive-skill-tree/",
+        "https://www.pathofexile.com/passive-skill-tree/3.15.0/",
+        "https://www.pathofexile.com/fullscreen-passive-skill-tree/3.25.0/",
+        "https://www.pathofexile.com/passive-skill-tree/2.6.2/",
+        "https://poeskilltree.com/?v=3.20.0#",
+        "https://www.pathofexile.com/passive-skill-tree/ruthless/",
+    ][rng.below(6)];
+    if rng.below(8) == 0 {
+        return format!("{prefix}AAAA");
+    }
+    format!("{prefix}{code}")
+}
+
 fn base64(b: &[u8]) -> String {
     const A: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut s = String::new();
@@ -3576,5 +3623,95 @@ fn shared_lists_survive_a_fallback() {
         compare_views(&mut d, &["state", "items"], &r.to_string(), &mut out);
     }
     compare_saves(&mut d, "shared", &mut out);
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Manage Passive Trees' Import Tree with links of each kind the popup
+/// reads (and broken ones), and Export Tree, on a few builds
+#[test]
+fn tree_links_import_and_export() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    for (k, (id, path)) in corpus().into_iter().step_by(17).take(4).enumerate() {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let mut rng = Lcg(seed(&id) + 5);
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            compare_views(
+                d,
+                &["state", "treeSpecs", "treeState"],
+                &format!("{id} {r}"),
+                out,
+            );
+        };
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": "items.specButton", "click": true}),
+            &mut out,
+        );
+        for i in 0..4 {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "popup.2", "click": true}),
+                &mut out,
+            );
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "popup.name", "text": format!("Imported {i}")}),
+                &mut out,
+            );
+            let link = tree_link(&mut d, &mut rng);
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "popup.edit", "text": link}),
+                &mut out,
+            );
+            step(
+                &mut d,
+                json!({"cmd": "popupButton", "name": "import"}),
+                &mut out,
+            );
+            let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if st["ok"]["popups"][0]["title"] == "Import Tree" {
+                step(
+                    &mut d,
+                    json!({"cmd": "popupButton", "name": "cancel"}),
+                    &mut out,
+                );
+            }
+        }
+        compare_views(&mut d, &["outputs"], &format!("{id} imported"), &mut out);
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": "popup.3", "click": true}),
+            &mut out,
+        );
+        step(
+            &mut d,
+            json!({"cmd": "popupButton", "name": "copy"}),
+            &mut out,
+        );
+        step(
+            &mut d,
+            json!({"cmd": "popupButton", "name": "done"}),
+            &mut out,
+        );
+        step(
+            &mut d,
+            json!({"cmd": "control", "path": "popup.4", "click": true}),
+            &mut out,
+        );
+        if k == 0 {
+            step(&mut d, json!({"cmd": "undo"}), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

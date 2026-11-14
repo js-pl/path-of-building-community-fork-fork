@@ -654,23 +654,32 @@ impl<'t> PassiveSpec<'t> {
     /// are left for `PostLoad`, and cluster nodes, which the spec does not
     /// have yet, are dropped.
     pub fn decode_url(&mut self, url: &str) -> Result<()> {
+        self.decode_url_message(url).map(|_| ())
+    }
+
+    /// `DecodeURL(url)` with the message it returns for a link it rejects
+    pub fn decode_url_message(&mut self, url: &str) -> Result<Option<String>> {
         let url = match url.rfind('/') {
             Some(i) if i > 0 => &url[i + 1..],
             _ => url,
         };
         let b = base64_decode(&url.replace('-', "+").replace('_', "/"));
         if b.len() < 6 {
-            return Ok(());
+            return Ok(Some("Invalid tree link (unrecognised format)".into()));
         }
         let byte = |i: usize| b.get(i - 1).copied().map_or(0, usize::from);
         let ver = (byte(1) << 24) + (byte(2) << 16) + (byte(3) << 8) + byte(4);
         if ver > 6 {
-            return Ok(());
+            return Ok(Some(format!(
+                "Invalid tree link (unknown version number '{ver}')"
+            )));
         }
         let class_id = byte(5) as i64;
         let ascendancy_ids = if ver >= 4 { byte(6) } else { 0 };
         if self.class(class_id).is_err() {
-            return Ok(());
+            return Ok(Some(format!(
+                "Invalid tree link (bad class ID '{class_id}')"
+            )));
         }
         self.reset_nodes();
         self.select_class(class_id)?;
@@ -688,13 +697,13 @@ impl<'t> PassiveSpec<'t> {
         let nodes_end = (ver >= 5).then(|| 7 + byte(7) * 2);
         self.allocate_decoded_nodes(&sub(nodes_start, nodes_end), 0);
         let Some(nodes_end) = nodes_end else {
-            return Ok(());
+            return Ok(None);
         };
         let cluster_start = nodes_end + 1;
         let cluster_end = cluster_start + byte(cluster_start) * 2;
         self.allocate_decoded_nodes(&sub(cluster_start + 1, Some(cluster_end)), 65536);
         if ver < 6 {
-            return Ok(());
+            return Ok(None);
         }
         let mastery_start = cluster_end + 1;
         let mastery_end = mastery_start + byte(mastery_start) * 4;
@@ -714,7 +723,7 @@ impl<'t> PassiveSpec<'t> {
                 self.mastery_selections.insert(id, f64::from(effect));
             }
         }
-        Ok(())
+        Ok(None)
     }
 
     /// `AllocateDecodedNodes(nodes, isCluster, "big")`

@@ -1000,7 +1000,7 @@ fn save_spec(spec: &engine::spec::PassiveSpec) -> X {
 }
 
 /// `PassiveSpec:EncodeURL(prefix)`
-fn encode_url(spec: &engine::spec::PassiveSpec, prefix: &str) -> String {
+pub(super) fn encode_url(spec: &engine::spec::PassiveSpec, prefix: &str) -> String {
     use engine::tree::NodeType;
     let class = spec.cur_class_id.unwrap_or(0);
     let ascend = spec.cur_ascend_class_id.unwrap_or(0);

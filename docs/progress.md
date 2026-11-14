@@ -576,7 +576,16 @@ What remains for the full migration, in order:
      classes), Rename and F2 with the name popup, Delete with its
      confirmation; the undo states move with the specs. A tattooed
      spec's copy keeps its tattoos (the undo state's `hashOverrides`;
-     phase `overlays` copies the tattoo variants' specs). Rows dragged
+     phase `overlays` copies the tattoo variants' specs). Import Tree
+     and Export Tree (`session::typed::tree_import`, the popup's unnamed
+     `popup.2` and `popup.3`, Done `popup.4`): a link of the official
+     tree's or poeskilltree's format, its version validated as
+     `validateTreeVersion` does (`treeVersions`' numbers and links are
+     game data now), decoded into a new spec that becomes the active one,
+     or the message `DecodeURL` returns for a broken one; the active
+     spec's link (`EncodeURL` with its version's prefix). PoEURL links,
+     shrinking and poeplanner's format need the network or are not ported
+     (`tree_links_import_and_export`, and the popup driver). Rows dragged
      within a list reorder it (`control` with `sel` and `moveTo`, which
      the translated session runs as ListControl's drop on a mutable
      list does, `session::typed::list_order`): the item list while

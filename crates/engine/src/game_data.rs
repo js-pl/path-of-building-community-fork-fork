@@ -23,6 +23,8 @@ pub struct GameData {
     pub jewel_radius: Vec<String>,
     /// `treeVersionList`, oldest first; the last is the latest
     pub tree_versions: Vec<String>,
+    /// `treeVersions[v]` of each of `tree_versions`
+    pub tree_version_info: Vec<TreeVersion>,
     /// `data.uniques`: each type's item texts, in `pairs` order, with the
     /// uniques `Generated.lua` adds before a tree loads as `generated`
     pub uniques: Vec<(String, Vec<String>)>,
@@ -74,6 +76,7 @@ crate::codec_struct!(GameData {
     config_vars,
     jewel_radius,
     tree_versions,
+    tree_version_info,
     uniques,
     rares,
     item_base_lists,
@@ -105,4 +108,26 @@ impl GameData {
     pub fn latest_tree_version(&self) -> &str {
         self.tree_versions.last().map_or("", String::as_str)
     }
+
+    /// `defaultTreeVersion`: the version multiple trees came with
+    pub fn default_tree_version(&self) -> &str {
+        self.tree_versions.get(1).map_or("", String::as_str)
+    }
+
+    /// `treeVersions[v]`
+    pub fn tree_version(&self, v: &str) -> Option<&TreeVersion> {
+        let i = self.tree_versions.iter().position(|x| x == v)?;
+        self.tree_version_info.get(i)
+    }
 }
+
+/// `treeVersions[v]`: a tree version's name, number and the official
+/// tree's link prefix
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TreeVersion {
+    pub display: String,
+    pub num: f64,
+    pub url: String,
+}
+
+crate::codec_struct!(TreeVersion { display, num, url });
