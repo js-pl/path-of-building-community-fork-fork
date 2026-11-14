@@ -52,6 +52,8 @@ pub struct DetailControls {
     count: String,
     /// The gem slots' texts and states
     pub gem_slots: super::gem_slots::GemSlots,
+    /// The imbued support box's list state
+    pub imbued_box: super::gem_slots::SlotTexts,
 }
 
 impl Default for DetailControls {
@@ -63,6 +65,7 @@ impl Default for DetailControls {
             full_dps: false,
             count: String::new(),
             gem_slots: Default::default(),
+            imbued_box: Default::default(),
         }
     }
 }
