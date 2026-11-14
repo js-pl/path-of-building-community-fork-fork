@@ -328,6 +328,14 @@ impl<'d> Dispatcher<'d> {
                 let req = req.clone();
                 self.edit(json, |s| s.item_editor_control(&req))
             }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_db_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_db_control(&req))
+            }
             "control" => {
                 let req = req.clone();
                 self.edit(json, |s| s.control(&req))

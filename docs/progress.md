@@ -155,8 +155,12 @@ What remains for the full migration, in order:
    Item, gem and anoint comparisons are on the calculator
    (`engine::compare`, see Done); the typed session sorts the anoint
    popup and the Skills tab's gem dropdown (`gemList` of a group's gem
-   slot, `session::typed::gem_select`) with them; the item database sort
-   is still to do. The Full DPS skills of one calculation on threads were
+   slot, `session::typed::gem_select`) and the Items tab's item databases
+   (`controls` of `items.uniqueDB`, `items.rareDB` and their inputs:
+   `ItemDBControl`'s filters, list and sort by a stat, a database flask
+   or tincture toggled through `Override::toggle_item`,
+   `session::typed::item_db_list`) with them; the session test's `power`
+   phase compares them. The Full DPS skills of one calculation on threads were
    tried (#100, closed) and are not worth it at current pass times: each
    skill calculated ahead from the first setup and taken only where the
    skills before it left the same base databases and cache, identical
