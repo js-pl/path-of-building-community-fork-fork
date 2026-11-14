@@ -19,6 +19,18 @@ impl TypedSession<'_> {
         if to == 0 || index.fract() != 0.0 {
             return Err(format!("{NOT_PORTED}: spec {}", pat::num(index)));
         }
+        self.switch_spec(to)?;
+        self.rebuild()?;
+        // Manage Passive Trees marks the active spec
+        if !self.editor.popups.is_empty() {
+            self.refresh_item_popups();
+        }
+        Ok(json!([]))
+    }
+
+    /// `SetActiveSpec(to)` without its calculation: the spec swapped in,
+    /// the sockets' jewels kept with the spec they were in
+    pub(super) fn switch_spec(&mut self, to: usize) -> Result<()> {
         let from = self.specs.0;
         if to != from {
             let next = self.other_specs[to - 1].clone().ok_or("no spec")?;
@@ -34,16 +46,17 @@ impl TypedSession<'_> {
             self.other_specs[to - 1] = None;
             self.specs.0 = to;
         }
+        self.spec_activated()
+    }
+
+    /// The end of `SetActiveSpec`: the slots populated, the version
+    /// drop-down on the spec's version, the loadouts synced
+    pub(super) fn spec_activated(&mut self) -> Result<()> {
         if !self.build.items.item_order_list.is_empty() {
             self.populate_slots();
         }
-        self.sync_loadouts()?;
-        self.rebuild()?;
-        // Manage Passive Trees marks the active spec
-        if !self.editor.popups.is_empty() {
-            self.refresh_item_popups();
-        }
-        Ok(json!([]))
+        self.select_current_version();
+        self.sync_loadouts()
     }
 
     /// `selectConfigSet`: `ConfigTab:SetActiveConfigSet(id)`

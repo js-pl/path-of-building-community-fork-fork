@@ -3282,35 +3282,75 @@ fn tree_controls_match(d: &mut Dispatcher) {
         }
         let mut rng = Lcg(seed(&id));
         let mut out = Vec::new();
-        for step in 0..8 {
+        let mut power_compared = false;
+        for step in 0..12 {
             if !out.is_empty() {
                 break;
             }
             let path = |name: &str| format!("tree.{name}");
-            let req = match rng.below(9) {
-                0 | 1 => {
-                    let s =
-                        ["", "fire", "Life", "(increased.fire.damage|area)", "%d+"][rng.below(5)];
-                    json!({"cmd": "control", "path": path("treeSearch"), "text": s})
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let popup = state["ok"]["popups"]
+                .as_array()
+                .and_then(|p| p.first())
+                .cloned();
+            let req = if let Some(p) = popup {
+                // A button of the popup in front
+                let names: Vec<&str> = p["buttons"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|b| b["name"].as_str())
+                    .collect();
+                json!({"cmd": "popupButton", "name": names[rng.below(names.len())]})
+            } else if rng.below(3) == 0 {
+                // Reset, the version drop-down and the conversions
+                match rng.below(4) {
+                    0 => json!({"cmd": "control", "path": path("reset"), "click": true}),
+                    1 => {
+                        json!({"cmd": "control", "path": path("versionSelect"), "sel": rng.below(41) + 1})
+                    }
+                    2 => json!({"cmd": "control", "path": path("specConvert"), "click": true}),
+                    _ => json!({"cmd": "control", "path": path("specConvertAll"), "click": true}),
                 }
-                2 => {
-                    json!({"cmd": "control", "path": path("treeHeatMap"), "state": rng.below(3) != 0})
+            } else {
+                match rng.below(9) {
+                    0 | 1 => {
+                        let s = ["", "fire", "Life", "(increased.fire.damage|area)", "%d+"]
+                            [rng.below(5)];
+                        json!({"cmd": "control", "path": path("treeSearch"), "text": s})
+                    }
+                    2 => {
+                        json!({"cmd": "control", "path": path("treeHeatMap"), "state": rng.below(3) != 0})
+                    }
+                    3 | 4 => {
+                        json!({"cmd": "control", "path": path("nodePowerMaxDepthSelect"), "sel": rng.below(6) + 1})
+                    }
+                    5 => {
+                        let s = ["3", "", "12", "x"][rng.below(4)];
+                        json!({"cmd": "control", "path": path("nodePowerMaxDepthCustom"), "text": s})
+                    }
+                    6 => json!({"cmd": "control", "path": path("powerReport"), "click": true}),
+                    7 => {
+                        let n =
+                            ["specSelect", "compareSelect", "treeHeatMapStatSelect"][rng.below(3)];
+                        json!({"cmd": "control", "path": path(n), "sel": rng.below(4) + 1})
+                    }
+                    _ => json!({"cmd": "control", "path": path("compareCheck"), "state": true}),
                 }
-                3 | 4 => {
-                    json!({"cmd": "control", "path": path("nodePowerMaxDepthSelect"), "sel": rng.below(6) + 1})
-                }
-                5 => {
-                    let s = ["3", "", "12", "x"][rng.below(4)];
-                    json!({"cmd": "control", "path": path("nodePowerMaxDepthCustom"), "text": s})
-                }
-                6 => json!({"cmd": "control", "path": path("powerReport"), "click": true}),
-                7 => {
-                    let n = ["specSelect", "compareSelect", "treeHeatMapStatSelect"][rng.below(3)];
-                    json!({"cmd": "control", "path": path(n), "sel": rng.below(4) + 1})
-                }
-                _ => json!({"cmd": "control", "path": path("compareCheck"), "state": true}),
             };
             let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
+            // Node power within the depth chosen, before the first
+            // conversion (see `docs/progress.md` on converted General's
+            // Cry builds)
+            let converts = matches!(req["name"].as_str(), Some("convert" | "convertCopy"))
+                || req["path"] == "tree.specConvert";
+            if converts && !power_compared {
+                compare_node_power(d, &mut out);
+                power_compared = true;
+            }
             let r = req.to_string();
             let typed = answer(d.request(&r), "typed tree control");
             if !d.typed_active() {
@@ -3324,7 +3364,12 @@ fn tree_controls_match(d: &mut Dispatcher) {
                 diff(&typed, &tr, &label, &mut out);
             }
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
-            compare_views(d, &["state", "outputs"], &label, &mut out);
+            compare_views(
+                d,
+                &["state", "outputs", "treeSpecs", "treeState"],
+                &label,
+                &mut out,
+            );
             let q = json!({"cmd": "controlTooltip", "path": path(names[rng.below(names.len())])})
                 .to_string();
             let t = answer(d.request(&q), "typed tooltip");
@@ -3332,12 +3377,21 @@ fn tree_controls_match(d: &mut Dispatcher) {
             diff(&t, &tr, &format!("{label} {q}"), &mut out);
             steps += 1;
         }
+        // Popups stay open over the next build's load in upstream: closed
+        for _ in 0..4 {
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if state["ok"]["popups"]
+                .as_array()
+                .is_none_or(|p| p.is_empty())
+            {
+                break;
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
+        }
         if out.is_empty() {
-            // Node power within the depth chosen
-            let q = r#"{"cmd":"nodePower","index":1}"#;
-            let t = answer(d.request(q), "typed nodePower");
-            let tr = answer(d.translated_request(q), "translated nodePower");
-            diff(&t, &tr, "nodePower", &mut out);
+            if !power_compared {
+                compare_node_power(d, &mut out);
+            }
             compare_saves(d, &format!("{id} after the tree controls"), &mut out);
         }
         if !out.is_empty() {
@@ -3357,6 +3411,14 @@ fn tree_controls_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// `nodePower` of the first power stat, typed against translated
+fn compare_node_power(d: &mut Dispatcher, out: &mut Vec<String>) {
+    let q = r#"{"cmd":"nodePower","index":1}"#;
+    let t = answer(d.request(q), "typed nodePower");
+    let tr = answer(d.translated_request(q), "translated nodePower");
+    diff(&t, &tr, "nodePower", out);
 }
 
 /// The first characters of a request, for a failure's label

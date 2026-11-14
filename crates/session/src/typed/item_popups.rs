@@ -65,6 +65,17 @@ pub enum ItemPopup {
     RenameSet(Box<super::item_sets::RenameSet>),
     ImportTree(Box<super::tree_import::ImportTree>),
     ExportTree(Box<super::tree_import::ExportTree>),
+    /// The Tree tab's Reset Tree/Tattoos
+    ResetTree,
+    /// `TreeTab:OpenVersionConvertPopup(version, true)`
+    ConvertVersion(String),
+    /// `TreeTab:OpenVersionConvertAllPopup(version)`
+    ConvertAll(String),
+    /// `main:OpenMessagePopup(title, msg)`: the message's lines and Ok
+    Message {
+        title: String,
+        lines: Vec<String>,
+    },
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
         title: String,
@@ -384,6 +395,32 @@ impl<'d> TypedSession<'d> {
                 self.rename_set_cancel(&p);
                 self.close_item_popup();
             }
+            (ItemPopup::ResetTree, "reset") => {
+                // `ResetNodes`, `BuildAllDependsAndPaths`, `AddUndoState`,
+                // `buildFlag`, then `main:ClosePopup()`
+                self.reset_tree()?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ResetTree, "removeTattoo") => {
+                self.remove_all_tattoos()?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertVersion(v), "convert" | "convertCopy") => {
+                self.convert_to_version(&v, name == "convert", false, true)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertVersion(_), "cancel") => {
+                // `versionSelect:SelByValue(spec.treeVersion, 'value')`
+                self.select_current_version();
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertAll(v), "convert") => {
+                self.convert_all_to_version(&v)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::Message { .. }, "close") => {
+                self.close_item_popup();
+            }
             (ItemPopup::Anoint(_), "close") | (_, "cancel") => {
                 self.close_item_popup();
             }
@@ -600,6 +637,41 @@ impl<'d> TypedSession<'d> {
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::ImportTree(p) => self.describe_import_tree(p),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
+            ItemPopup::ResetTree => json!({
+                "title": "Reset Tree/Tattoos",
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "removeTattoo", "label": "Remove All Tattoos", "enabled": true },
+                    { "name": "reset", "label": "Reset Tree", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::ConvertVersion(v) => json!({
+                "title": format!("Convert to Version {}", self.tree_display(v)),
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "convert", "label": "Convert", "enabled": true },
+                    { "name": "convertCopy", "label": "Copy + Convert", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::ConvertAll(v) => json!({
+                "title": format!("Convert all to Version {}", self.tree_display(v)),
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "convert", "label": "Convert", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::Message { title, lines } => json!({
+                "title": title,
+                "lines": lines,
+                "buttons": [{ "name": "close", "label": "Ok", "enabled": true }],
+                "controls": [],
+            }),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,
                 "lines": lines,
