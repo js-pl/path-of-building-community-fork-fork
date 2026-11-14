@@ -686,6 +686,14 @@ What remains for the full migration, in order:
      reference; socket groups carry an identity (`GroupUid`, which clones
      keep and equality ignores) for them. Every rebuild clamps the Calcs
      tab's skill to the list, as the Calcs tab's calculation does.
+     The shown group's controls (`session::typed::group_detail`,
+     `skills_group_detail_match`): label, socketed-in slot (with its
+     tooltips; an imbued support moves with the group to a slot without
+     one), enabled, Full DPS, an item's group's count and the note on its
+     source. Upstream sets their texts and states only when it shows a
+     group and when they are edited, so they are kept as such. The
+     imbued support, the sockets line with Optimise Sockets and the gem
+     slots stay on the translation.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

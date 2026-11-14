@@ -59,6 +59,7 @@ impl<'d> TypedSession<'d> {
         self.display_group = match (row, list) {
             (Some(i), Some(list)) if i < list.len() => {
                 process_socket_group(&mut list[i], data);
+                self.detail.show(&list[i]);
                 Some(list[i].uid.0)
             }
             _ => None,
