@@ -4848,8 +4848,11 @@ impl<'a> Perform<'a> {
                         let mut l = scaled(&buff.mod_list, mult * stack_count, precision);
                         let count = self.sd_num(j, "stackCount");
                         if count.is_some() || stack_var.is_some() {
+                            // Invariant: no minion skill in upstream's data has a
+                            // debuff with a stackVar but no stackCount (upstream
+                            // would add a mod without a value)
                             let count = count
-                                .ok_or("not ported: a minion's debuff without a stack count")?;
+                                .ok_or("invariant: a minion's debuff without a stack count")?;
                             l.push(src(&format!("Multiplier:{bname}Stack"), Base, count, bname));
                         }
                         merge_buff(&l, debuffs, bname)?;
