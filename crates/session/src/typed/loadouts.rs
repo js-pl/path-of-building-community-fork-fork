@@ -11,7 +11,7 @@
 use super::item_list::Loadouts;
 use super::{Result, TypedSession};
 
-const META: [&str; 5] = [
+pub(super) const META: [&str; 5] = [
     "^7^7Loadouts:",
     "^7^7-----",
     "^7^7New Loadout",
@@ -176,11 +176,9 @@ impl<'d> TypedSession<'d> {
             self.open_new_loadout();
             return self.loadout_set_sel(1);
         }
-        if META.contains(&value) {
-            return Err(format!(
-                "{}: the loadouts' {value} entry",
-                super::NOT_PORTED
-            ));
+        if value == META[4] {
+            self.open_help();
+            return self.loadout_set_sel(1);
         }
         let link = engine::pat::capture(value, "%{(%w+)%}");
         let missing = || "attempt to index a nil value".to_string();

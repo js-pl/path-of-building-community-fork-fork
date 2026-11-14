@@ -708,7 +708,20 @@ What remains for the full migration, in order:
      first group in a slot of the set used), Craft item... and Create
      custom... (Edit Item Text, empty without an item), and the Manage...
      buttons' descriptions. Trade for these items and Buy similar query
-     the trade site and stay on the translation.
+     the trade site and stay on the translation. Porting them needs
+     network access from the session (upstream's `launch:DownloadPage`,
+     asynchronous, with `TradeQueryRateLimiter`'s rate limits and the
+     POESESSID the user gives) and the trade API: `api/trade/data/static`
+     and `api/trade/data/stats` (the stat ids, which
+     `TradeQueryGenerator` maps the item's mods to and caches as
+     `QueryMods.lua`), `api/trade/search/<league>` and
+     `api/trade/fetch/...` for the results (`TradeQuery`,
+     `TradeQueryRequests`), the leagues and realms (`PoEAPI`), and the
+     DPS of each result's item in the slot to sort and weigh them
+     (`TradeQuery`'s item comparison, a misc calculation per item). Buy
+     similar (`displayItemBuySimilar`, `CompareBuySimilar`) builds a
+     search URL from the item's mods and opens it (`OpenURL`), which a
+     web session would hand to the browser.
      The build's own controls (`session::typed::build_controls`,
      `build_controls_match`): the view mode buttons, the loadouts
      drop-down with New Loadout's name popup (a latest-tree spec and an
@@ -718,7 +731,17 @@ What remains for the full migration, in order:
      area level, from `data.monsterExperienceLevelMap`, which gamedata
      now derives), the main socket group and the minion drop-down, and
      the descriptions of Back, Save, Save As and Manage Spectres....
-     Their clicks (and Help >>) stay unported, but for Manage
+     Their clicks (`build_buttons_match`), where the session has no
+     file and stays in the build: Save and Save As give the build's XML
+     (`saveXml`) and count the changes as saved (`SaveDBFile` with the
+     XML as the file), Back without changes reports the build closed
+     (`{"closed": true}`, `CloseBuild`), Back with changes opens Save
+     Changes (Cancel, Don't Save, which reports it closed, and Save,
+     which saves and reports it closed), and the loadouts' Help >> shows
+     the help file's Loadouts section (`help.txt`, which upstream's About
+     popup shows). The translated session cannot do these (file access,
+     leaving the build): the dispatcher replays none of them on it, and
+     Save Changes' buttons as the popup's closing. Before that, Manage
      Spectres...: the Spectre Library (`session::typed::spectre_library`,
      `spectre_library_match`) with the build's spectres and all spectres
      by name, the search by names, skills or both, the rows' tooltips,

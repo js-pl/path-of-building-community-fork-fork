@@ -757,15 +757,22 @@ impl<'d> Dispatcher<'d> {
         json: &str,
         f: impl FnOnce(&mut TypedSession<'d>) -> crate::typed::Result<J>,
     ) -> Option<String> {
+        // What the translation replays, as the build was before
+        let replay = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|req| self.typed.as_ref()?.translation_replay(&req));
         let r = f(self.typed.as_mut()?);
         match r {
             // The translation fails the same way, before changing the build
             Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
                 #[cfg(feature = "translation")]
-                if self.translated.is_some() {
-                    self.pending.push(json.to_string());
+                if self.translated.is_some()
+                    && let Some(r) = &replay
+                {
+                    self.pending.push(r.to_string());
                 }
+                let _ = &replay;
                 let _ = json;
                 Some(ok(v))
             }
