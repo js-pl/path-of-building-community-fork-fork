@@ -73,7 +73,7 @@ fn oracle() -> bool {
 /// LuaJIT does not reproduce between runs (its string hash is seeded per
 /// process), in a canonical order: breakdown rows, tree connectors, the
 /// base-type lines of an item's text (`{variant:..}` runs), the party's
-/// enemy modifiers. Build codes are compared decoded (zlib and miniz
+/// enemy modifiers and exported mods (`<value>|Skill:..` runs). Build codes are compared decoded (zlib and miniz
 /// compress differently).
 fn unordered(v: &mut J) {
     match v {
@@ -102,7 +102,7 @@ fn unordered(v: &mut J) {
                     if enemy_mods {
                         !l.starts_with("---") && !l.starts_with("^7---")
                     } else {
-                        l.trim_start().starts_with("{variant:")
+                        l.trim_start().starts_with("{variant:") || l.contains("|Skill:")
                     }
                 };
                 let start = i;
@@ -2150,6 +2150,12 @@ fn with_party(xml: &str, buffs: &[(String, String)]) -> String {
 /// exported mod line that differs only by the typed source being the
 /// tree's is aligned. The number of lines so aligned.
 fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
+    let (mut typed, mut tr) = (J::String(typed.into()), J::String(tr.into()));
+    if oracle() {
+        unordered(&mut typed);
+        unordered(&mut tr);
+    }
+    let (typed, tr) = (typed.as_str().unwrap(), tr.as_str().unwrap());
     let mut aligned = 0;
     if typed.lines().count() != tr.lines().count() {
         out.push("saveXml differs in its number of lines".into());

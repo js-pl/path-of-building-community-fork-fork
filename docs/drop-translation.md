@@ -202,11 +202,23 @@ of them, so each difference is one between the translation and LuaJIT):
   bug, fixed: it goes through the controls by name and breaks ties of
   position by path. The Party view now agrees but for the enemy modifiers
   label's order.
-- **Build codes:** zlib and miniz compress differently; compare decoded
-  codes.
-- **To investigate:** the party phase's stats with imported party members
-  (sidebar and `Ignite*` outputs differ on a few builds), a gem's DPS in
-  one `gemList` sort, and transfigured gem names (`Vaal Righteous Fire`
-  against `... of Arcane Devotion` after `saveDisplayItem`, `Explosive
-  Trap` against `... of Shrapnel` as a breakdown row's source); each may be
-  order-dependent too.
+- **Build codes:** zlib and miniz compress differently; compared decoded.
+- **Compared unordered against the oracle:** the session test puts what
+  upstream gives in `pairs` order into a canonical order when the oracle is
+  the reference (`unordered` in `tests/typed.rs`): breakdown rows, tree
+  connectors, runs of `{variant:..}` base-type lines, the party's enemy
+  modifiers and exported mods. With it, 24 of 33 shards agree with the
+  oracle (all of `commands`, `skills`, `save`, `items`, `new`, `overlays`,
+  `power`; `tree` and `config` too).
+- **Left to explain** (each a real difference, or upstream choosing between
+  equals in `pairs` order):
+  - with imported party members, a few builds' sidebar and `Ignite*`
+    outputs (a party curse's `SelfIgniteChance` is applied on one side);
+  - transfigured gem names: `Vaal Righteous Fire` against `... of Arcane
+    Devotion` as a breakdown row's source and in a saved gem;
+  - unique flavour text: two uniques (`Duskblight`, a flask) show different
+    lore lines;
+  - a connector of the 3.21 tree's Necromancer ascendancy, drawn as an arc
+    on one side and a line on the other;
+  - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
+    another order.
