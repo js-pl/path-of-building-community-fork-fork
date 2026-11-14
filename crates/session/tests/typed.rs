@@ -1349,6 +1349,12 @@ fn items_edits_match(d: &mut Dispatcher) {
                 let e = d.typed_error.clone().unwrap_or_default();
                 assert!(e.starts_with("not ported"), "{id}: {label} {r}: {e}");
                 skipped.push(format!("{id}: {r}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's own assert leaves its session broken for
+                    // the builds after: a fresh one for them
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
                 break;
             }
             let t = Instant::now();
