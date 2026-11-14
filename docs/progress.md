@@ -435,7 +435,19 @@ What remains for the full migration, in order:
    `clearInputText` leaves `actor.modDB`). `party_controls_match`
    changes them at random on party builds (about 260 edits) and compares
    the tab, sidebar, outputs, a control's tooltip and the saved file.
-   Downloading a linked build stays on the translation. A radius jewel's
+   Downloading a linked build stays on the translation. The Tree tab's
+   controls that open no popup are typed (`typed/tree_tab.rs`): the
+   search (saved as `TreeView`'s `searchStr`; one other than the saved
+   leaves the build unsaved, as `Build:OnFrame` counts
+   `treeTab.searchFlag`), the heat map, its node power depth (which
+   `nodePower` then searches within) and the power report's toggle; the
+   spec, compare and heat map stat drop-downs get their lists only when
+   the tab draws, so selecting in them headless changes nothing, and the
+   compare checkbox's spec only the drawing reads. `tree_controls_match`
+   (in the `tree` phase) changes them at random on every fourth build and
+   compares the sidebar, outputs, tooltips, node power and the saved
+   file. Reset, version conversion, spec conversion and Find Timeless
+   Jewel (popups) stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).

@@ -41,6 +41,7 @@ mod spec_sets;
 pub mod tooltip;
 mod tree;
 mod tree_import;
+mod tree_tab;
 mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
@@ -312,6 +313,8 @@ pub struct TypedSession<'d> {
     party_laid_out: std::cell::Cell<bool>,
     /// The Party tab once its controls changed it
     party_tab: Option<party_tab::PartyTab>,
+    /// The Tree tab's search, heat map and power report
+    tree_tab: tree_tab::TreeTab,
     /// The item editor's controls
     editor: item_editor::Editor,
     /// The unique and rare item database lists' inputs
@@ -361,6 +364,7 @@ impl<'d> TypedSession<'d> {
             display_item: None,
             party_laid_out: Default::default(),
             party_tab: None,
+            tree_tab: tree_tab::TreeTab::load(&root),
             editor: Default::default(),
             item_db_lists: Default::default(),
             select_db: 1,
@@ -537,7 +541,7 @@ impl<'d> TypedSession<'d> {
         let calc = engine::calculator::MiscCalculator::new(&self.build, &data)?;
         let opts = PowerOptions {
             stat,
-            max_depth: None,
+            max_depth: self.tree_tab.max_depth,
             cluster_nodes: Vec::new(),
         };
         let p = node_power(&calc, &opts)?;
