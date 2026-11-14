@@ -4459,8 +4459,6 @@ fn build_controls_match() {
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
-            let groups = t["ok"].clone();
-            let _ = groups;
             for (path, n) in [
                 ("build.characterLevel", 1),
                 ("build.mainSocketGroup", 12),
@@ -4587,6 +4585,136 @@ fn build_controls_match() {
             &format!("{id} reloaded"),
             &mut out,
         );
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's set drop-down and gem options, in the typed session
+/// as in the translated one: their descriptions, the default level's
+/// tooltips, the gem list they change, the save, and a reload
+#[test]
+fn skills_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths: Vec<String> = [
+        "setSelect",
+        "setManage",
+        "sortGemsByDPS",
+        "sortGemsByDPSFieldControl",
+        "defaultLevel",
+        "defaultQuality",
+        "showSupportGemTypes",
+        "showLegacyGems",
+    ]
+    .iter()
+    .map(|p| format!("skills.{p}"))
+    .collect();
+    let mut builds: Vec<(String, Option<PathBuf>)> = vec![("new".into(), None)];
+    builds.extend(
+        corpus()
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| i % 17 == 0)
+            .map(|(_, (id, p))| (id, Some(p)))
+            .take(4),
+    );
+    for (id, path) in builds {
+        match path {
+            Some(path) => {
+                let xml = std::fs::read_to_string(path).unwrap();
+                answer(
+                    d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+                    "load",
+                );
+            }
+            None => {
+                answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+            }
+        }
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "skills"], &format!("{id} {label}"), out);
+            for index in 0..=6 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.defaultLevel", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        // The gem list of the slot after the main group's last gem
+        let gem_list = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["mainSocketGroup"].as_f64().unwrap_or(1.0);
+            let Some(gems) = skills["ok"]["groups"][group as usize - 1]["gems"].as_array() else {
+                return;
+            };
+            let r = json!({"cmd": "gemList", "group": group, "slot": gems.len() + 1});
+            let (t, tr) = (
+                answer(d.request(&r.to_string()), "typed"),
+                answer(d.translated_request(&r.to_string()), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} {r}"), out);
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": false}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 3}),
+            json!({"cmd": "control", "path": "skills.showLegacyGems", "state": true}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "15"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // A gem list (its calculations leave selections on the gems), then
+        // saved and loaded again
+        gem_list(&mut d, "options", &mut out);
+        compare_views(
+            &mut d,
+            &["state", "skills"],
+            &format!("{id} gem list"),
+            &mut out,
+        );
+        compare_saves(&mut d, &id, &mut out);
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        check(&mut d, "reloaded", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": true}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 20}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 0}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "abc"}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "30"}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 1}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // Not saved: which gem the list calculates last (whose selections
+        // stay) is `pairs` order over the slot's gem table, which keeps the
+        // order of an earlier, wider fill (random in LuaJIT)
+        gem_list(&mut d, "options changed", &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

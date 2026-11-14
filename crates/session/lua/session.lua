@@ -100,6 +100,18 @@ local function findControl(path)
 		tab.controls.setSelect:SetList(sets)
 		tab.controls.specSelect:SetList(build().treeTab:GetSpecList())
 	end
+	-- The Skills tab's set drop-down, whose list its draw sets
+	if host == "skills" and name == "setSelect" then
+		local tab = build().skillsTab
+		local sets = { }
+		for index, skillSetId in ipairs(tab.skillSetOrderList) do
+			t_insert(sets, tab.skillSets[skillSetId].title or "Default")
+			if skillSetId == tab.activeSkillSetId then
+				tab.controls.setSelect.selIndex = index
+			end
+		end
+		tab.controls.setSelect:SetList(sets)
+	end
 	-- An item database's leagues and item types, which its first draw
 	-- loads
 	local db = control._className == "ItemDBControl" and control or (outer and at(list, outer))
