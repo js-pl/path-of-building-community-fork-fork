@@ -275,6 +275,8 @@ pub struct TypedSession<'d> {
     other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
     /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
     item_keys: lua::ljtab::LjMap<()>,
+    /// Config sets that share their tables (a set and its copies)
+    config_aliases: Vec<Vec<f64>>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
     /// The Notes tab's text
@@ -327,6 +329,7 @@ impl<'d> TypedSession<'d> {
             show_minion_set: false,
             other_specs: Vec::new(),
             item_keys: Default::default(),
+            config_aliases: Vec::new(),
             socket_labels: HashMap::new(),
             notes: notes::load_notes(&root),
             config_controls: config::ConfigControls::new(&data.game.config_vars),

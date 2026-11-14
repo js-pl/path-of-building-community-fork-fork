@@ -1522,9 +1522,13 @@ fn items_edits_match(d: &mut Dispatcher) {
                             |path: &str| json!({"cmd": "control", "path": path, "click": true});
                         let r = match rng.below(13) {
                             12 => {
-                                // Manage Item Sets
-                                let r = json!({"cmd": "control", "path": "items.setManage", "click": true}).to_string();
-                                *popup_inputs.entry("items.setManage".into()).or_default() += 1;
+                                // Manage Item, Skill or Config Sets
+                                let path =
+                                    ["items.setManage", "skills.setManage", "configTab.setManage"]
+                                        [rng.below(3)];
+                                let r = json!({"cmd": "control", "path": path, "click": true})
+                                    .to_string();
+                                *popup_inputs.entry(path.into()).or_default() += 1;
                                 answer(d.request(&r), "manage");
                                 log.push(r);
                                 if !d.typed_active()

@@ -166,8 +166,8 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::Anoint(p), "save" | "notableDB") => {
                 self.anoint_tooltip(&mut tip, p, &name, idx)?;
             }
-            (ItemPopup::ManageItemSets(_), "setList") => {
-                return self.item_set_tooltip(index);
+            (ItemPopup::ManageSets(m), n) if n == m.kind_list() => {
+                return self.set_list_tooltip(m.kind, index);
             }
             // The other inputs and buttons have no tooltip function
             (_, _) => {

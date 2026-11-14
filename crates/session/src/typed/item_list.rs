@@ -696,7 +696,7 @@ impl<'d> TypedSession<'d> {
         match action {
             Deletion::Item(id) => self.list_delete_item(*id),
             Deletion::AllItems => self.delete_all_items(),
-            Deletion::ItemSet { index, id } => self.confirm_delete_item_set(*index, *id),
+            Deletion::Set { kind, index, id } => self.confirm_delete_set(*kind, *index, *id),
         }
     }
 
