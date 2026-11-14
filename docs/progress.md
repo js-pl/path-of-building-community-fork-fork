@@ -158,8 +158,10 @@ What remains for the full migration, in order:
    slot, `session::typed::gem_select`) and the Items tab's item databases
    (`controls` of `items.uniqueDB`, `items.rareDB` and their inputs:
    `ItemDBControl`'s filters, list and sort by a stat, a database flask
-   or tincture toggled through `Override::toggle_item`,
-   `session::typed::item_db_list`) with them; the session test's `power`
+   or tincture toggled through `Override::toggle_item`, the leagues and
+   item types `LoadLeaguesAndTypes` adds when the list is first used, and
+   `items.selectDB`, which list shows; `session::typed::item_db_list`)
+   with them; the session test's `power`
    phase compares them. The Full DPS skills of one calculation on threads were
    tried (#100, closed) and are not worth it at current pass times: each
    skill calculated ahead from the first setup and taken only where the

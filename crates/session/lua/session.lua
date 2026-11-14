@@ -80,6 +80,12 @@ local function findControl(path)
 	if not control then
 		error("no control " .. tostring(path))
 	end
+	-- An item database's leagues and item types, which its first draw
+	-- loads
+	local db = control._className == "ItemDBControl" and control or (outer and list[outer])
+	if db and db._className == "ItemDBControl" and not db.leaguesAndTypesLoaded then
+		db:LoadLeaguesAndTypes()
+	end
 	return control
 end
 

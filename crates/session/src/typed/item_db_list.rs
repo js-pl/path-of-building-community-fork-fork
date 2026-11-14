@@ -34,8 +34,7 @@ const SLOTS: [&str; 14] = [
     "Graft 1",
     "Graft 2",
 ];
-/// `typeList` before the list is drawn (`LoadLeaguesAndTypes` adds the
-/// items' types when it is)
+/// `typeList` before `LoadLeaguesAndTypes` adds the items' types
 const TYPES: [&str; 5] = [
     "Any type",
     "Armour",
@@ -43,8 +42,9 @@ const TYPES: [&str; 5] = [
     "One Handed Melee",
     "Two Handed Melee",
 ];
-/// `leagueList` before the list is drawn
+/// `leagueList` before `LoadLeaguesAndTypes` adds the items' leagues
 const LEAGUES: [&str; 2] = ["Any league", "No league"];
+const SELECT_DB: [&str; 2] = ["Uniques", "Rare Templates"];
 const REQUIREMENTS: [&str; 4] = [
     "Any requirements",
     "Current level",
@@ -106,6 +106,9 @@ fn sort_list() -> Vec<(String, Option<PowerStat>)> {
 /// Which database a path names, and the input after it
 fn parse(path: &str) -> Option<(bool, Option<&str>)> {
     let rest = path.strip_prefix("items.")?;
+    if rest == "selectDB" {
+        return Some((false, Some("selectDB")));
+    }
     let (db, input) = match rest.split_once('.') {
         Some((db, input)) => (db, Some(input)),
         None => (rest, None),
@@ -117,7 +120,7 @@ fn parse(path: &str) -> Option<(bool, Option<&str>)> {
     };
     // The rare list has no sort, league, requirement or source inputs
     let ok = match input {
-        None | Some("slot" | "type" | "search" | "searchMode") => true,
+        None | Some("slot" | "type" | "search" | "searchMode" | "selectDB") => true,
         Some("sort" | "league" | "requirement" | "obtainable") => !rare,
         Some(_) => false,
     };
@@ -136,7 +139,39 @@ fn set_sel(cur: &mut usize, sel: f64, len: usize) -> bool {
     changed
 }
 
+/// `LoadLeaguesAndTypes`: the leagues and item types of a database's
+/// items, sorted, after the lists' first entries
+fn leagues_and_types(db: &super::item_db::ItemDb) -> (Vec<String>, Vec<String>) {
+    let mut leagues = std::collections::BTreeSet::new();
+    let mut types = std::collections::BTreeSet::new();
+    for item in db.values() {
+        if let Some(l) = &item.league {
+            leagues.extend(engine::pat::gmatch1(l, " ?([%w ]+),?"));
+        }
+        if let Some(t) = &item.typ {
+            types.insert(t.clone());
+        }
+    }
+    let leagues = LEAGUES
+        .iter()
+        .map(|s| s.to_string())
+        .chain(leagues)
+        .collect();
+    let types = TYPES.iter().map(|s| s.to_string()).chain(types).collect();
+    (leagues, types)
+}
+
 impl TypedSession<'_> {
+    /// A database's league and item type lists
+    fn db_lists(&self, rare: bool) -> Result<(Vec<String>, Vec<String>)> {
+        let db = if rare {
+            self.data.rare_db()?
+        } else {
+            self.data.unique_db()?
+        };
+        Ok(leagues_and_types(db))
+    }
+
     /// Whether a control path is an item database list or one of its inputs
     pub fn is_item_db_control(path: &str) -> bool {
         parse(path).is_some()
@@ -151,8 +186,11 @@ impl TypedSession<'_> {
         let (rare, input) = parse(path).ok_or("no control")?;
         let l = self.db_list(rare);
         // The session lays the Items tab out with no height, which shows the
-        // "Import from" selector; on Uniques, only the unique list shows
-        let shown = !rare;
+        // "Import from" selector: the list it selects shows
+        let shown = self.select_db == if rare { 2 } else { 1 };
+        let (leagues, types) = self.db_lists(rare)?;
+        let leagues: Vec<&str> = leagues.iter().map(String::as_str).collect();
+        let types: Vec<&str> = types.iter().map(String::as_str).collect();
         Ok(match input {
             None => {
                 let rows = self.item_db_rows(rare)?;
@@ -164,8 +202,9 @@ impl TypedSession<'_> {
                 drop_down(&labels, l.sort, shown)
             }
             Some("slot") => drop_down(&SLOTS, l.slot, shown),
-            Some("type") => drop_down(&TYPES, l.typ, shown),
-            Some("league") => drop_down(&LEAGUES, l.league, shown),
+            Some("type") => drop_down(&types, l.typ, shown),
+            Some("league") => drop_down(&leagues, l.league, shown),
+            Some("selectDB") => drop_down(&SELECT_DB, self.select_db, true),
             Some("requirement") => drop_down(&REQUIREMENTS, l.requirement, shown),
             Some("obtainable") => drop_down(&OBTAINABLE, l.obtainable, shown),
             Some("searchMode") => drop_down(&SEARCH_MODES, l.search_mode, shown),
@@ -182,6 +221,11 @@ impl TypedSession<'_> {
         let (rare, input) = parse(path).ok_or("no control")?;
         let sel = req.get("sel").and_then(J::as_f64);
         let text = req.get("text").and_then(J::as_str);
+        if let (Some("selectDB"), Some(s)) = (input, sel) {
+            set_sel(&mut self.select_db, s, SELECT_DB.len());
+            return Ok(json!([]));
+        }
+        let (leagues, types) = self.db_lists(rare)?;
         let l = &mut self.item_db_lists[rare as usize];
         match (input, sel, text) {
             (Some("sort"), Some(s), _) => {
@@ -191,10 +235,10 @@ impl TypedSession<'_> {
                 set_sel(&mut l.slot, s, SLOTS.len());
             }
             (Some("type"), Some(s), _) => {
-                set_sel(&mut l.typ, s, TYPES.len());
+                set_sel(&mut l.typ, s, types.len());
             }
             (Some("league"), Some(s), _) => {
-                set_sel(&mut l.league, s, LEAGUES.len());
+                set_sel(&mut l.league, s, leagues.len());
             }
             (Some("requirement"), Some(s), _) => {
                 set_sel(&mut l.requirement, s, REQUIREMENTS.len());
@@ -213,7 +257,13 @@ impl TypedSession<'_> {
     }
 
     /// `DoesItemMatchFilters(item)`
-    fn item_db_matches(&self, rare: bool, item: &Item) -> bool {
+    fn item_db_matches(
+        &self,
+        rare: bool,
+        item: &Item,
+        leagues: &[String],
+        types: &[String],
+    ) -> bool {
         let l = self.db_list(rare);
         if l.slot > 1 {
             let primary = item.primary_slot();
@@ -233,11 +283,18 @@ impl TypedSession<'_> {
                     return false;
                 }
             }
+            n if n > 5 && types.get(n - 1).is_some_and(|t| t != typ) => return false,
             _ => {}
         }
         if !rare {
             if l.league == 2 && item.league.is_some() {
                 return false;
+            }
+            if l.league > 2 {
+                let want = leagues.get(l.league - 1).map_or("", String::as_str);
+                if !item.league.as_deref().is_some_and(|il| is_match(il, want)) {
+                    return false;
+                }
             }
             if l.obtainable != 2 {
                 let source = item.source.as_deref().unwrap_or("");
@@ -384,9 +441,10 @@ impl TypedSession<'_> {
         } else {
             self.data.unique_db()?
         };
+        let (leagues, types) = leagues_and_types(db);
         let mut list: Vec<(&Arc<Item>, f64)> = db
             .values()
-            .filter(|i| self.item_db_matches(rare, i))
+            .filter(|i| self.item_db_matches(rare, i, &leagues, &types))
             .map(|i| (i, f64::NEG_INFINITY))
             .collect();
         // The rare list has no sort control: by name
