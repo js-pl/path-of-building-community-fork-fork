@@ -92,6 +92,10 @@ pub struct Controls {
     pub(super) level: Edit,
     /// The level box was typed in: its text stays as typed
     pub(super) level_typed: bool,
+    /// `levelScalingButton.label` once set ("Manual" or "Auto"): it reads
+    /// "Manual" until then, whatever the build's mode, as the session's
+    /// default level is set
+    pub(super) level_scaling_label: Option<&'static str>,
     pub(super) class: Drop,
     pub(super) ascend: Drop,
     pub(super) secondary: Drop,
@@ -544,15 +548,20 @@ impl TypedSession<'_> {
     /// `EstimatePlayerProgress` after a calculation: in the level's auto
     /// mode, the estimated level, with the configuration's mods built
     /// again for the next calculation
-    pub(super) fn estimate_progress(&mut self) -> Result<()> {
+    /// Whether it changed the level, which the next frame calculates
+    /// with again
+    pub(super) fn estimate_progress(&mut self) -> Result<bool> {
         let level = self.estimated_level();
         if self.build.info.character_level_auto_mode && self.build.info.character_level != level {
             let data = self.data;
             self.build
                 .set_character_level(level, &data.game.config, &data.parser)?;
             self.config_mods_built();
+            // `controls.characterLevel:SetText(self.characterLevel)`
+            self.controls.level.text = engine::pat::num(level);
+            return Ok(true);
         }
-        Ok(())
+        Ok(false)
     }
 
     /// The level `EstimatePlayerProgress` estimates from the points used

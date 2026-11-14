@@ -31,6 +31,7 @@ pub fn process(src: &Source) -> Result<()> {
         .map_err(|e| e.to_string())?;
     let data = &src.data;
     boss_stats(data);
+    monster_experience_levels(data);
     // The boss tooltip of the configuration, set after the boss stats
     let tooltip = "data.enemyIsBossTooltip";
     let stmt = statement(&text, tooltip).ok_or("no data.enemyIsBossTooltip")?;
@@ -85,6 +86,32 @@ fn key_text(k: &Key) -> String {
 
 /// `data.bossStats`: the mean armour and evasion of the bosses and the
 /// uber bosses
+/// `data.monsterExperienceLevelMap`: area levels to the enemy level plus
+/// two, each its effective monster level for experience
+fn monster_experience_levels(data: &TableRef) {
+    let misc = data.get_str("misc");
+    let num = |k| field(&misc, k).as_number().unwrap_or(f64::NAN);
+    let (free, mult) = (
+        num("maxExperiencePenaltyFreeAreaLevel"),
+        num("experiencePenaltyMultiplier"),
+    );
+    let map = TableRef::new();
+    let max = num("MaxEnemyLevel") + 2.0;
+    let mut level = 1.0;
+    while level <= max {
+        // `areaLevel - triangular(areaLevel - free) * mult` above the free level
+        let effective = if level <= free {
+            level
+        } else {
+            let n = level - free;
+            level - n * (n + 1.0) / 2.0 * mult
+        };
+        map.push(Value::Number(effective));
+        level += 1.0;
+    }
+    data.set_str("monsterExperienceLevelMap", Value::Table(map));
+}
+
 fn boss_stats(data: &TableRef) {
     let (mut count, mut uber_count) = (0.0, 0.0);
     let (mut armour, mut evasion, mut uber_armour, mut uber_evasion) = (0.0, 0.0, 0.0, 0.0);

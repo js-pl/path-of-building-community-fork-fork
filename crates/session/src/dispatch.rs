@@ -393,6 +393,14 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
+                    .is_some_and(TypedSession::is_build_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.build_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
                     .is_some_and(TypedSession::is_items_tab_control) =>
             {
                 let req = req.clone();
@@ -520,6 +528,18 @@ impl<'d> Dispatcher<'d> {
                 view(
                     &mut self.typed_error,
                     self.typed.as_mut()?.shared_list_tooltip(index),
+                )
+            }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_build_tooltip) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.build_control_tooltip(&path, index),
                 )
             }
             "controlTooltip" if req["path"].as_str() == Some("items.setSelect") => {

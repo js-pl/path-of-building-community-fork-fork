@@ -640,6 +640,16 @@ What remains for the full migration, in order:
      custom... (Edit Item Text, empty without an item), and the Manage...
      buttons' descriptions. Trade for these items and Buy similar query
      the trade site and stay on the translation.
+     The build's own controls (`session::typed::build_controls`,
+     `build_controls_match`): the view mode buttons, the loadouts
+     drop-down with New Loadout's name popup (a latest-tree spec and an
+     item, skill and config set named after it), the level scaling
+     button (auto mode re-estimates the level and rebuilds again when it
+     changes), the tooltips of the level box (experience multiplier by
+     area level, from `data.monsterExperienceLevelMap`, which gamedata
+     now derives), the main socket group and the minion drop-down, and
+     the descriptions of Back, Save, Save As and Manage Spectres....
+     Their clicks (and Help >>) stay unported.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor

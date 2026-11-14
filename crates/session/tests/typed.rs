@@ -4406,3 +4406,187 @@ fn items_tab_controls_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The build's own controls: their descriptions, the level box's, main
+/// socket group's and minion drop-down's tooltips, level scaling, the view
+/// modes, and each entry of the loadouts drop-down (New Loadout's popup
+/// saved), on a few builds and gen-0006's Animate Guardian's Weapon
+#[test]
+fn build_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut paths: Vec<String> = [
+        "buildLoadouts",
+        "levelScalingButton",
+        "back",
+        "save",
+        "saveAs",
+        "mainSkillMinionLibrary",
+        "modeImport",
+        "modeNotes",
+        "modeConfig",
+        "modeTree",
+        "modeSkills",
+        "modeItems",
+        "modeCalcs",
+        "modeParty",
+        "modeCompare",
+    ]
+    .iter()
+    .map(|p| format!("build.{p}"))
+    .collect();
+    paths.push("build.mainSkillMinion".into());
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 13 == 0 || id == "gen-0006")
+        .map(|(_, b)| b)
+        .take(6)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
+            let groups = t["ok"].clone();
+            let _ = groups;
+            for (path, n) in [
+                ("build.characterLevel", 1),
+                ("build.mainSocketGroup", 12),
+                ("build.mainSkillMinion", 3),
+            ] {
+                for index in 1..=n {
+                    let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
+                    let (t, tr) = (
+                        answer(d.request(&r.to_string()), "typed"),
+                        answer(d.translated_request(&r.to_string()), "translated"),
+                    );
+                    diff(&t, &tr, &format!("{id} {label} {r}"), out);
+                }
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        check(&mut d, "load", &mut out);
+        if id == "gen-0006" {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|g| g.to_string().contains("Animate Guardian"))
+                .unwrap()
+                + 1;
+            step(
+                &mut d,
+                json!({"cmd": "setMainSocketGroup", "index": group}),
+                &mut out,
+            );
+        }
+        for r in [
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "96"}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        for m in [
+            "Import", "Notes", "Config", "Skills", "Items", "Calcs", "Party", "Compare", "Tree",
+        ] {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": format!("build.mode{m}"), "click": true}),
+                &mut out,
+            );
+        }
+        // Each loadout entry but Help, New Loadout's popup saved
+        let c = answer(
+            d.request(&json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string()),
+            "controls",
+        );
+        let list: Vec<String> = c["ok"]["build.buildLoadouts"]["list"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect();
+        for (k, entry) in list.iter().enumerate() {
+            if entry.contains("Help") {
+                continue;
+            }
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "build.buildLoadouts", "sel": k + 1}),
+                &mut out,
+            );
+            if entry.contains("New Loadout") {
+                step(
+                    &mut d,
+                    json!({"cmd": "control", "path": "popup.edit", "text": format!("Loadout {k}")}),
+                    &mut out,
+                );
+                step(
+                    &mut d,
+                    json!({"cmd": "popupButton", "name": "save"}),
+                    &mut out,
+                );
+                // The new loadout picked, if it is listed
+                let c = answer(
+                    d.request(
+                        &json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string(),
+                    ),
+                    "controls",
+                );
+                let name = format!("Loadout {k}");
+                let at = c["ok"]["build.buildLoadouts"]["list"]
+                    .as_array()
+                    .and_then(|l| l.iter().position(|v| v.as_str() == Some(&name)));
+                if let Some(at) = at {
+                    step(
+                        &mut d,
+                        json!({"cmd": "control", "path": "build.buildLoadouts", "sel": at + 1}),
+                        &mut out,
+                    );
+                }
+            }
+        }
+        // Whatever popup is left, closed
+        while answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+            .as_array()
+            .is_some_and(|p| !p.is_empty())
+        {
+            step(&mut d, json!({"cmd": "closePopup"}), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+        // The file saved with the level's auto mode on, loaded again
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        compare_views(
+            &mut d,
+            &["state", "outputs"],
+            &format!("{id} reloaded"),
+            &mut out,
+        );
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

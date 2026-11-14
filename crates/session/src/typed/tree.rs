@@ -61,8 +61,13 @@ impl<'d> TypedSession<'d> {
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
         self.update_display_labels(false);
-        self.estimate_progress()?;
-        self.refresh_controls()
+        let level_changed = self.estimate_progress()?;
+        self.refresh_controls()?;
+        if level_changed {
+            // The level the points give, calculated on the next frame
+            return self.rebuild();
+        }
+        Ok(())
     }
 
     fn alloc(&mut self, i: usize) -> Result<()> {
