@@ -6028,3 +6028,89 @@ fn skills_hover_keys_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// Gem names with tags (`:`) in the Skills tab's gem slots, and imbued
+/// supports chosen by name, in the typed session as in the translated one
+#[test]
+fn skills_gem_tags_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.gemSlot1Level",
+        "skills.gemSlot2Level",
+        "skills.imbuedSupport",
+        "skills.imbuedSupportClear",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 7 == 4)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null() && groups[k]["slot"].is_string())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c("gemSlot1Name", json!({"text": "fire:melee"})),
+            c("gemSlot1Name", json!({"text": ":aura"})),
+            c("gemSlot2Name", json!({"text": "a:-support:aoe"})),
+            c("gemSlot2Name", json!({"text": "cold:active:int"})),
+            c("gemSlot2Name", json!({"text": ":"})),
+            c("imbuedSupport", json!({"text": "added fire damage"})),
+            c("imbuedSupport", json!({"text": "Added Cold"})),
+            c("imbuedSupport", json!({"text": "Faster Attacks"})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+            c("imbuedSupportClear", json!({"click": true})),
+            c("imbuedSupport", json!({"text": "Faster Attacks"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

@@ -183,6 +183,9 @@ impl<'d> TypedSession<'d> {
         match path {
             "skills.optimiseSockets" if click => self.optimise_sockets()?,
             "skills.imbuedSupportClear" if click => self.clear_imbued_support()?,
+            "skills.imbuedSupport" if req["text"].is_string() => {
+                return self.imbued_name_control(req["text"].as_str().unwrap_or(""));
+            }
             _ => return Err(format!("{NOT_PORTED}: control {path}")),
         }
         Ok(json!([]))

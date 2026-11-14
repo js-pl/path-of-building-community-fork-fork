@@ -797,9 +797,14 @@ What remains for the full migration, in order:
      of `BuildList(text)` (the names that are the text, its initials,
      start with it, contain it, each round with the text's tag) is
      chosen, and the slot's gem changes to it, calculated only when the
-     text is its name; the slot after the last gem adds one. Searches
-     with tags (`:`) and the imbued support's box stay on the
-     translation.
+     text is its name; the slot after the last gem adds one. A text
+     with tags (`:tag`, `:-tag`, and the aliases `active`, `int`, `str`,
+     `dex`, `aoe`) keeps the names with them (or without). The imbued
+     support's box lists the supports that can support the group's
+     skills by the skills' own types (`canGrantedEffectSupportActiveSkill`
+     with `imbuedSupport`, `engine::calc_skills::effect_supports_imbued`),
+     sorted by name, and only a text that is a support's name imbues it
+     into the group's slot; another text clears the slot's.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor

@@ -390,10 +390,22 @@ impl<'d> TypedSession<'d> {
     }
 }
 
+/// `string:split(":")`: the non-empty pieces, with an empty first one
+/// when the text starts with the separator
+fn split_tags(s: &str) -> Vec<String> {
+    let mut fields: Vec<String> = Vec::new();
+    if s.starts_with(':') {
+        fields.push(String::new());
+    }
+    fields.extend(s.split(':').filter(|p| !p.is_empty()).map(String::from));
+    fields
+}
+
 /// `BuildList(buf)`'s first gem, of the gems in `BuildList("")`'s order:
 /// names that are the search, are its initials, start with it, contain
-/// it, each round with the gems of the search's tag; `None` when nothing
-/// matches, `Err` for a search that is no pattern
+/// it, which have the tags after `:` (or not, after `:-`), each round with
+/// the gems of the search's tag; `None` when nothing matches, `Err` for a
+/// search that is no pattern
 fn first_match(
     data: &engine::skill_data::SkillData,
     order: &[String],
@@ -402,15 +414,36 @@ fn first_match(
     if buf.is_empty() {
         return Ok(order.first().cloned());
     }
-    let lower = engine::pat::lower(buf);
-    let tag = match lower.as_str() {
+    let fields = split_tags(buf);
+    let term = fields.first().cloned().unwrap_or_default();
+    // The tags: an alias's tag, and whether it must be absent
+    let tags: Vec<(String, bool)> = fields[1.min(fields.len())..]
+        .iter()
+        .map(|t| {
+            let t = engine::pat::lower(&engine::pat::gsub(t, "%s+", ""));
+            let (negate, t) = match t.strip_prefix('-') {
+                Some(r) => (true, r.to_string()),
+                None => (false, t),
+            };
+            let t = match t.as_str() {
+                "active" => "grants_active_skill".to_string(),
+                "int" => "intelligence".to_string(),
+                "str" => "strength".to_string(),
+                "dex" => "dexterity".to_string(),
+                "aoe" => "area".to_string(),
+                _ => t,
+            };
+            (t, negate)
+        })
+        .collect();
+    let lower = engine::pat::lower(&term);
+    let tag = engine::pat::lower(match term.as_str() {
         "active" => "grants_active_skill",
         "int" => "intelligence",
         "str" => "strength",
         "dex" => "dexterity",
         t => t,
-    }
-    .to_string();
+    });
     let patterns = [
         format!("^ {lower}$"),
         format!("^{}$", engine::pat::gsub(&lower, "%a", " %0%%l+")),
@@ -423,7 +456,14 @@ fn first_match(
                 continue;
             };
             let name = format!(" {}", engine::pat::lower(&gem.name));
-            if engine::pat::try_find(&name, p)?.is_some() || gem.tags.contains(&tag) {
+            if engine::pat::try_find(&name, p)?.is_some() {
+                let ok = tags
+                    .iter()
+                    .all(|(t, negate)| gem.tags.contains(t) != *negate);
+                if ok {
+                    return Ok(Some(id.clone()));
+                }
+            } else if gem.tags.contains(&tag) {
                 return Ok(Some(id.clone()));
             }
         }
@@ -483,9 +523,6 @@ impl<'d> TypedSession<'d> {
         let Some(text) = req["text"].as_str() else {
             return unported("without a text");
         };
-        if text.contains(':') {
-            return unported("with tags");
-        }
         let key = self.gem_cache_key(uid, i).ok_or("no group")?;
         let slot = &self.detail.gem_slots.0[i - 1];
         let cache = match (&slot.cache, slot.dropped) {
@@ -494,7 +531,8 @@ impl<'d> TypedSession<'d> {
             (Some(c), false) if c.key == key => c.clone(),
             _ => {
                 let row = self.group_row(uid).ok_or("no group")?;
-                let (_, _, order) = self.gem_select_rows((row + 1) as f64, i as f64, false)?;
+                let (_, _, order) =
+                    self.gem_select_rows((row + 1) as f64, i as f64, false, false)?;
                 SortCache { key, order }
             }
         };
@@ -572,6 +610,72 @@ impl<'d> TypedSession<'d> {
         s.count = lua_num(gem.count.unwrap_or(1.0));
         if matches {
             self.rebuild()?;
+        }
+        Ok(json!([]))
+    }
+}
+
+impl<'d> TypedSession<'d> {
+    /// The imbued support box's text: its list (the supports that can
+    /// support the group's skills by their own types) drops, the first
+    /// gem the text finds is chosen, and only a text that is its name
+    /// imbues it into the shown group's slot; another text clears it
+    pub(super) fn imbued_name_control(&mut self, text: &str) -> Result<J> {
+        let unported = |why: &str| Err(format!("{NOT_PORTED}: an imbued support {why}"));
+        let Some(uid) = self.display_group.filter(|u| self.group_row(*u).is_some()) else {
+            return unported("without a group shown");
+        };
+        let key = self.gem_cache_key(uid, 1).ok_or("no group")?;
+        let b = &self.detail.imbued_box;
+        let cache = match (&b.cache, b.dropped) {
+            (Some(c), true) => c.clone(),
+            (None, true) => return unported("in a list dropped without a cache"),
+            (Some(c), false) if c.key == key => c.clone(),
+            _ => {
+                let row = self.group_row(uid).ok_or("no group")?;
+                let (_, _, order) = self.gem_select_rows((row + 1) as f64, 1.0, false, true)?;
+                SortCache { key, order }
+            }
+        };
+        let data = &self.data.game.skills;
+        let first = match first_match(data, &cache.order, text) {
+            Ok(f) => f,
+            Err(_) => return unported("that is no pattern"),
+        };
+        let b = &mut self.detail.imbued_box;
+        b.dropped = true;
+        b.cache = Some(cache);
+        let gem = first
+            .as_ref()
+            .and_then(|id| data.gem(id))
+            .filter(|_| engine::pat::is_match(text, "%S"));
+        let matches = gem.is_some_and(|g| engine::pat::lower(&g.name) == engine::pat::lower(text));
+        // `gemChangeFunc(gemId, ...)`: the shown group's slot
+        let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
+        let Some(g) = tab
+            .socket_group_list_mut()
+            .and_then(|l| l.iter_mut().find(|g| g.uid.0 == uid))
+        else {
+            return Err("no group".into());
+        };
+        let Some(slot) = g.slot.clone() else {
+            return Ok(json!([]));
+        };
+        // `AddUndoState()`
+        self.ui.unsaved = true;
+        match gem.filter(|_| matches) {
+            Some(gem) => {
+                g.imbued_support = Some(gem.name.clone());
+                tab.imbued_support_by_slot
+                    .insert(slot, gem.granted_effect.id.clone());
+                self.rebuild()?;
+            }
+            None => {
+                g.imbued_support = None;
+                if tab.imbued_support_by_slot.remove(&slot).is_some() {
+                    self.rebuild()?;
+                }
+            }
         }
         Ok(json!([]))
     }

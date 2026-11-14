@@ -9,7 +9,7 @@
 
 use super::{Result, TypedSession, num};
 use engine::calc_env::{CalcMode, init_env};
-use engine::calc_skills::effect_supports;
+use engine::calc_skills::{effect_supports, effect_supports_imbued};
 use engine::calculator::MiscCalculator;
 use engine::compare::{self, GemCandidate};
 use engine::parallel::Threads;
@@ -28,7 +28,7 @@ impl<'d> TypedSession<'d> {
     /// last adds a gem): the gems of its dropdown in their order, each
     /// with its DPS in the slot and whether it supports the group's skills
     pub fn gem_select_list(&mut self, group: f64, slot: f64) -> Result<J> {
-        let (out, seq, order) = self.gem_select_rows(group, slot, true)?;
+        let (out, seq, order) = self.gem_select_rows(group, slot, true, false)?;
         // `DPSBuilder` runs each pending gem's calculation on the group's
         // own gems: `CalcOutputWithThisGem` puts back only the slot's gem
         // data and level, so the selections each calculation writes on the
@@ -90,7 +90,13 @@ impl<'d> TypedSession<'d> {
 
     /// The rows of `gemList`, and the build the last pending gem's
     /// calculation ran on
-    pub(super) fn gem_select_rows(&self, group: f64, slot: f64, with_dps: bool) -> Result<GemRows> {
+    pub(super) fn gem_select_rows(
+        &self,
+        group: f64,
+        slot: f64,
+        with_dps: bool,
+        imbued: bool,
+    ) -> Result<GemRows> {
         let opts = &self.gem_options;
         let skills_tab = self.build.skills.as_ref().ok_or("no skills tab")?;
         let groups = skills_tab.socket_group_list();
@@ -124,6 +130,17 @@ impl<'d> TypedSession<'d> {
                     .tag_string
                     .as_deref()
                     .is_some_and(|t| t.contains("Exceptional"));
+                if imbued {
+                    // Supports that are not exceptional and grant no
+                    // active skill
+                    return e.support
+                        && !exceptional
+                        && !legacy_awakened
+                        && gem
+                            .secondary_granted_effect
+                            .as_ref()
+                            .is_none_or(|s| s.support);
+                }
                 let (all, normal, exc) = (
                     opts.show == "ALL",
                     opts.show == "NORMAL",
@@ -148,7 +165,17 @@ impl<'d> TypedSession<'d> {
                 .filter(|gem| gem.granted_effect.support)
                 .filter(|gem| {
                     skills.iter().any(|&i| {
-                        effect_supports(&gem.granted_effect, &env.skills, i, &env.groups, data)
+                        if imbued {
+                            effect_supports_imbued(
+                                &gem.granted_effect,
+                                &env.skills,
+                                i,
+                                &env.groups,
+                                data,
+                            )
+                        } else {
+                            effect_supports(&gem.granted_effect, &env.skills, i, &env.groups, data)
+                        }
                     })
                 })
                 .map(|gem| gem.id.clone())
@@ -245,6 +272,9 @@ impl<'d> TypedSession<'d> {
                 let e = &gem.granted_effect;
                 if e.legacy && !opts.show_legacy {
                     return false;
+                }
+                if imbued {
+                    return can_support.contains(&gem.id);
                 }
                 let legacy_awakened = e.legacy && e.plus_version_of.is_some();
                 let exceptional = gem
