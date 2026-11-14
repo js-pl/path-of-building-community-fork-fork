@@ -1016,14 +1016,19 @@ fn config_edits_match(d: &mut Dispatcher) {
             if !out.is_empty() {
                 break;
             }
-            if rng.below(8) == 0 {
-                // Manage Config Sets: sets copied (sharing their tables),
+            let open = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+                .as_array()
+                .is_some_and(|p| !p.is_empty());
+            if !open && rng.below(8) == 0 {
+                // Manage Config Sets: sets copied,
                 // added, renamed, deleted and switched between edits
                 let r = json!({"cmd": "control", "path": "configTab.setManage", "click": true});
                 answer(d.request(&r.to_string()), "manage");
                 let label = format!("step {step} config sets");
                 let (mut log, mut counts) = (Vec::new(), Default::default());
-                if !d.typed_active() || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut counts) {
+                if !d.typed_active()
+                    || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut counts)
+                {
                     let e = d.typed_error.clone().unwrap_or_default();
                     skipped.push(format!("{id}: {e}"));
                     break;

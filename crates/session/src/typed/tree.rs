@@ -54,7 +54,6 @@ impl<'d> TypedSession<'d> {
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
-        self.sync_config_aliases();
         self.update_display_labels(false);
         self.estimate_progress()?;
         self.refresh_controls()

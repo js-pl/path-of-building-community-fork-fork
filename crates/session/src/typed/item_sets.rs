@@ -229,10 +229,6 @@ impl<'d> TypedSession<'d> {
             }
             SetKind::Config => {
                 Arc::make_mut(&mut self.build.config).config_sets.remove(&k);
-                for group in &mut self.config_aliases {
-                    group.retain(|x| *x != id);
-                }
-                self.config_aliases.retain(|g| g.len() > 1);
             }
         }
     }
@@ -371,8 +367,7 @@ impl<'d> TypedSession<'d> {
         Ok(id)
     }
 
-    /// Copy: the set under a free id (a config set's tables are shared
-    /// with the copy, as `copyTable` is shallow)
+    /// Copy: the set under a free id (`copyTable`, deep)
     fn copy_set(&mut self, kind: SetKind, src: f64) -> Result<f64> {
         let id = self.free_set_id(kind);
         let k = src as i64;
@@ -394,10 +389,6 @@ impl<'d> TypedSession<'d> {
                 let mut set = tab.config_sets.get(&k).cloned().ok_or(missing)?;
                 set.id = id;
                 tab.config_sets.insert(id as i64, set);
-                match self.config_aliases.iter_mut().find(|g| g.contains(&src)) {
-                    Some(g) => g.push(id),
-                    None => self.config_aliases.push(vec![src, id]),
-                }
             }
         }
         Ok(id)
@@ -614,31 +605,5 @@ impl<'d> TypedSession<'d> {
             }
         }
         Ok(tip.json())
-    }
-
-    /// A config set and its shallow copies share their `input`,
-    /// `placeholder` and `customModsList` tables: what the active one's
-    /// calculation and edits wrote, the others have too
-    pub(super) fn sync_config_aliases(&mut self) {
-        let active = self.build.config.active_config_set_id;
-        let Some(group) = self
-            .config_aliases
-            .iter()
-            .find(|g| g.contains(&active))
-            .cloned()
-        else {
-            return;
-        };
-        let tab = Arc::make_mut(&mut self.build.config);
-        let Some(src) = tab.config_sets.get(&(active as i64)).cloned() else {
-            return;
-        };
-        for id in group.iter().filter(|x| **x != active) {
-            if let Some(s) = tab.config_sets.get_mut(&(*id as i64)) {
-                s.input = src.input.clone();
-                s.placeholder = src.placeholder.clone();
-                s.custom_mods = src.custom_mods.clone();
-            }
-        }
     }
 }
