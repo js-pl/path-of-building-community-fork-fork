@@ -5,13 +5,15 @@
 //! (`engine::codec`). No Lua runs when the engine loads it.
 
 pub mod data_lua;
+mod enchantments;
 mod jsonc;
 pub mod mod_parser;
+mod uniques;
 
 use engine::calc_setup::SetupData;
 use engine::config::ConfigData;
 use engine::config_tab::OptionDefault;
-use engine::game_data::GameData;
+use engine::game_data::{GameData, TreeVersion};
 use engine::item_data::ItemData;
 use engine::mod_parser::{ModParser, ParserData};
 use engine::skill_data::SkillData;
@@ -74,6 +76,38 @@ impl Source {
             return Err("treeVersionList is empty".into());
         }
         Ok(versions)
+    }
+
+    /// `treeVersions` of `GameVersions.lua`: each version's display, number
+    /// and link prefix
+    pub fn tree_version_info(&self, versions: &[String]) -> Result<Vec<TreeVersion>> {
+        let mut im = self.importer();
+        im.load("GameVersions", vec![]).map_err(|e| e.to_string())?;
+        let all = im.global("treeVersions");
+        let all = all.as_table().ok_or("no treeVersions")?;
+        versions
+            .iter()
+            .map(|v| {
+                let t = all.get_str(v);
+                let t = t
+                    .as_table()
+                    .ok_or_else(|| format!("no treeVersions[{v}]"))?;
+                let s = |k: &str| {
+                    t.get_str(k)
+                        .as_str()
+                        .map(|s| s.to_str_lossy().into_owned())
+                        .ok_or_else(|| format!("treeVersions[{v}].{k}"))
+                };
+                Ok(TreeVersion {
+                    display: s("display")?,
+                    num: t
+                        .get_str("num")
+                        .as_number()
+                        .ok_or_else(|| format!("treeVersions[{v}].num"))?,
+                    url: s("url")?,
+                })
+            })
+            .collect()
     }
 
     /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
@@ -167,20 +201,9 @@ impl Source {
         let mapping = im
             .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
             .map_err(|e| e.to_string())?;
-        let dir = self.src_dir.join("Data/TimelessJewelData");
+        let src_dir = self.src_dir.clone();
         let loader = move |name: &str| -> Option<Vec<u8>> {
-            let mut packed = std::fs::read(dir.join(format!("{name}.zip"))).ok();
-            if packed.is_none() {
-                let mut parts = Vec::new();
-                for k in 0.. {
-                    match std::fs::read(dir.join(format!("{name}.zip.part{k}"))) {
-                        Ok(b) => parts.extend(b),
-                        Err(_) => break,
-                    }
-                }
-                packed = (!parts.is_empty()).then_some(parts);
-            }
-            miniz_oxide::inflate::decompress_to_vec_zlib(&packed?).ok()
+            miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
         };
         engine::timeless::Timeless::from_lua(&legion, &mapping, parser, Box::new(loader))
     }
@@ -221,6 +244,18 @@ impl Source {
         Value::Table(self.data.clone())
     }
 
+    /// The mods of the item editor's Add Modifier popup
+    pub fn craft(&self) -> Result<engine::item_data::CraftData> {
+        let mut im = self.importer();
+        let delve = im
+            .load1("Data/DelveDropOnly", vec![])
+            .map_err(|e| e.to_string())?;
+        let incursion = im
+            .load1("Data/IncursionDropOnly", vec![])
+            .map_err(|e| e.to_string())?;
+        engine::item_data::CraftData::from_lua(&Value::Table(self.data.clone()), &delve, &incursion)
+    }
+
     pub fn game_data(&self) -> Result<GameData> {
         let versions = self.tree_versions()?;
         Ok(GameData {
@@ -231,9 +266,34 @@ impl Source {
             option_defaults: self.option_defaults()?,
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
+            tree_version_info: self.tree_version_info(&versions)?,
             tree_versions: versions,
+            uniques: self.uniques()?,
+            rares: self.rares()?,
+            item_base_lists: self.item_base_lists()?,
+            enchantments: self.enchantments()?,
+            vestigial_mod_mappings: self.vestigial_mod_mappings()?,
+            craft: self.craft()?,
         })
     }
+}
+
+/// A timeless jewel's look-up table as upstream ships it, by its name
+/// without spaces (`LethalPride`): a zlib stream in `<name>.zip`, or split
+/// over `<name>.zip.part0`, `part1`, ...
+pub fn timeless_lut_packed(src_dir: &Path, name: &str) -> Option<Vec<u8>> {
+    let dir = src_dir.join("Data/TimelessJewelData");
+    if let Ok(b) = std::fs::read(dir.join(format!("{name}.zip"))) {
+        return Some(b);
+    }
+    let mut parts = Vec::new();
+    for k in 0.. {
+        match std::fs::read(dir.join(format!("{name}.zip.part{k}"))) {
+            Ok(b) => parts.extend(b),
+            Err(_) => break,
+        }
+    }
+    (!parts.is_empty()).then_some(parts)
 }
 
 /// The typed game data of upstream's `src/` directory, encoded.

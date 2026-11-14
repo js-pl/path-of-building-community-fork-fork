@@ -6,14 +6,40 @@
 mod calcs;
 mod config;
 pub mod display_stats;
+mod gem_select;
 mod geometry;
+mod item_add_implicit;
+mod item_add_modifier;
+mod item_anoint;
+mod item_corrupt;
+mod item_crucible;
+mod item_db;
+mod item_db_list;
+mod item_display;
 mod item_editor;
+mod item_editor_controls;
+mod item_enchant;
+mod item_list;
+mod item_popup_tooltips;
+mod item_popups;
+mod item_sets;
+mod item_tooltip;
 mod items;
+mod list_order;
+mod loadouts;
+mod node_tooltip;
+mod notes;
+mod party;
 mod save;
 mod sets;
+mod shared_lists;
 mod sidebar;
 mod skills;
+mod slot_drops;
+mod spec_sets;
+pub mod tooltip;
 mod tree;
+mod tree_import;
 mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
@@ -34,6 +60,10 @@ pub use sidebar::Controls;
 /// to the translation
 pub const NOT_PORTED: &str = "not ported";
 
+/// Starts an error the translation answers the same request with: the
+/// dispatcher answers it as the request's error, keeping the typed build
+pub const UPSTREAM_ERROR: &str = "upstream error: ";
+
 pub type Result<T> = std::result::Result<T, String>;
 
 /// Loads a tree version's passive tree
@@ -49,7 +79,16 @@ pub struct TypedData {
     source: Box<TreeSource>,
     /// Makes the timeless jewels' data, once a build needs it
     timeless_source: Option<Box<TimelessSource>>,
-    timeless: std::cell::OnceCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    /// The timeless jewels' data, once made (a source that fails, as on
+    /// a missing data file, is asked again next time)
+    timeless: RefCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    /// The unique and rare item databases, once asked for
+    item_dbs: (
+        std::cell::OnceCell<item_db::ItemDb>,
+        std::cell::OnceCell<item_db::ItemDb>,
+    ),
+    /// `main.uniqueDB.byTitle`, once asked for
+    unique_titles: std::cell::OnceCell<item_db::ItemDb>,
 }
 
 pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
@@ -64,6 +103,8 @@ impl TypedData {
             source,
             timeless_source: None,
             timeless: Default::default(),
+            item_dbs: Default::default(),
+            unique_titles: Default::default(),
         };
         let latest = data.tree(data.game.latest_tree_version())?;
         let socket_ids = latest
@@ -75,8 +116,43 @@ impl TypedData {
         Ok(TypedData { socket_ids, ..data })
     }
 
+    /// Reads the data from its binary form in a data bundle
+    /// ([`crate::bundle`]): the game data, the mod parser and the latest
+    /// tree must be there; other tree versions and the timeless jewels'
+    /// data are read when a build first needs them, and a missing one is
+    /// recorded in `files` so the caller can add it and retry.
+    pub fn from_files(files: std::rc::Rc<crate::Files>) -> Result<TypedData> {
+        use crate::bundle::{GAME_DATA, MOD_PARSER};
+        let read = |path: &str| {
+            files
+                .get(path)
+                .ok_or_else(|| format!("missing data file {path}"))
+        };
+        let game = GameData::decode(&read(GAME_DATA)?)?;
+        let parser = ModParser::decode(&read(MOD_PARSER)?)?;
+        let trees = files.clone();
+        let source = move |v: &str, _: &ModParser| {
+            let path = crate::bundle::tree_path(v);
+            let bytes = trees
+                .get(&path)
+                .ok_or_else(|| format!("missing data file {path}"))?;
+            let tree = crate::bundle::decode_tree(&bytes).map_err(|e| format!("{path}: {e}"))?;
+            trees.remove(&path);
+            Ok(tree)
+        };
+        let mut data = TypedData::new(game, parser, Box::new(source))?;
+        files.remove(GAME_DATA);
+        files.remove(MOD_PARSER);
+        let timeless = (*files).clone();
+        data.timeless_source = Some(Box::new(move |_: &ModParser| {
+            crate::bundle::decode_timeless(&timeless)
+        }));
+        Ok(data)
+    }
+
     /// Makes the data from upstream's source directory, as `gamedata`
     /// does at build time
+    #[cfg(feature = "source")]
     pub fn from_source(src_dir: &std::path::Path) -> Result<TypedData> {
         let src = gamedata::Source::load(src_dir)?;
         let game = src.game_data()?;
@@ -103,12 +179,13 @@ impl TypedData {
 
     /// The timeless jewels' data, if the session has a source of it
     fn timeless(&self) -> Option<std::sync::Arc<engine::timeless::Timeless>> {
-        self.timeless
-            .get_or_init(|| {
-                let f = self.timeless_source.as_ref()?;
-                f(&self.parser).ok().map(std::sync::Arc::new)
-            })
-            .clone()
+        if let Some(t) = &*self.timeless.borrow() {
+            return Some(t.clone());
+        }
+        let f = self.timeless_source.as_ref()?;
+        let t = std::sync::Arc::new(f(&self.parser).ok()?);
+        *self.timeless.borrow_mut() = Some(t.clone());
+        Some(t)
     }
 
     pub fn calc_data(&self) -> CalcData<'_> {
@@ -153,6 +230,7 @@ impl TypedData {
             } else {
                 None
             },
+            setup: &self.game.setup,
         };
         Build::load(root, &ctx, tree, &self.parser)
     }
@@ -203,8 +281,21 @@ pub struct TypedSession<'d> {
     other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
     /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
     item_keys: lua::ljtab::LjMap<()>,
+    /// Items added since the slots' lists were last populated, which
+    /// those lists (`slot.items`) do not offer yet
+    unlisted_items: Vec<f64>,
+    /// The shared item list and item sets (`None`: the translation's)
+    shared: Option<shared_lists::SharedLists>,
+    /// The shared item list's selection
+    shared_sel: shared_lists::ListSel,
+    /// The build's loadouts drop-down
+    loadout: loadouts::LoadoutState,
+    /// The new or copied spec its name popup holds (`RenameSpec`)
+    pending_spec: Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>,
     /// The jewel sockets' labels `UpdateSockets` last gave
     socket_labels: HashMap<u32, String>,
+    /// The Notes tab's text
+    notes: String,
     /// The Configuration tab's option controls
     config_controls: config::ConfigControls,
     /// The class each open class change popup selects, front first
@@ -215,6 +306,15 @@ pub struct TypedSession<'d> {
     gem_quality_nil: bool,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
+    /// Whether the Party tab was laid out since the build loaded: its
+    /// first layout wraps the notes label for good
+    party_laid_out: std::cell::Cell<bool>,
+    /// The item editor's controls
+    editor: item_editor::Editor,
+    /// The unique and rare item database lists' inputs
+    item_db_lists: [item_db_list::DbList; 2],
+    /// `itemsTab.controls.selectDB`: the list shown, 1 uniques, 2 rares
+    select_db: usize,
 }
 
 impl<'d> TypedSession<'d> {
@@ -244,12 +344,22 @@ impl<'d> TypedSession<'d> {
             show_minion_set: false,
             other_specs: Vec::new(),
             item_keys: Default::default(),
+            unlisted_items: Vec::new(),
+            shared: Some(Default::default()),
+            shared_sel: Default::default(),
+            loadout: Default::default(),
+            pending_spec: None,
             socket_labels: HashMap::new(),
+            notes: notes::load_notes(&root),
             config_controls: config::ConfigControls::new(&data.game.config_vars),
             class_popups: Vec::new(),
             undo: HashMap::new(),
             gem_quality_nil: false,
             display_item: None,
+            party_laid_out: Default::default(),
+            editor: Default::default(),
+            item_db_lists: Default::default(),
+            select_db: 1,
             root,
         };
         // `ConfigTab:Load` shows the loaded set
@@ -261,6 +371,7 @@ impl<'d> TypedSession<'d> {
             s.update_config_controls();
         }
         s.config_mods_built();
+        s.clamp_main_socket_group();
         s.load_specs()?;
         s.reset_undo();
         for id in &s.build.items.item_order_list {
@@ -269,6 +380,8 @@ impl<'d> TypedSession<'d> {
         s.update_display_labels(true);
         s.estimate_progress()?;
         s.refresh_controls()?;
+        // `buildMode:Init`'s last `SyncLoadouts()`
+        s.sync_loadouts_and_rebuild()?;
         Ok(s)
     }
 
@@ -282,6 +395,18 @@ impl<'d> TypedSession<'d> {
                 ("calcs", name) => self.calcs_control(name)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
+                ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                ("items", _) if Self::is_shared_list_control(p) => {
+                    self.shared_list_control_json(p).ok()?
+                }
+                ("items", _) if Self::is_item_list_control(p) => {
+                    self.item_list_control_json(p).ok()?
+                }
+                // An input the database's list does not have (the rare
+                // one's sort), which upstream leaves out
+                ("items", name) if name.starts_with("uniqueDB.") || name.starts_with("rareDB.") => {
+                    continue;
+                }
                 _ => return None,
             };
             out.insert(p.to_string(), c);

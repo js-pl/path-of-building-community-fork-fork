@@ -20,6 +20,8 @@ jobs:
       - run: sync/check.py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      # The engine without the translation, as the browser ships it
+      - run: cargo clippy -p session -p wasm --no-default-features -- -D warnings
       # Generated ports must match upstream's source
       - run: cargo run --release -p importer --bin portgen
       - run: cargo run --release -p importer --bin synthlines
@@ -113,7 +115,8 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  # The browser engine gives the same results as the native one
+  # The browser engine gives the same results as the native one, with the
+  # translation (--translation) and without (as shipped)
   wasm:
     runs-on: ubuntu-latest
     env:
@@ -129,8 +132,10 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.9
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo build --release -p cli
+      - run: node web/scripts/build-wasm.mjs --translation
+      - run: node web/scripts/build-data.mjs --translation
+      - run: node --test web/tests/*.test.mjs
       - run: node web/scripts/build-wasm.mjs
-      - run: node web/scripts/build-data.mjs
       - run: node --test web/tests/*.test.mjs
       - run: sccache --show-stats
 

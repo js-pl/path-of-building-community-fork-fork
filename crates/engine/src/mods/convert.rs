@@ -394,9 +394,8 @@ impl Converter<'_> {
         if !v.is_table() {
             return Err(format!("mod is {}", describe(v)));
         }
-        let t = v;
         check_fields(
-            t,
+            v,
             "mod",
             &[
                 "name",
@@ -420,14 +419,14 @@ impl Converter<'_> {
         // Upstream visits tags with `ipairs`
         let mut tags = Vec::new();
         loop {
-            let tag = t.get_i(tags.len() as i64 + 1);
+            let tag = v.get_i(tags.len() as i64 + 1);
             if tag.is_nil() {
                 break;
             }
             tags.push(self.tag(&tag)?);
         }
         let mut unreached_tags = Vec::new();
-        for (k, tag) in t.entries() {
+        for (k, tag) in v.entries() {
             if let DKey::Int(i) = k
                 && i as usize > tags.len() + 1
             {
@@ -457,7 +456,6 @@ impl Converter<'_> {
         if !v.is_table() {
             return Err(format!("tag is {}", describe(v)));
         }
-        let t = v;
         let g = |k: &str| v.get(k);
         let kind_name = d_text(&g("type"))?;
         let global_limit = match (g("globalLimit"), g("globalLimitKey")) {
@@ -467,7 +465,7 @@ impl Converter<'_> {
         let check = |known: &[&str]| {
             let mut all = vec!["type", "globalLimit", "globalLimitKey"];
             all.extend_from_slice(known);
-            check_fields(t, &format!("{kind_name} tag"), &all)
+            check_fields(v, &format!("{kind_name} tag"), &all)
         };
         let kind = match &*kind_name {
             "Multiplier" => {
@@ -855,4 +853,41 @@ pub fn truthy_keys(v: &Value) -> Result<HashSet<Sym>, String> {
         };
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lua::TableRef;
+
+    fn table(pairs: &[(&str, Value)]) -> Value {
+        let t = TableRef::new();
+        for (k, v) in pairs {
+            t.set_str(k, v.clone());
+        }
+        Value::Table(t)
+    }
+
+    /// A mod's tags, read with `ipairs`, and the ones past a gap
+    #[test]
+    fn mod_keeps_its_tags() {
+        let tag = |var: &str| table(&[("type", s("Condition")), ("var", s(var))]);
+        let m = lua::modlib::create_mod_args(&[
+            s("Life"),
+            s("BASE"),
+            Value::Number(5.0),
+            tag("A"),
+            tag("B"),
+        ]);
+        m.set(Value::Number(4.0), tag("C"));
+        let m = Converter::default().mod_(&Value::Table(m)).unwrap();
+        let vars: Vec<String> = m.tags.iter().map(|t| format!("{:?}", t.kind)).collect();
+        assert_eq!(vars.len(), 2, "{vars:?}");
+        assert!(
+            vars[0].contains("\"A\"") && vars[1].contains("\"B\""),
+            "{vars:?}"
+        );
+        assert_eq!(m.unreached_tags.len(), 1);
+        assert_eq!(m.unreached_tags[0].0, 4);
+    }
 }

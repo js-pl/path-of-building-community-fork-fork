@@ -60,6 +60,11 @@ pub struct Base {
     pub enchant: Option<String>,
     pub enchant_mod_types: Option<Vec<Vec<String>>>,
     pub cannot_be_anointed: bool,
+    /// The base's implicit lines, separated by newlines
+    pub implicit: Option<String>,
+    pub implicit_mod_types: Option<Vec<Vec<String>>>,
+    /// The tooltip's flavour text (`flavourText`)
+    pub flavour_text: Option<Vec<String>>,
 }
 
 /// An affix or other item mod (`data.itemMods.<group>[id]`).
@@ -77,6 +82,10 @@ pub struct Affix {
     pub weight_val: Vec<f64>,
     pub weight_multiplier_key: Vec<String>,
     pub weight_multiplier_val: Vec<f64>,
+    pub level: Option<f64>,
+    pub group: Option<String>,
+    /// `tags`: what the affix adds to an item's tags while crafting
+    pub tags: Vec<String>,
 }
 
 /// A table of affixes, in data order
@@ -86,6 +95,170 @@ pub struct AffixSet {
     /// the other groups')
     pub list: Vec<Arc<Affix>>,
     index: HashMap<String, usize>,
+}
+
+impl Affix {
+    /// A mod of a table of mods (`data.itemMods.*`, `data.masterMods`, ...)
+    pub fn from_lua(id: &str, m: &Value) -> Result<Affix> {
+        let strings = |field: &str| -> Result<Vec<String>> {
+            array(&get(m, field)).iter().map(string).collect()
+        };
+        let numbers = |field: &str| -> Result<Vec<f64>> {
+            array(&get(m, field)).iter().map(number).collect()
+        };
+        Ok(Affix {
+            id: id.to_string(),
+            typ: opt_string(&get(m, "type"))?,
+            affix: opt_string(&get(m, "affix"))?,
+            lines: array(m).iter().map(string).collect::<Result<_>>()?,
+            stat_order: numbers("statOrder")?,
+            mod_tags: strings("modTags")?,
+            weight_key: strings("weightKey")?,
+            weight_val: numbers("weightVal")?,
+            weight_multiplier_key: strings("weightMultiplierKey")?,
+            weight_multiplier_val: numbers("weightMultiplierVal")?,
+            level: opt_number(&get(m, "level"))?,
+            group: opt_string(&get(m, "group"))?,
+            tags: strings("tags")?,
+        })
+    }
+}
+
+/// The mods of the item editor's Add Modifier popup
+/// (`ItemsTab:AddCustomModifierToDisplayItem`): crafting bench, essences,
+/// veiled, beastcraft, Necropolis and drop-restricted mods, the tables in
+/// `pairs` order
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CraftData {
+    /// `data.masterMods` with each craft's item types
+    pub master_mods: Vec<(Arc<Affix>, Vec<String>)>,
+    pub essences: Vec<Essence>,
+    pub veiled_mods: Vec<Arc<Affix>>,
+    pub beast_craft: Vec<Arc<Affix>>,
+    pub necropolis_mods: Vec<Arc<Affix>>,
+    /// `Data/DelveDropOnly` and `Data/IncursionDropOnly`: mod id and the
+    /// item categories it drops on
+    pub delve_drop_only: Vec<(String, Vec<String>)>,
+    pub incursion_drop_only: Vec<(String, Vec<String>)>,
+    /// `supportsCustomModifiers` of the rare-like uniques: title and source ids
+    pub custom_modifier_sources: Vec<(String, Vec<String>)>,
+    /// `data.crucible`
+    pub crucible: Vec<CrucibleMod>,
+}
+
+/// A mod of `data.crucible`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CrucibleMod {
+    pub m: Arc<Affix>,
+    pub tier: f64,
+    /// The tree nodes it can be on (1 to 5)
+    pub node_location: Vec<f64>,
+}
+
+crate::codec_struct!(CrucibleMod {
+    m,
+    tier,
+    node_location
+});
+
+/// An essence of `data.essences`
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Essence {
+    pub name: String,
+    pub typ: f64,
+    pub tier: f64,
+    /// Mod id by item type
+    pub mods: Vec<(String, String)>,
+}
+
+crate::codec_struct!(Essence {
+    name,
+    typ,
+    tier,
+    mods
+});
+crate::codec_struct!(CraftData {
+    master_mods,
+    essences,
+    veiled_mods,
+    beast_craft,
+    necropolis_mods,
+    delve_drop_only,
+    incursion_drop_only,
+    custom_modifier_sources,
+    crucible,
+});
+
+impl CraftData {
+    /// From upstream's `data`, with the drop-restricted tables of their files
+    pub fn from_lua(data: &Value, delve: &Value, incursion: &Value) -> Result<CraftData> {
+        let set = |v: &Value| -> Result<Vec<Arc<Affix>>> {
+            pairs(v)
+                .into_iter()
+                .map(|(k, m)| Ok(Arc::new(Affix::from_lua(&key_string(&k)?, &m)?)))
+                .collect()
+        };
+        let drop_only = |v: &Value| -> Result<Vec<(String, Vec<String>)>> {
+            pairs(v)
+                .into_iter()
+                .map(|(k, e)| {
+                    let cats = array(&get(&e, "categories"))
+                        .iter()
+                        .map(string)
+                        .collect::<Result<_>>()?;
+                    Ok((key_string(&k)?, cats))
+                })
+                .collect()
+        };
+        let mut d = CraftData::default();
+        for (i, m) in array(&get(data, "masterMods")).iter().enumerate() {
+            let types = pairs(&get(m, "types"))
+                .into_iter()
+                .filter(|(_, v)| v.truthy())
+                .map(|(k, _)| key_string(&k))
+                .collect::<Result<_>>()?;
+            d.master_mods
+                .push((Arc::new(Affix::from_lua(&(i + 1).to_string(), m)?), types));
+        }
+        for (_, e) in pairs(&get(data, "essences")) {
+            d.essences.push(Essence {
+                name: string(&get(&e, "name"))?,
+                typ: number(&get(&e, "type"))?,
+                tier: number(&get(&e, "tier"))?,
+                mods: pairs(&get(&e, "mods"))
+                    .into_iter()
+                    .map(|(k, v)| Ok((key_string(&k)?, string(&v)?)))
+                    .collect::<Result<_>>()?,
+            });
+        }
+        d.veiled_mods = set(&get(data, "veiledMods"))?;
+        d.beast_craft = set(&get(data, "beastCraft"))?;
+        d.necropolis_mods = set(&get(data, "necropolisMods"))?;
+        for (k, v) in pairs(&get(data, "crucible")) {
+            d.crucible.push(CrucibleMod {
+                m: Arc::new(Affix::from_lua(&key_string(&k)?, &v)?),
+                tier: number(&get(&v, "tier"))?,
+                node_location: array(&get(&v, "nodeLocation"))
+                    .iter()
+                    .map(number)
+                    .collect::<Result<_>>()?,
+            });
+        }
+        d.delve_drop_only = drop_only(delve)?;
+        d.incursion_drop_only = drop_only(incursion)?;
+        for (k, v) in pairs(&get(data, "rareLikeUniques")) {
+            let sources = get(&v, "supportsCustomModifiers");
+            if sources.truthy() {
+                let ids = pairs(&sources)
+                    .into_iter()
+                    .filter(|(_, v)| v.truthy())
+                    .map(|(k, _)| key_string(&k))
+                    .collect::<Result<_>>()?;
+                d.custom_modifier_sources.push((key_string(&k)?, ids));
+            }
+        }
+        Ok(d)
+    }
 }
 
 impl AffixSet {
@@ -107,25 +280,7 @@ impl AffixSet {
                 set.list.push(a.clone());
                 continue;
             }
-            let strings = |field: &str| -> Result<Vec<String>> {
-                array(&get(&m, field)).iter().map(string).collect()
-            };
-            let numbers = |field: &str| -> Result<Vec<f64>> {
-                array(&get(&m, field)).iter().map(number).collect()
-            };
-            let affix = Affix {
-                id: id.clone(),
-                typ: opt_string(&get(&m, "type"))?,
-                affix: opt_string(&get(&m, "affix"))?,
-                lines: array(&m).iter().map(string).collect::<Result<_>>()?,
-                stat_order: numbers("statOrder")?,
-                mod_tags: strings("modTags")?,
-                weight_key: strings("weightKey")?,
-                weight_val: numbers("weightVal")?,
-                weight_multiplier_key: strings("weightMultiplierKey")?,
-                weight_multiplier_val: numbers("weightMultiplierVal")?,
-            };
-            let affix = Arc::new(affix);
+            let affix = Arc::new(Affix::from_lua(&id, &m)?);
             if let Some(p) = addr {
                 seen.insert(p, affix.clone());
             }
@@ -145,6 +300,9 @@ pub struct RareLikeUnique {
     pub prefix_limit: f64,
     pub suffix_limit: f64,
     pub ignore_mod_type: bool,
+    pub allow_duplicate_groups: bool,
+    /// Whether it takes custom modifiers (`supportsCustomModifiers`)
+    pub supports_custom_modifiers: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -172,6 +330,9 @@ pub struct ClusterSkill {
     /// `icon` and `masteryIcon`, art paths the tree view shows
     pub icon: Option<String>,
     pub mastery_icon: Option<String>,
+    pub tag: Option<String>,
+    /// The enchant lines a crafted jewel with this skill gets
+    pub enchant: Vec<String>,
 }
 
 /// One value of a line in `data.modScalability`
@@ -212,6 +373,10 @@ pub struct ItemData {
     /// numbers replaced (`uniqueModStatOrder` of `Classes/Item.lua`)
     pub unique_stat_order_exact: HashMap<String, f64>,
     pub unique_stat_order_normalised: HashMap<String, f64>,
+    /// `data.flavourText`: each unique's flavour texts by id, in the order
+    /// `flavourLookup` of `Classes/ItemsTab.lua` gets them (`pairs` of the
+    /// data)
+    pub flavour_text: HashMap<String, Vec<(String, Vec<String>)>>,
 }
 
 fn pairs(v: &Value) -> Vec<(Key, Value)> {
@@ -228,6 +393,19 @@ fn opt_string(v: &Value) -> Result<Option<String>> {
     } else {
         string(v).map(Some)
     }
+}
+
+/// `enchantModTypes` and `implicitModTypes`: each line's tags
+fn mod_types(x: &Value) -> Result<Option<Vec<Vec<String>>>> {
+    if x.is_nil() {
+        return Ok(None);
+    }
+    Ok(Some(
+        array(x)
+            .iter()
+            .map(|t| array(t).iter().map(string).collect())
+            .collect::<Result<_>>()?,
+    ))
 }
 
 fn key_string(k: &Key) -> Result<String> {
@@ -308,6 +486,7 @@ impl Base {
             },
             socket_limit: opt_number(&get(v, "socketLimit"))?,
             cannot_be_anointed: get(v, "cannotBeAnointed").truthy(),
+            flavour_text: opt_lines(&get(v, "flavourText"))?,
             weapon: opt_map("weapon")?,
             armour: opt_map("armour")?,
             flask: if flask.is_nil() {
@@ -332,19 +511,9 @@ impl Base {
                 })
             },
             enchant: opt_string(&get(v, "enchant"))?,
-            enchant_mod_types: {
-                let x = get(v, "enchantModTypes");
-                if x.is_nil() {
-                    None
-                } else {
-                    Some(
-                        array(&x)
-                            .iter()
-                            .map(|t| array(t).iter().map(string).collect())
-                            .collect::<Result<_>>()?,
-                    )
-                }
-            },
+            enchant_mod_types: mod_types(&get(v, "enchantModTypes"))?,
+            implicit: opt_string(&get(v, "implicit"))?,
+            implicit_mod_types: mod_types(&get(v, "implicitModTypes"))?,
         })
     }
 }
@@ -369,6 +538,21 @@ impl ItemData {
                 .collect::<Result<_>>()?,
             ..ItemData::default()
         };
+        // `pairs` order, as `flavourLookup` is filled: the data's table has
+        // explicit keys, so the order is the hash part's
+        for (_, entry) in pairs(&get(data, "flavourText")) {
+            let (name, id, text) = (get(&entry, "name"), get(&entry, "id"), get(&entry, "text"));
+            if name.is_nil() || id.is_nil() || text.is_nil() {
+                continue;
+            }
+            let list = d.flavour_text.entry(string(&name)?).or_default();
+            let id = string(&id)?;
+            let text = opt_lines(&text)?.unwrap_or_default();
+            match list.iter_mut().find(|(i, _)| *i == id) {
+                Some(e) => e.1 = text,
+                None => list.push((id, text)),
+            }
+        }
         for (k, v) in pairs(&get(data, "itemBases")) {
             let name = key_string(&k)?;
             let base = Base::from_lua(&name, &v).map_err(|e| format!("base {name}: {e}"))?;
@@ -411,6 +595,8 @@ impl ItemData {
                     prefix_limit: number(&get(&v, "prefixLimit"))?,
                     suffix_limit: number(&get(&v, "suffixLimit"))?,
                     ignore_mod_type: get(&v, "ignoreModType").truthy(),
+                    allow_duplicate_groups: get(&v, "allowDuplicateGroups").truthy(),
+                    supports_custom_modifiers: get(&v, "supportsCustomModifiers").truthy(),
                 },
             );
         }
@@ -448,6 +634,11 @@ impl ItemData {
                                     mastery: !get(sk, "masteryIcon").is_nil(),
                                     icon: opt_string(&get(sk, "icon"))?,
                                     mastery_icon: opt_string(&get(sk, "masteryIcon"))?,
+                                    tag: opt_string(&get(sk, "tag"))?,
+                                    enchant: array(&get(sk, "enchant"))
+                                        .iter()
+                                        .map(string)
+                                        .collect::<Result<_>>()?,
                                 },
                             ))
                         })
@@ -584,6 +775,9 @@ crate::codec_struct!(Base {
     enchant,
     enchant_mod_types,
     cannot_be_anointed,
+    implicit,
+    implicit_mod_types,
+    flavour_text,
 });
 crate::codec_struct!(Affix {
     id,
@@ -596,13 +790,18 @@ crate::codec_struct!(Affix {
     weight_val,
     weight_multiplier_key,
     weight_multiplier_val,
+    level,
+    group,
+    tags,
 });
 crate::codec_struct!(ClusterSkill {
     name,
     stats,
     mastery,
     icon,
-    mastery_icon
+    mastery_icon,
+    tag,
+    enchant,
 });
 crate::codec_struct!(ClusterJewel {
     size,
@@ -677,6 +876,8 @@ impl Codec for ItemData {
             u.prefix_limit.put(w);
             u.suffix_limit.put(w);
             u.ignore_mod_type.put(w);
+            u.allow_duplicate_groups.put(w);
+            u.supports_custom_modifiers.put(w);
         }
         self.bases.put(w);
         self.foulborn_map.put(w);
@@ -693,6 +894,7 @@ impl Codec for ItemData {
         self.minion_tag_crucible_uniques.put(w);
         self.unique_stat_order_exact.put(w);
         self.unique_stat_order_normalised.put(w);
+        self.flavour_text.put(w);
     }
 
     fn get(r: &mut Reader) -> codec::Result<Self> {
@@ -739,6 +941,8 @@ impl Codec for ItemData {
                     prefix_limit: Codec::get(r)?,
                     suffix_limit: Codec::get(r)?,
                     ignore_mod_type: Codec::get(r)?,
+                    allow_duplicate_groups: Codec::get(r)?,
+                    supports_custom_modifiers: Codec::get(r)?,
                 },
             );
         }
@@ -767,6 +971,7 @@ impl Codec for ItemData {
             minion_tag_crucible_uniques: Codec::get(r)?,
             unique_stat_order_exact: Codec::get(r)?,
             unique_stat_order_normalised: Codec::get(r)?,
+            flavour_text: Codec::get(r)?,
         })
     }
 }

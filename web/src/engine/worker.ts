@@ -1,7 +1,7 @@
 // One engine instance per worker (docs/design.md, "Workers"). Loads
 // engine.wasm and the data bundle, then answers requests; data files the
 // engine finds missing (older tree versions) are fetched and the request is
-// retried.
+// retried. How long loading took is logged to the console.
 
 type Exports = {
   memory: WebAssembly.Memory;
@@ -13,6 +13,7 @@ type Exports = {
   add_bundle(ptr: number, len: number): void;
   start(): void;
   request(ptr: number, len: number): void;
+  has_translation?(): number;
 };
 
 export type WorkerRequest = { id: number; req: Record<string, unknown> } | { init: string };
@@ -61,22 +62,41 @@ async function addMissing(missing: string[] | undefined): Promise<boolean> {
   return added;
 }
 
+// Compiles the engine while it downloads, where the server sends it as
+// application/wasm
+async function compile(): Promise<WebAssembly.Module> {
+  const r = await fetch(base + "engine.wasm");
+  if (!r.ok) throw new Error(`engine.wasm: ${r.status}`);
+  try {
+    return await WebAssembly.compileStreaming(r.clone());
+  } catch {
+    return WebAssembly.compile(await r.arrayBuffer());
+  }
+}
+
 async function init() {
-  const [wasm, bundle] = await Promise.all([
-    fetch(base + "engine.wasm").then((r) => r.arrayBuffer()),
-    fetchBytes("data/core.bin"),
-  ]);
-  const { instance } = await WebAssembly.instantiate(wasm, {});
+  const t0 = performance.now();
+  const module = compile();
+  const bundle = await fetchBytes("data/core.bin");
+  const tFetch = performance.now();
+  const instance = await WebAssembly.instantiate(await module, {});
+  const tCompile = performance.now();
   ex = instance.exports as unknown as Exports;
   const [p, l] = put(bundle);
   ex.add_bundle(p, l);
   ex.dealloc(p, l);
   const b = result();
   if (b.error) throw new Error(b.error);
+  const tBundle = performance.now();
   for (let i = 0; i < 10; i++) {
     ex.start();
     const r = result();
-    if (!r.error) return;
+    if (!r.error) {
+      const ms = (t: number) => Math.round(t - t0);
+      const mode = ex.has_translation?.() === 0 ? "typed engine only" : "with the translation";
+      console.info(`engine ready in ${ms(performance.now())} ms (${mode}): data fetched at ${ms(tFetch)} ms, module compiled at ${ms(tCompile)} ms, bundle read at ${ms(tBundle)} ms`);
+      return;
+    }
     if (!(await addMissing(r.missing))) throw new Error(r.error);
   }
   throw new Error("engine did not start");

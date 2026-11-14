@@ -288,6 +288,39 @@ impl TypedSession<'_> {
         Ok(json!([]))
     }
 
+    /// A socket group dragged within the skills tab's list
+    /// (`SkillListClass:OnOrderChange`): the main socket group and the
+    /// Calcs tab's skill follow their groups
+    fn move_socket_group(&mut self, req: &J) -> Result<J> {
+        let sel = req["sel"].as_f64().unwrap_or(0.0);
+        let to = super::list_order::move_to(req).unwrap_or(0.0);
+        let Some(list) = self.skills_tab()?.socket_group_list_mut() else {
+            return Ok(json!([]));
+        };
+        if !(sel >= 1.0 && sel.fract() == 0.0 && sel as usize <= list.len()) {
+            return Ok(json!([]));
+        }
+        let Some(m) = super::list_order::move_row(list, sel as usize, to)? else {
+            return Ok(json!([]));
+        };
+        let (from, to) = (m.from as f64, m.to as f64);
+        let follow = |i: f64| {
+            if i == from {
+                to
+            } else if i > from && i <= to {
+                i - 1.0
+            } else if i < from && i >= to {
+                i + 1.0
+            } else {
+                i
+            }
+        };
+        self.build.info.main_socket_group = follow(self.build.info.main_socket_group);
+        self.build.calcs.skill_number = follow(self.build.calcs.skill_number);
+        self.rebuild()?;
+        Ok(json!([]))
+    }
+
     /// `setGem`: a gem changed, or a new one added
     pub fn set_gem(&mut self, group: f64, gem: f64, e: GemEdit) -> Result<J> {
         let g = self.group_mut(group)?;
@@ -352,6 +385,7 @@ impl TypedSession<'_> {
         let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
         let id = id.unwrap_or(tab.active_skill_set_id);
         tab.set_active_skill_set(id, data);
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }
@@ -401,6 +435,9 @@ impl TypedSession<'_> {
         let (host, name) = path.split_once('.').ok_or("no control")?;
         match (host, name) {
             ("config", var) => return self.config_control(var, req),
+            ("skills", "groupList") if super::list_order::move_to(req).is_some() => {
+                return self.move_socket_group(req);
+            }
             ("build", "classDrop" | "ascendDrop" | "secondaryAscendDrop") => {
                 return match req.get("sel").and_then(J::as_f64) {
                     Some(sel) => self.class_control(name, sel),

@@ -1,13 +1,13 @@
 //! `saveXml` and `saveCode`: `buildMode:SaveDB` (`Modules/Build.lua`) with
 //! every tab's `Save`, written as `xml.ComposeXML` writes it. What the
-//! typed build does not hold (notes, party, import and tree view
-//! settings, timeless jewel search, item set links, trade weights) comes
+//! typed build does not hold (party, import and tree view settings,
+//! timeless jewel search, item set links, trade weights) comes
 //! from the loaded file as each tab's `Load` kept it.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
 use super::sidebar::display_stats;
-use super::{NOT_PORTED, Result, TypedSession};
+use super::{Result, TypedSession};
 use engine::actor::OutVal;
 use engine::config::Val;
 use engine::pat::{self, num};
@@ -161,7 +161,7 @@ const PARTY_BUFFS: [&str; 7] = [
 ];
 
 impl TypedSession<'_> {
-    fn section(&self, name: &str) -> Option<&Element> {
+    pub(super) fn section(&self, name: &str) -> Option<&Element> {
         self.root.child("PathOfBuilding")?.child(name)
     }
 
@@ -170,10 +170,17 @@ impl TypedSession<'_> {
         // Upstream's frame made the Calcs tab's calculation, which writes
         // its selections back to the gems
         self.calcs_output()?;
-        let party = self.section("Import").and_then(|i| i.attr("exportParty")) == Some("true");
-        if party {
-            return Err(format!("{NOT_PORTED}: exported party buffs"));
-        }
+        let data = self.data;
+        let exported = match &self.calcs_output()?.buff_exports {
+            Some(x) => {
+                let setup = &data.game.setup;
+                x.texts(&engine::party::Flags {
+                    mod_flags: &setup.mod_flags,
+                    keyword_flags: &setup.keyword_flags,
+                })?
+            }
+            None => Vec::new(),
+        };
         let mut root = X::new("PathOfBuilding");
         root.push(self.save_build()?);
         root.push(self.save_calcs());
@@ -181,7 +188,7 @@ impl TypedSession<'_> {
         root.push(self.save_import());
         root.push(self.save_items()?);
         root.push(self.save_notes());
-        root.push(self.save_party());
+        root.push(self.save_party(&exported));
         root.push(self.save_skills());
         root.push(self.save_tree()?);
         root.push(self.save_tree_view());
@@ -521,8 +528,8 @@ impl TypedSession<'_> {
             .is_none_or(|v| v == "true");
         // Without an `Items` section `ItemsTab:Load` leaves it nil
         let second = match xml {
-            Some(_) => b(active.use_second_weapon_set),
-            None => "nil".to_string(),
+            Some(_) if !active.second_unset => b(active.use_second_weapon_set),
+            _ => "nil".to_string(),
         };
         let mut x = X::new("Items")
             .a("activeItemSet", n(tab.active_item_set_id))
@@ -595,8 +602,8 @@ impl TypedSession<'_> {
                 .a(
                     "useSecondWeaponSet",
                     match xml {
-                        Some(_) => b(set.use_second_weapon_set),
-                        None => "nil".to_string(),
+                        Some(_) if !set.second_unset => b(set.use_second_weapon_set),
+                        _ => "nil".to_string(),
                     },
                 );
             for slot in &tab.ordered_slots {
@@ -679,14 +686,13 @@ impl TypedSession<'_> {
         Ok(x)
     }
 
-    fn save_notes(&self) -> X {
+    fn save_notes(&mut self) -> X {
         let mut x = X::new("Notes");
-        let text = self.section("Notes").and_then(first_text).unwrap_or("");
-        x.text(text);
+        x.text(self.notes_for_save());
         x
     }
 
-    fn save_party(&self) -> X {
+    fn save_party(&self, exported: &[(&str, String)]) -> X {
         let p = self.section("Party");
         let mut bufs: BTreeMap<&str, &str> = BTreeMap::new();
         for e in p.iter().flat_map(|p| p.elements()) {
@@ -726,6 +732,11 @@ impl TypedSession<'_> {
                 c.text(*t);
                 x.push(c);
             }
+        }
+        for (name, t) in exported {
+            let mut c = X::new("ExportedBuffs").a("name", name.to_string());
+            c.text(t);
+            x.push(c);
         }
         x
     }
@@ -970,12 +981,26 @@ fn save_spec(spec: &engine::spec::PassiveSpec) -> X {
         }
     }
     x.push(sockets);
-    x.push(X::new("Overrides"));
+    // The tattoos, by node id
+    let mut overrides = X::new("Overrides");
+    for (id, o) in &spec.hash_overrides {
+        let opt = |v: &Option<std::sync::Arc<str>>| v.as_deref().unwrap_or("nil").to_string();
+        let mut x = X::new("Override")
+            .a("nodeId", id.to_string())
+            .a("icon", opt(&o.icon))
+            .a("activeEffectImage", opt(&o.active_effect_image))
+            .a("dn", o.dn.to_string());
+        for line in &o.sd {
+            x.text(line.to_string());
+        }
+        overrides.push(x);
+    }
+    x.push(overrides);
     x
 }
 
 /// `PassiveSpec:EncodeURL(prefix)`
-fn encode_url(spec: &engine::spec::PassiveSpec, prefix: &str) -> String {
+pub(super) fn encode_url(spec: &engine::spec::PassiveSpec, prefix: &str) -> String {
     use engine::tree::NodeType;
     let class = spec.cur_class_id.unwrap_or(0);
     let ascend = spec.cur_ascend_class_id.unwrap_or(0);

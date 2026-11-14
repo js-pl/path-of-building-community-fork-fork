@@ -1,5 +1,6 @@
 //! The engine API's commands, each answered by the typed engine where it
-//! is ported, else by the translated session.
+//! is ported, else by the translated session (with the `translation`
+//! feature) or with a "not ported" error.
 //!
 //! The translation follows lazily: requests the typed engine answered that
 //! change the build are queued and replayed on the translated session
@@ -7,8 +8,9 @@
 //! changes the build leaves the typed build behind; until the next typed
 //! load, the translation answers everything.
 
+#[cfg(feature = "translation")]
 use crate::Session;
-use crate::typed::{TypedData, TypedSession};
+use crate::typed::{NOT_PORTED, TypedData, TypedSession, UPSTREAM_ERROR};
 use serde_json::{Value as J, json};
 
 /// Which implementation answers the commands both have
@@ -19,6 +21,7 @@ pub enum Prefer {
 }
 
 /// Commands of the translation that leave the build as it is
+#[cfg(feature = "translation")]
 const READ_ONLY: &[&str] = &[
     "state",
     "outputs",
@@ -40,6 +43,7 @@ const READ_ONLY: &[&str] = &[
     "previewItem",
     "itemDb",
     "displayItem",
+    "controlTooltip",
     "config",
     "calcs",
     "breakdown",
@@ -51,14 +55,43 @@ const READ_ONLY: &[&str] = &[
 
 /// A build session answering JSON requests, as [`Session::request`]
 pub struct Dispatcher<'d> {
-    translated: Session,
+    /// The translation, if this session falls back to it
+    #[cfg(feature = "translation")]
+    translated: Option<Session>,
     data: Option<&'d TypedData>,
     prefer: Prefer,
     typed: Option<TypedSession<'d>>,
     /// Requests the typed engine answered that the translation has not seen
+    #[cfg(feature = "translation")]
     pending: Vec<String>,
     /// Why the typed engine last gave a request to the translation
     pub typed_error: Option<String>,
+    /// Each request the typed engine preferred gave to the translation
+    /// while it held the build or loading one: the command and why
+    pub fallbacks: Vec<(String, String)>,
+    /// Whether the typed sessions still know the shared item lists: not
+    /// once the translation held a build
+    shared_known: bool,
+}
+
+/// Whether a request may change what outlives the build: a popup (opened
+/// by a click, used or closed) or the shared item lists
+#[cfg(feature = "translation")]
+fn outlives_build(json: &str) -> bool {
+    let Ok(r) = serde_json::from_str::<J>(json) else {
+        return true;
+    };
+    let path = r["path"].as_str().unwrap_or("");
+    match r["cmd"].as_str() {
+        Some("closePopup" | "popupButton") => true,
+        Some("control") => {
+            path.starts_with("popup.")
+                || path.starts_with("items.sharedItemList")
+                || r["click"] == json!(true)
+                || r["dragTo"].is_string()
+        }
+        _ => false,
+    }
 }
 
 fn ok(v: J) -> String {
@@ -66,19 +99,43 @@ fn ok(v: J) -> String {
 }
 
 impl<'d> Dispatcher<'d> {
+    #[cfg(feature = "translation")]
     pub fn new(translated: Session, data: Option<&'d TypedData>, prefer: Prefer) -> Dispatcher<'d> {
         Dispatcher {
-            translated,
+            translated: Some(translated),
             data,
             prefer,
             typed: None,
+            shared_known: true,
             pending: Vec::new(),
             typed_error: None,
+            fallbacks: Vec::new(),
         }
     }
 
+    /// A session on the typed engine alone: commands it does not have are
+    /// "not ported" errors. No build is open until one is loaded.
+    pub fn typed(data: &'d TypedData) -> Dispatcher<'d> {
+        Dispatcher {
+            #[cfg(feature = "translation")]
+            translated: None,
+            data: Some(data),
+            prefer: Prefer::Typed,
+            typed: None,
+            shared_known: true,
+            #[cfg(feature = "translation")]
+            pending: Vec::new(),
+            typed_error: None,
+            fallbacks: Vec::new(),
+        }
+    }
+
+    /// The translated session; panics on a session without one
+    #[cfg(feature = "translation")]
     pub fn translated(&self) -> &Session {
-        &self.translated
+        self.translated
+            .as_ref()
+            .expect("a dispatcher on the typed engine alone")
     }
 
     /// Whether the typed engine holds the current build
@@ -86,25 +143,66 @@ impl<'d> Dispatcher<'d> {
         self.typed.is_some()
     }
 
-    /// Answers a request on the translation, whatever is preferred
+    /// Whether commands the typed engine does not have go to the
+    /// translation
+    pub fn has_translation(&self) -> bool {
+        #[cfg(feature = "translation")]
+        return self.translated.is_some();
+        #[cfg(not(feature = "translation"))]
+        false
+    }
+
+    /// Answers a request on the translation, whatever is preferred. A save
+    /// the typed engine answered just before a save asked of the
+    /// translation is the same save: it is not replayed, so both have
+    /// saved (and re-parsed their items) as often.
+    #[cfg(feature = "translation")]
     pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
+        let is_save = |r: &str| {
+            serde_json::from_str::<J>(r)
+                .ok()
+                .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
+        };
+        if is_save(json) && self.pending.last().is_some_and(|p| is_save(p)) {
+            self.pending.pop();
+        }
         self.sync()?
-            .map_or_else(|| self.translated.request(json), Ok)
+            .map_or_else(|| self.translated().request(json), Ok)
     }
 
     /// Answers one JSON request, as [`Session::request`] does
     pub fn request(&mut self, json: &str) -> Result<String, String> {
+        let cmd = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|r| r["cmd"].as_str().map(String::from))
+            .unwrap_or_default();
+        let load = cmd == "loadXml" || cmd == "loadCode" || cmd == "newBuild";
+        let held = self.typed.is_some();
+        if !self.has_translation() || held || load {
+            self.typed_error = None;
+        }
         if let Some(r) = self.typed_request(json) {
             return Ok(r);
+        }
+        if (held || load) && self.prefer == Prefer::Typed && self.has_translation() {
+            let why = self
+                .typed_error
+                .clone()
+                .unwrap_or_else(|| format!("{cmd}: not typed"));
+            self.fallbacks.push((cmd, why));
         }
         self.sync()?.map_or_else(|| self.fallback(json), Ok)
     }
 
     /// Replays the queued requests on the translation; an error response
     /// stops it, the rest stays queued
+    #[cfg(feature = "translation")]
     fn sync(&mut self) -> Result<Option<String>, String> {
+        let Some(translated) = &self.translated else {
+            return Ok(None);
+        };
         while let Some(req) = self.pending.first() {
-            let r = self.translated.request(req)?;
+            let r = translated.request(req)?;
             if r.starts_with("{\"error\"") {
                 return Ok(Some(r));
             }
@@ -113,14 +211,37 @@ impl<'d> Dispatcher<'d> {
         Ok(None)
     }
 
+    #[cfg(not(feature = "translation"))]
+    fn sync(&mut self) -> Result<Option<String>, String> {
+        Ok(None)
+    }
+
     fn fallback(&mut self, json: &str) -> Result<String, String> {
         let cmd = serde_json::from_str::<J>(json)
             .ok()
             .and_then(|r| r["cmd"].as_str().map(String::from));
-        if !cmd.is_some_and(|c| READ_ONLY.contains(&c.as_str())) {
-            self.typed = None;
+        #[cfg(feature = "translation")]
+        if let Some(translated) = &self.translated {
+            if !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
+                self.typed = None;
+                self.shared_known = false;
+            }
+            return translated.request(json);
         }
-        self.translated.request(json)
+        Ok(self.not_ported(cmd.as_deref().unwrap_or("?")))
+    }
+
+    /// The error of a command the typed engine did not answer, on a
+    /// session without the translation
+    fn not_ported(&self, cmd: &str) -> String {
+        let msg = match &self.typed_error {
+            Some(e) => format!("{cmd}: {e}"),
+            None if self.typed.is_none() && self.data.is_some() => {
+                format!("{cmd}: no build is open")
+            }
+            None => format!("{NOT_PORTED}: {cmd}"),
+        };
+        json!({ "error": msg }).to_string()
     }
 
     /// The typed engine's answer, where it has one
@@ -140,13 +261,19 @@ impl<'d> Dispatcher<'d> {
                 let xml = decode_build_code(req["code"].as_str()?)?;
                 self.load(data, &xml, name, json)
             }
-            "state" => self.typed.as_ref()?.state().ok().map(ok),
+            "state" => view(&mut self.typed_error, self.typed.as_ref()?.state()),
             "outputs" => Some(ok(self.typed.as_ref()?.outputs())),
-            "calcs" => self.typed.as_mut()?.calcs().ok().map(ok),
-            "tree" => self.typed.as_ref()?.tree().ok().map(ok),
-            "treeState" => self.typed.as_ref()?.tree_state().ok().map(ok),
-            "nodePath" => self.typed.as_ref()?.node_path(id(&req)?).ok().map(ok),
-            "masteryOptions" => self.typed.as_ref()?.mastery_options(id(&req)?).ok().map(ok),
+            "calcs" => view(&mut self.typed_error, self.typed.as_mut()?.calcs()),
+            "tree" => view(&mut self.typed_error, self.typed.as_ref()?.tree()),
+            "treeState" => view(&mut self.typed_error, self.typed.as_ref()?.tree_state()),
+            "nodePath" => view(
+                &mut self.typed_error,
+                self.typed.as_ref()?.node_path(id(&req)?),
+            ),
+            "masteryOptions" => view(
+                &mut self.typed_error,
+                self.typed.as_ref()?.mastery_options(id(&req)?),
+            ),
             "treeSpecs" => Some(ok(self.typed.as_ref()?.tree_specs())),
             "powerStats" => {
                 self.typed.as_ref()?;
@@ -161,8 +288,14 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.select_mastery(id, effect))
             }
             "resetTree" => self.edit(json, |s| s.reset_tree()),
-            "skills" => self.typed.as_ref()?.skills().ok().map(ok),
-            "gemList" => Some(ok(self.typed.as_ref()?.gem_list())),
+            "skills" => view(&mut self.typed_error, self.typed.as_ref()?.skills()),
+            "gemList" => match (req["group"].as_f64(), req["slot"].as_f64()) {
+                (Some(g), Some(k)) => view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_select_list(g, k),
+                ),
+                _ => Some(ok(self.typed.as_ref()?.gem_list())),
+            },
             "setMainSocketGroup" => {
                 let i = req["index"].as_f64()?;
                 self.edit(json, |s| s.set_main_socket_group(i))
@@ -205,6 +338,80 @@ impl<'d> Dispatcher<'d> {
                 let id = req["id"].as_f64();
                 self.edit(json, |s| s.select_skill_set(id))
             }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p.starts_with("popup."))
+                    && self.typed.as_ref()?.has_item_popup() =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_popup_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_editor_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_editor_control(&req))
+            }
+            "control"
+                if req["dragTo"].is_string()
+                    && req["path"]
+                        .as_str()
+                        .is_some_and(|p| p.starts_with("items.")) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.items_drag(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_shared_list_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.shared_list_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_spec_manage_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.spec_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_spec_manage_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.spec_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_set_manage_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.set_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_list_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_list_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_item_db_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.item_db_control(&req))
+            }
             "control" => {
                 let req = req.clone();
                 self.edit(json, |s| s.control(&req))
@@ -223,12 +430,15 @@ impl<'d> Dispatcher<'d> {
                     .iter()
                     .map(|v| v.as_u64().map(|n| n as usize))
                     .collect::<Option<_>>()?;
-                self.typed.as_mut()?.breakdown(&cell).ok().map(ok)
+                view(&mut self.typed_error, self.typed.as_mut()?.breakdown(&cell))
             }
-            "items" => self.typed.as_mut()?.items().ok().map(ok),
+            "items" => view(&mut self.typed_error, self.typed.as_mut()?.items()),
             "copySocketGroup" => {
                 let i = req["index"].as_f64()?;
-                self.typed.as_ref()?.copy_socket_group(i).ok().map(ok)
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.copy_socket_group(i),
+                )
             }
             "pasteSocketGroup" => {
                 let text = req["text"].as_str()?.to_string();
@@ -257,6 +467,10 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.set_display_item(id, text.as_deref()))
             }
             "saveDisplayItem" => self.edit(json, |s| s.save_display_item()),
+            "itemDb" => {
+                let rare = req["kind"].as_str() == Some("rare");
+                view(&mut self.typed_error, self.typed.as_ref()?.item_db(rare))
+            }
             "selectItemSet" => {
                 let id = req["id"].as_f64()?;
                 self.edit(json, |s| s.select_item_set(id))
@@ -271,36 +485,117 @@ impl<'d> Dispatcher<'d> {
             }
             "saveXml" => self.edit(json, |s| Ok(json!({ "xml": s.save_xml()? }))),
             "saveCode" => self.edit(json, |s| Ok(json!({ "code": s.save_code()? }))),
-            "config" => self.typed.as_ref()?.config().ok().map(ok),
+            "config" => view(&mut self.typed_error, self.typed.as_ref()?.config()),
             "undo" => self.edit(json, |s| s.undo()),
-            "newBuild" => match TypedSession::new_build(data) {
-                Ok(mut s) => {
-                    if let Some(prev) = &self.typed {
-                        s.keep_popups(prev);
-                    }
-                    self.typed = Some(s);
-                    self.pending = vec![json.to_string()];
-                    Some(ok(json!([])))
-                }
-                Err(e) => {
-                    self.typed = None;
-                    self.typed_error = Some(e);
-                    None
-                }
-            },
-            "popupButton" => {
+            "newBuild" => self.open(TypedSession::new_build(data), json),
+            "popupButton" if self.typed.as_ref()?.has_item_popup() => {
                 let name = req["name"].as_str()?.to_string();
-                if !self.typed.as_ref()?.has_class_popup() {
-                    return None;
+                self.edit(json, |s| s.item_popup_button(&name))
+            }
+            "closePopup" if self.typed.as_ref()?.has_item_popup() => {
+                self.edit(json, |s| Ok(s.close_item_popup()))
+            }
+            "craftItem" => self.edit(json, |s| s.craft_item()),
+            "displayItem" => view(&mut self.typed_error, self.typed.as_mut()?.display_item()),
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p == "items.uniqueDB" || p == "items.rareDB") =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_db_tooltip(&path, index),
+                )
+            }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p == "items.sharedItemList") =>
+            {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.shared_list_tooltip(index),
+                )
+            }
+            "controlTooltip" if req["path"].as_str().is_some_and(|p| p == "items.itemList") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_list_tooltip(index),
+                )
+            }
+            "controlTooltip" if self.typed.as_ref()?.has_item_popup() => {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_popup_tooltip(&path, index),
+                )
+            }
+            "popupButton" => {
+                // The typed session's popups are the class change popups,
+                // whose only button with a name is Continue's
+                let name = req["name"].as_str().unwrap_or("nil").to_string();
+                if !self.typed.as_ref()?.has_class_popup() || name != "confirm" {
+                    let e = format!("no popup button {name}");
+                    return Some(json!({ "error": e }).to_string());
                 }
-                self.edit(json, |s| s.popup_button(&name))
+                self.edit(json, |s| s.popup_button())
             }
             "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
-                self.typed.as_ref()?.node_power(index).ok().map(ok)
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.node_power(index),
+                )
+            }
+            // Notes, party and tooltips
+            "notes" => Some(ok(self.typed.as_ref()?.notes())),
+            "party" => {
+                let r = self.typed.as_ref()?.party();
+                self.view(r)
+            }
+            "setNotes" => {
+                let text = req["text"].as_str()?.to_string();
+                self.edit(json, |s| s.set_notes(&text))
+            }
+            "socketGroupTooltip" => {
+                let i = req["index"].as_f64()?;
+                let r = self.typed.as_ref()?.socket_group_tooltip(i);
+                self.view(r)
+            }
+            "nodeTooltip" => {
+                let r = self.typed.as_mut()?.node_tooltip(id(&req)?);
+                self.view(r)
+            }
+            "itemTooltip" => {
+                let (i, slot) = (req["id"].as_f64()?, req["slot"].as_str());
+                let r = self.typed.as_mut()?.item_tooltip(i, slot);
+                self.view(r)
+            }
+            "previewItem" => {
+                let text = req["text"].as_str()?;
+                let r = self.typed.as_mut()?.preview_item(text);
+                self.view(r)
             }
             _ => None,
+        }
+    }
+
+    /// A view of the typed build; one it cannot give comes from the
+    /// translation, with the reason kept
+    fn view(&mut self, r: crate::typed::Result<J>) -> Option<String> {
+        match r {
+            Ok(v) => Some(ok(v)),
+            Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
+            Err(e) => {
+                self.typed_error = Some(e);
+                None
+            }
         }
     }
 
@@ -313,16 +608,38 @@ impl<'d> Dispatcher<'d> {
     ) -> Option<String> {
         let r = f(self.typed.as_mut()?);
         match r {
+            // The translation fails the same way, before changing the build
+            Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
-                self.pending.push(json.to_string());
+                #[cfg(feature = "translation")]
+                if self.translated.is_some() {
+                    self.pending.push(json.to_string());
+                }
+                let _ = json;
                 Some(ok(v))
             }
             Err(e) => {
-                self.typed = None;
+                // Without the translation the build stays, as far as the
+                // edit got
+                if self.has_translation() {
+                    self.typed = None;
+                    self.shared_known = false;
+                }
                 self.typed_error = Some(e);
                 None
             }
         }
+    }
+
+    /// The translation's shared item list and item sets
+    fn translated_shared(&mut self) -> Option<J> {
+        #[cfg(feature = "translation")]
+        if self.translated.is_some() {
+            let r = self.translated_request(r#"{"cmd":"sharedLists"}"#).ok()?;
+            let v: J = serde_json::from_str(&r).ok()?;
+            return Some(v["ok"].clone());
+        }
+        None
     }
 
     fn load(
@@ -332,23 +649,76 @@ impl<'d> Dispatcher<'d> {
         name: Option<&str>,
         json: &str,
     ) -> Option<String> {
-        match TypedSession::load(data, xml, name) {
+        self.open(TypedSession::load(data, xml, name), json)
+    }
+
+    /// A build loaded or made by a request
+    fn open(
+        &mut self,
+        session: crate::typed::Result<TypedSession<'d>>,
+        json: &str,
+    ) -> Option<String> {
+        match session {
             Ok(mut s) => {
                 if let Some(prev) = &self.typed {
+                    if prev.has_item_popup() {
+                        // Its buttons act on the items tab it came from
+                        self.typed = None;
+                        self.shared_known = false;
+                        self.typed_error = Some(format!(
+                            "{}: a load with an item popup open",
+                            crate::typed::NOT_PORTED
+                        ));
+                        return None;
+                    }
                     s.keep_popups(prev);
+                    s.keep_shared(prev);
+                } else if !self.shared_known {
+                    // The translation held the builds since: its lists
+                    match self.translated_shared().map(|v| s.set_shared(&v)) {
+                        Some(Ok(())) => self.shared_known = true,
+                        _ => s.forget_shared(),
+                    }
                 }
                 self.typed = Some(s);
-                // A load replaces whatever the queued requests did
-                self.pending = vec![json.to_string()];
+                // A load replaces whatever the queued requests did to the
+                // build; the popups and the shared lists outlive it, so
+                // requests that may have changed them reach the translation
+                #[cfg(feature = "translation")]
+                if self.translated.is_some() {
+                    if self.pending.iter().any(|r| outlives_build(r)) {
+                        let _ = self.sync();
+                    }
+                    self.pending = vec![json.to_string()];
+                }
+                let _ = json;
                 Some(ok(json!([])))
             }
             Err(e) => {
-                self.typed = None;
+                // Without the translation the open build stays, so a load
+                // can be retried once missing data files are added
+                if self.has_translation() {
+                    self.typed = None;
+                    self.shared_known = false;
+                }
                 self.typed_error = Some(e);
                 None
             }
         }
     }
+}
+
+/// A view's answer; why the typed engine has none
+fn view(error: &mut Option<String>, r: crate::typed::Result<J>) -> Option<String> {
+    match r {
+        Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
+        r => r.map_err(|e| *error = Some(e)).ok().map(ok),
+    }
+}
+
+/// The error response the translation gives, of an [`UPSTREAM_ERROR`]
+fn upstream_error(e: &str) -> String {
+    json!({ "error": &e[UPSTREAM_ERROR.len()..] }).to_string()
 }
 
 /// A request's node id

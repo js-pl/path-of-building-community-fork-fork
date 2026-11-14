@@ -55,7 +55,10 @@ local function controlHosts()
 		tree = b.treeTab.controls,
 		skills = b.skillsTab.controls,
 		items = b.itemsTab.controls,
+		-- The item slots, as drag targets: "slots.Weapon 1"
+		slots = b.itemsTab.slots,
 		config = b.configTab.varControls,
+		configTab = b.configTab.controls,
 		party = b.partyTab.controls,
 		calcs = { },
 		popup = main.popups[1] and main.popups[1].controls or { },
@@ -71,9 +74,24 @@ end
 local function findControl(path)
 	local host, name = path:match("^(%a+)%.(.+)$")
 	local list = host and controlHosts()[host]
-	local control = list and list[name]
+	-- A control without a name by its index: "popup.1"
+	local function at(t, key)
+		return t[key] or t[tonumber(key)]
+	end
+	local control = list and at(list, name)
+	-- A control's own control: "popup.notableDB.search"
+	local outer, inner = (name or ""):match("^([^%.]+)%.(.+)$")
+	if not control and outer and list and at(list, outer) and at(list, outer).controls then
+		control = at(list, outer).controls[inner]
+	end
 	if not control then
 		error("no control " .. tostring(path))
+	end
+	-- An item database's leagues and item types, which its first draw
+	-- loads
+	local db = control._className == "ItemDBControl" and control or (outer and at(list, outer))
+	if db and db._className == "ItemDBControl" and not db.leaguesAndTypesLoaded then
+		db:LoadLeaguesAndTypes()
 	end
 	return control
 end
@@ -84,6 +102,9 @@ local function listLabel(value)
 	end
 	return tostring(value)
 end
+
+-- Builds a list control's list now (defined below)
+local buildList
 
 local function describeControl(control)
 	local c = { class = control._className }
@@ -105,6 +126,24 @@ local function describeControl(control)
 		c.val = control.val
 	elseif control._className == "LabelControl" then
 		c.label = control:GetProperty("label")
+	elseif control.SelectIndex and control.GetRowValue and control._className ~= "ItemDBControl" and control._className ~= "NotableDBControl" then
+		-- A list's rows by their first column, and its selection
+		buildList(control)
+		local list = { }
+		for i, value in ipairs(control.list) do
+			list[i] = tostring(control:GetRowValue(1, i, value) or "")
+		end
+		c.list = arrayOf(list, function(v) return v end)
+		c.sel = control.selValue ~= nil and control.selIndex or nil
+	elseif control._className == "ItemDBControl" then
+		-- The items the filters let through, in the sort's order, each with
+		-- its power by the sort's stat
+		-- Drawing the tab updates the jewel sockets' activity first
+		build().itemsTab:UpdateSockets()
+		buildList(control)
+		c.list = arrayOf(control.list, function(item)
+			return { name = item.name, power = control.sortDetail and control.sortDetail.stat and item.measuredPower or nil }
+		end)
 	end
 	local label = control.label
 	if type(label) == "string" and c.label == nil then
@@ -118,9 +157,116 @@ local function describeControl(control)
 	return c
 end
 
+-- A list a coroutine builds as it draws (NotableDBControl, ItemDBControl),
+-- built now
+function buildList(control)
+	-- The Items tab updates its sockets as it draws
+	if control._className == "ItemListControl" or control._className == "ItemDBControl" then
+		build().itemsTab:UpdateSockets()
+		-- The tab's bottom, which its draw sets and the databases' heights
+		-- (scrolling a selected row into view) read
+		build().itemsTab.maxY = build().itemsTab.maxY or 1e9
+	end
+	-- The item list updates as it draws
+	if control._className == "ItemListControl" then
+		local outputRevision = control.itemsTab.build.outputRevision
+		if control:UpdateLoadoutList() or outputRevision ~= control.lastOutputRevision then
+			control.lastOutputRevision = outputRevision
+			control:UpdateList()
+		end
+	end
+	if control.ListBuilder and (control.listBuildFlag or control.listOutputRevision ~= build().outputRevision) then
+		control.listBuildFlag = false
+		control.listBuilder = nil
+		control.listOutputRevision = build().outputRevision
+		local co = coroutine.create(control.ListBuilder)
+		while true do
+			local ok, err = coroutine.resume(co, control)
+			if not ok then
+				error(err, 0)
+			end
+			if coroutine.status(co) == "dead" then
+				break
+			end
+		end
+	end
+end
+
 function api.control(req)
 	local control = findControl(req.path)
-	if req.sel then
+	if req.moveTo and control.SelectIndex then
+		-- A list's row dragged within the list to before row `moveTo`, as
+		-- ListControl's left button release does on a mutable list
+		buildList(control)
+		if control:SelectIndex(req.sel) and control.isMutable then
+			local to = math.min(req.moveTo, #control.list + 1)
+			if to < 1 then
+				error("no row " .. tostring(req.moveTo))
+			end
+			if to ~= control.selIndex then
+				table.remove(control.list, control.selIndex)
+				if to > control.selIndex then
+					to = to - 1
+				end
+				table.insert(control.list, to, control.selValue)
+				if control.OnOrderChange then
+					control:OnOrderChange(control.selIndex, to)
+				end
+				control.selValue = nil
+			end
+		end
+	elseif req.dragTo and control.SelectIndex then
+		-- A list's row dragged onto another list (one of its drag targets),
+		-- dropped before row `at` (after the last by default), as
+		-- ListControl's left button release does
+		buildList(control)
+		local target = findControl(req.dragTo)
+		local listed = false
+		for _, t in ipairs(control.dragTargetList or { }) do
+			if t == target then
+				listed = true
+			end
+		end
+		if not listed then
+			error("no drag target " .. tostring(req.dragTo))
+		end
+		if control:SelectIndex(req.sel) then
+			buildList(target)
+			local dragType, dragValue = control:GetDragValue(control.selIndex, control.selValue)
+			if not target.CanReceiveDrag or target:CanReceiveDrag(dragType, dragValue) then
+				target.selDragIndex = req.at or #target.list + 1
+				target:ReceiveDrag(dragType, dragValue, control)
+				target.selDragIndex = nil
+				if control.OnDragSend then
+					control:OnDragSend(control.selIndex, control.selValue, target)
+				end
+				control.selValue = nil
+			end
+		end
+	elseif req.sel and control.SelectIndex and not control.SetSel then
+		-- A row of a list, clicked with the keys held as ListControl's
+		-- left button does
+		buildList(control)
+		if control:SelectIndex(req.sel) and req.click and control.OnSelClick then
+			local isKeyDown = IsKeyDown
+			IsKeyDown = function(key)
+				return (key == "CTRL" and req.ctrl) or (key == "SHIFT" and req.shift) or false
+			end
+			local ok, err = pcall(control.OnSelClick, control, control.selIndex, control.selValue, req.doubleClick)
+			IsKeyDown = isKeyDown
+			if not ok then
+				error(err, 0)
+			end
+		end
+	elseif req.key and control.SelectIndex then
+		-- A key on a list's selected row
+		buildList(control)
+		if req.key == "DELETE" and control.selValue and control.OnSelDelete then
+			control:OnSelDelete(control.selIndex, control.selValue)
+		elseif req.key ~= "DELETE" and control.selValue and control.OnSelKeyDown then
+			control:OnSelKeyDown(control.selIndex, control.selValue, req.key)
+		end
+	elseif req.sel then
 		control:SetSel(req.sel)
 	elseif req.text then
 		control:SetText(req.text, true)
@@ -135,6 +281,25 @@ function api.control(req)
 		control:SetVal(req.val)
 	end
 	return { }
+end
+
+-- The tooltip a control shows when hovered (its tooltipFunc): a
+-- drop-down's entry or a list's row by index, or a button
+function api.controlTooltip(req)
+	local control = findControl(req.path)
+	local tooltip = newTooltip()
+	if control.ListBuilder or (control.SelectIndex and control.AddValueTooltip) then
+		buildList(control)
+		local node = control.list[req.index]
+		if node and control.AddValueTooltip then
+			control:AddValueTooltip(tooltip, req.index, node)
+		end
+	elseif control.tooltipFunc then
+		local index = req.index
+		local value = index and control.list and control.list[index]
+		control.tooltipFunc(tooltip, "HOVER", index, value)
+	end
+	return { lines = tooltipLines(tooltip) }
 end
 
 function api.controls(req)
@@ -154,7 +319,26 @@ end
 -- the label upstream draws next to each
 local function layoutControls(controls, prefix, filter)
 	local out = { }
+	-- By name, not in `pairs` order: positioning a control runs the size
+	-- functions of the controls it is anchored to, which can change their
+	-- labels (the Party tab's notes wrap when their width is first asked),
+	-- so the order must not depend on the string hash
+	local names = { }
+	local byName = { }
 	for name, control in pairs(controls) do
+		if type(name) == "string" then
+			t_insert(names, name)
+			byName[name] = control
+		elseif type(name) == "number" and type(control) == "table" and control.SelectIndex and control.GetRowValue then
+			-- A list without a name (the Manage Skill Sets popup's), by
+			-- its index
+			t_insert(names, tostring(name))
+			byName[tostring(name)] = control
+		end
+	end
+	table.sort(names)
+	for _, name in ipairs(names) do
+		local control = byName[name]
 		-- Labels of other controls go with them
 		local labelOf = type(name) == "string" and control._className == "LabelControl" and controls[(name:gsub("Label(%d*)$", "%1"))]
 		if labelOf == control then
@@ -162,7 +346,30 @@ local function layoutControls(controls, prefix, filter)
 		end
 		if type(name) == "string" and not labelOf and (not filter or filter(name, control)) and control.IsShown and control:IsShown() then
 			local cls = control._className
-			if cls == "DropDownControl" or cls == "EditControl" or cls == "ResizableEditControl" or cls == "CheckBoxControl"
+			if cls == "NotableDBControl" or (control.SelectIndex and control.GetRowValue and cls ~= "ItemDBControl") then
+				-- A list, its rows, and its own inputs
+				buildList(control)
+				local x, y = control:GetPos()
+				local d = describeControl(control)
+				if cls == "NotableDBControl" then
+					-- By name, the selection by value
+					d.list = arrayOf(control.list, function(node) return node.dn end)
+					d.sel = nil
+					for i, node in ipairs(control.list) do
+						if node == control.selValue then
+							d.sel = i
+						end
+					end
+				end
+				d.path = prefix .. name
+				d.x, d.y = x, y
+				t_insert(out, d)
+				for _, inner in ipairs(layoutControls(control.controls, prefix .. name .. ".")) do
+					local cx, cy = control.controls[inner.path:sub(#prefix + #name + 2)]:GetPos()
+					inner.x, inner.y = cx, cy
+					t_insert(out, inner)
+				end
+			elseif cls == "DropDownControl" or cls == "EditControl" or cls == "ResizableEditControl" or cls == "CheckBoxControl"
 				or cls == "ButtonControl" or cls == "SliderControl" or (cls == "LabelControl" and filter) then
 				local x, y = control:GetPos()
 				local d = describeControl(control)
@@ -178,7 +385,8 @@ local function layoutControls(controls, prefix, filter)
 	end
 	table.sort(out, function(a, b)
 		if a.y ~= b.y then return a.y < b.y end
-		return a.x < b.x
+		if a.x ~= b.x then return a.x < b.x end
+		return a.path < b.path
 	end)
 	for _, d in ipairs(out) do
 		d.x, d.y = nil, nil
@@ -268,6 +476,27 @@ function api.loadCode(req)
 		error("invalid build code")
 	end
 	return api.loadXml({ xml = xml, name = req.name })
+end
+
+-- The shared item list and item sets, which outlive builds: each item's
+-- text and its quality (NormaliseQuality changes only that), the sets'
+-- slots in `pairs` order
+function api.sharedLists()
+	local function item(i)
+		return { raw = i.raw, quality = i.quality }
+	end
+	return {
+		items = arrayOf(main.sharedItemList, item),
+		sets = arrayOf(main.sharedItemSetList, function(s)
+			local slots = setmetatable({ }, { __jsontype = "array" })
+			for slotName, i in pairs(s.slots) do
+				local x = item(i)
+				x.slot = slotName
+				t_insert(slots, x)
+			end
+			return { title = s.title, slots = slots }
+		end),
+	}
 end
 
 function api.saveXml()
@@ -779,7 +1008,51 @@ function api.removeGem(req)
 end
 
 -- Gem names for the gem picker, as GemSelectControl lists them
-function api.gemList()
+-- A gem slot's dropdown (GemSelectControl) of a socket group: its gems in
+-- their order, each with its DPS in the slot (DPSBuilder) and whether it
+-- supports the group's skills
+local function gemSelectList(req)
+	local tab = build().skillsTab
+	local group = tab.socketGroupList[req.group]
+	if not group then
+		error("no socket group " .. tostring(req.group))
+	end
+	local prev = tab.displayGroup
+	tab:SetDisplayGroup(group)
+	local slot = tab.gemSlots[req.slot]
+	if not slot then
+		error("no gem slot " .. tostring(req.slot))
+	end
+	local control = slot.nameSpec
+	control.sortCache = nil
+	control:UpdateSortCache()
+	control:BuildList("")
+	control:DPSBuilder()
+	local cache = control.sortCache
+	local gems = { }
+	for _, gemId in ipairs(control.list) do
+		local gem = control.gems[gemId]
+		if gem then
+			t_insert(gems, {
+				id = gem.id,
+				name = gem.name,
+				dps = cache.dps[gemId],
+				canSupport = cache.canSupport[gemId] and true or false,
+			})
+		end
+	end
+	if prev then
+		tab:SetDisplayGroup(prev)
+	else
+		tab.displayGroup = nil
+	end
+	return { baseDps = cache.baseDPS, gems = setmetatable(gems, { __jsontype = "array" }) }
+end
+
+function api.gemList(req)
+	if req and req.group and req.slot then
+		return gemSelectList(req)
+	end
 	local out = { }
 	for _, gem in pairs(build().data.gems) do
 		if not gem.grantedEffect.unsupported then
@@ -981,7 +1254,7 @@ function api.displayItem()
 		controls = layoutControls(tab.controls, "items.", function(name, control)
 			return name:match("^displayItem") and not name:match("Label%d*$") and not name:match("^displayItemSection")
 				and name ~= "displayItemTooltipAnchor" and name ~= "displayItemBuySimilar" and control._className ~= "LabelControl"
-				or name == "displayItemQuality"
+				or name == "displayItemQuality" or name == "craftingSorting"
 		end),
 	}
 end

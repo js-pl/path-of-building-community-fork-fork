@@ -33,6 +33,30 @@ pub(super) fn describe(item: &Item) -> J {
 impl<'d> TypedSession<'d> {
     /// Whether the slot at this index is shown and active (`IsShown()`
     /// and not `inactive`); `ring3` is `AdditionalRingSlot`
+    /// `slot.inactive`: an unallocated socket, or an abyssal socket its
+    /// item does not have
+    pub(super) fn slot_inactive(&self, i: usize) -> bool {
+        let tab = &self.build.items;
+        let s = &tab.ordered_slots[i];
+        match (&s.node_id, &s.parent_slot) {
+            (Some(n), _) => !self.build.spec.alloc_nodes.contains(*n),
+            (None, Some(p)) => {
+                let sel = tab
+                    .ordered_slots
+                    .iter()
+                    .find(|s| s.slot_name == *p)
+                    .map_or(0.0, |s| s.sel_item_id);
+                let count = if sel > 0.0 {
+                    tab.item(sel).map_or(0.0, |i| i.abyssal_socket_count)
+                } else {
+                    0.0
+                };
+                s.slot_num.unwrap_or(0.0) > count
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn slot_shown(&self, i: usize, ring3: bool) -> bool {
         let tab = &self.build.items;
         let spec = &self.build.spec;
@@ -77,6 +101,7 @@ impl<'d> TypedSession<'d> {
 
     /// `PopulateSlots()`
     pub(super) fn populate_slots(&mut self) {
+        self.unlisted_items.clear();
         let info = &self.data.game.setup.weapon_type_info;
         let one_hand = |t: &str| info.get(t).map(|w| w.one_hand);
         let b = &mut self.build;
@@ -137,6 +162,7 @@ impl<'d> TypedSession<'d> {
                 let candidates: Vec<J> = self
                     .item_keys
                     .iter()
+                    .filter(|(id, _)| !self.unlisted_items.contains(&(*id as f64)))
                     .filter_map(|(id, _)| tab.item(id as f64))
                     .filter(|i| self.valid_for_slot(i, name))
                     .filter_map(|i| i.id.map(num))
@@ -275,6 +301,7 @@ impl<'d> TypedSession<'d> {
         };
         tab.active_item_set_id = id;
         self.populate_slots();
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }

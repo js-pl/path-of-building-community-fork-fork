@@ -16,6 +16,9 @@ pub type Result<T> = std::result::Result<T, String>;
 /// The id the items tab holds an override's replacement item under
 pub const REP_ITEM_ID: i64 = -100;
 
+/// The id the items tab holds an override's toggled item under
+pub const TOGGLE_ITEM_ID: i64 = -101;
+
 /// A node an override allocates
 #[derive(Clone, Debug)]
 pub enum OverrideNode {
@@ -39,6 +42,10 @@ pub struct Override {
     /// `toggleFlask`, `toggleTincture`: an item of the items tab, by id
     pub toggle_flask: Option<f64>,
     pub toggle_tincture: Option<f64>,
+    /// `toggleFlask`, `toggleTincture` of an item outside the items tab (an
+    /// item database's), held under [`TOGGLE_ITEM_ID`] and toggled by its
+    /// type
+    pub toggle_item: Option<Item>,
     /// `conditions` set on the player
     pub conditions: Vec<String>,
 }

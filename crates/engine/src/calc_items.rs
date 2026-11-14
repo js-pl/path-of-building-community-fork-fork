@@ -8,7 +8,7 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
-use crate::calc_override::{Override, REP_ITEM_ID};
+use crate::calc_override::{Override, REP_ITEM_ID, TOGGLE_ITEM_ID};
 use crate::calc_setup::WeaponTypeInfo;
 use crate::calc_setup::{RadiusJewel, calc_mod, set_source};
 use crate::config::Inputs;
@@ -749,11 +749,12 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             }
             out.add_mult(&mult, 1.0);
         }
-        let aegis = input.alloc.contains(45175)
-            && spec
-                .tree
-                .node(45175)
-                .is_some_and(|n| &*n.dn == "Necromantic Aegis");
+        // `env.allocNodes[45175].dn`: the spec's node, which a timeless
+        // jewel may have replaced
+        let aegis = input
+            .alloc
+            .get(45175)
+            .is_some_and(|&i| spec.dn(i) == "Necromantic Aegis");
         let weapon = slot_name == "Weapon 1" || slot_name == "Weapon 2";
         if typ(item) == "Shield" && aegis {
             // Necromantic Aegis: the shield's mods go to the minions, but
@@ -932,9 +933,20 @@ pub fn setup_items(input: &ItemsInput) -> Result<ItemsSetup> {
             out.set_mult(&format!("Empty{color}SocketsInAnySlot"), v.num());
         }
     }
+    let toggled = |typ: &str| {
+        input
+            .ovr
+            .toggle_item
+            .as_ref()
+            .filter(|i| i.typ.as_deref() == Some(typ))
+            .map(|_| TOGGLE_ITEM_ID as f64)
+    };
     for (toggle, list) in [
-        (input.ovr.toggle_flask, &mut out.flasks),
-        (input.ovr.toggle_tincture, &mut out.tinctures),
+        (input.ovr.toggle_flask.or(toggled("Flask")), &mut out.flasks),
+        (
+            input.ovr.toggle_tincture.or(toggled("Tincture")),
+            &mut out.tinctures,
+        ),
     ] {
         if let Some(id) = toggle.map(|id| id as i64) {
             match list.iter().position(|&x| x == id) {

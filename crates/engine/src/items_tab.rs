@@ -79,6 +79,9 @@ pub struct ItemSet {
     pub id: f64,
     pub title: Option<String>,
     pub use_second_weapon_set: bool,
+    /// `useSecondWeaponSet` is nil: a set `NewItemSet` made, which nothing
+    /// set it on
+    pub second_unset: bool,
     pub slots: HashMap<String, SlotSelection>,
 }
 
@@ -287,6 +290,7 @@ impl ItemsTab {
                     let mut set = tab.new_item_set(id);
                     set.title = node.attr("title").map(String::from);
                     set.use_second_weapon_set = node.attr("useSecondWeaponSet") == Some("true");
+                    set.second_unset = false;
                     for child in node.elements() {
                         if child.elem == "Slot" {
                             let name = child.attr("name").unwrap_or("");
@@ -305,6 +309,7 @@ impl ItemsTab {
         if tab.item_set_order_list.is_empty() {
             let mut set = tab.new_item_set(1.0);
             set.use_second_weapon_set = xml.attr("useSecondWeaponSet") == Some("true");
+            set.second_unset = false;
             for (name, sel) in legacy {
                 set.slots.insert(name, sel);
             }
@@ -322,11 +327,12 @@ impl ItemsTab {
     }
 
     /// `NewItemSet(id)`: every slot but the jewel sockets empty
-    fn new_item_set(&self, id: f64) -> ItemSet {
+    pub fn new_item_set(&self, id: f64) -> ItemSet {
         ItemSet {
             id,
             title: None,
             use_second_weapon_set: false,
+            second_unset: true,
             slots: self
                 .ordered_slots
                 .iter()
@@ -356,6 +362,18 @@ impl ItemsTab {
         &self,
         item: &Item,
         slot_name: &str,
+        sockets: &dyn Sockets,
+        one_hand: &dyn Fn(&str) -> Option<bool>,
+    ) -> bool {
+        self.valid_for_slot_in(item, slot_name, self.active_item_set(), sockets, one_hand)
+    }
+
+    /// `IsItemValidForSlot(item, slotName, itemSet)`
+    pub fn valid_for_slot_in(
+        &self,
+        item: &Item,
+        slot_name: &str,
+        set: &ItemSet,
         sockets: &dyn Sockets,
         one_hand: &dyn Fn(&str) -> Option<bool>,
     ) -> bool {
@@ -399,7 +417,6 @@ impl ItemsTab {
                 item.base.as_ref().is_some_and(|b| b.weapon.is_some())
             }
             "Weapon 2" | "Weapon 2 Swap" => {
-                let set = self.active_item_set();
                 let first = if slot_name == "Weapon 2" {
                     "Weapon 1"
                 } else {

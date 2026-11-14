@@ -127,10 +127,34 @@ impl<'a, 't> MiscCalculator<'a, 't> {
     /// false or build.viewMode == "TREE"`), the Full DPS is calculated again
     /// when the build has Full DPS skills
     pub fn calculate(&self, ovr: &Override, full_dps: bool) -> Result<CalcOutput> {
-        let (mut out, cache, _) = calculate(&self.build, self.data, ovr, self.cache.clone())?;
+        self.calculate_on(&self.build, ovr, full_dps)
+    }
+
+    /// `calcFunc` with `override.spec`: the calculation on another spec
+    /// of the build, from the calculator's cache
+    pub fn calculate_on_spec(
+        &self,
+        spec: std::sync::Arc<crate::spec::PassiveSpec<'t>>,
+        ovr: &Override,
+        full_dps: bool,
+    ) -> Result<CalcOutput> {
+        let mut build = self.build.clone();
+        build.spec = spec;
+        self.calculate_on(&build, ovr, full_dps)
+    }
+
+    /// `calcFunc` on a copy of the build changed in ways [`Override`] does
+    /// not hold (an item outside the items tab), from the calculator's cache
+    pub fn calculate_on(
+        &self,
+        build: &Build<'t>,
+        ovr: &Override,
+        full_dps: bool,
+    ) -> Result<CalcOutput> {
+        let (mut out, cache, _) = calculate(build, self.data, ovr, self.cache.clone())?;
         if full_dps && self.used_full_dps {
-            let mode = CalcMode::Calculator.buff_mode(&self.build);
-            let (full, _) = calc_full_dps_with(&self.build, self.data, mode, ovr, cache)?;
+            let mode = CalcMode::Calculator.buff_mode(build);
+            let (full, _) = calc_full_dps_with(build, self.data, mode, ovr, cache)?;
             out.set_full_dps(&full);
         }
         Ok(out)

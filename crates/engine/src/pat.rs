@@ -175,3 +175,58 @@ pub fn format_num_sep(s: &str) -> String {
         Some(format!("{colour}{}{grouped}{}", parts[0], parts[2]))
     })
 }
+
+/// `string:matchOrPattern(pattern)` (`Modules/Common.lua`): whether `s`
+/// matches one of the patterns that `(a|b)` groups and `|` make of
+/// `pattern`. Upstream tries them in `pairs` order and stops at the first
+/// match or at a malformed one (its search's `PCall` then fails); here
+/// they are tried in the order they are made.
+pub fn match_or_pattern(s: &str, pattern: &str) -> Result<bool, String> {
+    fn generate(p: &str) -> Vec<String> {
+        let mut groups: Vec<(usize, usize, Vec<String>)> = Vec::new();
+        for g in gmatch1(p, "%b()") {
+            let init = groups.last().map_or(1, |g| g.1);
+            let Some(at) = p[init - 1..].find(g.as_str()) else {
+                continue;
+            };
+            let open = init + at;
+            let close = open + g.len() - 1;
+            groups.push((open, close, generate(&g[1..g.len() - 1])));
+        }
+        // `pattern:sub(i, j)` with 1-based, inclusive, -1 for the end
+        let sub = |i: usize, j: Option<usize>| -> String {
+            let end = j.unwrap_or(p.len()).min(p.len());
+            if i > end {
+                String::new()
+            } else {
+                p[i - 1..end].to_string()
+            }
+        };
+        let mut generated = vec![sub(1, groups.first().map(|g| g.0 - 1))];
+        for (i, (_, close, patterns)) in groups.iter().enumerate() {
+            let next = sub(close + 1, groups.get(i + 1).map(|g| g.0 - 1));
+            let mut temp = Vec::new();
+            for sp in &generated {
+                for gp in patterns {
+                    temp.push(format!("{sp}{gp}{next}"));
+                }
+            }
+            generated = temp;
+        }
+        let mut out: Vec<String> = Vec::new();
+        for g in &generated {
+            for o in g.split('|').filter(|o| !o.is_empty()) {
+                if !out.iter().any(|x| x == o) {
+                    out.push(o.to_string());
+                }
+            }
+        }
+        out
+    }
+    for p in generate(pattern) {
+        if try_find(s, &p)?.is_some() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}

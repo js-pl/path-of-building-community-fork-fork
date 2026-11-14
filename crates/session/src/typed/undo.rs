@@ -19,9 +19,6 @@ pub(super) struct UndoState {
     masteries: Vec<(u32, f64)>,
 }
 
-/// The ids of cluster jewel subgraph nodes
-const SUBGRAPH_IDS: u32 = 0x10000;
-
 impl TypedSession<'_> {
     fn undo_state(&self) -> UndoState {
         Self::state_of(&self.build.spec)
@@ -74,13 +71,10 @@ impl TypedSession<'_> {
             return Ok(json!([]));
         }
         let state = list[1].clone();
-        let spec = &self.build.spec;
-        if !spec.hash_overrides.is_empty()
-            || !spec.sub_graphs.is_empty()
-            || state.hash_list.iter().any(|&i| i >= SUBGRAPH_IDS)
-        {
-            return Err(format!("{NOT_PORTED}: undo with tattoos or cluster jewels"));
-        }
+        // The session cannot change tattoos, so the state's are the
+        // spec's; the subgraphs stay as they are (`RestoreUndoState`
+        // does not rebuild them): ids they no longer have wait in
+        // `allocSubgraphNodes`
         let (class, ascend) = match (state.class, state.ascend) {
             (Some(c), Some(a)) => (c, a),
             _ => return Err(format!("{NOT_PORTED}: undo to a spec without a class")),

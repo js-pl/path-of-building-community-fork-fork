@@ -294,6 +294,10 @@ impl<'a> Perform<'a> {
                     self.c
                         .out(crate::calc::PLAYER, &resist_name)
                         .unwrap_or(f64::NAN)
+                } else if self.party_flag(&format!("Enemy{t}ResistEqualToYours"))? {
+                    self.c
+                        .out(crate::calc::PARTY, &resist_name)
+                        .ok_or("upstream fails too: the party members' resistance is nil (bad argument #1 to 'min')")?
                 } else {
                     let mut names = vec![resist_name.as_str()];
                     if is_elemental(t) {
@@ -359,8 +363,8 @@ impl<'a> Perform<'a> {
         let cfg = self.cfg(i);
         let spell = self.mf("Spell");
         let attack = self.mf("Attack");
-        // Add addition stat bonuses
-        let str_bonus = self.str_dmg_bonus.unwrap_or(0.0);
+        // Add addition stat bonuses: the skill's own actor's
+        let str_bonus = self.str_dmg_bonus.get(&actor).copied().unwrap_or(0.0);
         if self.c.flag(list, None, &["IronGrip"])? {
             let flags = attack | self.mf("Projectile");
             self.c.add(
