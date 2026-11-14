@@ -649,7 +649,12 @@ What remains for the full migration, in order:
      area level, from `data.monsterExperienceLevelMap`, which gamedata
      now derives), the main socket group and the minion drop-down, and
      the descriptions of Back, Save, Save As and Manage Spectres....
-     Their clicks (and Help >>) stay unported.
+     Their clicks (and Help >>) stay unported, but for Manage
+     Spectres...: the Spectre Library (`session::typed::spectre_library`,
+     `spectre_library_match`) with the build's spectres and all spectres
+     by name, the search by names, skills or both, the rows' tooltips,
+     adding (Add, a double click, a drag), reordering, Remove and Delete,
+     and Save.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

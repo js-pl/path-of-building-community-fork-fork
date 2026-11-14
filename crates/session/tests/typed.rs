@@ -4718,3 +4718,96 @@ fn skills_controls_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The Spectre Library (Manage Spectres...), in the typed session as in the
+/// translated one: its lists, search, rows' tooltips, adding, dragging,
+/// removing, Save and Cancel
+#[test]
+fn spectre_library_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 23 == 0 || id == "gen-0006")
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_none_or(|p| p.is_empty()) {
+                return;
+            }
+            for (path, n) in [("popup.list", 4), ("popup.source", 3)] {
+                for index in 0..=n {
+                    let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
+                    let (t, tr) = (
+                        answer(d.request(&r.to_string()), "typed"),
+                        answer(d.translated_request(&r.to_string()), "translated"),
+                    );
+                    diff(&t, &tr, &format!("{id} {label} {r}"), out);
+                }
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": path});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        for r in [
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            c(
+                "popup.source",
+                json!({"sel": 2, "click": true, "doubleClick": true}),
+            ),
+            c("popup.source", json!({"sel": 5})),
+            c("popup.source.add", json!({"click": true})),
+            c("popup.source.add", json!({"click": true})),
+            c("popup.source.searchText", json!({"text": "ze"})),
+            c(
+                "popup.source",
+                json!({"sel": 2, "dragTo": "popup.list", "at": 1}),
+            ),
+            c("popup.source.searchModeDropDown", json!({"sel": 2})),
+            c("popup.source.searchText", json!({"text": "fire"})),
+            c("popup.source.searchModeDropDown", json!({"sel": 3})),
+            c("popup.source", json!({"sel": 1, "dragTo": "popup.list"})),
+            c("popup.source.searchText", json!({"text": "zzzz"})),
+            c("popup.source.searchText", json!({"text": "("})),
+            c("popup.source.searchText", json!({"text": ""})),
+            c("popup.list", json!({"sel": 1, "moveTo": 4})),
+            c("popup.list", json!({"sel": 2})),
+            c("popup.list.delete", json!({"click": true})),
+            c("popup.list", json!({"sel": 1})),
+            c("popup.list", json!({"key": "DELETE"})),
+            c("popup.list", json!({"sel": 9})),
+            json!({"cmd": "popupButton", "name": "save"}),
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            c("popup.list", json!({"sel": 1, "key": "DELETE"})),
+            c("popup.list", json!({"key": "DELETE"})),
+            json!({"cmd": "popupButton", "name": "cancel"}),
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            json!({"cmd": "closePopup"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

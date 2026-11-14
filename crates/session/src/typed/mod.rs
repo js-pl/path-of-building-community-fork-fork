@@ -41,6 +41,7 @@ mod skills;
 mod skills_controls;
 mod slot_drops;
 mod spec_sets;
+mod spectre_library;
 pub mod tooltip;
 mod tree;
 mod tree_import;
