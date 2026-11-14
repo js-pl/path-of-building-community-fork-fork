@@ -3378,7 +3378,6 @@ fn tree_controls_match(d: &mut Dispatcher) {
         }
         let mut rng = Lcg(seed(&id));
         let mut out = Vec::new();
-        let mut power_compared = false;
         for step in 0..12 {
             if !out.is_empty() {
                 break;
@@ -3438,15 +3437,6 @@ fn tree_controls_match(d: &mut Dispatcher) {
             if std::env::var("SESSION_DUMP").is_ok() {
                 eprintln!("{id} {label}");
             }
-            // Node power within the depth chosen, before the first
-            // conversion (see `docs/progress.md` on converted General's
-            // Cry builds)
-            let converts = matches!(req["name"].as_str(), Some("convert" | "convertCopy"))
-                || req["path"] == "tree.specConvert";
-            if converts && !power_compared {
-                compare_node_power(d, &mut out);
-                power_compared = true;
-            }
             let r = req.to_string();
             let typed = answer(d.request(&r), "typed tree control");
             if !d.typed_active() {
@@ -3485,9 +3475,8 @@ fn tree_controls_match(d: &mut Dispatcher) {
             answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
         }
         if out.is_empty() {
-            if !power_compared {
-                compare_node_power(d, &mut out);
-            }
+            // Node power within the depth chosen
+            compare_node_power(d, &mut out);
             compare_saves(d, &format!("{id} after the tree controls"), &mut out);
         }
         if !out.is_empty() {

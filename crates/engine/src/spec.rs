@@ -382,6 +382,16 @@ impl<'t> PassiveSpec<'t> {
         }
     }
 
+    /// `spec.nodes[id]` as the tree's node: a cluster jewel's subgraph
+    /// node replaces the tree's proxy node of its id (and has no
+    /// `nodesInRadius`); ids the spec does not have are the tree's
+    pub fn node_by_id(&self, id: u32) -> Option<&tree::Node> {
+        match self.index.get(&id) {
+            Some(&i) => Some(self.tree_node(i)),
+            None => self.tree.node(id),
+        }
+    }
+
     pub fn kind(&self, i: usize) -> NodeType {
         self.tree_node(i).kind
     }
@@ -1103,7 +1113,7 @@ impl<'t> PassiveSpec<'t> {
         let mut out = LjMap::default();
         let list = radius
             .and_then(|r| r.checked_sub(1))
-            .and_then(|r| self.tree.node(id)?.nodes_in_radius.as_ref()?.get(r));
+            .and_then(|r| self.node_by_id(id)?.nodes_in_radius.as_ref()?.get(r));
         for &n in list.into_iter().flatten() {
             out.insert(n, ());
         }
