@@ -224,6 +224,12 @@ fn typed_session_matches_translated() {
     SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
     let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    // Every skill's `hasGlobalEffect` as after its first calculation, as
+    // the typed engine has it (`docs/progress.md`, "Upstream quirks")
+    if let Some(host) = d.translated().host() {
+        host.look_up_skill_stats(true)
+            .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())));
+    }
     at_build(&mut d, "");
     match phase {
         "commands" => commands_match(data, &mut d),

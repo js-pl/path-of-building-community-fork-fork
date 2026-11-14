@@ -1137,6 +1137,19 @@ instantiate per worker, so it dominates regardless of the link.
 The typed port keeps upstream's results but not its shared mutable state;
 the tests align these:
 
+- `hasGlobalEffect` is set when a calculation first looks a skill's stat
+  up in `data.skillStatMap` (`skillStatMapMeta`, `processMod`), so it
+  depends on what the process calculated before: a fresh process's first
+  calculation of a Vaal transfigured gem with its second effect disabled
+  still has the second skill, and the gem select's DPS sort skips General's
+  Cry, Intimidating Cry, Chain Hook, Cleave of Rage, Rage and Blind
+  (`canSupport or hasGlobalEffect`) unless they were calculated before.
+  The typed engine has the flags as after every skill's first calculation
+  (`engine::data`); `typed_session_matches_translated` primes the
+  translation (`Host::look_up_skill_stats`), `game_data` compares with
+  upstream after the lookups, and
+  `vaal_global_effect_matches_after_the_first_calculation` shows the fresh
+  process's difference.
 - `modLib.setSource` in `mergeKeystones` rewrites the tree's shared keystone
   mods, so their source depends on earlier calculations
 - `grantedEffect.fromItem = true` marks a support on the shared skill data
