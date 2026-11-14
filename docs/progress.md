@@ -198,7 +198,7 @@ What remains for the full migration, in order:
    session (`session::typed`) where it is ported, else with the
    translated one, which replays the typed requests that change the
    build before it answers (`Prefer::Translated` forces the
-   translation; `pob serve --typed`). Typed: `loadXml`, `loadCode`,
+   translation; `pob serve --typed`, typed only `pob serve`). Typed: `loadXml`, `loadCode`,
    `state` (the sidebar: `BuildDisplayStats.lua`, the stat list,
    warnings, class and skill selection controls; the engine's side in
    `engine::sidebar`) and `outputs` (the sidebar calculation's player
@@ -785,17 +785,22 @@ trigger, or a source skill the templates lack).
 
 ## Next
 
-See the handoff above.
+See the handoff above, and [drop-translation.md](drop-translation.md) for
+how the translation can go and what the tests use as reference instead
+(option C: step 1, typed-only by default, is done; step 2, the oracle
+session `oracle/session.lua` with `SESSION_REFERENCE=oracle`, is under way
+and its differences from the translation are listed there).
 
 ## Shipping the typed engine to the browser
 
-`crates/wasm` and `crates/session` have a `translation` cargo feature, on
-by default. Built with it, the module holds upstream's translated program
-(`crates/upstream`, the Lua runtime, `lua/session.lua`) as the fallback
-of commands the typed engine does not have yet. Built without it
-(`web/scripts/build-wasm.mjs --typed`, `cargo build -p wasm
---no-default-features`), neither the translation nor the Lua interpreter
-is linked, and those commands are `not ported: <cmd>` errors
+`crates/wasm` and `crates/session` have a `translation` cargo feature, off
+by default in `wasm` (the browser ships the typed engine) and on in
+`session` (the CLI and the tests). Built with it
+(`web/scripts/build-wasm.mjs --translation`), the module holds upstream's
+translated program (`crates/upstream`, the Lua runtime, `lua/session.lua`)
+as the fallback of commands the typed engine does not have yet. Built
+without it (`web/scripts/build-wasm.mjs`, `cargo build -p wasm`), neither
+the translation nor the Lua interpreter is linked, and those commands are `not ported: <cmd>` errors
 (`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
 `loadXml`/`loadCode` opens a build on the typed engine, and the browser
 frontend works for everything the typed session answers (sidebar,
@@ -821,7 +826,9 @@ sidebar, outputs and tree as on the data made from source. With
 `pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
 data files the translation reads starting up and loading the given builds,
 and every tree version's Lua data, for an engine built with the
-translation (`build-data.mjs` without `--typed`).
+translation (`build-data.mjs --translation`). `pob serve` answers with
+the typed engine alone too; `--typed` adds the translation as the
+fallback, `--translated` answers everything with the translation.
 
 The frontend takes `not ported` answers as such
 (`isNotPorted` in `web/src/engine/client.ts`, `web/src/ui/NotPorted.tsx`): an edit the engine

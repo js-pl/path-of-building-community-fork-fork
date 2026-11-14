@@ -1,9 +1,11 @@
 //! Native runner of the engine API.
 //!
-//!   pob serve [--typed | --typed-only]
-//!                             JSON requests on stdin, one per line; responses on stdout;
-//!                             with --typed, the commands the typed engine has are its;
-//!                             with --typed-only, the others are "not ported" errors
+//!   pob serve [--typed | --translated]
+//!                             JSON requests on stdin, one per line; responses on stdout:
+//!                             the typed engine, as the browser ships it, where commands
+//!                             it does not have are "not ported" errors; with --typed,
+//!                             those fall back to upstream's translated program; with
+//!                             --translated, the translation answers everything
 //!   pob bundle <out> [--lua [xml..]]
 //!                             writes the typed engine's data in its binary form (game
 //!                             data, mod parser, the latest tree) as `<out>/core.bin`, and
@@ -49,15 +51,15 @@ fn ok(s: &Session, req: serde_json::Value) -> serde_json::Value {
 }
 
 fn serve(mode: Option<&str>) {
-    let typed = matches!(mode, Some("--typed" | "--typed-only"));
+    let typed = matches!(mode, None | Some("--typed"));
     let data = typed.then(|| {
         &*Box::leak(Box::new(
             TypedData::from_source(&src_dir()).unwrap_or_else(|e| die(e)),
         ))
     });
     let mut s = match (mode, data) {
-        (Some("--typed-only"), Some(data)) => Dispatcher::typed(data),
-        _ => {
+        (None, Some(data)) => Dispatcher::typed(data),
+        (Some("--typed" | "--translated"), _) => {
             let s = Session::new(Rc::new(Imported::new(src_dir()))).unwrap_or_else(|e| die(e));
             let prefer = if typed {
                 Prefer::Typed
@@ -66,6 +68,7 @@ fn serve(mode: Option<&str>) {
             };
             Dispatcher::new(s, data, prefer)
         }
+        _ => usage(),
     };
     let stdout = std::io::stdout();
     for line in std::io::stdin().lock().lines() {
@@ -280,8 +283,12 @@ fn main() {
         Some("serve") if args.len() <= 2 => serve(args.get(1).map(String::as_str)),
         Some("bundle") if args.len() >= 2 => bundle(Path::new(&args[1]), &args[2..]),
         Some("bench") if args.len() == 2 => bench(&args[1]),
-        _ => die(
-            "usage: pob serve [--typed | --typed-only] | pob bundle <out dir> [--lua [build.xml ...]] | pob bench <build.xml>",
-        ),
+        _ => usage(),
     }
+}
+
+fn usage() -> ! {
+    die(
+        "usage: pob serve [--typed | --translated] | pob bundle <out dir> [--lua [build.xml ...]] | pob bench <build.xml>",
+    )
 }

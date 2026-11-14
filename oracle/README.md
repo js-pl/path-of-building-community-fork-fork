@@ -33,6 +33,7 @@ if the files differ from what upstream produces.
 | `data.lua` | Writes hashes of upstream's raw data tables |
 | `tables.lua` | Writes LuaJIT's `pairs` order for random number-keyed tables (`tables.jsonl`), which `lua::value::Table` reproduces |
 | `json.lua` | The exact JSON encoder both use |
+| `session.lua` | The engine API (`crates/session/lua/session.lua`) on upstream on LuaJIT, JSON lines on stdin and stdout; `Session::oracle` runs it, `SESSION_REFERENCE=oracle` makes it the session test's reference (see `docs/drop-translation.md`) |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
 

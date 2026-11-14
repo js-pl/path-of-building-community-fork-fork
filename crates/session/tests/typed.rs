@@ -52,18 +52,83 @@ fn answer(r: Result<String, String>, what: &str) -> J {
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{what}: {e}: {text}"))
 }
 
-/// Where two JSON values differ, as paths
+/// Where two JSON values differ, as paths. Against the oracle, in their
+/// canonical forms ([`unordered`]).
 fn diff(a: &J, b: &J, path: &str, out: &mut Vec<String>) {
+    if oracle() {
+        let (mut a, mut b) = (a.clone(), b.clone());
+        unordered(&mut a);
+        unordered(&mut b);
+        return diff_values(&a, &b, path, out);
+    }
+    diff_values(a, b, path, out)
+}
+
+/// Whether the reference is the oracle (`SESSION_REFERENCE=oracle`)
+fn oracle() -> bool {
+    std::env::var("SESSION_REFERENCE").is_ok_and(|r| r == "oracle")
+}
+
+/// What upstream gives in `pairs` order over string or table keys, which
+/// LuaJIT does not reproduce between runs (its string hash is seeded per
+/// process), in a canonical order: breakdown rows, tree connectors, the
+/// base-type lines of an item's text (`{variant:..}` runs), the party's
+/// enemy modifiers and exported mods (`<value>|Skill:..` runs). Build codes are compared decoded (zlib and miniz
+/// compress differently).
+fn unordered(v: &mut J) {
+    match v {
+        J::Object(m) => {
+            for (k, x) in m.iter_mut() {
+                if k == "code"
+                    && let Some(xml) = x.as_str().and_then(session::dispatch::decode_build_code)
+                {
+                    *x = J::String(xml);
+                }
+                unordered(x);
+                if (k == "rows" || k == "connectors")
+                    && let J::Array(a) = x
+                {
+                    a.sort_by_key(|r| r.to_string());
+                }
+            }
+        }
+        J::Array(a) => a.iter_mut().for_each(unordered),
+        J::String(s) if s.contains('\n') => {
+            let mut lines: Vec<&str> = s.split('\n').collect();
+            let enemy_mods = s.starts_with("^7-----");
+            let mut i = 0;
+            while i < lines.len() {
+                let group = |l: &str| {
+                    if enemy_mods {
+                        !l.starts_with("---") && !l.starts_with("^7---")
+                    } else {
+                        l.trim_start().starts_with("{variant:") || l.contains("|Skill:")
+                    }
+                };
+                let start = i;
+                while i < lines.len() && group(lines[i]) {
+                    i += 1;
+                }
+                lines[start..i].sort_unstable();
+                i += 1;
+            }
+            *s = lines.join("\n");
+        }
+        _ => {}
+    }
+}
+
+fn diff_values(a: &J, b: &J, path: &str, out: &mut Vec<String>) {
     match (a, b) {
         (J::Object(x), J::Object(y)) => {
             for k in x.keys().chain(y.keys().filter(|k| !x.contains_key(*k))) {
                 let (u, v) = (x.get(k).unwrap_or(&J::Null), y.get(k).unwrap_or(&J::Null));
-                diff(u, v, &format!("{path}.{k}"), out);
+                diff_values(u, v, &format!("{path}.{k}"), out);
             }
         }
         (J::Array(x), J::Array(y)) if x.len() == y.len() => {
             for (i, (u, v)) in x.iter().zip(y).enumerate() {
-                diff(u, v, &format!("{path}[{i}]"), out);
+                diff_values(u, v, &format!("{path}[{i}]"), out);
             }
         }
         _ if a != b => out.push(format!("{path}: typed {a}, translated {b}")),
@@ -80,7 +145,12 @@ fn data() -> &'static TypedData {
     data
 }
 
+/// The reference session: the translation, or with
+/// `SESSION_REFERENCE=oracle` upstream on LuaJIT (`oracle/session.lua`)
 fn session() -> Session {
+    if oracle() {
+        return Session::oracle(&src()).unwrap_or_else(|e| panic!("{e}"));
+    }
     Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
 }
 
@@ -1685,11 +1755,15 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
 
 /// `saveXml` of both on the dispatcher's build: where they differ
 fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
-    let typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
-    let tr = answer(
+    let mut typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+    let mut tr = answer(
         d.translated_request(r#"{"cmd":"saveXml"}"#),
         "translated save",
     );
+    if oracle() {
+        unordered(&mut typed);
+        unordered(&mut tr);
+    }
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
     if a != b && std::env::var("DUMP_SAVES").is_ok() {
         eprintln!(
@@ -2192,6 +2266,12 @@ fn with_party(xml: &str, buffs: &[(String, String)]) -> String {
 /// exported mod line that differs only by the typed source being the
 /// tree's is aligned. The number of lines so aligned.
 fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
+    let (mut typed, mut tr) = (J::String(typed.into()), J::String(tr.into()));
+    if oracle() {
+        unordered(&mut typed);
+        unordered(&mut tr);
+    }
+    let (typed, tr) = (typed.as_str().unwrap(), tr.as_str().unwrap());
     let mut aligned = 0;
     if typed.lines().count() != tr.lines().count() {
         out.push("saveXml differs in its number of lines".into());
