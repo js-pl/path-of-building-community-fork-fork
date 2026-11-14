@@ -42,6 +42,7 @@ mod shared_lists;
 mod sidebar;
 mod skills;
 mod skills_controls;
+mod skills_sockets;
 mod slot_drops;
 mod spec_sets;
 mod spectre_library;
@@ -439,6 +440,9 @@ impl<'d> TypedSession<'d> {
                 ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
                 ("skills", _) if Self::is_group_list_control(p) => self.group_list_json(p)?,
                 ("skills", _) if Self::is_group_detail_control(p) => self.group_detail_json(p)?,
+                ("skills", _) if Self::is_skills_sockets_control(p) => {
+                    self.skills_sockets_json(p)?
+                }
                 // A slot the tab has not made is no control
                 ("skills", _) if Self::is_gem_slot_control(p) && !self.gem_slot_exists(p) => {
                     continue;

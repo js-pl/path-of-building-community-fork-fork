@@ -410,6 +410,14 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
+                    .is_some_and(TypedSession::is_skills_sockets_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.skills_sockets_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
                     .is_some_and(TypedSession::is_gem_slot_control) =>
             {
                 let req = req.clone();
