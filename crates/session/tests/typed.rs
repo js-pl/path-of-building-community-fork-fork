@@ -2988,10 +2988,15 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         tr["ok"]["xml"].as_str().map(String::from)
     };
     let mut exports: Vec<Vec<(String, String)>> = Vec::new();
+    let mut codes: Vec<String> = Vec::new();
     for (k, (id, xml)) in builds.iter().enumerate() {
         let groups = PARTY_GROUPS[k % PARTY_GROUPS.len()];
         let xml = with_groups(data, &with_export(xml), groups).unwrap_or_else(|| with_export(xml));
         let saved = check(d, &format!("{id}-export"), &xml, &mut failures);
+        if let Some(x) = &saved {
+            let z = miniz_oxide::deflate::compress_to_vec_zlib(x.as_bytes(), 9);
+            codes.push(base64(&z).replace('+', "-").replace('/', "_"));
+        }
         exports.push(saved.map(|x| exported(&x)).unwrap_or_default());
     }
     let n = builds.len();
@@ -3023,6 +3028,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         );
         check(d, &format!("{id}-party-stats"), &xml, &mut failures);
     }
+    party_controls_match(d, &builds, &exports, &codes, &mut failures, &mut skipped);
     eprintln!(
         "{compared} party builds compared, {aligned} keystone sources aligned; skipped {}:\n{}",
         skipped.len(),
@@ -3034,6 +3040,154 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// The Party tab's views after a change
+const PARTY_VIEWS: [&str; 3] = ["party", "state", "outputs"];
+
+/// The Party tab's controls (`party.*`) changed at random on corpus builds
+/// with a party: import codes (other builds' exports, invalid text, a
+/// link) to each destination, appended or replacing, Clear, Disable Party
+/// Effects, Rebuild All, Show Advanced Info and the edit boxes' texts.
+/// After each change the tab, the sidebar and the outputs, and at the end
+/// the saved file, are the translation's.
+fn party_controls_match(
+    d: &mut Dispatcher,
+    builds: &[(String, String)],
+    exports: &[Vec<(String, String)>],
+    codes: &[String],
+    failures: &mut Vec<String>,
+    skipped: &mut Vec<String>,
+) {
+    if codes.is_empty() {
+        return;
+    }
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let n = builds.len();
+    let mut steps = 0;
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let buffs = &exports[(k + 1) % n];
+        let xml = if buffs.is_empty() {
+            xml.clone()
+        } else {
+            with_party(xml, buffs)
+        };
+        let id = format!("{id}-party-controls");
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id));
+        let mut out = Vec::new();
+        let edits = [
+            ("editPartyMemberStats", "PartyMemberStats"),
+            ("editAuras", "Aura"),
+            ("editCurses", "Curse"),
+            ("editWarcries", "Warcry Skills"),
+            ("editLinks", "Link Skills"),
+            ("enemyCond", "EnemyConditions"),
+            ("enemyMods", "EnemyMods"),
+        ];
+        for step in 0..steps_per_build {
+            if !out.is_empty() {
+                break;
+            }
+            let path = |name: &str| format!("party.{name}");
+            let req = match rng.below(12) {
+                0..=2 => {
+                    let code = match rng.below(6) {
+                        0 => "not a code".to_string(),
+                        1 => String::new(),
+                        2 => format!(" {}? ", codes[rng.below(codes.len())]),
+                        _ => codes[rng.below(codes.len())].clone(),
+                    };
+                    json!({"cmd": "control", "path": path("importCodeIn"), "text": code})
+                }
+                3 => {
+                    json!({"cmd": "control", "path": path("importCodeDestination"), "sel": rng.below(9) + 1})
+                }
+                4 => {
+                    json!({"cmd": "control", "path": path("appendNotReplace"), "state": rng.below(2) == 0})
+                }
+                5 => {
+                    json!({"cmd": "control", "path": path("ShowAdvanceTools"), "state": rng.below(2) == 0})
+                }
+                6 | 7 => json!({"cmd": "control", "path": path("importCodeGo"), "click": true}),
+                8 => json!({"cmd": "control", "path": path("clear"), "click": true}),
+                9 => json!({"cmd": "control", "path": path("removeEffects"), "click": true}),
+                10 => json!({"cmd": "control", "path": path("rebuild"), "click": true}),
+                _ => {
+                    let (name, buf) = edits[rng.below(edits.len())];
+                    let from = &exports[rng.below(n)];
+                    let text = from
+                        .iter()
+                        .find(|(b, _)| b == buf)
+                        .map(|(_, t)| t.clone())
+                        .unwrap_or_default();
+                    json!({"cmd": "control", "path": path(name), "text": text})
+                }
+            };
+            let label = format!("step {step} {}", truncate(&req.to_string()));
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed party edit");
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(
+                    e.starts_with("not ported") || e.contains("upstream fails"),
+                    "{id}: {label}: {e}"
+                );
+                skipped.push(format!("{id}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's failure leaves its session broken: a
+                    // fresh one for the builds after
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
+                break;
+            }
+            if typed.get("error").is_some() {
+                let tr = answer(d.translated_request(&r), "translated party edit");
+                diff(&typed, &tr, &label, &mut out);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            compare_views(d, &PARTY_VIEWS, &label, &mut out);
+            // A control's hover tooltip
+            let names = [
+                "importCodeDestination",
+                "importCodeGo",
+                "rebuild",
+                "editAuras",
+                "simpleCurses",
+            ];
+            let q = json!({"cmd": "controlTooltip", "path": format!("party.{}", names[rng.below(names.len())])});
+            let q = q.to_string();
+            let t = answer(d.request(&q), "typed tooltip");
+            let tr = answer(d.translated_request(&q), "translated tooltip");
+            diff(&t, &tr, &format!("{label} {q}"), &mut out);
+            steps += 1;
+        }
+        if out.is_empty() {
+            compare_saves(d, &format!("{id} after the party edits"), &mut out);
+        }
+        if !out.is_empty() {
+            let m = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({m}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!("{steps} party control edits compared");
+}
+
+/// The first characters of a request, for a failure's label
+fn truncate(s: &str) -> String {
+    s.chars().take(160).collect()
 }
 
 /// The colour codes the sidebar uses are upstream's

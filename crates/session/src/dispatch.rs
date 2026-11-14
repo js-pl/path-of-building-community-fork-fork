@@ -529,6 +529,17 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_mut()?.item_list_tooltip(index),
                 )
             }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p.starts_with("party.")) =>
+            {
+                let name = req["path"].as_str()?["party.".len()..].to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.party_tooltip(&name),
+                )
+            }
             "controlTooltip" if self.typed.as_ref()?.has_item_popup() => {
                 let path = req["path"].as_str()?.to_string();
                 let index = req["index"].as_f64();

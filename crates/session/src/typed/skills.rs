@@ -435,6 +435,7 @@ impl TypedSession<'_> {
         let (host, name) = path.split_once('.').ok_or("no control")?;
         match (host, name) {
             ("config", var) => return self.config_control(var, req),
+            ("party", name) => return self.party_control(name, req),
             ("skills", "groupList") if super::list_order::move_to(req).is_some() => {
                 return self.move_socket_group(req);
             }

@@ -60,7 +60,7 @@ pub fn poe_planner_version(
         .ok_or_else(|| "Invalid tree version found in link.".into())
 }
 
-fn base64_decode(data: &str) -> Vec<u8> {
+pub fn base64_decode(data: &str) -> Vec<u8> {
     let (mut bits, mut n, mut out) = (0u32, 0, Vec::new());
     for c in data.bytes() {
         let v = match c {

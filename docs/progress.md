@@ -420,11 +420,22 @@ What remains for the full migration, in order:
    effect, sorted; extra auras and other effects with their mods; the
    enemy modifiers by name, recorded as `Party::load` reads them), or
    the texts in edit boxes with the advanced info shown, in the order of
-   their positions on a tab never drawn (width 0). Its first layout
-   positions the import header with the notes unwrapped, then the notes'
-   width wraps them at every space (no string has a width headless) for
-   every later control and layout; `party_match` asks for the view twice
-   on every party build. A radius jewel's
+   their positions on a tab never drawn (width 0). `layoutControls`
+   positions the controls by name: on the first layout `ShowAdvanceTools`
+   sees the notes unwrapped, then the notes' width wraps them at every
+   space (no string has a width headless) for every later control and
+   layout; `party_match` asks for the view twice on every party build.
+   The tab's controls are typed too (`typed/party_tab.rs`): the import
+   code (codes, links, invalid text) to each destination, appended or
+   replacing, Import, Clear, Disable Party Effects, Rebuild All, Show
+   Advanced Info and the edit boxes, with upstream's split between the
+   boxes' texts, the labels and the parsed actor (an edited box is parsed
+   only by Rebuild All or an import; Disable Party Effects empties the
+   actor alone; party member stats accumulate over imports, as
+   `clearInputText` leaves `actor.modDB`). `party_controls_match`
+   changes them at random on party builds (about 260 edits) and compares
+   the tab, sidebar, outputs, a control's tooltip and the saved file.
+   Downloading a linked build stays on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -473,8 +484,7 @@ What remains for the full migration, in order:
    per phase and fails on any not in its `KNOWN_FALLBACKS`.
 
    Still on the translation, before it can be dropped:
-   - Read-only views: `party` with imported party data,
-     `controls` of other tabs.
+   - Read-only views: `controls` of other tabs (also `party.*`).
    - Tooltips in the cases above that fall back.
    - Items and crafting: the item editor's enchant, anoint, corrupt,
      add implicit, custom and crucible modifier popups, its modifier

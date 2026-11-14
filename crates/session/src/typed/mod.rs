@@ -30,6 +30,7 @@ mod loadouts;
 mod node_tooltip;
 mod notes;
 mod party;
+mod party_tab;
 mod save;
 mod sets;
 mod shared_lists;
@@ -309,6 +310,8 @@ pub struct TypedSession<'d> {
     /// Whether the Party tab was laid out since the build loaded: its
     /// first layout wraps the notes label for good
     party_laid_out: std::cell::Cell<bool>,
+    /// The Party tab once its controls changed it
+    party_tab: Option<party_tab::PartyTab>,
     /// The item editor's controls
     editor: item_editor::Editor,
     /// The unique and rare item database lists' inputs
@@ -357,6 +360,7 @@ impl<'d> TypedSession<'d> {
             gem_quality_nil: false,
             display_item: None,
             party_laid_out: Default::default(),
+            party_tab: None,
             editor: Default::default(),
             item_db_lists: Default::default(),
             select_db: 1,
