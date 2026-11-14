@@ -363,6 +363,14 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
+                    .is_some_and(TypedSession::is_spec_manage_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.spec_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
                     .is_some_and(TypedSession::is_set_manage_control) =>
             {
                 let req = req.clone();
