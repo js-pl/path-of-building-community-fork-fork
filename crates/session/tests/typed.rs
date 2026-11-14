@@ -2990,6 +2990,33 @@ fn tree_edits_match(d: &mut Dispatcher) {
                 .iter()
                 .filter_map(J::as_u64)
                 .collect();
+            if step >= socket_clicks.len() && step < total && rng.below(10) == 0 {
+                // Manage Passive Trees: specs copied, added, renamed,
+                // deleted and switched between the edits (and their undo)
+                let r = json!({"cmd": "control", "path": "items.specButton", "click": true});
+                answer(d.request(&r.to_string()), "manage");
+                let label = format!("step {step} trees");
+                let (mut log, mut counts) = (Vec::new(), Default::default());
+                if !d.typed_active()
+                    || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut counts)
+                {
+                    let e = d.typed_error.clone().unwrap_or_default();
+                    skipped.push(format!("{id}: {e}"));
+                    break;
+                }
+                let follow = [
+                    json!({"cmd": "treeState"}),
+                    json!({"cmd": "treeSpecs"}),
+                    json!({"cmd": "state"}),
+                    json!({"cmd": "outputs"}),
+                ];
+                compare(d, &follow, &label, &mut out);
+                steps += 1;
+                if !out.is_empty() {
+                    break;
+                }
+                continue;
+            }
             let req = if let Some(s) = (step < socket_clicks.len()).then(|| socket_clicks[step]) {
                 json!({"cmd": "clickNode", "id": s})
             } else if step == total {
