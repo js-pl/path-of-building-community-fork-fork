@@ -638,6 +638,17 @@ What remains for the full migration, in order:
      of a set or spec, its drop-down's selection, and the sets a changed
      selection switches to (a new spec named as the active one's
      loadout activates it), calculated once per request.
+     The Items tab's own controls (`session::typed::items_tab_controls`,
+     `items_tab_controls_match` and a step of `items_edits_match`): the
+     item set and passive tree drop-downs (`setSelect`, `specSelect`;
+     their lists are what the tab's draw sets them to, which the
+     translated session now sets before it reads or uses them), the set
+     drop-down's tooltip (`AddItemSetTooltip`, which fails past the
+     list), the weapon set buttons (the main socket group moves to the
+     first group in a slot of the set used), Craft item... and Create
+     custom... (Edit Item Text, empty without an item), and the Manage...
+     buttons' descriptions. Trade for these items and Buy similar query
+     the trade site and stay on the translation.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor
