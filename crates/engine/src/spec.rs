@@ -228,6 +228,10 @@ pub struct PassiveSpec<'t> {
     pub alloc_extended_nodes: Vec<u32>,
     /// `subGraphs`: each cluster jewel subgraph, by its id
     pub sub_graphs: LjMap<SubGraph>,
+    /// Whether two subgraphs were built with the same id: upstream keeps
+    /// the last, and the other's entrance link then fails its next
+    /// rebuild (`Entrance for subGraph not linked to parent socket???`)
+    pub sub_graph_collision: bool,
     pub cur_class_id: Option<i64>,
     pub cur_ascend_class_id: Option<i64>,
     pub cur_secondary_ascend_class_id: Option<i64>,
@@ -275,6 +279,7 @@ impl<'t> PassiveSpec<'t> {
             alloc_subgraph_nodes: Vec::new(),
             alloc_extended_nodes: Vec::new(),
             sub_graphs: LjMap::default(),
+            sub_graph_collision: false,
             cur_class_id: None,
             cur_ascend_class_id: None,
             cur_secondary_ascend_class_id: None,

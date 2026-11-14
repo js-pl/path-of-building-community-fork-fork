@@ -690,3 +690,22 @@ impl<'d> TypedSession<'d> {
         })
     }
 }
+
+impl<'d> TypedSession<'d> {
+    /// The mod of an implicit drop-down's entry
+    pub(super) fn corrupt_entry(
+        &self,
+        p: &CorruptPopup,
+        name: &str,
+        idx: Option<usize>,
+    ) -> Option<Arc<Affix>> {
+        let i: usize = name.strip_prefix("implicit")?.parse().ok()?;
+        let c = p.implicits.get(i.wrapping_sub(1))?;
+        c.list.get(idx?.wrapping_sub(1))?.clone()
+    }
+
+    /// The item Corrupt makes
+    pub(super) fn corrupt_save_item(&self, p: &CorruptPopup) -> Result<Item> {
+        self.corrupt_item(p, p.implicits[0].shown)
+    }
+}

@@ -647,12 +647,30 @@ impl<'a> Perform<'a> {
             .enemy
             .ok_or("an actor without an enemy")?;
         let edb = self.c.db(enemy);
+        // Upstream caches the mods by identity: equal mods of different
+        // sources (two copies of a flask) each apply, so a mod is skipped
+        // only while this tabulation has no more of it than were applied
+        let mut seen: Vec<(Mod, usize)> = Vec::new();
         for (v, m) in self.c.tabulate(db, None, None, &["EnemyModifier"])? {
             let ModValue::Record(r) = &v else { continue };
             let Some(ModValue::Mod(inner)) = r.get("mod") else {
                 continue;
             };
-            if self.applied_enemy_modifiers[actor].contains(inner) {
+            let nth = match seen.iter_mut().find(|(x, _)| x == &**inner) {
+                Some((_, n)) => {
+                    *n += 1;
+                    *n
+                }
+                None => {
+                    seen.push(((**inner).clone(), 1));
+                    1
+                }
+            };
+            let applied = self.applied_enemy_modifiers[actor]
+                .iter()
+                .filter(|x| *x == &**inner)
+                .count();
+            if applied >= nth {
                 continue;
             }
             let source = inner.source.clone().or(m.source.clone());

@@ -533,7 +533,16 @@ What remains for the full migration, in order:
      `data.crucible`, the item's own selected), and the Modifier sorting
      drop-down (`craftingSorting`, which both sessions now list with the
      editor's controls: the affix lists' series by the power of a stat,
-     their middle tier added to the item, re-parsed). All in `items_edits_match`, with
+     their middle tier added to the item, re-parsed), and
+     `controlTooltip` (`session::typed::item_popup_tooltips`, the
+     translated session's `api.controlTooltip`): the hover tooltip of a
+     popup's drop-down entry or button (`tooltipFunc`,
+     `AddModComparisonTooltip`, the enchanted, anointed or saved item's
+     `AddItemTooltip`, a notable's anoint comparison). Upstream caches
+     applied enemy modifiers by identity, so a flask's copy in the editor
+     applies its `EnemyModifier`s again (`apply_enemy_modifiers` counts
+     equal mods). A rebuild of cluster subgraphs that shared an id
+     (upstream asserts) falls back. All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

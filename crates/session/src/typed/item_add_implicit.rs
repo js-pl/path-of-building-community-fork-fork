@@ -34,6 +34,8 @@ struct ListMod {
     /// The mod's id (`defaultOrder` of Exarch and Eater mods, `id` of
     /// vestigial ones)
     id: String,
+    /// A vestigial mod's unique (`uniqueTitle`)
+    unique_title: Option<String>,
     default_sort_order: usize,
     sort_value: Option<f64>,
     sort_values: HashMap<String, f64>,
@@ -164,6 +166,7 @@ impl<'d> TypedSession<'d> {
                         m: m.clone(),
                         typ,
                         id: m.id.clone(),
+                        unique_title: None,
                         default_sort_order: 0,
                         sort_value: None,
                         sort_values: HashMap::new(),
@@ -249,6 +252,7 @@ impl<'d> TypedSession<'d> {
                     m: Arc::new(m.clone()),
                     typ: "vestigial",
                     id: id.clone(),
+                    unique_title: Some(title.clone()),
                     default_sort_order: 0,
                     sort_value: None,
                     sort_values: HashMap::new(),
@@ -520,6 +524,12 @@ impl<'d> TypedSession<'d> {
 
     /// Add: `SetDisplayItem(addModifier())`
     pub(super) fn add_implicit_popup_save(&mut self, p: &AddImplicitPopup) -> Result<()> {
+        let item = self.add_implicit_save_item(p)?;
+        self.set_display_item_value(Some(item))
+    }
+
+    /// The item the save button makes
+    pub(super) fn add_implicit_save_item(&self, p: &AddImplicitPopup) -> Result<Item> {
         let item = if p.source() == "CUSTOM" {
             let display = self.display_item.as_ref().ok_or("no item in the editor")?;
             let mut item = Item::new(&self.data.item_context(), &display.build_raw(), None, false)?;
@@ -543,7 +553,7 @@ impl<'d> TypedSession<'d> {
                 .ok_or(NIL_INDEX)?;
             self.with_implicit(m)?
         };
-        self.set_display_item_value(Some(item))
+        Ok(item)
     }
 
     /// `describePopups` of the popup
@@ -589,5 +599,33 @@ impl<'d> TypedSession<'d> {
             ],
             "controls": controls,
         })
+    }
+}
+
+impl<'d> TypedSession<'d> {
+    /// A group entry's mod, unique title and whether it replaces the
+    /// implicits (a vestigial group is its mod)
+    pub(super) fn implicit_group_entry(
+        &self,
+        p: &AddImplicitPopup,
+        idx: Option<usize>,
+    ) -> Option<(Arc<Affix>, Option<String>, bool)> {
+        let g = p.groups.get(idx?.wrapping_sub(1))?;
+        if p.vestigial {
+            let m = p.mod_list.get(g.mod_list_index - 1)?.first()?;
+            Some((m.m.clone(), m.unique_title.clone(), true))
+        } else {
+            Some((g.m.clone(), None, false))
+        }
+    }
+
+    /// A mod entry's mod and unique title
+    pub(super) fn implicit_mod_entry(
+        &self,
+        p: &AddImplicitPopup,
+        idx: Option<usize>,
+    ) -> Option<(Arc<Affix>, Option<String>, bool)> {
+        let m = p.select_list().get(idx?.wrapping_sub(1))?;
+        Some((m.m.clone(), m.unique_title.clone(), false))
     }
 }

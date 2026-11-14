@@ -142,6 +142,12 @@ fn translate_orbit_index(src: i64, src_n: i64, dest_n: i64) -> i64 {
     table.get(src as usize).copied().unwrap_or(0)
 }
 
+/// A rebuild after two subgraphs shared an id: upstream fails it
+/// (`Entrance for subGraph not linked to parent socket???`) and leaves the
+/// spec broken, which the typed spec doesn't model
+pub const SUB_GRAPH_COLLISION: &str =
+    "not ported: rebuilding cluster subgraphs that shared an id (upstream fails)";
+
 impl<'t> PassiveSpec<'t> {
     /// `GetJewel(itemId)`
     fn jewel<'i>(&self, tab: &'i ItemsTab, id: Option<f64>) -> Option<&'i Item> {
@@ -274,6 +280,9 @@ impl<'t> PassiveSpec<'t> {
     /// `BuildClusterJewelGraphs()` after an edit: the subgraphs removed,
     /// keeping their allocated nodes to allocate again, and built anew
     pub fn rebuild_cluster_jewel_graphs(&mut self, tab: &ItemsTab, data: &ItemData) -> Result<()> {
+        if self.sub_graph_collision {
+            return Err(SUB_GRAPH_COLLISION.into());
+        }
         for (_, sg) in self.sub_graphs.iter() {
             for &id in &sg.nodes {
                 if self.index.remove(&id).is_some() {
@@ -369,6 +378,9 @@ impl<'t> PassiveSpec<'t> {
         }
         let size_index = cj.size_index as i64;
         let node_id = id + ((size_index as u32) << 4);
+        if self.sub_graphs.contains(node_id) {
+            self.sub_graph_collision = true;
+        }
         self.sub_graphs.insert(node_id, Default::default());
         let proxy_node = ej
             .proxy

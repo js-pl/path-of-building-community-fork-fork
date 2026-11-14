@@ -530,6 +530,9 @@ fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
 /// The fallbacks the typed session still has, as substrings of their
 /// reasons: any other fails the test. Remove one once it is typed.
 const KNOWN_FALLBACKS: &[&str] = &[
+    // Upstream fails the rebuild after two cluster subgraphs shared an id
+    // (`Entrance for subGraph not linked to parent socket???`)
+    "rebuilding cluster subgraphs that shared an id",
     // The tooltip's stat comparison, where the translation carries another
     // build's change of upstream's shared data (see `compare_display`)
     "aligned with a fresh translation",
@@ -1373,6 +1376,21 @@ fn items_edits_match(d: &mut Dispatcher) {
                                 break;
                             }
                             let st = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                            // Hover tooltips: an entry of an input, and the
+                            // save button
+                            let inputs = st["ok"]["popups"][0]["controls"].clone();
+                            if let Some(c) = pick(&mut rng, &inputs).filter(|c| {
+                                c["path"] != "popup.sort" && c["path"] != "popup.notableDB.sort"
+                            }) {
+                                let n = c["list"].as_array().map_or(1, Vec::len);
+                                let req = json!({"cmd": "controlTooltip", "path": c["path"], "index": rng.below(n) + 1});
+                                compare(d, &req, &format!("step {step}"), &mut out);
+                                *popup_inputs.entry("tooltip".into()).or_default() += 1;
+                            }
+                            if rng.below(2) == 0 {
+                                let req = json!({"cmd": "controlTooltip", "path": "popup.save"});
+                                compare(d, &req, &format!("step {step}"), &mut out);
+                            }
                             let mut closing: Vec<String> = st["ok"]["popups"][0]["buttons"]
                                 .as_array()
                                 .into_iter()
@@ -1462,6 +1480,12 @@ fn items_edits_match(d: &mut Dispatcher) {
                 let e = d.typed_error.clone().unwrap_or_default();
                 assert!(e.starts_with("not ported"), "{id}: {label} {r}: {e}");
                 skipped.push(format!("{id}: {r}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's own assert leaves its session broken for
+                    // the builds after: a fresh one for them
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
                 break;
             }
             let t = Instant::now();

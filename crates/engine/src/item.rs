@@ -670,7 +670,7 @@ impl Item {
     }
 
     /// `IsVariantGroupOptionEligible`
-    fn variant_group_option_eligible(&self, group: i64, variant: i64) -> bool {
+    pub fn variant_group_option_eligible(&self, group: i64, variant: i64) -> bool {
         self.variant_groups
             .get(&group)
             .and_then(|g| g.get(&variant))
