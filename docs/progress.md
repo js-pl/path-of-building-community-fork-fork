@@ -754,9 +754,12 @@ What remains for the full migration, in order:
      of Rage) is active in the first `initEnv` and gone from the next;
      triggered by General's Cry it is the main skill, and `calcs.mirages`
      does not find it again (`UPSTREAM_GEM_LIST_FAILS` in
-     `skills_gem_select_match`). The typed engine keeps the flags as the
-     data loads them, as a skill's first calculation upstream sees them,
-     and does not fail. The list also shows its group and the
+     `skills_gem_select_match`). The typed engine sets the flag from the
+     shared stat maps at load (`engine::data`), as every calculation
+     after a skill's first one upstream sees it, the intended behaviour
+     (the gem's disabled effect stays off); only a fresh process's first
+     calculation of such a skill differs
+     (`vaal_global_effect_matches_after_the_first_calculation`). The list also shows its group and the
      shown one again (`SetDisplayGroup`), and gives the slot's name box a
      sort cache by DPS.
      Choosing a gem by name in a gem slot (`GemSelectControl`'s text,

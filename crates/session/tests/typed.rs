@@ -5613,8 +5613,9 @@ fn skills_sockets_match() {
 /// (`calcs.buildActiveSkill`), which no longer has it, so nothing is
 /// cached and `GlobalCache.cachedData[mode][uuid]` is indexed nil. In the
 /// application the DPS sort's coroutine dies silently and leaves the gem
-/// data in the slot. The typed engine takes `hasGlobalEffect` as the data
-/// loads it, as upstream's first calculation of a skill does, and answers.
+/// data in the slot. The typed engine has `hasGlobalEffect` as every
+/// later calculation upstream sees it (`engine::data`), so the candidate's
+/// group has no Cleave of Rage, and answers.
 const UPSTREAM_GEM_LIST_FAILS: &[(&str, &str, &str)] = &[(
     "3.13-generals-perforate-zerker",
     "Vaal Cleave of Rage",
@@ -5743,5 +5744,88 @@ fn skills_gem_select_match() {
         .map(|(b, _, _)| b.to_string())
         .collect();
     assert_eq!(upstream_fails, expected, "the gem lists that fail upstream");
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// A Vaal transfigured gem with its second effect disabled (Vaal Cleave of
+/// Rage without Cleave of Rage) as the main skill group, its second skill
+/// chosen. Cleave of Rage's `gain_x_rage_on_attack_hit` maps to a
+/// `GlobalEffect` mod in `data.skillStatMap`, which upstream copies into the
+/// skill's stat map, setting `hasGlobalEffect`, only when a calculation
+/// first looks the stat up: the first calculation of a process still has
+/// Cleave of Rage (the main skill, with no hit on these weapons), every later
+/// one does not. The typed engine has the flag from the load, as every
+/// calculation after the first: the typed session differs from a fresh
+/// translated one only on the load, and agrees after an edit and on a
+/// load again.
+#[test]
+fn vaal_global_effect_matches_after_the_first_calculation() {
+    let (_, path) = corpus()
+        .into_iter()
+        .find(|(id, _)| id == "3.13-generals-perforate-zerker")
+        .unwrap();
+    let xml = std::fs::read_to_string(path).unwrap();
+    let load = |d: &mut Dispatcher, xml: &str| {
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "load: {:?}", d.typed_error);
+    };
+    // The variant, saved
+    let mut d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+    load(&mut d, &xml);
+    let g = answer(d.request(r#"{"cmd":"addSocketGroup"}"#), "add")["ok"]["index"]
+        .as_u64()
+        .unwrap();
+    for r in [
+        json!({"cmd": "setGem", "group": g, "gem": 1, "name": "Vaal Cleave of Rage"}),
+        json!({"cmd": "control", "path": "skills.groupList", "sel": g}),
+        json!({"cmd": "control", "path": "skills.gemSlot1EnableGlobal2", "state": false}),
+        json!({"cmd": "setMainSocketGroup", "index": g}),
+    ] {
+        answer(d.request(&r.to_string()), "variant");
+    }
+    let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+    let saved = saved["ok"]
+        .as_str()
+        .or(saved["ok"]["xml"].as_str())
+        .unwrap()
+        .to_string();
+    let gem = saved.find("nameSpec=\"Vaal Cleave of Rage\"").unwrap();
+    let start = saved[..gem].rfind("<Skill ").unwrap();
+    let end = start + saved[start..].find('>').unwrap();
+    // Its second skill, Cleave of Rage, chosen
+    let mut tag = saved[start..end].to_string();
+    for attr in ["mainActiveSkill=\"", "mainActiveSkillCalcs=\""] {
+        let a = tag.find(attr).unwrap() + attr.len();
+        let b = a + tag[a..].find('"').unwrap();
+        tag.replace_range(a..b, "2");
+    }
+    let variant = format!("{}{tag}{}", &saved[..start], &saved[end..]);
+    assert!(variant.contains("enableGlobal2=\"false\""), "{variant}");
+
+    // A fresh translation: its first calculation still has Cleave of Rage
+    let mut d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+    load(&mut d, &variant);
+    let mut first = Vec::new();
+    compare_views(&mut d, &["outputs"], "load", &mut first);
+    assert!(
+        !first.is_empty(),
+        "upstream's first calculation no longer differs: hasGlobalEffect may be set at load now"
+    );
+    let mut out = Vec::new();
+    answer(
+        d.request(r#"{"cmd":"setGem","group":3,"gem":1,"level":19}"#),
+        "edit",
+    );
+    compare_views(&mut d, &["state", "skills", "outputs"], "edit", &mut out);
+    load(&mut d, &variant);
+    compare_views(
+        &mut d,
+        &["state", "skills", "outputs"],
+        "load again",
+        &mut out,
+    );
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
