@@ -18,8 +18,12 @@ use engine::tree::NodeType;
 use lua::ljtab::LjMap;
 
 /// `data.timelessJewelSeedMin` and `Max`, by type from 1
-const SEED_MIN: [f64; 6] = [100.0, 10000.0, 500.0, 2000.0, 100.0, 100.0];
-const SEED_MAX: [f64; 6] = [8000.0, 18000.0, 8000.0, 10000.0, 8000.0, 8000.0];
+const SEED_MIN: [f64; 11] = [
+    100.0, 10000.0, 500.0, 2000.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+];
+const SEED_MAX: [f64; 11] = [
+    8000.0, 18000.0, 8000.0, 10000.0, 8000.0, 8000.0, 8000.0, 8000.0, 8000.0, 8000.0, 8000.0,
+];
 
 /// `reverseTotalModIDs`
 const TOTAL_IDS: [&str; 9] = [
@@ -125,15 +129,28 @@ impl<'d> TypedSession<'d> {
         let spec = &self.build.spec;
         let tree = spec.tree;
         let jewel = p.jewel();
-        if jewel >= 7 {
-            return Err(unported("an Abyss jewel"));
-        }
+        let abyss = jewel >= 7;
         let Some(socket_node) = tree.node(socket).filter(|n| n.kind == NodeType::Socket) else {
             return Ok(None);
         };
         if socket_node.nodes_in_radius.is_none() {
             return Ok(None);
         }
+        // Reclaimed Malevolence changes the socket's path to the class
+        // start and an ascendancy notable
+        let zorath = if jewel == 11 {
+            let path = spec
+                .index
+                .get(&socket)
+                .and_then(|&i| spec.shortest_path_to_class_start(i));
+            if path.is_none() {
+                return Ok(None);
+            }
+            path
+        } else {
+            None
+        };
+        let ascendancy = spec.ascend_class_name();
         let t = self
             .data
             .timeless()
@@ -282,6 +299,9 @@ impl<'d> TypedSession<'d> {
         let (mut attribute_smalls, mut other_smalls) = (0.0, 0.0);
         let has_total = desired.iter().any(|d| d.id == "totalStat");
         for (id, _) in radius.iter() {
+            if abyss {
+                break;
+            }
             let Some(n) = tree.node(id) else { continue };
             if roots.contains(&id) || n.kind == NodeType::Socket || n.kind == NodeType::Keystone {
                 continue;
@@ -311,10 +331,58 @@ impl<'d> TypedSession<'d> {
         }
         let protected = |id: u32| -> bool { tree.node(id).is_some_and(|n| p.is_protected(&n.dn)) };
         let mult = if jewel == 5 { 20.0 } else { 1.0 };
-        let mut results: LjMap<Vec<(String, Matched)>> = LjMap::default();
-        let mut weights: LjMap<f64> = LjMap::default();
+        let mut seeds = Vec::new();
         let mut seed = SEED_MIN[jewel - 1] * mult;
-        let last = SEED_MAX[jewel - 1] * mult;
+        while seed <= SEED_MAX[jewel - 1] * mult {
+            seeds.push(seed);
+            seed += mult;
+        }
+        let targets: Vec<(u32, bool)> = targets.iter().map(|(id, _)| (id, protected(id))).collect();
+        // Militant Faith adds a Devotion total the first time a seed keeps
+        // a protected notable; seeds before that one score without it
+        let base = desired.clone();
+        let mut with_total = desired.clone();
+        let mut added_at: Option<(f64, usize)> = None;
+        if jewel == 4
+            && !base.iter().any(|d| d.id == "totalStat")
+            && targets.iter().any(|(_, p)| *p)
+        {
+            with_total.push(Desired {
+                id: "totalStat".into(),
+                weight: 0.1,
+                weight2: 0.0,
+                display: "Devotion".into(),
+                idx: desired_idx + 1,
+            });
+            'seeds: for &seed in &seeds {
+                for (pos, &(target, protected)) in targets.iter().enumerate() {
+                    if !protected {
+                        continue;
+                    }
+                    let lut = t.read_lut(seed, target, jewel)?;
+                    match lut.first() {
+                        None => continue,
+                        Some(&v) if v >= ADDITIONS => continue 'seeds,
+                        Some(_) => {
+                            added_at = Some((seed, pos));
+                            break 'seeds;
+                        }
+                    }
+                }
+            }
+        }
+        let desired = if added_at.is_some() {
+            with_total.clone()
+        } else {
+            base.clone()
+        };
+        // The desired nodes at a target of a seed
+        let desired_at = |seed: f64, pos: usize| -> &Vec<Desired> {
+            match added_at {
+                Some((s, p)) if seed > s || (seed == s && pos >= p) => &with_total,
+                _ => &base,
+            }
+        };
         let add = |list: &mut Vec<(String, Matched)>, id: &str, node: u32, w: f64| {
             let i = match list.iter().position(|(k, _)| k == id) {
                 Some(i) => i,
@@ -328,49 +396,107 @@ impl<'d> TypedSession<'d> {
             m.names
                 .push(tree.node(node).map_or(String::new(), |n| n.dn.to_string()));
         };
-        while seed <= last {
-            let key = seed as u32;
+        // Each seed on its own: its weight, its matches and whether it is
+        // dropped
+        let score = |seed: f64| -> Result<(f64, Vec<(String, Matched)>, bool)> {
             let mut weight = 0.0;
             let mut list: Vec<(String, Matched)> = Vec::new();
             let mut dropped = false;
-            for (target, _) in targets.iter() {
+            if abyss {
+                // The affected nodes, in the order upstream's table gets
+                // them
+                let read = t.read_abyss_in(
+                    seed,
+                    socket,
+                    jewel,
+                    zorath.as_deref(),
+                    ascendancy.as_deref(),
+                )?;
+                let mut affected: LjMap<usize> = LjMap::default();
+                for (i, (n, _)) in read.iter().enumerate() {
+                    affected.insert(*n, i);
+                }
+                for (target, &i) in affected.iter() {
+                    let tree_node = tree.node(target);
+                    let mut score = tree_node.is_some_and(|n| {
+                        !roots.contains(&target)
+                            && n.kind != NodeType::Socket
+                            && n.kind != NodeType::Keystone
+                    });
+                    if score
+                        && tree_node
+                            .is_some_and(|n| n.ascendancy_name.is_some() && p.is_protected(&n.dn))
+                    {
+                        dropped = true;
+                        break;
+                    }
+                    if score && filter && zorath.is_none() {
+                        let allocated =
+                            granted.contains(&target) || spec.alloc_nodes.contains(target);
+                        let d = match spec.index.get(&target) {
+                            Some(&k) => spec.nodes[k].path_dist,
+                            None => return Err(unported("a node the spec does not have")),
+                        };
+                        score = allocated || (distance > 0.0 && d <= distance);
+                    }
+                    if !score {
+                        continue;
+                    }
+                    for c in read[i].1.iter() {
+                        // `resolveAbyssJewelComponent`
+                        let changed = match c.kind {
+                            1 => {
+                                c.id.checked_sub(ADDITIONS)
+                                    .and_then(|k| t.nodes.get(k as usize))
+                            }
+                            2 => t.additions.get(c.id as usize),
+                            _ => None,
+                        };
+                        let Some(changed) = changed else { continue };
+                        let Some(d) = base.iter().find(|d| *d.id == *changed.node.id) else {
+                            continue;
+                        };
+                        // `getAbyssJewelComponentRoll(component, node, statIndex)`
+                        let roll = |k: usize| -> Option<Option<f64>> {
+                            let (_, stat) = changed.stats.iter().find(|(_, s)| s.index == k)?;
+                            let r = c.rolls.get(stat.index.wrapping_sub(1)).copied();
+                            Some(r.map(|r| if r < 0.0 && stat.min >= 0.0 { -r } else { r }))
+                        };
+                        let mut w = d.weight * roll(1).flatten().unwrap_or(1.0);
+                        if let Some(r2) = roll(2) {
+                            w += d.weight2 * r2.unwrap_or(1.0);
+                        }
+                        add(&mut list, &d.id, target, w);
+                        weight += w;
+                    }
+                }
+            }
+            for (pos, &(target, is_protected)) in targets.iter().enumerate() {
+                if dropped {
+                    break;
+                }
                 let lut = t.read_lut(seed, target, jewel)?;
                 if lut.is_empty() {
                     continue;
                 }
-                let mut cur_id: Option<String> = None;
-                let is_protected = protected(target);
-                if jewel == 4 && is_protected {
-                    if lut[0] >= ADDITIONS {
-                        dropped = true;
-                        break;
-                    }
-                    if !desired.iter().any(|d| d.id == "totalStat") {
-                        desired.push(Desired {
-                            id: "totalStat".into(),
-                            weight: 0.1,
-                            weight2: 0.0,
-                            display: "Devotion".into(),
-                            idx: desired_idx + 1,
-                        });
-                    }
+                if jewel == 4 && is_protected && lut[0] >= ADDITIONS {
+                    dropped = true;
+                    break;
                 }
+                let desired = desired_at(seed, pos);
+                let has_total = desired.iter().any(|d| d.id == "totalStat");
                 let cur = if lut[0] >= ADDITIONS && !is_protected {
                     t.nodes.get((lut[0] - ADDITIONS) as usize)
                 } else {
                     t.additions.get(lut[0] as usize)
                 };
-                if let Some(c) = cur {
-                    cur_id = Some(c.node.id.to_string());
-                }
-                if desired.iter().any(|d| d.id == "totalStat")
-                    && cur_id.as_deref().is_some_and(|c| TOTAL_IDS.contains(&c))
-                {
+                let mut cur_id = cur.map(|c| c.node.id.to_string());
+                if has_total && cur_id.as_deref().is_some_and(|c| TOTAL_IDS.contains(&c)) {
                     cur_id = Some("totalStat".into());
                 }
-                let find = |id: &Option<String>| -> Option<Desired> {
+                let find = |id: &Option<String>| -> Option<&Desired> {
                     let id = id.as_deref()?;
-                    desired.iter().find(|d| d.id == id).cloned()
+                    desired.iter().find(|d| d.id == id)
                 };
                 if jewel == 1 {
                     let header = lut.len();
@@ -410,7 +536,8 @@ impl<'d> TypedSession<'d> {
                 }
             }
             if !dropped {
-                if let Some(d) = desired.iter().find(|d| d.id == "totalStat").cloned() {
+                let desired = desired_at(seed, targets.len());
+                if let Some(d) = desired.iter().find(|d| d.id == "totalStat") {
                     let i = match list.iter().position(|(k, _)| k == "totalStat") {
                         Some(i) => i,
                         None => {
@@ -434,13 +561,24 @@ impl<'d> TypedSession<'d> {
                         < *w
                 });
             }
+            Ok((weight, list, dropped))
+        };
+        let scored = engine::parallel::map(
+            seeds.clone(),
+            engine::parallel::Threads::available(),
+            |seed| score(seed),
+        );
+        let mut results: LjMap<Vec<(String, Matched)>> = LjMap::default();
+        let mut weights: LjMap<f64> = LjMap::default();
+        for (seed, r) in seeds.into_iter().zip(scored) {
+            let (weight, list, dropped) = r?;
+            let key = seed as u32;
             weights.insert(key, weight);
             // `resultNodes[curSeed] = { }`, then nil for a seed dropped
             results.insert(key, list);
             if dropped {
                 results.remove(key);
             }
-            seed += mult;
         }
         Ok(Some(SocketSearch {
             results,
@@ -688,6 +826,36 @@ const JEWELS: [JewelText; 6] = [
     ),
 ];
 
+/// `GetJewelItem`'s Abyss jewels: name, base and the seed's line (`{}`
+/// for the seed)
+const ABYSS_JEWELS: [(&str, &str, &str); 5] = [
+    (
+        "Festering Vengeance",
+        "Murderous Eye Jewel",
+        "Subjugating {} souls in the thrall of Tecrod",
+    ),
+    (
+        "Extinguishing Grasp",
+        "Searching Eye Jewel",
+        "Subjugating {} souls in the thrall of Ulaman",
+    ),
+    (
+        "Baleful Dominion",
+        "Hypnotic Eye Jewel",
+        "Subjugating {} souls in the thrall of Kurgal",
+    ),
+    (
+        "Destructive Aspiration",
+        "Ghastly Eye Jewel",
+        "Subjugating {} souls in the thrall of Amanamu",
+    ),
+    (
+        "Reclaimed Malevolence",
+        "Assembled Eye Jewel",
+        "Binding {} souls to phylacteries to sustain Zorath",
+    ),
+];
+
 /// Militant Faith's devotion variants after its conquerors
 const DEVOTION_VARIANTS: [(&str, &str); 16] = [
     ("Totem Damage", "4% increased Totem Damage per 10 Devotion"),
@@ -773,8 +941,17 @@ impl<'d> TypedSession<'d> {
         } else {
             format!("{}\n", sh.conqueror - 1)
         };
+        if let Some((name, base, line)) = ABYSS_JEWELS.get(sh.jewel.wrapping_sub(7)) {
+            let line = line.replace("{}", &seed);
+            return Ok((
+                format!(
+                    "{name} {label}{base}\nLeague: Allflame\nLimited to: 1 Historic\nImplicits: 0\n{line}\nPassives affected are Conquered by the Abyssal\nHistoric\n"
+                ),
+                None,
+            ));
+        }
         let Some((name, conquerors, conquered)) = JEWELS.get(sh.jewel.wrapping_sub(1)) else {
-            return Err(unported("an Abyss jewel's item"));
+            return Err(unported("a timeless jewel's item"));
         };
         let mut text =
             format!("{name} {label}Timeless Jewel\nLeague: Legion\nLimited to: 1 Historic\n");

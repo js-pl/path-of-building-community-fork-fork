@@ -5249,6 +5249,10 @@ fn timeless_search_match() {
             (6, &[3, 7][..]),
             (1, &[6, 15, 30][..]),
             (4, &[2, 6, 10][..]),
+            (7, &[3, 9][..]),
+            (8, &[4, 12][..]),
+            (9, &[2, 6, 40][..]),
+            (10, &[5, 8][..]),
         ] {
             steps.push(c("jewelSelect", json!({"sel": jewel})));
             steps.push(c("socketSelect", json!({"sel": 4})));
@@ -5265,6 +5269,21 @@ fn timeless_search_match() {
             steps.push(c("searchResults", json!({"sel": 2})));
             steps.push(json!({"tips": true}));
         }
+        // Reclaimed Malevolence: an ascendancy outcome required, on sockets
+        // the class start's path may run through
+        steps.push(c("jewelSelect", json!({"sel": 11})));
+        steps.push(c("nodeSelect", json!({"sel": 3})));
+        steps.push(c("nodeSlider", json!({"val": 0.4})));
+        steps.push(c("nodeSelect", json!({"sel": 9})));
+        steps.push(c("abyssAscendancySelect", json!({"sel": 2})));
+        for socket in 2..=9 {
+            steps.push(c("socketSelect", json!({"sel": socket})));
+            steps.push(search.clone());
+            steps.push(json!({"tips": true}));
+        }
+        steps.push(c("abyssAscendancySelect", json!({"sel": 1})));
+        steps.push(search.clone());
+        steps.push(json!({"tips": true}));
         steps.extend([
             // Militant Faith with the socket's notables protected
             c("socketFilter", json!({"state": true})),

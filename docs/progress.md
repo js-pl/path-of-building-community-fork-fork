@@ -467,11 +467,17 @@ What remains for the full migration, in order:
    the desired and fallback lists, the lists' edit boxes, Reset, the trade
    choices the tab remembers, and the tooltips; `find_timeless_jewel_match`
    drives them on three builds. Its Search is typed too
-   (`typed/timeless_seeds.rs`) but for the Abyss jewels: the desired and
+   (`typed/timeless_seeds.rs`), the Abyss jewels' included (the affected
+   nodes from their tables, Zorath's along the socket's path to the class
+   start in its `pairs` order and the build's ascendancy, rolls from the
+   components): the desired and
    fallback rows read as weights (required, minimum, the totals, protected
    notables), each seed scored from the jewel's look-up table on the
-   socket's notables, the results by total weight (the radius and the
-   seeds kept in LuaJIT's `pairs` order, so ties come out the same), All
+   socket's notables, the seeds scored on `engine::parallel` (each on its
+   own; Militant Faith's Devotion total, which upstream adds the first
+   time a seed keeps a protected notable, is found first), the results by
+   total weight (the radius and the seeds kept in LuaJIT's `pairs` order,
+   so ties come out the same), All
    Sockets, and the results list: rows, selection, each row's tooltip (the
    nodes it changes, the jewel's stat differences) and double click, which
    adds the jewel and with Socket Jewel sockets it.
@@ -484,8 +490,8 @@ What remains for the full migration, in order:
    fallback mode's stat, written to the fallback list; a line the parser
    does not know weighs nothing (`AddList(nil)`). Generate on passives
    with several stats (Glorious Vanity's, the Abyss jewels', which
-   upstream describes with `describeStats`), the Abyss search, the trade
-   URL and the tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
+   upstream describes with `describeStats`), the trade URL and the
+   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
    notable, a protected notable) stay on the translation, and so does
    Militant Faith's item while a devotion variant is Any (upstream picks
    one at random). Against the oracle, a row tooltip's node names and the
