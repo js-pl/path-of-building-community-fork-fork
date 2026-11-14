@@ -676,6 +676,16 @@ What remains for the full migration, in order:
      by name, the search by names, skills or both, the rows' tooltips,
      adding (Add, a double click, a drag), reordering, Remove and Delete,
      and Save.
+     The Skills tab's socket group list (`session::typed::group_list`,
+     `skills_group_list_match`): rows (labels with their gem colours,
+     disabled, active and Full DPS marks), the selection, which shows the
+     group (`SetDisplayGroup`), the rows' tooltips (empty for a group the
+     sidebar's calculation never listed), New, Delete with its
+     confirmation (an empty group goes at once), the Delete key and
+     Delete All. Upstream holds the shown group and the selection by
+     reference; socket groups carry an identity (`GroupUid`, which clones
+     keep and equality ignores) for them. Every rebuild clamps the Calcs
+     tab's skill to the list, as the Calcs tab's calculation does.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

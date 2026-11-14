@@ -9,6 +9,7 @@ mod config;
 pub mod display_stats;
 mod gem_select;
 mod geometry;
+mod group_list;
 mod item_add_implicit;
 mod item_add_modifier;
 mod item_anoint;
@@ -312,6 +313,10 @@ pub struct TypedSession<'d> {
     gem_quality_nil: bool,
     /// The Skills tab's gem options
     gem_options: skills_controls::GemOptions,
+    /// `SkillsTab.displayGroup`, the group shown
+    display_group: Option<u64>,
+    /// The socket group list's selection
+    group_sel: group_list::GroupSel,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
     /// Whether the Party tab was laid out since the build loaded: its
@@ -370,6 +375,8 @@ impl<'d> TypedSession<'d> {
             undo: HashMap::new(),
             gem_quality_nil: false,
             gem_options: skills_controls::GemOptions::load(None, None),
+            display_group: None,
+            group_sel: Default::default(),
             display_item: None,
             party_laid_out: Default::default(),
             party_tab: None,
@@ -392,6 +399,8 @@ impl<'d> TypedSession<'d> {
             s.section("Skills"),
             s.build.skills.as_ref().map(|k| k.default_gem_quality),
         );
+        // `SetActiveSkillSet` shows the set's first group
+        s.reset_display_group();
         s.config_mods_built();
         s.clamp_main_socket_group();
         s.load_specs()?;
@@ -419,6 +428,7 @@ impl<'d> TypedSession<'d> {
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
                 ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
+                ("skills", _) if Self::is_group_list_control(p) => self.group_list_json(p)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
                 ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {

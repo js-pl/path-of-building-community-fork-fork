@@ -4897,3 +4897,100 @@ fn spectre_library_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The Skills tab's socket group list, in the typed session as in the
+/// translated one: rows, selection, rows' tooltips, New, Delete with its
+/// confirmation, the Delete key, Delete All and reordering
+#[test]
+fn skills_group_list_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupList",
+        "skills.groupList.new",
+        "skills.groupList.delete",
+        "skills.groupList.deleteAll",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 11 == 3)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            let n = t["ok"]["skills.groupList"]["list"]
+                .as_array()
+                .map_or(0, Vec::len);
+            for index in 0..=n + 1 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.groupList", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |v: J| {
+            let mut r = json!({"cmd": "control", "path": "skills.groupList"});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            c(json!({"sel": 2})),
+            c(json!({"sel": 99})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"sel": 1, "moveTo": 4})),
+            c(json!({"sel": 3, "moveTo": 1})),
+            c(json!({"sel": 2})),
+            c(json!({"path": "skills.groupList.delete", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"sel": 1})),
+            c(json!({"key": "DELETE"})),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "pasteSocketGroup", "text": "Label: Pasted\r\nFireball 20/0 Default  1\r\n"}),
+            c(json!({"sel": 1, "click": true})),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "closePopup"}),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

@@ -87,7 +87,6 @@ impl TypedSession<'_> {
         let main = sb.main_socket_group;
         let used = sb.slot_enabled.clone();
         let counts: Vec<usize> = sb.groups.iter().map(Vec::len).collect();
-        let calcs_group = self.build.calcs.skill_number as usize;
         let Some(list) = self
             .build
             .skills
@@ -96,10 +95,17 @@ impl TypedSession<'_> {
         else {
             return;
         };
+        // The Calcs tab's calculation, which every rebuild makes, clamps
+        // its skill to the list
+        let n = self.build.calcs.skill_number.min(list.len().max(1) as f64);
+        self.build.calcs.skill_number = n;
+        let calcs_group = n as usize;
         for (gi, g) in list.iter_mut().enumerate() {
-            if all || gi + 1 == main || (g.enabled && used.get(gi).copied().unwrap_or(false)) {
+            let listed = gi + 1 == main || (g.enabled && used.get(gi).copied().unwrap_or(false));
+            if all || listed {
                 g.display_label = Some(display_label(g));
             }
+            g.display_skill_list |= listed;
             // The calculations write back the main group's active skill
             let n = counts.get(gi).copied().unwrap_or(0) as f64;
             if n > 0.0 {
@@ -280,6 +286,8 @@ impl TypedSession<'_> {
         self.group_mut(index)?;
         let list = self.skills_tab()?.socket_group_list_mut().unwrap();
         list.remove(index as usize - 1);
+        // `tab.displayGroup = nil`
+        self.display_group = None;
         let main = &mut self.build.info.main_socket_group;
         if *main >= index && *main > 1.0 {
             *main -= 1.0;
@@ -291,17 +299,17 @@ impl TypedSession<'_> {
     /// A socket group dragged within the skills tab's list
     /// (`SkillListClass:OnOrderChange`): the main socket group and the
     /// Calcs tab's skill follow their groups
-    fn move_socket_group(&mut self, req: &J) -> Result<J> {
+    pub(super) fn move_socket_group(&mut self, req: &J) -> Result<bool> {
         let sel = req["sel"].as_f64().unwrap_or(0.0);
         let to = super::list_order::move_to(req).unwrap_or(0.0);
         let Some(list) = self.skills_tab()?.socket_group_list_mut() else {
-            return Ok(json!([]));
+            return Ok(false);
         };
         if !(sel >= 1.0 && sel.fract() == 0.0 && sel as usize <= list.len()) {
-            return Ok(json!([]));
+            return Ok(false);
         }
         let Some(m) = super::list_order::move_row(list, sel as usize, to)? else {
-            return Ok(json!([]));
+            return Ok(false);
         };
         let (from, to) = (m.from as f64, m.to as f64);
         let follow = |i: f64| {
@@ -318,7 +326,7 @@ impl TypedSession<'_> {
         self.build.info.main_socket_group = follow(self.build.info.main_socket_group);
         self.build.calcs.skill_number = follow(self.build.calcs.skill_number);
         self.rebuild()?;
-        Ok(json!([]))
+        Ok(true)
     }
 
     /// `setGem`: a gem changed, or a new one added
@@ -385,6 +393,7 @@ impl TypedSession<'_> {
         let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
         let id = id.unwrap_or(tab.active_skill_set_id);
         tab.set_active_skill_set(id, data);
+        self.reset_display_group();
         self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
@@ -439,9 +448,6 @@ impl TypedSession<'_> {
             ("tree", name) => return self.tree_control(name, req),
             ("configTab", name) if name != "setManage" => {
                 return self.config_tab_control(name, req);
-            }
-            ("skills", "groupList") if super::list_order::move_to(req).is_some() => {
-                return self.move_socket_group(req);
             }
             ("build", "classDrop" | "ascendDrop" | "secondaryAscendDrop") => {
                 return match req.get("sel").and_then(J::as_f64) {
