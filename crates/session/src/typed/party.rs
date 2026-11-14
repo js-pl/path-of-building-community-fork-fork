@@ -324,8 +324,10 @@ impl TypedSession<'_> {
             .collect();
         let mut take = |name: &str| by_path.remove(&format!("party.{name}")).unwrap_or(J::Null);
         // `notesDesc`'s width wraps its label at every space (no string
-        // has a width headless): on the first layout only the import
-        // header sees it unwrapped
+        // has a width headless). `layoutControls` positions the controls
+        // by name: on the first layout `ShowAdvanceTools`, the first, sees
+        // the notes' height before their width wraps them; later controls
+        // and layouts see them wrapped
         let mut notes = take("notesDesc");
         let original = notes["label"].as_str().unwrap_or("").to_string();
         let wrapped = original
@@ -333,21 +335,19 @@ impl TypedSession<'_> {
             .filter(|w| !w.is_empty())
             .collect::<Vec<_>>()
             .join("\n");
-        let first = !self.party_laid_out.replace(true);
-        if !first {
-            notes["label"] = json!(wrapped);
-        }
+        notes["label"] = json!(wrapped);
         let header_wrapped = 8 + 16 + line_counter(&wrapped) + 4;
-        let header = if first {
+        let h = header_wrapped;
+        let first = !self.party_laid_out.replace(true);
+        let tools_h = if first {
             8 + 16 + line_counter(&original) + 4
         } else {
-            header_wrapped
+            h
         };
-        let h = header_wrapped;
         let mut rows: Vec<(i64, i64, J)> = Vec::new();
         let mut put = |x: i64, y: i64, c: J| rows.push((y, x, c));
         put(8, 8, notes);
-        put(8, header, take("importCodeHeader"));
+        put(8, h, take("importCodeHeader"));
         put(8, h + 20, take("importCodeIn"));
         put(-84, h + 22, take("importCodeState"));
         let mut d = take("importCodeDestination");
@@ -360,7 +360,7 @@ impl TypedSession<'_> {
         put(88, h + 68, take("clear"));
         let mut t = take("ShowAdvanceTools");
         t["state"] = json!(advanced);
-        put(148, h + 92, t);
+        put(148, tools_h + 92, t);
         put(176, h + 92, take("removeEffects"));
         put(8, h + 116, take("rebuild"));
         let edit = |name: &str, label: &str, buff: &str| {
@@ -434,7 +434,11 @@ impl TypedSession<'_> {
             put(0, mods_y + 18, simple("simpleEnemyMods", &enemy_mods));
             put(0, curses_y + 18, simple("simpleCurses", &curses));
         }
-        rows.sort_by_key(|r| (r.0, r.1));
+        rows.sort_by(|a, b| {
+            (a.0, a.1)
+                .cmp(&(b.0, b.1))
+                .then_with(|| a.2["path"].as_str().cmp(&b.2["path"].as_str()))
+        });
         let controls: Vec<J> = rows.into_iter().map(|(_, _, c)| c).collect();
         Ok(json!({ "controls": controls }))
     }

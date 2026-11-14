@@ -856,6 +856,7 @@ impl<'d> TypedSession<'d> {
             a.0.partial_cmp(&b.0)
                 .unwrap()
                 .then(a.1.partial_cmp(&b.1).unwrap())
+                .then_with(|| a.2["path"].as_str().cmp(&b.2["path"].as_str()))
         });
         Ok(J::Array(out.into_iter().map(|(_, _, d)| d).collect()))
     }
