@@ -63,6 +63,8 @@ pub enum ItemPopup {
     RenameShared(Box<super::shared_lists::RenameShared>),
     RenameSpec(Box<super::spec_sets::RenameSpec>),
     RenameSet(Box<super::item_sets::RenameSet>),
+    ImportTree(Box<super::tree_import::ImportTree>),
+    ExportTree(Box<super::tree_import::ExportTree>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
         title: String,
@@ -227,6 +229,20 @@ impl<'d> TypedSession<'d> {
             let mut p = p.clone();
             let r = self.rename_set_control(&mut p, name, req);
             self.editor.popups[0] = ItemPopup::RenameSet(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::ImportTree(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.import_tree_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::ImportTree(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::ExportTree(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.export_tree_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::ExportTree(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -406,6 +422,24 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::ManageSets(_), "close") => {
                 self.close_item_popup();
             }
+            // Manage Passive Trees' unnamed Import Tree, Export Tree, Done
+            (ItemPopup::ManageSpecs(_), "2") => self.open_import_tree(),
+            (ItemPopup::ManageSpecs(_), "3") => self.open_export_tree()?,
+            (ItemPopup::ManageSpecs(_), "4") | (ItemPopup::ExportTree(_), "done") => {
+                self.close_item_popup();
+            }
+            (ItemPopup::ExportTree(_), "copy") => {}
+            (ItemPopup::ExportTree(_), "shrink") => {
+                return Err(format!("{NOT_PORTED}: shrinking a tree link with PoEURL"));
+            }
+            (ItemPopup::ImportTree(mut p), "import") => {
+                let closes = self.import_tree(&mut p)?;
+                if closes {
+                    self.close_item_popup();
+                } else {
+                    self.editor.popups[0] = ItemPopup::ImportTree(p);
+                }
+            }
             (ItemPopup::RenameSet(p), "save") => {
                 // `main:ClosePopup()` after the changes
                 self.rename_set_save(&p)?;
@@ -552,6 +586,8 @@ impl<'d> TypedSession<'d> {
             ItemPopup::ManageSpecs(p) => self.describe_manage_specs(p),
             ItemPopup::RenameShared(p) => self.describe_rename_shared(p),
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
+            ItemPopup::ImportTree(p) => self.describe_import_tree(p),
+            ItemPopup::ExportTree(p) => self.describe_export_tree(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,
                 "lines": lines,

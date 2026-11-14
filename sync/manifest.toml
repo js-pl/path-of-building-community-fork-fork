@@ -84,7 +84,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/TradeQueryRateLimiter.lua" = { status = "todo" }
 "Classes/TradeQueryRequests.lua" = { status = "todo" }
 "Classes/TradeStatWeightMultiplierListControl.lua" = { status = "todo" }
-"Classes/TreeTab.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx crates/session/src/typed/tree.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/TreeTab.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx crates/session/src/typed/tree.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/spec_sets.rs crates/session/src/typed/tree_import.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/UndoHandler.lua" = { status = "partial", port = "crates/session/src/typed/undo.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/Bases/amulet.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/Bases/axe.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }

@@ -38,6 +38,7 @@ mod skills;
 mod spec_sets;
 pub mod tooltip;
 mod tree;
+mod tree_import;
 mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
