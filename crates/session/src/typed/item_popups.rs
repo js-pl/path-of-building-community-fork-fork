@@ -59,6 +59,8 @@ pub enum ItemPopup {
     Crucible(Box<super::item_crucible::CruciblePopup>),
     /// Manage Item Sets, and the name popup of a set
     ManageSets(Box<super::item_sets::ManageSets>),
+    ManageSpecs(Box<super::spec_sets::ManageSpecs>),
+    RenameSpec(Box<super::spec_sets::RenameSpec>),
     RenameSet(Box<super::item_sets::RenameSet>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
@@ -73,6 +75,10 @@ pub enum ItemPopup {
 pub enum Deletion {
     Item(f64),
     AllItems,
+    /// The tree spec at this index of the list
+    Spec {
+        index: usize,
+    },
     /// The set at this index of its list
     Set {
         kind: super::item_sets::SetKind,
@@ -156,8 +162,13 @@ impl<'d> TypedSession<'d> {
     pub fn item_popup_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let name = path.strip_prefix("popup.").unwrap_or(path);
-        let list_click = matches!(self.editor.popups.first(), Some(ItemPopup::ManageSets(m))
-            if name.split('.').next() == Some(m.kind_list()) || name.starts_with("sharedList"));
+        let list_click = match self.editor.popups.first() {
+            Some(ItemPopup::ManageSets(m)) => {
+                name.split('.').next() == Some(m.kind_list()) || name.starts_with("sharedList")
+            }
+            Some(ItemPopup::ManageSpecs(_)) => name.split('.').next() == Some("1"),
+            _ => false,
+        };
         if req["click"].as_bool() == Some(true) && !list_click {
             return self.item_popup_button(name);
         }
@@ -173,6 +184,27 @@ impl<'d> TypedSession<'d> {
             {
                 self.editor.popups[i] = ItemPopup::ManageSets(p);
             }
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::ManageSpecs(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.manage_specs_control(&mut p, name, req);
+            if let Some(i) = self
+                .editor
+                .popups
+                .iter()
+                .position(|x| matches!(x, ItemPopup::ManageSpecs(_)))
+            {
+                self.editor.popups[i] = ItemPopup::ManageSpecs(p);
+            }
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::RenameSpec(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.rename_spec_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::RenameSpec(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -304,6 +336,15 @@ impl<'d> TypedSession<'d> {
                 self.anoint_popup_save(&p)?;
                 self.close_item_popup();
             }
+            (ItemPopup::RenameSpec(p), "save") => {
+                self.rename_spec_save(&p)?;
+                self.sync_loadouts_and_rebuild()?;
+                self.close_item_popup();
+            }
+            (ItemPopup::RenameSpec(p), "cancel") => {
+                self.rename_spec_cancel(&p);
+                self.close_item_popup();
+            }
             (ItemPopup::RenameSet(p), "cancel") => {
                 self.rename_set_cancel(&p);
                 self.close_item_popup();
@@ -349,6 +390,7 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::RenameSet(p), "save") => {
                 // `main:ClosePopup()` after the changes
                 self.rename_set_save(&p)?;
+                self.sync_loadouts_and_rebuild()?;
                 self.close_item_popup();
             }
             (ItemPopup::Confirm { action, .. }, "confirm") => {
@@ -488,6 +530,8 @@ impl<'d> TypedSession<'d> {
             ItemPopup::Crucible(p) => self.describe_crucible_popup(p),
             ItemPopup::ManageSets(p) => self.describe_manage_sets(p),
             ItemPopup::RenameSet(p) => self.describe_rename_set(p),
+            ItemPopup::ManageSpecs(p) => self.describe_manage_specs(p),
+            ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,
                 "lines": lines,

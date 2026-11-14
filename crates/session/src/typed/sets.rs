@@ -37,6 +37,7 @@ impl TypedSession<'_> {
         if !self.build.items.item_order_list.is_empty() {
             self.populate_slots();
         }
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }
@@ -57,6 +58,7 @@ impl TypedSession<'_> {
         self.build
             .build_config_mods(&self.data.game.config, &self.data.parser)?;
         self.config_mods_built();
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }

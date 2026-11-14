@@ -43,6 +43,12 @@ impl<'d> TypedSession<'d> {
 
     /// What a frame does after `buildFlag` is set: both calculations again
     pub(super) fn rebuild(&mut self) -> Result<()> {
+        // A switch the loadouts made waits for the request's one calculation
+        if self.loadout.depth > 0 {
+            self.loadout.rebuild_pending = true;
+            return Ok(());
+        }
+        self.loadout.rebuild_pending = false;
         let data = self.data.calc_data();
         self.main = engine::calcs::build_output(
             &mut self.build,

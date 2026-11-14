@@ -475,7 +475,7 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `SelectSecondaryAscendClass(ascendClassId)`, which may be nil
-    fn select_secondary(&mut self, ascend_class_id: Option<i64>) -> Result<()> {
+    pub fn select_secondary(&mut self, ascend_class_id: Option<i64>) -> Result<()> {
         let Some(alternates) = &self.tree.alternate_ascendancies else {
             return Ok(());
         };

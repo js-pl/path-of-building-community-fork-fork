@@ -299,6 +299,7 @@ impl<'d> TypedSession<'d> {
         };
         tab.active_item_set_id = id;
         self.populate_slots();
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }
