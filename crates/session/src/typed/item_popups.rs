@@ -60,6 +60,7 @@ pub enum ItemPopup {
     /// Manage Item Sets, and the name popup of a set
     ManageSets(Box<super::item_sets::ManageSets>),
     ManageSpecs(Box<super::spec_sets::ManageSpecs>),
+    RenameShared(Box<super::shared_lists::RenameShared>),
     RenameSpec(Box<super::spec_sets::RenameSpec>),
     RenameSet(Box<super::item_sets::RenameSet>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
@@ -77,6 +78,13 @@ pub enum Deletion {
     AllItems,
     /// The tree spec at this index of the list
     Spec {
+        index: usize,
+    },
+    /// A shared item, or a shared item set
+    SharedItem {
+        index: usize,
+    },
+    SharedSet {
         index: usize,
     },
     /// The set at this index of its list
@@ -198,6 +206,13 @@ impl<'d> TypedSession<'d> {
             {
                 self.editor.popups[i] = ItemPopup::ManageSpecs(p);
             }
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::RenameShared(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.rename_shared_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::RenameShared(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -334,6 +349,10 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::Anoint(p), "save") => {
                 self.anoint_popup_save(&p)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::RenameShared(p), "save") => {
+                self.rename_shared_save(&p)?;
                 self.close_item_popup();
             }
             (ItemPopup::RenameSpec(p), "save") => {
@@ -531,6 +550,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::ManageSets(p) => self.describe_manage_sets(p),
             ItemPopup::RenameSet(p) => self.describe_rename_set(p),
             ItemPopup::ManageSpecs(p) => self.describe_manage_specs(p),
+            ItemPopup::RenameShared(p) => self.describe_rename_shared(p),
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,

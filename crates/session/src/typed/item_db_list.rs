@@ -537,6 +537,11 @@ impl TypedSession<'_> {
     }
 
     /// A row's item (1-based)
+    /// A row's item, for a drag
+    pub(super) fn item_db_row_item(&self, rare: bool, sel: f64) -> Result<Option<Arc<Item>>> {
+        self.item_db_row(rare, Some(sel))
+    }
+
     fn item_db_row(&self, rare: bool, index: Option<f64>) -> Result<Option<Arc<Item>>> {
         let Some(i) = index.filter(|i| *i >= 1.0 && i.fract() == 0.0) else {
             return Ok(None);
