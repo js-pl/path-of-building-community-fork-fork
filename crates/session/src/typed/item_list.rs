@@ -762,6 +762,8 @@ impl<'d> TypedSession<'d> {
                 self.confirm_delete_set(*kind, *index, *id)?;
                 self.sync_loadouts_and_rebuild()
             }
+            Deletion::Group { index, uid } => self.remove_group_at(*index, *uid, true),
+            Deletion::AllGroups => self.remove_all_groups(),
             Deletion::SharedItem { index } => self.confirm_delete_shared(*index, false),
             Deletion::SharedSet { index } => self.confirm_delete_shared(*index, true),
             Deletion::Spec { index } => {

@@ -140,10 +140,15 @@ impl TypedSession<'_> {
         }
         if !group.gem_list.is_empty() {
             process_socket_group(&mut group, &self.data.game.skills);
-            self.skills_tab()?
+            let list = self
+                .skills_tab()?
                 .socket_group_list_mut()
-                .ok_or("no skill set")?
-                .push(group);
+                .ok_or("no skill set")?;
+            list.push(group);
+            // The list selects and shows the new group
+            let n = list.len();
+            self.group_sel = super::group_list::GroupSel::at(n, list[n - 1].uid.0);
+            self.set_display_group(Some(n - 1));
         }
         self.rebuild()?;
         Ok(json!([]))

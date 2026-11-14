@@ -91,6 +91,12 @@ pub enum Deletion {
     SharedSet {
         index: usize,
     },
+    /// The Skills tab's socket group at this row, and all of them
+    Group {
+        index: usize,
+        uid: u64,
+    },
+    AllGroups,
     /// The set at this index of its list
     Set {
         kind: super::item_sets::SetKind,
