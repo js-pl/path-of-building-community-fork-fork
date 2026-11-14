@@ -559,8 +559,13 @@ What remains for the full migration, in order:
      a double click to activate a set, Copy, New, Rename (and F2) with the
      name popup, Delete with its confirmation, and a row's tooltip
      (`AddItemSetTooltip`); the shared list beside it is empty, as only
-     dragging fills it. The translated session lays out a popup's lists
-     with their own buttons. All in `items_edits_match`, with
+     dragging fills it. Manage Skill Sets and Manage Config Sets
+     (`skills.setManage`, `configTab.setManage`) the same, their unnamed
+     list as `popup.1` (a config set's copy is deep: `copyTable` without
+     `noRecurse`). The translated session lays out a popup's lists with
+     their own buttons, and unnamed lists by their index. A fractional
+     enemy level (the config edit "3.5") falls back: upstream's
+     `monsterAccuracyTable[3.5]` is nil and its calculation fails. All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test
