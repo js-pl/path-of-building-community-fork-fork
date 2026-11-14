@@ -16,7 +16,7 @@ use engine::skills::{ExplodeSource, SocketGroup, process_socket_group};
 use serde_json::{Value as J, json};
 
 /// `groupSlotDropList`: label and slot
-const SLOTS: [(&str, Option<&str>); 14] = [
+pub(super) const SLOTS: [(&str, Option<&str>); 14] = [
     ("None", None),
     ("Weapon 1", Some("Weapon 1")),
     ("Weapon 2", Some("Weapon 2")),
@@ -46,7 +46,7 @@ const PATHS: [&str; 6] = [
 #[derive(Clone, Debug)]
 pub struct DetailControls {
     label: String,
-    slot_sel: usize,
+    pub(super) slot_sel: usize,
     enabled: bool,
     full_dps: bool,
     count: String,

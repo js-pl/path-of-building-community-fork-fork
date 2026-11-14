@@ -3440,7 +3440,6 @@ fn tree_controls_match(d: &mut Dispatcher) {
         }
         let mut rng = Lcg(seed(&id));
         let mut out = Vec::new();
-        let mut power_compared = false;
         for step in 0..12 {
             if !out.is_empty() {
                 break;
@@ -3500,15 +3499,6 @@ fn tree_controls_match(d: &mut Dispatcher) {
             if std::env::var("SESSION_DUMP").is_ok() {
                 eprintln!("{id} {label}");
             }
-            // Node power within the depth chosen, before the first
-            // conversion (see `docs/progress.md` on converted General's
-            // Cry builds)
-            let converts = matches!(req["name"].as_str(), Some("convert" | "convertCopy"))
-                || req["path"] == "tree.specConvert";
-            if converts && !power_compared {
-                compare_node_power(d, &mut out);
-                power_compared = true;
-            }
             let r = req.to_string();
             let typed = answer(d.request(&r), "typed tree control");
             if !d.typed_active() {
@@ -3547,9 +3537,8 @@ fn tree_controls_match(d: &mut Dispatcher) {
             answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
         }
         if out.is_empty() {
-            if !power_compared {
-                compare_node_power(d, &mut out);
-            }
+            // Node power within the depth chosen
+            compare_node_power(d, &mut out);
             compare_saves(d, &format!("{id} after the tree controls"), &mut out);
         }
         if !out.is_empty() {
@@ -5513,6 +5502,98 @@ fn skills_gem_slots_match() {
             c("gemSlot1Delete", json!({"click": true})),
             c("groupList", json!({"sel": 1})),
             c("groupList", json!({"sel": k + 1})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's sockets line, Optimise Sockets and the imbued support's
+/// controls, in the typed session as in the translated one, as groups are
+/// shown, slots selected, sockets rebuilt and imbued supports cleared
+#[test]
+fn skills_sockets_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.socketsLabel",
+        "skills.optimiseSockets",
+        "skills.imbuedSupportLabel",
+        "skills.imbuedSupport",
+        "skills.imbuedSupportClear",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 9 == 4)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs", "items"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for (k, g) in groups.iter().enumerate().take(6) {
+            step(&mut d, c("groupList", json!({"sel": k + 1})), &mut out);
+            if g["slot"].is_string() && g["source"].is_null() {
+                step(
+                    &mut d,
+                    c("optimiseSockets", json!({"click": true})),
+                    &mut out,
+                );
+                step(
+                    &mut d,
+                    c("imbuedSupportClear", json!({"click": true})),
+                    &mut out,
+                );
+            }
+        }
+        // Another slot's item, and no slot
+        for r in [
+            c("groupList", json!({"sel": 1})),
+            c("groupSlot", json!({"sel": 7})),
+            c("optimiseSockets", json!({"click": true})),
+            c("groupSlot", json!({"sel": 1})),
+            c("optimiseSockets", json!({"click": true})),
+            c("imbuedSupportClear", json!({"click": true})),
         ] {
             step(&mut d, r, &mut out);
         }

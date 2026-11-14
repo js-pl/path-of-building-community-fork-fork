@@ -458,24 +458,24 @@ What remains for the full migration, in order:
    version drop-down), Convert to the latest version and Convert all
    (each spec on another version in turn, then the active one again), the
    "Tree Converted" message; `tree_controls_match` presses their buttons
-   at random. Find Timeless Jewel's settings are typed
-   (`typed/timeless_search.rs`): the build's `timelessData` (loaded,
-   saved, kept for the next opening), jewel type, conqueror, socket (its
-   list by nearest keystone), the socket filter with its node distance and
-   the protected notables, devotion and Abyss ascendancy choices, the node
-   weight sliders and node drop-down writing the desired and fallback
-   lists, the lists' edit boxes, Reset, the trade choices the tab
-   remembers, and the tooltips; `find_timeless_jewel_match` drives them on
-   three builds. Search, Generate (fallback weights), the trade URL and the
-   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
-   notable, a protected notable) stay on the translation. Upstream names
-   the Abyss additions the game only numbers (`data.abyssNotableNames`,
-   `PassiveTree`); the typed timeless data does too. Node power of
-   another ascendancy's notables differs on a General's Cry build
-   converted to a newer tree (3.13 Generals Perforate Zerker, Master
-   Distiller and Ngamahu, Flame's Advance: offence 0 upstream); the sidebar
-   and outputs agree, so `tree_controls_match` compares node power before
-   the first conversion. To find out. The Configuration tab's search
+   at random, and compares node power after them. Find Timeless Jewel's
+   settings are typed (`typed/timeless_search.rs`): the build's
+   `timelessData` (loaded, saved, kept for the next opening), jewel type,
+   conqueror, socket (its list by nearest keystone), the socket filter
+   with its node distance and the protected notables, devotion and Abyss
+   ascendancy choices, the node weight sliders and node drop-down writing
+   the desired and fallback lists, the lists' edit boxes, Reset, the trade
+   choices the tab remembers, and the tooltips; `find_timeless_jewel_match`
+   drives them on three builds. Search, Generate (fallback weights), the
+   trade URL and the tooltips that show a node (a conqueror's keystone, an
+   Abyss ascendancy notable, a protected notable) stay on the translation.
+   Upstream names the Abyss additions the game only numbers
+   (`data.abyssNotableNames`, `PassiveTree`); the typed timeless data does
+   too. Two engine fixes came out of a General's Cry
+   build converted to a newer tree: the skill types General's Cry adds to
+   its main skill reach the skill's cfgs (upstream's `skillCfg.skillTypes`
+   is the skill's table), and a socket in a cluster jewel's subgraph has
+   no radius (`env.spec.nodes[id]`, not the tree's proxy). The Configuration tab's search
    and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
    an option shows when its label matches the search (magic characters
    escaped, `string.matchOrPattern`) and its rules pass, or Show All is on
@@ -716,7 +716,11 @@ What remains for the full migration, in order:
      one), enabled, Full DPS, an item's group's count and the note on its
      source. Upstream sets their texts and states only when it shows a
      group and when they are edited, so they are kept as such. The
-     imbued support and the sockets line with Optimise Sockets stay on
+     The item sockets line, Optimise Sockets (the selected slot's item
+     gets a socket of its colour per gem of the groups socketed in it,
+     linked by group, then its abyssal ones) and the imbued support's
+     label, box and clear button (`session::typed::skills_sockets`,
+     `skills_sockets_match`); choosing an imbued support by name stays on
      the translation.
      The shown group's gem slots (`session::typed::gem_slots`,
      `skills_gem_slots_match`): the slots the tab has made so far (it
@@ -993,7 +997,7 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- A gap in the curse slots, a minion's debuff without a stack count
+- A gap in the curse slots
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
