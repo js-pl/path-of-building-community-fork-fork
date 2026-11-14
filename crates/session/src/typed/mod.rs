@@ -22,6 +22,7 @@ mod item_enchant;
 mod item_list;
 mod item_popup_tooltips;
 mod item_popups;
+mod item_sets;
 mod item_tooltip;
 mod items;
 mod node_tooltip;

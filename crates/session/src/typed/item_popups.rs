@@ -57,19 +57,27 @@ pub enum ItemPopup {
     AddImplicit(Box<super::item_add_implicit::AddImplicitPopup>),
     AddModifier(Box<super::item_add_modifier::AddModifierPopup>),
     Crucible(Box<super::item_crucible::CruciblePopup>),
+    /// Manage Item Sets, and the name popup of a set
+    ManageItemSets(Box<super::item_sets::ManageItemSets>),
+    RenameSet(Box<super::item_sets::RenameSet>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
         title: String,
         lines: Vec<String>,
-        action: ConfirmAction,
+        action: Deletion,
     },
 }
 
 /// What a confirmation's Delete does
 #[derive(Clone, Debug)]
-pub enum ConfirmAction {
-    DeleteItem(f64),
-    DeleteAll,
+pub enum Deletion {
+    Item(f64),
+    AllItems,
+    /// The item set at this index of the list
+    ItemSet {
+        index: usize,
+        id: f64,
+    },
 }
 
 /// `DropDownControl:SetSel(sel)`: the new selection, clamped to the list,
@@ -147,8 +155,34 @@ impl<'d> TypedSession<'d> {
     pub fn item_popup_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let name = path.strip_prefix("popup.").unwrap_or(path);
-        if req["click"].as_bool() == Some(true) {
+        let list_click = matches!(
+            self.editor.popups.first(),
+            Some(ItemPopup::ManageItemSets(_))
+        ) && (name.starts_with("setList") || name.starts_with("sharedList"));
+        if req["click"].as_bool() == Some(true) && !list_click {
             return self.item_popup_button(name);
+        }
+        if let Some(ItemPopup::ManageItemSets(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.manage_item_sets_control(&mut p, name, req);
+            // The name popup or a confirmation may have opened in front
+            if let Some(i) = self
+                .editor
+                .popups
+                .iter()
+                .position(|x| matches!(x, ItemPopup::ManageItemSets(_)))
+            {
+                self.editor.popups[i] = ItemPopup::ManageItemSets(p);
+            }
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::RenameSet(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.rename_set_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::RenameSet(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
         }
         if let Some(ItemPopup::Crucible(p)) = self.editor.popups.first() {
             let mut p = p.clone();
@@ -271,6 +305,10 @@ impl<'d> TypedSession<'d> {
                 self.anoint_popup_save(&p)?;
                 self.close_item_popup();
             }
+            (ItemPopup::RenameSet(p), "cancel") => {
+                self.rename_set_cancel(&p);
+                self.close_item_popup();
+            }
             (ItemPopup::Anoint(_), "close") | (_, "cancel") => {
                 self.close_item_popup();
             }
@@ -304,6 +342,14 @@ impl<'d> TypedSession<'d> {
                 let normalise = !self.has_display_item();
                 self.display_item_from_raw(&raw, normalise)?;
                 self.set_display_item_id(id);
+                self.close_item_popup();
+            }
+            (ItemPopup::ManageItemSets(_), "close") => {
+                self.close_item_popup();
+            }
+            (ItemPopup::RenameSet(p), "save") => {
+                // `main:ClosePopup()` after the changes
+                self.rename_set_save(&p)?;
                 self.close_item_popup();
             }
             (ItemPopup::Confirm { action, .. }, "confirm") => {
@@ -441,6 +487,8 @@ impl<'d> TypedSession<'d> {
             ItemPopup::AddImplicit(p) => self.describe_add_implicit_popup(p),
             ItemPopup::AddModifier(p) => self.describe_add_modifier_popup(p),
             ItemPopup::Crucible(p) => self.describe_crucible_popup(p),
+            ItemPopup::ManageItemSets(p) => self.describe_manage_item_sets(p),
+            ItemPopup::RenameSet(p) => self.describe_rename_set(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,
                 "lines": lines,
