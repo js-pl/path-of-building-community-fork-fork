@@ -704,7 +704,11 @@ What remains for the full migration, in order:
      one), enabled, Full DPS, an item's group's count and the note on its
      source. Upstream sets their texts and states only when it shows a
      group and when they are edited, so they are kept as such. The
-     imbued support and the sockets line with Optimise Sockets stay on
+     The item sockets line, Optimise Sockets (the selected slot's item
+     gets a socket of its colour per gem of the groups socketed in it,
+     linked by group, then its abyssal ones) and the imbued support's
+     label, box and clear button (`session::typed::skills_sockets`,
+     `skills_sockets_match`); choosing an imbued support by name stays on
      the translation.
      The shown group's gem slots (`session::typed::gem_slots`,
      `skills_gem_slots_match`): the slots the tab has made so far (it
