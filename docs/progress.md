@@ -446,8 +446,20 @@ What remains for the full migration, in order:
    compare checkbox's spec only the drawing reads. `tree_controls_match`
    (in the `tree` phase) changes them at random on every fourth build and
    compares the sidebar, outputs, tooltips, node power and the saved
-   file. Reset, version conversion, spec conversion and Find Timeless
-   Jewel (popups) stay on the translation. The Configuration tab's search
+   file. Its popups are typed too: Reset Tree/Tattoos (Remove All
+   Tattoos only on a spec without tattoos), the version drop-down's
+   Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
+   active one's undo state on the other version, inserted after it, the
+   old one removed or kept, `SetActiveSpec` once with its loadout sync and
+   version drop-down), Convert to the latest version and Convert all
+   (each spec on another version in turn, then the active one again), the
+   "Tree Converted" message; `tree_controls_match` presses their buttons
+   at random. Find Timeless Jewel stays on the translation. Node power of
+   another ascendancy's notables differs on a General's Cry build
+   converted to a newer tree (3.13 Generals Perforate Zerker, Master
+   Distiller and Ngamahu, Flame's Advance: offence 0 upstream); the sidebar
+   and outputs agree, so `tree_controls_match` compares node power before
+   the first conversion. To find out. The Configuration tab's search
    and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
    an option shows when its label matches the search (magic characters
    escaped, `string.matchOrPattern`) and its rules pass, or Show All is on

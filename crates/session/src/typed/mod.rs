@@ -373,7 +373,7 @@ impl<'d> TypedSession<'d> {
             display_item: None,
             party_laid_out: Default::default(),
             party_tab: None,
-            tree_tab: tree_tab::TreeTab::load(&root),
+            tree_tab: tree_tab::TreeTab::load(&root, data.game.tree_versions.len()),
             config_ui: Default::default(),
             editor: Default::default(),
             item_db_lists: Default::default(),
