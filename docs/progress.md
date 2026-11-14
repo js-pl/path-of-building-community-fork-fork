@@ -747,8 +747,16 @@ What remains for the full migration, in order:
      gem table; `pairs` over the slot's table is random in LuaJIT, and in
      the translation keeps the order of an earlier fill, so after the
      options widen the list the order can differ. A candidate whose
-     calculation fails upstream leaves its gem in the slot; the typed
-     calculation does not fail. The list also shows its group and the
+     calculation fails upstream leaves its gem in the slot. One does in
+     the corpus, an upstream bug: `hasGlobalEffect` is set when a skill's
+     stat with a `GlobalEffect` mod is first looked up in
+     `data.skillStatMap`, so a Vaal transfigured gem's base skill (Cleave
+     of Rage) is active in the first `initEnv` and gone from the next;
+     triggered by General's Cry it is the main skill, and `calcs.mirages`
+     does not find it again (`UPSTREAM_GEM_LIST_FAILS` in
+     `skills_gem_select_match`). The typed engine keeps the flags as the
+     data loads them, as a skill's first calculation upstream sees them,
+     and does not fail. The list also shows its group and the
      shown one again (`SetDisplayGroup`), and gives the slot's name box a
      sort cache by DPS.
      Choosing a gem by name in a gem slot (`GemSelectControl`'s text,
