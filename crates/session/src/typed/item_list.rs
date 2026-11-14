@@ -600,6 +600,12 @@ impl<'d> TypedSession<'d> {
         value
     }
 
+    /// The rows the list shows, as drawing updates them
+    pub(super) fn item_list_len(&self) -> usize {
+        self.refresh_item_list();
+        self.list_of(&self.editor.list.borrow()).len()
+    }
+
     /// The dragged row's `selValue = nil`
     pub(super) fn item_list_drop_sent(&mut self) {
         self.editor.list.borrow_mut().sel_value = None;

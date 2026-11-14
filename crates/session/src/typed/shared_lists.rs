@@ -307,8 +307,11 @@ impl<'d> TypedSession<'d> {
                 // `ItemListClass:ReceiveDrag`: the item added at the drop
                 let mut new = self.item_from_raw(&item.raw)?;
                 new.normalise_quality();
+                // `selDragIndex` counts the rows the list shows (its
+                // filter's), `AddItem` inserts there in the whole order
+                let shown = self.item_list_len();
                 let len = self.build.items.item_order_list.len();
-                let at = req["at"].as_f64().unwrap_or(len as f64 + 1.0);
+                let at = req["at"].as_f64().unwrap_or(shown as f64 + 1.0);
                 if at < 1.0 || at.fract() != 0.0 || at as usize > len + 1 {
                     return Err(format!("{NOT_PORTED}: dropping outside the list"));
                 }
