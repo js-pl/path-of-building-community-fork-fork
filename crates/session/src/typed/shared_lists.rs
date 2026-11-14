@@ -64,6 +64,13 @@ pub struct RenameShared {
 /// The drag targets upstream gives each list (`dragTargetList`) that the
 /// session can reach
 fn drag_target_ok(src: &str, dst: &str) -> bool {
+    // Every item slot is a target of the lists of items
+    if dst.starts_with("slots.") {
+        return matches!(
+            src,
+            "items.itemList" | "items.uniqueDB" | "items.rareDB" | "items.sharedItemList"
+        );
+    }
     matches!(
         (src, dst),
         ("items.itemList", "items.sharedItemList")
@@ -72,6 +79,10 @@ fn drag_target_ok(src: &str, dst: &str) -> bool {
                 "items.itemList" | "items.sharedItemList"
             )
             | ("items.sharedItemList", "items.itemList")
+            | (
+                "items.itemList" | "items.uniqueDB" | "items.rareDB" | "items.sharedItemList",
+                "build.mainSkillMinion"
+            )
             | ("popup.setList", "popup.sharedList")
             | ("popup.sharedList", "popup.setList")
     )
@@ -89,6 +100,20 @@ impl<'d> TypedSession<'d> {
         self.shared
             .as_mut()
             .ok_or_else(|| format!("{NOT_PORTED}: the shared lists after a fallback"))
+    }
+
+    /// `ItemsTab:AddForbiddenJewelCounterpart(item)` of the item with
+    /// this id
+    pub(super) fn add_forbidden_jewel_counterpart(&mut self, id: f64) -> Result<()> {
+        let added = self.build.items.item(id).ok_or("no item")?.clone();
+        let other = super::item_editor::FORBIDDEN
+            .iter()
+            .find(|(t, _)| added.title.as_deref() == Some(*t))
+            .map(|(_, o)| *o);
+        if let Some(other) = other {
+            self.add_forbidden_counterpart(&added, other)?;
+        }
+        Ok(())
     }
 
     /// The shared lists of the session a load replaces
@@ -281,7 +306,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// A new item from a text, as `new("Item"):Item(raw)`
-    fn item_from_raw(&self, raw: &str) -> Result<Item> {
+    pub(super) fn item_from_raw(&self, raw: &str) -> Result<Item> {
         let item = Item::new(&self.data.item_context(), raw, None, false)?;
         if item.base.is_none() {
             return Err(format!("{NOT_PORTED}: a dragged item without a base"));
@@ -345,7 +370,7 @@ impl<'d> TypedSession<'d> {
                 }
                 shared.items.insert(at as usize - 1, Arc::new(new));
             }
-            _ => {
+            "items.itemList" => {
                 // `ItemListClass:ReceiveDrag`: the item added at the drop
                 let mut new = self.item_from_raw(&item.raw)?;
                 new.normalise_quality();
@@ -363,16 +388,19 @@ impl<'d> TypedSession<'d> {
                     order.remove(p);
                     order.insert(at as usize - 1, id);
                 }
-                let added = self.build.items.item(id).ok_or("no item")?.clone();
-                let other = super::item_editor::FORBIDDEN
-                    .iter()
-                    .find(|(t, _)| added.title.as_deref() == Some(*t))
-                    .map(|(_, o)| *o);
-                if let Some(other) = other {
-                    self.add_forbidden_counterpart(&added, other)?;
-                }
+                self.add_forbidden_jewel_counterpart(id)?;
                 self.populate_slots();
                 self.item_list_changed();
+            }
+            d => {
+                let taken = match d.strip_prefix("slots.") {
+                    Some(slot) => self.drop_on_slot(slot, &item)?,
+                    None => self.drop_on_minion(&item)?,
+                };
+                // `CanReceiveDrag` refused it: nothing happens
+                if !taken {
+                    return Ok(json!([]));
+                }
             }
         }
         // The source's `selValue = nil`

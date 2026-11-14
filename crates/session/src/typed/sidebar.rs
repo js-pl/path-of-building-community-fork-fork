@@ -109,6 +109,9 @@ pub(super) struct SkillSelect {
     pub mine: Edit,
     pub minion: Drop,
     minion_entries: Vec<MinionEntry>,
+    /// The main skill's `minionUses` while the minion drop-down lists
+    /// item sets: the slots whose items it takes (`CanReceiveDrag`)
+    pub minion_uses: Option<Vec<String>>,
     pub minion_skill: Drop,
     /// `mainSkillMinionLibrary.shown`, once set
     pub library: Option<bool>,
@@ -725,6 +728,7 @@ impl TypedSession<'_> {
         c.stage.shown = false;
         c.minion.shown = false;
         c.minion_skill.shown = false;
+        c.minion_uses = None;
         c.library = Some(false);
         if display.is_empty() {
             return Ok(());
@@ -814,6 +818,7 @@ impl TypedSession<'_> {
             let mut labels = Vec::new();
             let items = &self.build.items;
             if ge.minion_has_item_set {
+                c.minion_uses = ge.minion_uses.clone();
                 for &id in &items.item_set_order_list {
                     let title = items
                         .item_sets

@@ -365,6 +365,18 @@ impl ItemsTab {
         sockets: &dyn Sockets,
         one_hand: &dyn Fn(&str) -> Option<bool>,
     ) -> bool {
+        self.valid_for_slot_in(item, slot_name, self.active_item_set(), sockets, one_hand)
+    }
+
+    /// `IsItemValidForSlot(item, slotName, itemSet)`
+    pub fn valid_for_slot_in(
+        &self,
+        item: &Item,
+        slot_name: &str,
+        set: &ItemSet,
+        sockets: &dyn Sockets,
+        one_hand: &dyn Fn(&str) -> Option<bool>,
+    ) -> bool {
         let (slot_type, slot_id) = match crate::pat::captures(slot_name, "^([%a ]+) (%d+)$") {
             Some(c) => (c[0].clone(), Some(c[1].clone())),
             None => (slot_name.to_string(), None),
@@ -405,7 +417,6 @@ impl ItemsTab {
                 item.base.as_ref().is_some_and(|b| b.weapon.is_some())
             }
             "Weapon 2" | "Weapon 2 Swap" => {
-                let set = self.active_item_set();
                 let first = if slot_name == "Weapon 2" {
                     "Weapon 1"
                 } else {
