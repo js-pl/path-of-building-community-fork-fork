@@ -192,7 +192,35 @@ end
 
 function api.control(req)
 	local control = findControl(req.path)
-	if req.sel and control.SelectIndex and not control.SetSel then
+	if req.dragTo and control.SelectIndex then
+		-- A list's row dragged onto another list (one of its drag targets),
+		-- dropped before row `at` (after the last by default), as
+		-- ListControl's left button release does
+		buildList(control)
+		local target = findControl(req.dragTo)
+		local listed = false
+		for _, t in ipairs(control.dragTargetList or { }) do
+			if t == target then
+				listed = true
+			end
+		end
+		if not listed then
+			error("no drag target " .. tostring(req.dragTo))
+		end
+		if control:SelectIndex(req.sel) then
+			buildList(target)
+			local dragType, dragValue = control:GetDragValue(control.selIndex, control.selValue)
+			if not target.CanReceiveDrag or target:CanReceiveDrag(dragType, dragValue) then
+				target.selDragIndex = req.at or #target.list + 1
+				target:ReceiveDrag(dragType, dragValue, control)
+				target.selDragIndex = nil
+				if control.OnDragSend then
+					control:OnDragSend(control.selIndex, control.selValue, target)
+				end
+				control.selValue = nil
+			end
+		end
+	elseif req.sel and control.SelectIndex and not control.SetSel then
 		-- A row of a list, clicked with the keys held as ListControl's
 		-- left button does
 		buildList(control)

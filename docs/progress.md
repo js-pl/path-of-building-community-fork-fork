@@ -577,7 +577,20 @@ What remains for the full migration, in order:
      after loading and after every switch, rename, addition or deletion
      of a set or spec, its drop-down's selection, and the sets a changed
      selection switches to (a new spec named as the active one's
-     loadout activates it), calculated once per request. All in `items_edits_match`, with
+     loadout activates it), calculated once per request.
+     The shared item list and shared item sets
+     (`session::typed::shared_lists`, `items.sharedItemList` and Manage
+     Item Sets' `popup.sharedList`): rows (the list shown while the editor
+     is empty), selection, a double click to edit, Delete and Rename with
+     their popups, row tooltips, and drags (`control` with `dragTo` and
+     `at`, which the translated session runs as ListControl's drop does)
+     between the item list, the databases and the shared list, and
+     between the build's and the shared item sets. They outlive the
+     build: a typed session hands them to the next build it loads, and
+     after the translation held a build they are unknown, so the typed
+     session falls back on them. A shared set of several items dragged
+     into the build falls back (`pairs` of its slot names orders the new
+     items' ids). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

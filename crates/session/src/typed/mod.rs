@@ -31,6 +31,7 @@ mod notes;
 mod party;
 mod save;
 mod sets;
+mod shared_lists;
 mod sidebar;
 mod skills;
 mod spec_sets;
@@ -277,6 +278,10 @@ pub struct TypedSession<'d> {
     other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
     /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
     item_keys: lua::ljtab::LjMap<()>,
+    /// The shared item list and item sets (`None`: the translation's)
+    shared: Option<shared_lists::SharedLists>,
+    /// The shared item list's selection
+    shared_sel: shared_lists::ListSel,
     /// The build's loadouts drop-down
     loadout: loadouts::LoadoutState,
     /// The new or copied spec its name popup holds (`RenameSpec`)
@@ -333,6 +338,8 @@ impl<'d> TypedSession<'d> {
             show_minion_set: false,
             other_specs: Vec::new(),
             item_keys: Default::default(),
+            shared: Some(Default::default()),
+            shared_sel: Default::default(),
             loadout: Default::default(),
             pending_spec: None,
             socket_labels: HashMap::new(),
@@ -382,6 +389,9 @@ impl<'d> TypedSession<'d> {
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                ("items", _) if Self::is_shared_list_control(p) => {
+                    self.shared_list_control_json(p).ok()?
+                }
                 ("items", _) if Self::is_item_list_control(p) => {
                     self.item_list_control_json(p).ok()?
                 }

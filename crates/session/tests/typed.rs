@@ -611,6 +611,10 @@ const KNOWN_FALLBACKS: &[&str] = &[
     "upstream fails too",
     // A fractional enemy level, which upstream's accuracy sums fail on
     "an enemy level without a monster accuracy",
+    // `pairs` of a shared set's slot names orders its items' new ids
+    "a shared item set of several items dragged into the build",
+    // The translation's shared lists once it held a build
+    "the shared lists after a fallback",
 ];
 
 /// The build the dispatcher's fallbacks are recorded for, and each
@@ -1528,6 +1532,8 @@ fn items_edits_match(d: &mut Dispatcher) {
                         "items.itemList.deleteUnused",
                         "items.itemList.deleteAll",
                         "items.itemList.delete",
+                        "items.sharedItemList",
+                        "items.sharedItemList.delete",
                     ];
                     let view = json!({"cmd": "controls", "paths": paths});
                     let mut fell_back = false;
@@ -1550,7 +1556,81 @@ fn items_edits_match(d: &mut Dispatcher) {
                         }
                         let click =
                             |path: &str| json!({"cmd": "control", "path": path, "click": true});
-                        let r = match rng.below(13) {
+                        let shared = c["ok"]["items.sharedItemList"]["list"]
+                            .as_array()
+                            .map_or(0, Vec::len);
+                        let r = match rng.below(15) {
+                            13 => {
+                                // A row dragged between the item list, the
+                                // databases and the shared item list
+                                let (src, n, dst) = match rng.below(4) {
+                                    0 => ("items.itemList", rows, "items.sharedItemList"),
+                                    1 => ("items.sharedItemList", shared, "items.itemList"),
+                                    k => {
+                                        let db = if rng.below(2) == 0 {
+                                            "items.uniqueDB"
+                                        } else {
+                                            "items.rareDB"
+                                        };
+                                        let c = compare(
+                                            d,
+                                            &json!({"cmd": "controls", "paths": [db]}),
+                                            &label,
+                                            &mut out,
+                                        );
+                                        let n = c["ok"][db]["list"].as_array().map_or(0, Vec::len);
+                                        (
+                                            db,
+                                            n,
+                                            if k == 2 {
+                                                "items.itemList"
+                                            } else {
+                                                "items.sharedItemList"
+                                            },
+                                        )
+                                    }
+                                };
+                                if n == 0 {
+                                    continue;
+                                }
+                                let target_len = if dst == "items.itemList" {
+                                    rows
+                                } else {
+                                    shared
+                                };
+                                let mut r = json!({"cmd": "control", "path": src, "sel": rng.below(n) + 1, "dragTo": dst});
+                                if rng.below(2) == 0 {
+                                    r["at"] = json!(rng.below(target_len + 1) + 1);
+                                }
+                                *popup_inputs.entry(format!("drag {src} {dst}")).or_default() += 1;
+                                r
+                            }
+                            14 if shared > 0 => {
+                                // The shared item list: a row's tooltip,
+                                // selected, clicked twice or deleted
+                                let index = rng.below(shared) + 1;
+                                let req = json!({"cmd": "controlTooltip", "path": "items.sharedItemList", "index": index});
+                                compare(d, &req, &label, &mut out);
+                                *popup_inputs
+                                    .entry("items.sharedItemList".into())
+                                    .or_default() += 1;
+                                match rng.below(4) {
+                                    0 if c["ok"]["items.sharedItemList.delete"]["enabled"]
+                                        == true =>
+                                    {
+                                        click("items.sharedItemList.delete")
+                                    }
+                                    1 => {
+                                        json!({"cmd": "control", "path": "items.sharedItemList", "key": "DELETE"})
+                                    }
+                                    2 => {
+                                        json!({"cmd": "control", "path": "items.sharedItemList", "sel": index, "click": true, "doubleClick": true})
+                                    }
+                                    _ => {
+                                        json!({"cmd": "control", "path": "items.sharedItemList", "sel": index})
+                                    }
+                                }
+                            }
                             12 => {
                                 // Manage Item, Skill or Config Sets
                                 let path = [
@@ -1893,6 +1973,15 @@ fn drive_popups(
                     }
                     1 if c["sel"].is_number() => {
                         json!({"cmd": "control", "path": path, "key": "F2"})
+                    }
+                    // Between the build's and the shared item sets
+                    2 if n > 0 && (path == "popup.setList" || path == "popup.sharedList") => {
+                        let dst = if path == "popup.setList" {
+                            "popup.sharedList"
+                        } else {
+                            "popup.setList"
+                        };
+                        json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "dragTo": dst})
                     }
                     _ if n > 0 => {
                         let mut r = json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "click": true});

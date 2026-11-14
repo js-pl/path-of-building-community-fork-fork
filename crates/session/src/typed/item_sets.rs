@@ -56,6 +56,8 @@ pub struct ManageSets {
     pub kind: SetKind,
     sel_index: Option<usize>,
     sel_value: Option<f64>,
+    /// The shared item sets' list's selection
+    pub shared_sel: super::shared_lists::ListSel,
 }
 
 impl ManageSets {
@@ -112,6 +114,7 @@ impl<'d> TypedSession<'d> {
                 kind,
                 sel_index: None,
                 sel_value: None,
+                shared_sel: Default::default(),
             })),
         );
         self.refresh_item_popups();
@@ -288,9 +291,10 @@ impl<'d> TypedSession<'d> {
         // The Done button of the skill and config set popups has no name
         let mut buttons = vec![];
         if kind == SetKind::Item {
+            let shared_selected = p.shared_sel.value;
             let shared = |name: &str, label: &str| {
                 json!({
-                    "class": "ButtonControl", "enabled": false, "label": label,
+                    "class": "ButtonControl", "enabled": shared_selected, "label": label,
                     "path": format!("popup.sharedList.{name}"), "shown": true,
                 })
             };
@@ -300,10 +304,14 @@ impl<'d> TypedSession<'d> {
         }
         controls.push(list);
         if kind == SetKind::Item {
-            controls.push(json!({
-                "class": "SharedItemSetListControl", "enabled": true, "list": [],
-                "path": "popup.sharedList", "shown": true,
-            }));
+            let mut shared = json!({
+                "class": "SharedItemSetListControl", "enabled": true,
+                "list": self.shared_set_rows(), "path": "popup.sharedList", "shown": true,
+            });
+            if let Some(i) = p.shared_sel.row() {
+                shared["sel"] = num(i as f64);
+            }
+            controls.push(shared);
         }
         json!({
             "title": kind.title(),
@@ -409,7 +417,28 @@ impl<'d> TypedSession<'d> {
             .and_then(|r| r.strip_prefix('.'))
             .filter(|_| click);
         let missing = || "attempt to index a nil value".to_string();
+        if kind == SetKind::Item && name.split('.').next() == Some("sharedList") {
+            return self.shared_sets_control(p, name, req);
+        }
         match (name == list, button) {
+            (true, _) if req["dragTo"].is_string() => {
+                // A set dragged onto the shared sets
+                if req["dragTo"].as_str() != Some("popup.sharedList") || kind != SetKind::Item {
+                    return Err(format!("no drag target {}", req["dragTo"]));
+                }
+                let sel = req["sel"].as_f64().unwrap_or(0.0);
+                let order = self.set_order(kind);
+                let value = (sel >= 1.0 && sel.fract() == 0.0)
+                    .then(|| order.get(sel as usize - 1).copied())
+                    .flatten();
+                p.sel_value = value;
+                let Some(id) = value else {
+                    return Ok(());
+                };
+                p.sel_index = Some(sel as usize);
+                self.drop_item_set_on_shared(id)?;
+                p.sel_value = None;
+            }
             (true, _) => {
                 if let Some(sel) = req["sel"].as_f64() {
                     let order = self.set_order(kind);

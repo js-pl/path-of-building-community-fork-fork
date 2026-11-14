@@ -585,6 +585,38 @@ impl<'d> TypedSession<'d> {
         Ok(json!([]))
     }
 
+    /// `SelectIndex(sel)` for a drag: the dragged item's id
+    pub(super) fn item_list_select_value(&mut self, sel: f64) -> Option<f64> {
+        self.refresh_item_list();
+        let mut s = self.editor.list.borrow_mut();
+        let list = self.list_of(&s);
+        let value = (sel >= 1.0 && sel.fract() == 0.0)
+            .then(|| list.get(sel as usize - 1).copied())
+            .flatten();
+        s.sel_value = value;
+        if value.is_some() {
+            s.sel_index = Some(sel as usize);
+        }
+        value
+    }
+
+    /// The rows the list shows, as drawing updates them
+    pub(super) fn item_list_len(&self) -> usize {
+        self.refresh_item_list();
+        self.list_of(&self.editor.list.borrow()).len()
+    }
+
+    /// The dragged row's `selValue = nil`
+    pub(super) fn item_list_drop_sent(&mut self) {
+        self.editor.list.borrow_mut().sel_value = None;
+    }
+
+    /// `UpdateList()` after a drop
+    pub(super) fn item_list_changed(&mut self) {
+        let mut s = self.editor.list.borrow_mut();
+        self.update_list(&mut s);
+    }
+
     /// `SelectIndex(sel)`, then `OnSelClick` for a click
     fn item_list_select(&mut self, sel: f64, click: bool, req: &J) -> Result<()> {
         let id = {
@@ -705,6 +737,8 @@ impl<'d> TypedSession<'d> {
                 self.confirm_delete_set(*kind, *index, *id)?;
                 self.sync_loadouts_and_rebuild()
             }
+            Deletion::SharedItem { index } => self.confirm_delete_shared(*index, false),
+            Deletion::SharedSet { index } => self.confirm_delete_shared(*index, true),
             Deletion::Spec { index } => {
                 self.confirm_delete_spec(*index)?;
                 self.sync_loadouts_and_rebuild()

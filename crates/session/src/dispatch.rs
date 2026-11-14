@@ -69,6 +69,9 @@ pub struct Dispatcher<'d> {
     /// Each request the typed engine preferred gave to the translation
     /// while it held the build or loading one: the command and why
     pub fallbacks: Vec<(String, String)>,
+    /// Whether the typed sessions still know the shared item lists: not
+    /// once the translation held a build
+    shared_known: bool,
 }
 
 fn ok(v: J) -> String {
@@ -83,6 +86,7 @@ impl<'d> Dispatcher<'d> {
             data,
             prefer,
             typed: None,
+            shared_known: true,
             pending: Vec::new(),
             typed_error: None,
             fallbacks: Vec::new(),
@@ -98,6 +102,7 @@ impl<'d> Dispatcher<'d> {
             data: Some(data),
             prefer: Prefer::Typed,
             typed: None,
+            shared_known: true,
             #[cfg(feature = "translation")]
             pending: Vec::new(),
             typed_error: None,
@@ -199,6 +204,7 @@ impl<'d> Dispatcher<'d> {
         if let Some(translated) = &self.translated {
             if !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
                 self.typed = None;
+                self.shared_known = false;
             }
             return translated.request(json);
         }
@@ -330,6 +336,31 @@ impl<'d> Dispatcher<'d> {
                 self.edit(json, |s| s.item_editor_control(&req))
             }
             "control"
+                if req["dragTo"].is_string()
+                    && req["path"]
+                        .as_str()
+                        .is_some_and(|p| p.starts_with("items.")) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.items_drag(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_shared_list_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.shared_list_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_spec_manage_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.spec_manage_control(&req))
+            }
+            "control"
                 if req["path"]
                     .as_str()
                     .is_some_and(TypedSession::is_spec_manage_control) =>
@@ -458,6 +489,17 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_mut()?.item_db_tooltip(&path, index),
                 )
             }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p == "items.sharedItemList") =>
+            {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.shared_list_tooltip(index),
+                )
+            }
             "controlTooltip" if req["path"].as_str().is_some_and(|p| p == "items.itemList") => {
                 let index = req["index"].as_f64();
                 view(
@@ -561,6 +603,7 @@ impl<'d> Dispatcher<'d> {
                 // edit got
                 if self.has_translation() {
                     self.typed = None;
+                    self.shared_known = false;
                 }
                 self.typed_error = Some(e);
                 None
@@ -590,6 +633,7 @@ impl<'d> Dispatcher<'d> {
                     if prev.has_item_popup() {
                         // Its buttons act on the items tab it came from
                         self.typed = None;
+                        self.shared_known = false;
                         self.typed_error = Some(format!(
                             "{}: a load with an item popup open",
                             crate::typed::NOT_PORTED
@@ -597,6 +641,9 @@ impl<'d> Dispatcher<'d> {
                         return None;
                     }
                     s.keep_popups(prev);
+                    s.keep_shared(prev);
+                } else if !self.shared_known {
+                    s.forget_shared();
                 }
                 self.typed = Some(s);
                 // A load replaces whatever the queued requests did
@@ -612,6 +659,7 @@ impl<'d> Dispatcher<'d> {
                 // can be retried once missing data files are added
                 if self.has_translation() {
                     self.typed = None;
+                    self.shared_known = false;
                 }
                 self.typed_error = Some(e);
                 None
