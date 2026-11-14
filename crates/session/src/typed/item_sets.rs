@@ -421,6 +421,26 @@ impl<'d> TypedSession<'d> {
             return self.shared_sets_control(p, name, req);
         }
         match (name == list, button) {
+            (true, _) if super::list_order::move_to(req).is_some() => {
+                // A set dragged within the list; `OnOrderChange` only flags
+                // the tab as modified
+                let sel = req["sel"].as_f64().unwrap_or(0.0);
+                let order = self.set_order(kind);
+                let value = (sel >= 1.0 && sel.fract() == 0.0)
+                    .then(|| order.get(sel as usize - 1).copied())
+                    .flatten();
+                p.sel_value = value;
+                if value.is_none() {
+                    return Ok(());
+                }
+                p.sel_index = Some(sel as usize);
+                let to = super::list_order::move_to(req).unwrap_or(0.0);
+                let order = self.set_order_mut(kind).ok_or_else(missing)?;
+                if super::list_order::move_row(order, sel as usize, to)?.is_some() {
+                    p.sel_value = None;
+                    self.ui.unsaved = true;
+                }
+            }
             (true, _) if req["dragTo"].is_string() => {
                 // A set dragged onto the shared sets
                 if req["dragTo"].as_str() != Some("popup.sharedList") || kind != SetKind::Item {

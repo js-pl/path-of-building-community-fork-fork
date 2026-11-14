@@ -96,6 +96,40 @@ impl<'d> TypedSession<'d> {
         self.shared = prev.shared.clone();
     }
 
+    /// The shared lists the translation held (its `sharedLists`)
+    pub fn set_shared(&mut self, v: &J) -> Result<()> {
+        let item = |v: &J| -> Result<Arc<Item>> {
+            let mut item = self.item_from_raw(v["raw"].as_str().ok_or("no raw")?)?;
+            item.quality = v["quality"].as_f64();
+            Ok(Arc::new(item))
+        };
+        let items = v["items"]
+            .as_array()
+            .ok_or("no shared items")?
+            .iter()
+            .map(item)
+            .collect::<Result<Vec<_>>>()?;
+        let sets = v["sets"]
+            .as_array()
+            .ok_or("no shared sets")?
+            .iter()
+            .map(|s| {
+                let slots = s["slots"]
+                    .as_array()
+                    .ok_or("no slots")?
+                    .iter()
+                    .map(|x| Ok((x["slot"].as_str().ok_or("no slot")?.to_string(), item(x)?)))
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(SharedSet {
+                    title: s["title"].as_str().map(String::from),
+                    slots,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.shared = Some(SharedLists { items, sets });
+        Ok(())
+    }
+
     /// The translation held the build: its shared lists are unknown
     pub fn forget_shared(&mut self) {
         self.shared = None;
@@ -160,7 +194,15 @@ impl<'d> TypedSession<'d> {
             self.delete_shared_item(i)?;
             return Ok(json!([]));
         }
-        if let Some(sel) = req["sel"].as_f64() {
+        if let (Some(sel), Some(to)) = (req["sel"].as_f64(), super::list_order::move_to(req)) {
+            // An item dragged within the list, which has no `OnOrderChange`
+            if self.shared_sel.select(sel, len) {
+                let items = &mut self.shared_mut()?.items;
+                if super::list_order::move_row(items, sel as usize, to)?.is_some() {
+                    self.shared_sel.value = false;
+                }
+            }
+        } else if let Some(sel) = req["sel"].as_f64() {
             if !self.shared_sel.select(sel, len) {
                 return Ok(json!([]));
             }
@@ -375,7 +417,17 @@ impl<'d> TypedSession<'d> {
         let missing = || "attempt to index a nil value".to_string();
         match name {
             "sharedList" => {
-                if let Some(dst) = req["dragTo"].as_str() {
+                if let (Some(sel), Some(to)) =
+                    (req["sel"].as_f64(), super::list_order::move_to(req))
+                {
+                    // A set dragged within the list
+                    if m.shared_sel.select(sel, len) {
+                        let sets = &mut self.shared_mut()?.sets;
+                        if super::list_order::move_row(sets, sel as usize, to)?.is_some() {
+                            m.shared_sel.value = false;
+                        }
+                    }
+                } else if let Some(dst) = req["dragTo"].as_str() {
                     if dst != "popup.setList" {
                         return Err(format!("no drag target {dst}"));
                     }
@@ -448,14 +500,10 @@ impl<'d> TypedSession<'d> {
         index: usize,
         at: Option<f64>,
     ) -> Result<()> {
+        // `pairs(value.slots)`: the slot names in the order they were set
+        // (the order of `pairs(itemsTab.slots)` when the set was shared),
+        // which is the order the session's tables keep string keys in
         let shared = self.shared()?.sets[index - 1].clone();
-        if shared.slots.len() > 1 {
-            // `pairs(value.slots)` gives the items their ids in the order
-            // of the slot names' hashes
-            return Err(format!(
-                "{NOT_PORTED}: a shared item set of several items dragged into the build"
-            ));
-        }
         let len = self.build.items.item_set_order_list.len();
         let at = at.unwrap_or(len as f64 + 1.0);
         if at < 1.0 || at.fract() != 0.0 || at as usize > len + 1 {

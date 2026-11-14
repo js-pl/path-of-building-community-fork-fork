@@ -546,7 +546,12 @@ impl<'d> TypedSession<'d> {
         let click = req["click"].as_bool().unwrap_or(false) || req["click"] == json!(1);
         match input {
             None => {
-                if let Some(sel) = req["sel"].as_f64() {
+                if let (Some(sel), Some(to)) =
+                    (req["sel"].as_f64(), super::list_order::move_to(req))
+                {
+                    self.item_list_select(sel, false, req)?;
+                    self.item_list_move(to)?;
+                } else if let Some(sel) = req["sel"].as_f64() {
                     self.item_list_select(sel, click, req)?;
                 } else if req["key"].as_str() == Some("DELETE") {
                     self.item_list_delete_selected()?;
@@ -618,6 +623,26 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `SelectIndex(sel)`, then `OnSelClick` for a click
+    /// The selected row dragged to before row `to`: only the unfiltered
+    /// list, `itemOrderList` itself, is mutable; `OnOrderChange` adds an
+    /// undo state
+    fn item_list_move(&mut self, to: f64) -> Result<()> {
+        let mut s = self.editor.list.borrow_mut();
+        let (Some(sel), Some(_)) = (s.sel_index, s.sel_value) else {
+            return Ok(());
+        };
+        if s.list.is_some() {
+            return Ok(());
+        }
+        let order = &mut self.build.items.item_order_list;
+        if super::list_order::move_row(order, sel, to)?.is_some() {
+            s.sel_value = None;
+            drop(s);
+            self.ui.unsaved = true;
+        }
+        Ok(())
+    }
+
     fn item_list_select(&mut self, sel: f64, click: bool, req: &J) -> Result<()> {
         let id = {
             let mut s = self.editor.list.borrow_mut();

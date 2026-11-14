@@ -572,7 +572,16 @@ What remains for the full migration, in order:
      selected one's undo state, without its bloodline as upstream's
      `CreateUndoState` reads none), New (the latest tree with the build's
      classes), Rename and F2 with the name popup, Delete with its
-     confirmation; the undo states move with the specs. The build's
+     confirmation; the undo states move with the specs. A tattooed
+     spec's copy keeps its tattoos (the undo state's `hashOverrides`;
+     phase `overlays` copies the tattoo variants' specs). Rows dragged
+     within a list reorder it (`control` with `sel` and `moveTo`, which
+     the translated session runs as ListControl's drop on a mutable
+     list does, `session::typed::list_order`): the item list while
+     unfiltered, the item, skill and config sets, the specs (the active
+     spec and the loadouts follow), the shared items and sets, and the
+     skills tab's socket groups (the main socket group and the Calcs
+     tab's skill follow theirs; `skills_edits_match`). The build's
      loadouts (`session::typed::loadouts`): `buildMode:SyncLoadouts`
      after loading and after every switch, rename, addition or deletion
      of a set or spec, its drop-down's selection, and the sets a changed
@@ -587,10 +596,13 @@ What remains for the full migration, in order:
      between the item list, the databases and the shared list, and
      between the build's and the shared item sets. They outlive the
      build: a typed session hands them to the next build it loads, and
-     after the translation held a build they are unknown, so the typed
-     session falls back on them. A shared set of several items dragged
-     into the build falls back (`pairs` of its slot names orders the new
-     items' ids). All in `items_edits_match`, with
+     after the translation held a build the next typed session reads
+     them from it (`sharedLists`: each item's text and quality, the
+     sets' slots in `pairs` order). A shared set dragged into the build
+     gives its items ids in the `pairs` order of its slot names, which
+     the session's tables keep in the order they were set (LuaJIT's
+     string hashes are seeded, so upstream's own order is not
+     reproducible). All in `items_edits_match`, with
      database items and Forbidden jewels in its pool. The translation's
      tooltip comparison can carry another build's change of upstream's
      shared data (gen-0010's before gen-0018's: a mana cost); the test

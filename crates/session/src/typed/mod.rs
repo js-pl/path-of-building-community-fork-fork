@@ -25,6 +25,7 @@ mod item_popups;
 mod item_sets;
 mod item_tooltip;
 mod items;
+mod list_order;
 mod loadouts;
 mod node_tooltip;
 mod notes;

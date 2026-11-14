@@ -192,7 +192,28 @@ end
 
 function api.control(req)
 	local control = findControl(req.path)
-	if req.dragTo and control.SelectIndex then
+	if req.moveTo and control.SelectIndex then
+		-- A list's row dragged within the list to before row `moveTo`, as
+		-- ListControl's left button release does on a mutable list
+		buildList(control)
+		if control:SelectIndex(req.sel) and control.isMutable then
+			local to = math.min(req.moveTo, #control.list + 1)
+			if to < 1 then
+				error("no row " .. tostring(req.moveTo))
+			end
+			if to ~= control.selIndex then
+				table.remove(control.list, control.selIndex)
+				if to > control.selIndex then
+					to = to - 1
+				end
+				table.insert(control.list, to, control.selValue)
+				if control.OnOrderChange then
+					control:OnOrderChange(control.selIndex, to)
+				end
+				control.selValue = nil
+			end
+		end
+	elseif req.dragTo and control.SelectIndex then
 		-- A list's row dragged onto another list (one of its drag targets),
 		-- dropped before row `at` (after the last by default), as
 		-- ListControl's left button release does
@@ -453,6 +474,27 @@ function api.loadCode(req)
 		error("invalid build code")
 	end
 	return api.loadXml({ xml = xml, name = req.name })
+end
+
+-- The shared item list and item sets, which outlive builds: each item's
+-- text and its quality (NormaliseQuality changes only that), the sets'
+-- slots in `pairs` order
+function api.sharedLists()
+	local function item(i)
+		return { raw = i.raw, quality = i.quality }
+	end
+	return {
+		items = arrayOf(main.sharedItemList, item),
+		sets = arrayOf(main.sharedItemSetList, function(s)
+			local slots = setmetatable({ }, { __jsontype = "array" })
+			for slotName, i in pairs(s.slots) do
+				local x = item(i)
+				x.slot = slotName
+				t_insert(slots, x)
+			end
+			return { title = s.title, slots = slots }
+		end),
+	}
 end
 
 function api.saveXml()

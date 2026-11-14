@@ -611,6 +611,17 @@ impl<'d> Dispatcher<'d> {
         }
     }
 
+    /// The translation's shared item list and item sets
+    fn translated_shared(&mut self) -> Option<J> {
+        #[cfg(feature = "translation")]
+        if self.translated.is_some() {
+            let r = self.translated_request(r#"{"cmd":"sharedLists"}"#).ok()?;
+            let v: J = serde_json::from_str(&r).ok()?;
+            return Some(v["ok"].clone());
+        }
+        None
+    }
+
     fn load(
         &mut self,
         data: &'d TypedData,
@@ -643,7 +654,11 @@ impl<'d> Dispatcher<'d> {
                     s.keep_popups(prev);
                     s.keep_shared(prev);
                 } else if !self.shared_known {
-                    s.forget_shared();
+                    // The translation held the builds since: its lists
+                    match self.translated_shared().map(|v| s.set_shared(&v)) {
+                        Some(Ok(())) => self.shared_known = true,
+                        _ => s.forget_shared(),
+                    }
                 }
                 self.typed = Some(s);
                 // A load replaces whatever the queued requests did
