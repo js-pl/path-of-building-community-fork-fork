@@ -18,7 +18,7 @@ use engine::tree::NodeType;
 use serde_json::{Value as J, json};
 
 /// `jewelTypes`: label and name, by id from 1
-const JEWEL_TYPES: [(&str, &str); 11] = [
+pub(super) const JEWEL_TYPES: [(&str, &str); 11] = [
     ("Glorious Vanity", "vaal"),
     ("Lethal Pride", "karui"),
     ("Brutal Restraint", "maraketh"),
@@ -112,7 +112,7 @@ const IGNORED: [&str; 9] = [
 ];
 
 /// `totalMods[jewelType]`
-fn total_mod(jewel: usize) -> Option<&'static str> {
+pub(super) fn total_mod(jewel: usize) -> Option<&'static str> {
     match jewel {
         2 => Some("Strength"),
         3 => Some("Dexterity"),
@@ -138,6 +138,10 @@ pub(super) struct TimelessData {
     pub search_list: Option<String>,
     pub search_list_fallback: Option<String>,
     pub total_minimum_weight: Option<f64>,
+    /// `searchResults` and `sharedResults`, which the build keeps until
+    /// it loads again
+    pub results: Vec<super::timeless_seeds::SeedResult>,
+    pub shared: Option<super::timeless_seeds::Shared>,
 }
 
 impl TimelessData {
@@ -170,7 +174,7 @@ impl TimelessData {
             socket_filter_distance: Some(n("socketFilterDistance").unwrap_or(0.0)),
             search_list: t.attr("searchList").map(String::from),
             search_list_fallback: t.attr("searchListFallback").map(String::from),
-            total_minimum_weight: None,
+            ..TimelessData::default()
         }
     }
 }
@@ -179,6 +183,7 @@ impl TimelessData {
 #[derive(Clone, Debug)]
 struct Socket {
     label: String,
+    keystone: String,
     /// -1 for All Sockets
     id: f64,
 }
@@ -237,6 +242,12 @@ pub struct FindTimeless {
     search_more: bool,
     realm_sel: usize,
     trade_type_sel: usize,
+    /// The results list's `selIndex`, whether it has a `selValue`, and
+    /// `highlightIndex`
+    results_sel: Option<usize>,
+    results_value: bool,
+    trade_enabled: bool,
+    trade_label: String,
 }
 
 /// `DropDownControl:SetSel(sel)` on a list of `len`: the new selection if
@@ -284,8 +295,47 @@ fn tostring(v: f64) -> String {
 }
 
 impl FindTimeless {
-    fn jewel(&self) -> usize {
+    pub(super) fn jewel(&self) -> usize {
         self.jewel_sel
+    }
+
+    /// `searchListTbl` and `searchListFallbackTbl`
+    pub(super) fn tables(&self) -> &[Vec<Vec<String>>; 2] {
+        &self.tbl
+    }
+
+    pub(super) fn protected_count(&self) -> i64 {
+        self.protected_count
+    }
+
+    pub(super) fn is_protected(&self, label: &str) -> bool {
+        self.protected.iter().any(|(l, s)| l == label && *s)
+    }
+
+    pub(super) fn socket_filter_state(&self) -> bool {
+        self.socket_filter
+    }
+
+    /// `jewelSockets`: id, label and keystone
+    pub(super) fn socket_list(&self) -> Vec<(f64, String, String)> {
+        self.sockets
+            .iter()
+            .map(|s| (s.id, s.label.clone(), s.keystone.clone()))
+            .collect()
+    }
+
+    pub(super) fn conqueror(&self) -> usize {
+        self.conqueror_sel
+    }
+
+    /// What a search sets on the results list and the trade button
+    pub(super) fn searched(&mut self) {
+        self.results_sel = Some(1);
+        self.trade_label = "Open Trade URL".into();
+    }
+
+    pub(super) fn set_trade_enabled(&mut self, enabled: bool) {
+        self.trade_enabled = enabled;
     }
 
     fn sel_id(&self) -> Option<&str> {
@@ -452,6 +502,7 @@ impl<'d> TypedSession<'d> {
             }
             out.push(Socket {
                 label,
+                keystone,
                 id: id as f64,
             });
         }
@@ -460,6 +511,7 @@ impl<'d> TypedSession<'d> {
             0,
             Socket {
                 label: "All Sockets".into(),
+                keystone: "Multi-Socket Search".into(),
                 id: -1.0,
             },
         );
@@ -621,6 +673,10 @@ impl<'d> TypedSession<'d> {
             search_more,
             realm_sel,
             trade_type_sel,
+            results_sel: None,
+            results_value: false,
+            trade_enabled: !self.tree_tab.timeless.results.is_empty(),
+            trade_label: "Open Trade URL".into(),
         };
         self.tree_tab.timeless = td;
         self.tree_tab.realm = Some(realm_sel);
@@ -980,6 +1036,24 @@ impl<'d> TypedSession<'d> {
                 p.search_more = s;
                 self.tree_tab.search_more = s;
             }
+            "searchResults" if sel.is_some() && req.get("key").is_none() => {
+                // `SelectIndex`: no row leaves the selection's index
+                let s = sel.unwrap_or(0.0);
+                let rows = self.tree_tab.timeless.results.len();
+                let row =
+                    (s >= 1.0 && s.fract() == 0.0 && s as usize <= rows).then_some(s as usize);
+                p.results_value = row.is_some();
+                let Some(row) = row else { return Ok(()) };
+                p.results_sel = Some(row);
+                if req["doubleClick"].as_bool() == Some(true)
+                    && req["click"].as_bool() == Some(true)
+                    && !self.tree_tab.timeless.results[row - 1]
+                        .label
+                        .contains("B2B2B2")
+                {
+                    self.timeless_add_jewel(row)?;
+                }
+            }
             n if n.starts_with("protectAllocatedBox") => {
                 let Some(s) = state else { return unported() };
                 let i: usize = n["protectAllocatedBox".len()..]
@@ -1019,8 +1093,11 @@ impl<'d> TypedSession<'d> {
                 self.timeless_update_list(p, "", true);
                 self.timeless_update_list(p, "", false);
                 p.abyss_sel = 1;
+                self.tree_tab.timeless.results.clear();
+                p.trade_enabled = false;
                 self.timeless_set_allocated(p)?;
             }
+            "searchButton" => self.timeless_search(p)?,
             "closeButton" => return Ok(true),
             _ => return Err(format!("{NOT_PORTED}: popup button {name}")),
         }
@@ -1208,12 +1285,14 @@ impl<'d> TypedSession<'d> {
             list_name,
             json!({ "class": "EditControl", "text": p.buf[i], "multiline": true }),
         );
-        add(
-            344.0,
-            524.0,
-            "searchResults",
-            json!({ "class": "TimelessJewelListControl", "list": [] }),
-        );
+        let rows: Vec<J> = td.results.iter().map(|r| json!(r.label)).collect();
+        let mut results = json!({ "class": "TimelessJewelListControl", "list": rows });
+        if p.results_value
+            && let Some(s) = p.results_sel
+        {
+            results["sel"] = json!(s);
+        }
+        add(344.0, 524.0, "searchResults", results);
         controls.sort_by(|a, b| {
             a.0.total_cmp(&b.0)
                 .then(a.1.total_cmp(&b.1))
@@ -1230,7 +1309,7 @@ impl<'d> TypedSession<'d> {
                 button("searchButton", "Search", true),
                 button("searchListButton", "^7Desired Nodes", true),
                 button("searchListFallbackButton", &p.fallback_button, true),
-                button("searchTradeButton", "Open Trade URL", false),
+                button("searchTradeButton", &p.trade_label, p.trade_enabled),
             ],
             "controls": controls.into_iter().map(|c| c.3).collect::<Vec<J>>(),
         })
@@ -1238,7 +1317,7 @@ impl<'d> TypedSession<'d> {
 
     /// `controlTooltip` of a control of Find a Timeless Jewel
     pub(super) fn find_timeless_tooltip(
-        &self,
+        &mut self,
         p: &FindTimeless,
         name: &str,
         index: Option<f64>,
@@ -1339,6 +1418,12 @@ impl<'d> TypedSession<'d> {
             },
             n if n.starts_with("protectAllocatedBox") => {
                 return Err(format!("{NOT_PORTED}: the tooltip of a protected notable"));
+            }
+            "searchResults" => {
+                let rows = self.tree_tab.timeless.results.len();
+                if let Some(i) = idx.filter(|i| *i <= rows) {
+                    return self.timeless_row_tooltip(i);
+                }
             }
             "jewelSelect"
             | "socketSelect"

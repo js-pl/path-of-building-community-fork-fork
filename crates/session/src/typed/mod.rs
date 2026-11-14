@@ -47,6 +47,7 @@ mod slot_drops;
 mod spec_sets;
 mod spectre_library;
 mod timeless_search;
+mod timeless_seeds;
 pub mod tooltip;
 mod tree;
 mod tree_import;

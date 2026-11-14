@@ -466,9 +466,24 @@ What remains for the full migration, in order:
    ascendancy choices, the node weight sliders and node drop-down writing
    the desired and fallback lists, the lists' edit boxes, Reset, the trade
    choices the tab remembers, and the tooltips; `find_timeless_jewel_match`
-   drives them on three builds. Search, Generate (fallback weights), the
-   trade URL and the tooltips that show a node (a conqueror's keystone, an
-   Abyss ascendancy notable, a protected notable) stay on the translation.
+   drives them on three builds. Its Search is typed too
+   (`typed/timeless_seeds.rs`) but for the Abyss jewels: the desired and
+   fallback rows read as weights (required, minimum, the totals, protected
+   notables), each seed scored from the jewel's look-up table on the
+   socket's notables, the results by total weight (the radius and the
+   seeds kept in LuaJIT's `pairs` order, so ties come out the same), All
+   Sockets, and the results list: rows, selection, each row's tooltip (the
+   nodes it changes, the jewel's stat differences) and double click, which
+   adds the jewel and with Socket Jewel sockets it.
+   `timeless_search_match` searches each jewel type on two builds. Upstream
+   fails on a required weight before a minimum given as text (it compares
+   the text with a number); the typed search fails the same way.
+   Generate (fallback weights), the Abyss search, the trade URL and the
+   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
+   notable, a protected notable) stay on the translation, and so does
+   Militant Faith's item while a devotion variant is Any (upstream picks
+   one at random). Against the oracle, a row tooltip's node names are
+   compared unordered (the `pairs` order of the tree data's string keys).
    Upstream names the Abyss additions the game only numbers
    (`data.abyssNotableNames`, `PassiveTree`); the typed timeless data does
    too. Two engine fixes came out of a General's Cry

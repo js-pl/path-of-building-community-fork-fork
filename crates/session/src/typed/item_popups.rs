@@ -201,6 +201,7 @@ impl<'d> TypedSession<'d> {
             Some(ItemPopup::SpectreLibrary(_)) => {
                 name.starts_with("list") || name.starts_with("source")
             }
+            Some(ItemPopup::FindTimeless(_)) => name == "searchResults",
             _ => false,
         };
         if req["click"].as_bool() == Some(true) && !list_click {

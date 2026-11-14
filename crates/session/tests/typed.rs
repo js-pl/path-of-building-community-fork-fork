@@ -93,6 +93,34 @@ fn unordered(v: &mut J) {
                     *e = format!("{}attempt to index a nil value", &e[..i]);
                 }
                 unordered(x);
+                // A timeless jewel seed's node names, which upstream lists
+                // in the `pairs` order of the tree data's string keys
+                if k == "lines"
+                    && let J::Array(a) = x
+                {
+                    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+                    let mut i = 0;
+                    while i < a.len() {
+                        if !text(&a[i]).starts_with("^8                ") {
+                            i += 1;
+                            continue;
+                        }
+                        let start = i;
+                        i += 1;
+                        while i < a.len() && text(&a[i]).starts_with("                ") {
+                            i += 1;
+                        }
+                        let mut names: Vec<String> = a[start..i]
+                            .iter()
+                            .map(|l| text(l).trim_start_matches("^8").to_string())
+                            .collect();
+                        names.sort();
+                        for (k, n) in names.into_iter().enumerate() {
+                            let n = if k == 0 { format!("^8{n}") } else { n };
+                            a[start + k]["text"] = J::String(n);
+                        }
+                    }
+                }
                 if (k == "rows" || k == "connectors")
                     && let J::Array(a) = x
                 {
@@ -5167,6 +5195,156 @@ fn find_timeless_jewel_match() {
             assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
             check(&mut d, &r.to_string(), &mut out);
         }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Find a Timeless Jewel's Search in the typed session as in the
+/// translated one: each non-Abyss jewel type on a socket, with desired and
+/// fallback weights, required and minimum weights, protected notables, a
+/// total minimum weight and All Sockets; the results' rows, selection and
+/// the trade button, kept for the next opening
+#[test]
+fn timeless_search_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .filter(|(id, _)| id == "gen-0016" || id == "gen-0032")
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let open = json!({"cmd": "control", "path": "tree.findTimelessJewel", "click": true});
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let search = button("searchButton");
+        let mut most = 0;
+        let mut steps = vec![open.clone()];
+        // Each jewel type on the fourth socket, a few nodes wanted
+        for (jewel, nodes) in [
+            (2, &[3, 8, 2][..]),
+            (3, &[4, 9][..]),
+            (5, &[5, 2, 12][..]),
+            (6, &[3, 7][..]),
+            (1, &[6, 15, 30][..]),
+            (4, &[2, 6, 10][..]),
+        ] {
+            steps.push(c("jewelSelect", json!({"sel": jewel})));
+            steps.push(c("socketSelect", json!({"sel": 4})));
+            if jewel == 4 {
+                // Not "Any": the jewel's item would take random variants
+                steps.push(c("devotionSelect1", json!({"sel": 3})));
+                steps.push(c("devotionSelect2", json!({"sel": 9})));
+            }
+            for (k, n) in nodes.iter().enumerate() {
+                steps.push(c("nodeSelect", json!({"sel": n})));
+                steps.push(c("nodeSlider", json!({"val": 0.1 + 0.2 * k as f64})));
+            }
+            steps.push(search.clone());
+            steps.push(c("searchResults", json!({"sel": 2})));
+            steps.push(json!({"tips": true}));
+        }
+        steps.extend([
+            // Militant Faith with the socket's notables protected
+            c("socketFilter", json!({"state": true})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("protectAllocatedBox2", json!({"state": true})),
+            search.clone(),
+            c("socketFilterAdditionalDistance", json!({"val": 0.3})),
+            search.clone(),
+            c("socketFilter", json!({"state": false})),
+            // Lethal Pride: required and minimum weights, the fallback list
+            c("jewelSelect", json!({"sel": 2})),
+            c("searchList", json!({"text": "total_strength, 1, 0, 0\nkarui_notable_add_life, required, 0, 0"})),
+            c("searchListFallback", json!({"text": "karui_notable_add_armour, 2, 0, 0\nkarui_notable_add_life, 9, 0, 0"})),
+            search.clone(),
+            c("searchList", json!({"text": "total_strength, 1, 0, 40"})),
+            search.clone(),
+            c("totalMinimumWeight", json!({"text": "60"})),
+            search.clone(),
+            c("totalMinimumWeight", json!({"text": ""})),
+            c("searchResults", json!({"sel": 3, "click": true})),
+            c("searchResults", json!({"sel": 99999})),
+            // A jewel added, then one socketed
+            c("searchResults", json!({"sel": 2, "click": true, "doubleClick": true})),
+            json!({"tips": true}),
+            c("socketAllocate", json!({"state": true})),
+            json!({"tips": true}),
+            c("searchResults", json!({"sel": 1, "click": true, "doubleClick": true})),
+            c("searchResults", json!({"sel": 1, "click": true, "doubleClick": true})),
+            json!({"tips": true}),
+            // All Sockets
+            c("socketSelect", json!({"sel": 1})),
+            search.clone(),
+            c("searchResults", json!({"sel": 1})),
+            button("closeButton"),
+            open,
+            c("searchResults", json!({"sel": 2})),
+            button("resetButton"),
+            json!({"cmd": "closePopup"}),
+        ]);
+        for r in steps {
+            if r["tips"] == true {
+                // The first rows' tooltips (and one past the list)
+                for index in [1, 2, 3, 100000] {
+                    let q = json!({"cmd": "controlTooltip", "path": "popup.searchResults", "index": index})
+                        .to_string();
+                    d.typed_error = None;
+                    let (mut t, mut tr) = (
+                        answer(d.request(&q), "typed"),
+                        answer(d.translated_request(&q), "translated"),
+                    );
+                    assert!(d.typed_error.is_none(), "{id} {q}: {:?}", d.typed_error);
+                    if oracle() {
+                        unordered(&mut t);
+                        unordered(&mut tr);
+                    }
+                    diff(&t, &tr, &format!("{id} {q}"), &mut out);
+                }
+                continue;
+            }
+            if r["path"]
+                .as_str()
+                .is_some_and(|p| p.starts_with("popup.protectAllocatedBox"))
+            {
+                let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                let shown = state["ok"]["popups"][0]["controls"]
+                    .as_array()
+                    .is_some_and(|c| c.iter().any(|c| c["path"] == r["path"]));
+                if !shown {
+                    continue;
+                }
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let views: &[&str] = if r["doubleClick"] == true {
+                &["state", "items", "outputs"]
+            } else {
+                &["state"]
+            };
+            compare_views(&mut d, views, &format!("{id} {r}"), &mut out);
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let rows = state["ok"]["popups"][0]["controls"]
+                .as_array()
+                .and_then(|c| c.iter().find(|c| c["path"] == "popup.searchResults"))
+                .and_then(|c| c["list"].as_array())
+                .map_or(0, Vec::len);
+            most = most.max(rows);
+        }
+        assert!(most > 10, "{id}: the searches found {most} seeds");
         compare_saves(&mut d, &id, &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
