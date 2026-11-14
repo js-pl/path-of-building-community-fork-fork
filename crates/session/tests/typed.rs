@@ -80,7 +80,12 @@ fn data() -> &'static TypedData {
     data
 }
 
+/// The reference session: the translation, or with
+/// `SESSION_REFERENCE=oracle` upstream on LuaJIT (`oracle/session.lua`)
 fn session() -> Session {
+    if std::env::var("SESSION_REFERENCE").is_ok_and(|r| r == "oracle") {
+        return Session::oracle(&src()).unwrap_or_else(|e| panic!("{e}"));
+    }
     Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
 }
 

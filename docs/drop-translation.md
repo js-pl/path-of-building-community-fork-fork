@@ -1,7 +1,8 @@
 # Dropping the translation
 
 Status: option C accepted; step 1 done (the browser build and `pob serve`
-are typed-only by default), nothing removed yet. The goal in
+are typed-only by default), step 2 under way (see
+[the oracle session](#the-oracle-session-step-2)), nothing removed yet. The goal in
 [design.md](design.md#mirroring-upstream) is that `crates/upstream`, `luagen`
 and the Lua runtime go, the oracle stays the only reference, and Lua is left
 in the importer and the oracle. This note lists what still depends on them
@@ -164,3 +165,46 @@ tests are adaptive and need fresh sessions on demand, and because transcripts
 for all views would be large and would need regenerating on every sync
 anyway; the recorded set is for offline runs and as a fallback when LuaJIT is
 not available.
+
+## The oracle session (step 2)
+
+`oracle/session.lua` runs `lua/session.lua` on upstream headless on the
+oracle's LuaJIT, one JSON request and response per line, as `pob serve`.
+It differs from the translation's host only where headless upstream has
+no implementation: `Inflate` and `Deflate` are zlib through LuaJIT's FFI,
+files are read only, and source positions are stripped from errors (the
+translation's carry none). `Session::oracle` runs it in a child process,
+and `SESSION_REFERENCE=oracle` makes it the reference of
+`typed_session_matches_translated` instead of the translation. It is fast:
+a session starts and loads a corpus build in about 3.5 s, and the
+`commands` phase takes 25 s, against the translation's 1.6 GB and minutes
+per shard.
+
+First run over all phases (the typed engine equals the translation on all
+of them, so each difference is one between the translation and LuaJIT):
+
+- **Agree:** `commands` (sidebar and outputs after loading every corpus
+  build), `new`, most of `geometry`, half of `power`.
+- **`pairs` order (not reproducible in upstream either).** LuaJIT seeds its
+  string hash per process, so upstream itself gives these in a different
+  order from run to run (checked: the same breakdown three times gives two
+  orders). Breakdown rows (`flags` Attack/Cast/Spell, damage taken by type,
+  sources of a stat), the base-type lines of a unique's raw text (`Variant`
+  lines, so also saved items and builds), a tree connector, the party view's
+  control order. The comparison has to treat these as unordered, or the
+  oracle's LuaJIT has to run with a fixed seed and the typed engine learn
+  LuaJIT's string order; unordered comparison is the practical option,
+  since table keys hash by address.
+- **The Party view's help label** is wrapped word by word on LuaJIT and not
+  on the translation: `layoutControls` in `session.lua` iterates the
+  controls with `pairs` and reads a label before positioning the controls
+  anchored to it, whose position runs the label's width function, which
+  wraps it. Our session script's bug, not upstream's: lay the controls out
+  before describing them.
+- **Build codes:** zlib and miniz compress differently; compare decoded
+  codes.
+- **To investigate:** the party phase's stats with imported party members
+  (sidebar and `Ignite*` outputs differ on a few builds), a gem's DPS in
+  one `gemList` sort, and a transfigured gem name after `saveDisplayItem`
+  (`Vaal Righteous Fire` against `... of Arcane Devotion`); each may be
+  order-dependent too.
