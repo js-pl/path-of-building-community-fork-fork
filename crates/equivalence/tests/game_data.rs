@@ -209,6 +209,43 @@ fn diff_config(got: &ConfigData, want: &ConfigData) -> Vec<String> {
     out
 }
 
+/// Looks every skill's stats up in its `statMap`, as a calculation of the
+/// skill does (`calcs.mergeSkillInstanceMods`): upstream's
+/// `skillStatMapMeta` copies the shared stat maps then, setting
+/// `hasGlobalEffect` (`processMod`), which the typed data has from the load.
+/// The copies are removed again
+fn look_up_skill_stats(ldata: &lua::Value) {
+    use lua::{Value, rt};
+    let get = |v: &Value, k: &str| rt::index(v, &Value::str(k)).unwrap_or_default();
+    let skills = get(ldata, "skills");
+    for (_, ge) in skills.as_table().unwrap().entries() {
+        let stat_map = get(&ge, "statMap");
+        let mut names = Vec::new();
+        if let Some(t) = get(&ge, "stats").as_table() {
+            names.extend(t.array());
+        }
+        for key in ["constantStats", "qualityStats"] {
+            if let Some(t) = get(&ge, key).as_table() {
+                names.extend(
+                    t.array()
+                        .iter()
+                        .filter_map(|e| e.as_table().map(|e| e.get_int(1))),
+                );
+            }
+        }
+        // The copies themselves stay out: the typed data keeps the shared
+        // stat maps apart
+        let own = stat_map.as_table().unwrap();
+        for name in names {
+            if !own.get(&name).is_nil() {
+                continue;
+            }
+            rt::index(&stat_map, &name).unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())));
+            own.set(name, Value::Nil);
+        }
+    }
+}
+
 #[test]
 fn typed_data_matches_upstream() {
     let t = Instant::now();
@@ -240,6 +277,7 @@ fn typed_data_matches_upstream() {
     let start = t.elapsed();
     let t = Instant::now();
     let ldata = host.global("data");
+    look_up_skill_stats(&ldata);
     let items = ItemData::from_lua(&ldata, &host.global("colorCodes"))
         .unwrap_or_else(|e| panic!("item data: {e}"));
     let skills = SkillData::from_lua(
