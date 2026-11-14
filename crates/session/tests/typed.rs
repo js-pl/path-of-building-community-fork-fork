@@ -6114,3 +6114,111 @@ fn skills_gem_tags_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// The build's Back, Save, Save As and Help >>: Back with unsaved changes
+/// asks as the translated session does (its Cancel and Don't Save too);
+/// what the translation cannot do (save files, leave the build, read the
+/// help file) answers in the typed session alone: Save gives the build's
+/// XML and counts the changes as saved, Back without changes and Don't
+/// Save report the build closed, Help >> shows the help's Loadouts section
+#[test]
+fn build_buttons_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus().into_iter().take(2).collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let typed = |d: &mut Dispatcher, r: J| {
+            let a = answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            a
+        };
+        let state =
+            |d: &mut Dispatcher| answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"].clone();
+        let back = json!({"cmd": "control", "path": "build.back", "click": true});
+        // Saved, nothing changed: the build closes
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.save", "click": true}),
+        );
+        let a = typed(&mut d, back.clone());
+        assert_eq!(a["ok"]["closed"], json!(true), "{id}: {a}");
+        // A change: Back asks, Cancel and Don't Save
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "90"}),
+        );
+        for (button, closed) in [("close", false), ("noSave", true)] {
+            typed(&mut d, back.clone());
+            compare_views(&mut d, &["state"], &format!("{id} back unsaved"), &mut out);
+            let a = typed(&mut d, json!({"cmd": "popupButton", "name": button}));
+            assert_eq!(
+                a["ok"]["closed"].as_bool() == Some(true),
+                closed,
+                "{id} {button}: {a}"
+            );
+            compare_views(
+                &mut d,
+                &["state", "outputs"],
+                &format!("{id} {button}"),
+                &mut out,
+            );
+        }
+        // Save from the popup and from the button: the build's XML, saved
+        typed(&mut d, back.clone());
+        let a = typed(&mut d, json!({"cmd": "popupButton", "name": "save"}));
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save")["ok"]["xml"].clone();
+        assert_eq!(a["ok"]["xml"], saved, "{id}: the popup's save");
+        assert_eq!(a["ok"]["closed"], json!(true));
+        assert_eq!(state(&mut d)["unsaved"], json!(false), "{id}: saved");
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "91"}),
+        );
+        for button in ["build.save", "build.saveAs"] {
+            let a = typed(
+                &mut d,
+                json!({"cmd": "control", "path": button, "click": true}),
+            );
+            let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save")["ok"]["xml"].clone();
+            assert_eq!(a["ok"]["xml"], saved, "{id}: {button}");
+            assert_eq!(
+                state(&mut d)["unsaved"],
+                json!(false),
+                "{id}: {button} saved"
+            );
+        }
+        // Help >>
+        let loadouts = |d: &mut Dispatcher| {
+            let r = json!({"cmd": "controls", "paths": ["build.buildLoadouts"]});
+            answer(d.request(&r.to_string()), "controls")["ok"]["build.buildLoadouts"].clone()
+        };
+        let n = loadouts(&mut d)["list"].as_array().map_or(0, Vec::len);
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.buildLoadouts", "sel": n}),
+        );
+        let s = state(&mut d);
+        assert_eq!(
+            s["popups"][0]["title"],
+            json!("Loadouts"),
+            "{id}: {}",
+            s["popups"]
+        );
+        assert!(
+            s["popups"][0]["lines"]
+                .as_array()
+                .is_some_and(|l| l.len() > 3)
+        );
+        assert_eq!(loadouts(&mut d)["sel"], json!(1));
+        typed(&mut d, json!({"cmd": "popupButton", "name": "close"}));
+        assert_eq!(state(&mut d)["popups"], json!([]));
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

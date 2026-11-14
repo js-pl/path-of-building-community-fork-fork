@@ -93,6 +93,19 @@ impl<'d> TypedSession<'d> {
         match (name, req["sel"].as_f64(), click) {
             ("buildLoadouts", Some(sel), _) => self.select_loadout(sel)?,
             ("mainSkillMinionLibrary", _, true) => self.open_spectre_library(),
+            ("back", _, true) => {
+                // Unsaved changes ask first; else `CloseBuild()`, which
+                // leaves the build to the caller
+                if !self.ui.unsaved {
+                    return Ok(json!({ "closed": true }));
+                }
+                self.editor.popups.insert(0, ItemPopup::SaveChanges);
+                self.refresh_item_popups();
+            }
+            ("save" | "saveAs", _, true) => {
+                // `SaveDBFile()`: the session's file is the build's XML
+                return Ok(json!({ "xml": self.save_db_file()? }));
+            }
             ("levelScalingButton", _, true) => {
                 let info = &mut self.build.info;
                 info.character_level_auto_mode = !info.character_level_auto_mode;
@@ -110,6 +123,67 @@ impl<'d> TypedSession<'d> {
             _ => return Err(format!("{NOT_PORTED}: control {path}")),
         }
         Ok(json!([]))
+    }
+
+    /// Saving the build: its XML, and the changes count as saved
+    /// (`ResetModFlags()`)
+    pub(super) fn save_db_file(&mut self) -> Result<String> {
+        let xml = self.save_xml()?;
+        self.ui.unsaved = false;
+        Ok(xml)
+    }
+
+    /// Help >> of the loadouts: the help file's Loadouts section
+    /// (`main:OpenAboutPopup(7)`), without its developer lines
+    pub(super) fn open_help(&mut self) {
+        const HELP: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../upstream/PathOfBuilding/help.txt"
+        ));
+        let mut sections: Vec<(String, Vec<String>)> = Vec::new();
+        for line in HELP.lines() {
+            if let Some(t) = engine::pat::capture(line, "^%-%-%-%[(.+)%]$") {
+                sections.push((t, Vec::new()));
+            } else if let Some((_, lines)) = sections.last_mut()
+                && !engine::pat::is_match(line, "^DEV%[(.+)%]$")
+            {
+                lines.push(format!("^7{}", line.replace('\t', "    ")));
+            }
+        }
+        let (title, mut lines) = sections.get(6).cloned().unwrap_or_default();
+        while lines.last().is_some_and(|l| l == "^7") {
+            lines.pop();
+        }
+        self.editor
+            .popups
+            .insert(0, ItemPopup::Help { title, lines });
+        self.refresh_item_popups();
+    }
+
+    /// What the translation replays of a request the typed session ran:
+    /// the request, nothing (what it cannot do: the file system, leaving
+    /// the build, the help file), or the closing of its popup
+    pub fn translation_replay(&self, req: &J) -> Option<J> {
+        let click = req["click"].as_bool() == Some(true);
+        let top = self.editor.popups.first();
+        match (req["cmd"].as_str(), req["path"].as_str()) {
+            (Some("control"), Some("build.save" | "build.saveAs")) if click => None,
+            (Some("control"), Some("build.back")) if click && !self.ui.unsaved => None,
+            (Some("control"), Some("build.buildLoadouts")) => {
+                let list = self.loadout_list();
+                let sel = req["sel"]
+                    .as_f64()
+                    .unwrap_or(0.0)
+                    .clamp(1.0, list.len() as f64);
+                (list[sel as usize - 1] != super::loadouts::META[4]).then(|| req.clone())
+            }
+            (Some("popupButton" | "closePopup"), _) => match top {
+                Some(ItemPopup::Help { .. }) => None,
+                Some(ItemPopup::SaveChanges) => Some(json!({ "cmd": "closePopup" })),
+                _ => Some(req.clone()),
+            },
+            _ => Some(req.clone()),
+        }
     }
 
     pub fn is_build_tooltip(path: &str) -> bool {
