@@ -625,6 +625,20 @@ impl<'d> TypedSession<'d> {
         }
     }
 
+    /// `controlTooltip` of the Items tab's set drop-down: its `tooltipFunc`
+    /// on hover, `AddItemSetTooltip` of the entry's set
+    pub fn item_set_select_tooltip(&mut self, index: Option<f64>) -> Result<J> {
+        // `AddItemSetTooltip(tooltip, nil)` past the list fails upstream
+        let n = self.build.items.item_set_order_list.len();
+        if !index.is_some_and(|i| i >= 1.0 && i.fract() == 0.0 && i as usize <= n) {
+            return Err(format!(
+                "{}attempt to index a nil value",
+                super::UPSTREAM_ERROR
+            ));
+        }
+        self.set_list_tooltip(SetKind::Item, index)
+    }
+
     /// `controlTooltip` of a row: `AddItemSetTooltip` for an item set; the
     /// other lists have none
     pub(super) fn set_list_tooltip(&mut self, kind: SetKind, index: Option<f64>) -> Result<J> {

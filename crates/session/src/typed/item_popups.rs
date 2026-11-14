@@ -520,7 +520,18 @@ impl<'d> TypedSession<'d> {
     /// `ItemsTab:EditDisplayItemText()`: opens Edit Item Text on the
     /// display item
     pub(super) fn edit_display_item_text(&mut self) -> Result<()> {
-        let item = self.display_item.as_ref().ok_or("no item in the editor")?;
+        let Some(item) = self.display_item.as_ref() else {
+            // No item: an empty text, Rare
+            self.editor.popups.insert(
+                0,
+                ItemPopup::EditText {
+                    rarity: 3,
+                    edit: String::new(),
+                    with_item: false,
+                },
+            );
+            return Ok(());
+        };
         let edit = engine::pat::gsub(&item.build_raw(), "Rarity: %w+\n", "");
         let rarity = RARITIES
             .iter()

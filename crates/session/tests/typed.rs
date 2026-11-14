@@ -1630,7 +1630,67 @@ fn items_edits_match(d: &mut Dispatcher) {
                         let shared = c["ok"]["items.sharedItemList"]["list"]
                             .as_array()
                             .map_or(0, Vec::len);
-                        let r = match rng.below(15) {
+                        let r = match rng.below(16) {
+                            15 => {
+                                // The tab's own controls: their descriptions,
+                                // a set's tooltip, then one of them used
+                                let paths = [
+                                    "items.setSelect",
+                                    "items.specSelect",
+                                    "items.weaponSwap1",
+                                    "items.weaponSwap2",
+                                    "items.craftDisplayItem",
+                                    "items.newDisplayItem",
+                                    "items.setManage",
+                                    "items.specButton",
+                                ];
+                                let c = compare(
+                                    d,
+                                    &json!({"cmd": "controls", "paths": paths}),
+                                    &label,
+                                    &mut out,
+                                );
+                                let sets = c["ok"]["items.setSelect"]["list"]
+                                    .as_array()
+                                    .map_or(1, Vec::len);
+                                let tip = json!({"cmd": "controlTooltip", "path": "items.setSelect", "index": rng.below(sets) + 1});
+                                compare(d, &tip, &label, &mut out);
+                                let path = paths[rng.below(6)];
+                                *popup_inputs.entry(path.into()).or_default() += 1;
+                                match path {
+                                    "items.setSelect" => {
+                                        json!({"cmd": "control", "path": path, "sel": rng.below(sets + 1) + 1})
+                                    }
+                                    "items.specSelect" => {
+                                        let n =
+                                            c["ok"][path]["list"].as_array().map_or(1, Vec::len);
+                                        json!({"cmd": "control", "path": path, "sel": rng.below(n + 1) + 1})
+                                    }
+                                    "items.craftDisplayItem" | "items.newDisplayItem" => {
+                                        // A popup opens: driven, then closed
+                                        let r =
+                                            json!({"cmd": "control", "path": path, "click": true})
+                                                .to_string();
+                                        answer(d.request(&r), "items control");
+                                        log.push(r);
+                                        if !d.typed_active()
+                                            || drive_popups(
+                                                d,
+                                                &mut rng,
+                                                &label,
+                                                &mut log,
+                                                &mut out,
+                                                &mut popup_inputs,
+                                            )
+                                        {
+                                            fell_back = true;
+                                            break;
+                                        }
+                                        continue;
+                                    }
+                                    _ => json!({"cmd": "control", "path": path, "click": true}),
+                                }
+                            }
                             13 if rng.below(3) == 0 => {
                                 // A row of the item list or the shared item
                                 // list dragged within its list
@@ -4288,5 +4348,85 @@ fn items_dropped_on_slots_and_minion_sets() {
         );
     }
     compare_saves(&mut d, &id, &mut out);
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Items tab's own controls on a few builds: their descriptions, the
+/// set drop-down's tooltips, both weapon sets, a second item set and tree
+/// picked from the drop-downs, Craft item... and Create custom...
+#[test]
+fn items_tab_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "items.setSelect",
+        "items.specSelect",
+        "items.weaponSwap1",
+        "items.weaponSwap2",
+        "items.craftDisplayItem",
+        "items.newDisplayItem",
+        "items.setManage",
+        "items.specButton",
+    ];
+    for (id, path) in corpus().into_iter().step_by(11).take(5) {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {r} controls"), out);
+            compare_views(d, &["state", "items", "outputs"], &format!("{id} {r}"), out);
+        };
+        for r in [
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.weaponSwap1", "click": true}),
+            // A second set, then each picked
+            json!({"cmd": "control", "path": "items.setManage", "click": true}),
+            json!({"cmd": "control", "path": "popup.setList.new", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "control", "path": "items.setSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.setSelect", "sel": 9}),
+            // A second tree, then each picked
+            json!({"cmd": "control", "path": "items.specButton", "click": true}),
+            json!({"cmd": "control", "path": "popup.1.new", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "control", "path": "items.specSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "items.specSelect", "sel": 1}),
+            // A crafted item, and a custom one
+            json!({"cmd": "control", "path": "items.craftDisplayItem", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "saveDisplayItem"}),
+            json!({"cmd": "control", "path": "items.newDisplayItem", "click": true}),
+            json!({"cmd": "control", "path": "popup.edit", "text": "Custom Band\nIron Ring"}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "control", "path": "items.newDisplayItem", "click": true}),
+            json!({"cmd": "popupButton", "name": "cancel"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        for index in 1..=3 {
+            let r = json!({"cmd": "controlTooltip", "path": "items.setSelect", "index": index});
+            let (t, tr) = (
+                answer(d.request(&r.to_string()), "typed"),
+                answer(d.translated_request(&r.to_string()), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {r}"), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
