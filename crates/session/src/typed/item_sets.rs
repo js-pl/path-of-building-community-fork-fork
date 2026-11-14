@@ -32,11 +32,6 @@ pub struct RenameSet {
     save_enabled: bool,
 }
 
-/// `buf:match("%S")`
-fn has_text(buf: &str) -> bool {
-    buf.chars().any(|c| !c.is_ascii_whitespace())
-}
-
 impl<'d> TypedSession<'d> {
     pub fn is_item_set_control(path: &str) -> bool {
         path == "items.setManage"
@@ -303,7 +298,9 @@ impl<'d> TypedSession<'d> {
             ("edit", Some(t)) => {
                 // `SetText(text, true)` neither filters nor limits
                 p.buf = t.to_string();
-                p.save_enabled = has_text(&p.buf);
+                // `save.enabled = buf:match("%S")`: a string or nil, and nil
+                // is no `false`, so it reads as enabled from then on
+                p.save_enabled = true;
                 Ok(())
             }
             _ => Err(format!("{NOT_PORTED}: control popup.{name}")),
@@ -312,9 +309,6 @@ impl<'d> TypedSession<'d> {
 
     /// The name popup's Save
     pub(super) fn rename_set_save(&mut self, p: &RenameSet) -> Result<()> {
-        if !p.save_enabled {
-            return Err(format!("{NOT_PORTED}: a disabled button"));
-        }
         if let Some(set) = self.build.items.item_sets.get_mut(&(p.id as i64)) {
             set.title = Some(p.buf.clone());
         }
