@@ -225,6 +225,10 @@ fn power_sorts_match(d: &mut Dispatcher) {
             json!({"cmd": "control", "path": "items.uniqueDB.search", "text": SEARCHES[n % SEARCHES.len()]}),
             json!({"cmd": "control", "path": "items.uniqueDB.sort", "sel": SORTS[n % SORTS.len()]}),
             json!({"cmd": "control", "path": "items.rareDB.search", "text": "amulet"}),
+            // An item type and a league `LoadLeaguesAndTypes` adds
+            json!({"cmd": "control", "path": "items.uniqueDB.type", "sel": if n % 4 == 1 { 6 + n % 7 } else { 1 }}),
+            json!({"cmd": "control", "path": "items.uniqueDB.league", "sel": if n % 3 == 2 { 3 + n % 5 } else { 1 }}),
+            json!({"cmd": "control", "path": "items.rareDB.type", "sel": 6 + n % 9}),
         ];
         for e in &edits {
             let r = answer(d.request(&e.to_string()), "item db control");
@@ -246,31 +250,45 @@ fn power_sorts_match(d: &mut Dispatcher) {
             "items.uniqueDB.searchMode",
             "items.rareDB.search",
             "items.rareDB.sort",
+            "items.rareDB.type",
+            "items.selectDB",
         ];
         let req = json!({"cmd": "controls", "paths": paths}).to_string();
-        let t = Instant::now();
-        let typed = answer(d.request(&req), "typed item db");
-        t_typed += t.elapsed();
-        if let Some(e) = d.typed_error.take() {
-            failures.push(format!("{id}: item db fell back: {e}"));
-            continue;
+        // Then with the rare templates selected
+        for (k, select) in [None, Some(2)].into_iter().enumerate() {
+            if let Some(sel) = select {
+                let e = json!({"cmd": "control", "path": "items.selectDB", "sel": sel});
+                answer(d.request(&e.to_string()), "selectDB");
+                if let Some(err) = d.typed_error.take() {
+                    failures.push(format!("{id}: selectDB fell back: {err}"));
+                }
+            }
+            let t = Instant::now();
+            let typed = answer(d.request(&req), "typed item db");
+            t_typed += t.elapsed();
+            if let Some(e) = d.typed_error.take() {
+                failures.push(format!("{id}: item db fell back: {e}"));
+                break;
+            }
+            let t = Instant::now();
+            let tr = answer(d.translated_request(&req), "translated item db");
+            t_tr += t.elapsed();
+            let mut out = Vec::new();
+            diff(&typed, &tr, &format!("itemDb {k}"), &mut out);
+            if !out.is_empty() {
+                let n = out.len();
+                out.truncate(10);
+                failures.push(format!(
+                    "{id}: {n} item db differences\n    {}",
+                    out.join("\n    ")
+                ));
+            }
+            if k == 0 {
+                items_compared += typed["ok"]["items.uniqueDB"]["list"]
+                    .as_array()
+                    .map_or(0, Vec::len);
+            }
         }
-        let t = Instant::now();
-        let tr = answer(d.translated_request(&req), "translated item db");
-        t_tr += t.elapsed();
-        let mut out = Vec::new();
-        diff(&typed, &tr, "itemDb", &mut out);
-        if !out.is_empty() {
-            let n = out.len();
-            out.truncate(10);
-            failures.push(format!(
-                "{id}: {n} item db differences\n    {}",
-                out.join("\n    ")
-            ));
-        }
-        items_compared += typed["ok"]["items.uniqueDB"]["list"]
-            .as_array()
-            .map_or(0, Vec::len);
     }
     eprintln!(
         "{compared} gem lists and item databases compared ({items_compared} unique rows): typed {t_typed:.1?}, translated {t_tr:.1?}"

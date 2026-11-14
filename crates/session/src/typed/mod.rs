@@ -293,6 +293,8 @@ pub struct TypedSession<'d> {
     editor: item_editor::Editor,
     /// The unique and rare item database lists' inputs
     item_db_lists: [item_db_list::DbList; 2],
+    /// `itemsTab.controls.selectDB`: the list shown, 1 uniques, 2 rares
+    select_db: usize,
 }
 
 impl<'d> TypedSession<'d> {
@@ -332,6 +334,7 @@ impl<'d> TypedSession<'d> {
             party_laid_out: Default::default(),
             editor: Default::default(),
             item_db_lists: Default::default(),
+            select_db: 1,
             root,
         };
         // `ConfigTab:Load` shows the loaded set
