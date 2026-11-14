@@ -65,6 +65,7 @@ pub enum ItemPopup {
     RenameSet(Box<super::item_sets::RenameSet>),
     ImportTree(Box<super::tree_import::ImportTree>),
     NewLoadout(Box<super::build_controls::NewLoadout>),
+    SpectreLibrary(Box<super::spectre_library::SpectreLibrary>),
     ExportTree(Box<super::tree_import::ExportTree>),
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
@@ -178,6 +179,9 @@ impl<'d> TypedSession<'d> {
                 name.split('.').next() == Some(m.kind_list()) || name.starts_with("sharedList")
             }
             Some(ItemPopup::ManageSpecs(_)) => name.split('.').next() == Some("1"),
+            Some(ItemPopup::SpectreLibrary(_)) => {
+                name.starts_with("list") || name.starts_with("source")
+            }
             _ => false,
         };
         if req["click"].as_bool() == Some(true) && !list_click {
@@ -230,6 +234,13 @@ impl<'d> TypedSession<'d> {
             let mut p = p.clone();
             let r = self.rename_set_control(&mut p, name, req);
             self.editor.popups[0] = ItemPopup::RenameSet(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::SpectreLibrary(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.spectre_library_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::SpectreLibrary(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -441,6 +452,11 @@ impl<'d> TypedSession<'d> {
                 self.export_tree_shrink(&mut p);
                 self.editor.popups[0] = ItemPopup::ExportTree(p);
             }
+            (ItemPopup::SpectreLibrary(p), "save") => {
+                // `self.spectreList = destList`, then `main:ClosePopup()`
+                self.spectre_library_save(&p)?;
+                self.close_item_popup();
+            }
             (ItemPopup::NewLoadout(p), "save") => {
                 // The sets added, then `main:ClosePopup()`
                 self.new_loadout_save(&p)?;
@@ -613,6 +629,7 @@ impl<'d> TypedSession<'d> {
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::ImportTree(p) => self.describe_import_tree(p),
             ItemPopup::NewLoadout(p) => self.describe_new_loadout(p),
+            ItemPopup::SpectreLibrary(p) => self.describe_spectre_library(p),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,

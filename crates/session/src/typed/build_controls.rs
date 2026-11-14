@@ -92,6 +92,7 @@ impl<'d> TypedSession<'d> {
         }
         match (name, req["sel"].as_f64(), click) {
             ("buildLoadouts", Some(sel), _) => self.select_loadout(sel)?,
+            ("mainSkillMinionLibrary", _, true) => self.open_spectre_library(),
             ("levelScalingButton", _, true) => {
                 let info = &mut self.build.info;
                 info.character_level_auto_mode = !info.character_level_auto_mode;
