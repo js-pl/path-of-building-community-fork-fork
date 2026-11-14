@@ -319,6 +319,63 @@ impl<'d> TypedSession<'d> {
         Ok(json!([]))
     }
 
+    /// `controlTooltip` of a slot's enabled box: the stats with the gem
+    /// enabled or disabled
+    pub fn gem_slot_enable_tooltip(&self, path: &str) -> Result<J> {
+        let (i, _) = parse(path).ok_or("no gem slot")?;
+        let mut tip = super::tooltip::Tooltip::default();
+        let Some(uid) = self.display_group else {
+            return Err(format!(
+                "{}attempt to index a nil value",
+                super::UPSTREAM_ERROR
+            ));
+        };
+        let groups = self.groups();
+        let Some(row) = groups.iter().position(|g| g.uid.0 == uid) else {
+            return Err(format!(
+                "{NOT_PORTED}: the tooltip of a group no longer in the list"
+            ));
+        };
+        let Some(gem) = groups[row].gem_list.get(i - 1) else {
+            return Ok(tip.json());
+        };
+        let enabled = gem.enabled;
+        let mut b = self.build.clone();
+        if let Some(g) = b
+            .skills
+            .as_mut()
+            .and_then(|s| s.socket_group_list_mut())
+            .and_then(|l| l.get_mut(row))
+        {
+            g.gem_list[i - 1].enabled = !enabled;
+        }
+        let data = self.data.calc_data();
+        let none = engine::calc_override::Override::default();
+        let calc = engine::calculator::MiscCalculator::new(&self.build, &data)?;
+        // `calcFunc()`: the Full DPS too
+        let o = calc.calculate_on(&b, &none, true)?;
+        let base = calc.base();
+        let header = if enabled {
+            "^7Disabling this gem will give you:"
+        } else {
+            "^7Enabling this gem will give you:"
+        };
+        self.add_stat_compares(
+            &mut tip,
+            &super::tooltip::Outputs {
+                player: &base.player,
+                minion: base.minion.as_ref(),
+            },
+            &super::tooltip::Outputs {
+                player: &o.player,
+                minion: o.minion.as_ref(),
+            },
+            header,
+            None,
+        )?;
+        Ok(tip.json())
+    }
+
     /// `controlTooltip` of a slot's count: what it is for
     pub fn gem_slot_count_tooltip(&self) -> J {
         let mut tip = super::tooltip::Tooltip::default();

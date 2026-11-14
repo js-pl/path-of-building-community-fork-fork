@@ -706,7 +706,12 @@ What remains for the full migration, in order:
      group (`SetDisplayGroup`), the rows' tooltips (empty for a group the
      sidebar's calculation never listed), New, Delete with its
      confirmation (an empty group goes at once), the Delete key and
-     Delete All. Upstream holds the shown group and the selection by
+     Delete All, and the keys over a row (`OnHoverKeyUp`, `control` with
+     `hover`, `hoverKey` and the keys held, which the translated session
+     runs with the list's hover methods answering that row): Ctrl and the
+     right button toggle Full DPS, the right button makes the row the
+     main socket group, Ctrl and the left button enable or disable it.
+     Upstream holds the shown group and the selection by
      reference; socket groups carry an identity (`GroupUid`, which clones
      keep and equality ignores) for them. Every rebuild clamps the Calcs
      tab's skill to the list, as the Calcs tab's calculation does.
@@ -729,8 +734,11 @@ What remains for the full migration, in order:
      tooltip, a gem's level, quality, enabled box, count and Vaal skill
      boxes, and deleting gems. Choosing a gem by name
      (`GemSelectControl`), typing in the slot after the last gem (which
-     adds one) and the quality and enabled boxes' tooltips stay on the
-     translation.
+     adds one) is ported apart; the enabled box's tooltip compares the
+     stats with the gem toggled. The quality box's tooltip describes the
+     gem's quality stats (`describeStats`, `Modules/StatDescriber.lua`
+     with `Data/StatDescriptions`), which the typed engine does not have
+     yet, and stays on the translation.
      The Skills tab's set drop-down and gem options
      (`session::typed::skills_controls`, `skills_controls_match`): the
      skill set drop-down, Sort gems by DPS and its stat, the default gem

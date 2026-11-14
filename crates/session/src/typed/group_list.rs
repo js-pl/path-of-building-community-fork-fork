@@ -186,6 +186,9 @@ impl<'d> TypedSession<'d> {
             "skills.groupList" if req["dragTo"].is_string() => {
                 return Err(format!("no drag target {}", req["dragTo"]));
             }
+            "skills.groupList" if req["hoverKey"].is_string() => {
+                self.group_hover_key(req)?;
+            }
             "skills.groupList" if sel.is_some() => {
                 // No `OnSelClick`
                 self.select_group_row(sel.unwrap_or(0.0));
@@ -239,6 +242,46 @@ impl<'d> TypedSession<'d> {
             _ => return Err(format!("{NOT_PORTED}: control {path}")),
         }
         Ok(json!([]))
+    }
+
+    /// `OnHoverKeyUp(key)` over a row: Ctrl and the right button include
+    /// it in Full DPS or not, the right button makes it the main socket
+    /// group, Ctrl and the left button enable or disable it (the shown
+    /// group is shown again); F1 opens the wiki
+    fn group_hover_key(&mut self, req: &J) -> Result<()> {
+        let ctrl = req["ctrl"].as_bool() == Some(true);
+        let n = self.groups().len();
+        let Some(row) = req["hover"]
+            .as_f64()
+            .filter(|i| *i >= 1.0 && i.fract() == 0.0 && *i as usize <= n)
+            .map(|i| i as usize - 1)
+        else {
+            return Ok(());
+        };
+        let uid = self.groups()[row].uid.0;
+        let key = req["hoverKey"].as_str().unwrap_or("");
+        match (key, ctrl) {
+            ("RIGHTBUTTON", true) | ("LEFTBUTTON", true) => {
+                let list = self
+                    .skills_tab()?
+                    .socket_group_list_mut()
+                    .ok_or("no skill set")?;
+                let g = &mut list[row];
+                if key == "RIGHTBUTTON" {
+                    g.include_in_full_dps = Some(g.include_in_full_dps != Some(true));
+                } else {
+                    g.enabled = !g.enabled;
+                }
+                if self.display_group == Some(uid) {
+                    self.set_display_group(Some(row));
+                }
+            }
+            ("RIGHTBUTTON", false) => self.build.info.main_socket_group = (row + 1) as f64,
+            _ => return Ok(()),
+        }
+        // `AddUndoState()`, a calculation
+        self.ui.unsaved = true;
+        self.rebuild()
     }
 
     /// `OnSelDelete(selIndex, selValue)`: a group of an item cannot go, an

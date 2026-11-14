@@ -5705,3 +5705,82 @@ fn skills_gem_select_match() {
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// Keys over the Skills tab's socket group rows (`OnHoverKeyUp`) and the gem
+/// slots' enabled boxes' tooltips, in the typed session as in the
+/// translated one
+#[test]
+fn skills_hover_keys_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupList",
+        "skills.groupEnabled",
+        "skills.includeInFullDPS",
+        "skills.gemSlot1Enable",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 15 == 6)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for i in 1..=3 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Enable")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let key = |hover: usize, k: &str, ctrl: bool| json!({"cmd": "control", "path": "skills.groupList", "hover": hover, "hoverKey": k, "ctrl": ctrl});
+        check(&mut d, "load", &mut out);
+        for r in [
+            key(1, "RIGHTBUTTON", true),
+            key(2, "RIGHTBUTTON", false),
+            key(1, "LEFTBUTTON", true),
+            key(2, "LEFTBUTTON", true),
+            key(1, "LEFTBUTTON", true),
+            key(3, "F1", false),
+            key(99, "RIGHTBUTTON", false),
+            key(1, "LEFTBUTTON", false),
+            json!({"cmd": "control", "path": "skills.groupList", "sel": 2}),
+            key(2, "RIGHTBUTTON", true),
+            key(2, "LEFTBUTTON", true),
+            key(1, "RIGHTBUTTON", false),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

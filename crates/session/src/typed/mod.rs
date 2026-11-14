@@ -632,3 +632,8 @@ impl<'d> TypedSession<'d> {
 pub fn gem_slots_count_path(path: &str) -> bool {
     gem_slots::parse(path).is_some_and(|(_, part)| part == "Count")
 }
+
+/// Whether a path is a gem slot's enabled box (`skills.gemSlot<i>Enable`)
+pub fn gem_slots_enable_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Enable")
+}
