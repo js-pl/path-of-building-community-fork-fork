@@ -727,13 +727,27 @@ What remains for the full migration, in order:
      reads and the build saves (a value no entry has keeps the entry
      selected, as upstream's `SelByValue` does). A gem slot's gem list
      (`gemList` with a group) is an edit: upstream's DPS loop puts back
-     only the slot's gem data and level, so the selections the last
-     pending gem's calculation wrote (`skillMinion`, ...) stay on the
-     gems, and the save shows them. The typed list takes the gems in data
-     order, the order of a fresh gem table; `pairs` over the slot's table
-     is random in LuaJIT, and in the translation keeps the order of an
-     earlier fill, so after the options widen the list the last gem can
-     differ.
+     only the slot's gem data and level, so the selections each pending
+     gem's calculation writes on the gems (`skillMinion`, `skillPart`,
+     ...) carry on to the next and stay, and the save shows them: the
+     typed list runs the pending gems' skill setups one after another on
+     the group's gems. It takes them in data order, the order of a fresh
+     gem table; `pairs` over the slot's table is random in LuaJIT, and in
+     the translation keeps the order of an earlier fill, so after the
+     options widen the list the order can differ. A candidate whose
+     calculation fails upstream leaves its gem in the slot; the typed
+     calculation does not fail. The list also shows its group and the
+     shown one again (`SetDisplayGroup`), and gives the slot's name box a
+     sort cache by DPS.
+     Choosing a gem by name in a gem slot (`GemSelectControl`'s text,
+     `skills_gem_select_match`): the box's list drops (a sort cache by
+     support and name unless the one it has still holds), the first gem
+     of `BuildList(text)` (the names that are the text, its initials,
+     start with it, contain it, each round with the text's tag) is
+     chosen, and the slot's gem changes to it, calculated only when the
+     text is its name; the slot after the last gem adds one. Searches
+     with tags (`:`) and the imbued support's box stay on the
+     translation.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor
