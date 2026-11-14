@@ -429,8 +429,9 @@ impl<'d> TypedSession<'d> {
                 self.close_item_popup();
             }
             (ItemPopup::ExportTree(_), "copy") => {}
-            (ItemPopup::ExportTree(_), "shrink") => {
-                return Err(format!("{NOT_PORTED}: shrinking a tree link with PoEURL"));
+            (ItemPopup::ExportTree(mut p), "shrink") => {
+                self.export_tree_shrink(&mut p);
+                self.editor.popups[0] = ItemPopup::ExportTree(p);
             }
             (ItemPopup::ImportTree(mut p), "import") => {
                 let closes = self.import_tree(&mut p)?;

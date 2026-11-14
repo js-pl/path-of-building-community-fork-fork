@@ -29,6 +29,37 @@ pub type Result<T> = std::result::Result<T, String>;
 /// (mastery node, effect) in its `pairs` order.
 /// `base64.decode` of upstream's runtime: characters outside the alphabet
 /// are dropped, a last incomplete byte too
+/// The error of a tree link's mastery on a node the spec does not have or
+/// has not allocated, which upstream fails on (it indexes nil)
+pub const MASTERY_NODE_MISSING: &str = "a tree link's mastery on a missing node";
+
+/// A tree link's bytes: its last part, URL-safe base64
+fn link_bytes(url: &str) -> Vec<u8> {
+    let url = match url.rfind('/') {
+        Some(i) if i > 0 => &url[i + 1..],
+        _ => url,
+    };
+    base64_decode(&url.replace('-', "+").replace('_', "/"))
+}
+
+/// `DecodePoePlannerURL(url, true)`: a poeplanner link's tree version, or
+/// the message for a link it rejects
+pub fn poe_planner_version(
+    url: &str,
+    versions: &[(f64, String)],
+) -> std::result::Result<String, String> {
+    let b = link_bytes(url);
+    if b.len() < 15 {
+        return Err("Invalid tree link (unrecognised format).".into());
+    }
+    let v = f64::from(b[6]) + f64::from(b[7]) * 256.0;
+    versions
+        .iter()
+        .find(|(n, _)| *n == v)
+        .map(|(_, t)| t.clone())
+        .ok_or_else(|| "Invalid tree version found in link.".into())
+}
+
 fn base64_decode(data: &str) -> Vec<u8> {
     let (mut bits, mut n, mut out) = (0u32, 0, Vec::new());
     for c in data.bytes() {
@@ -711,19 +742,118 @@ impl<'t> PassiveSpec<'t> {
         for c in effects.as_chunks::<4>().0 {
             let effect = u32::from(c[0]) * 256 + u32::from(c[1]);
             let id = u32::from(c[2]) * 256 + u32::from(c[3]);
-            if self
-                .tree
-                .mastery_effects
-                .contains_key(&f64::from(effect).to_bits())
-            {
-                // Upstream indexes `allocNodes[id]` without a check
-                if !self.alloc_nodes.contains(id) {
-                    return Err(format!("mastery {id} of a tree link is not allocated"));
-                }
-                self.mastery_selections.insert(id, f64::from(effect));
-            }
+            self.allocate_mastery_effect(id, effect)?;
         }
         Ok(None)
+    }
+
+    /// `DecodePoePlannerURL(url, false)`: a poeplanner link, little endian,
+    /// whose version [`poe_planner_version`] found
+    pub fn decode_poe_planner_url(&mut self, url: &str) -> Result<()> {
+        let b = link_bytes(url);
+        let nil = || "attempt to perform arithmetic on a nil value".to_string();
+        let byte = |i: usize| b.get(i.wrapping_sub(1)).copied().map(usize::from);
+        // `byteToInt(bytes, start)`
+        let int = |i: usize| -> Result<usize> {
+            Ok(byte(i).ok_or_else(nil)? + byte(i + 1).ok_or_else(nil)? * 256)
+        };
+        // `b:sub(i, j)`, 1-based
+        let sub = |i: usize, j: usize| -> Vec<u8> {
+            let j = j.min(b.len());
+            if i == 0 || i > j {
+                return Vec::new();
+            }
+            b[i - 1..j].to_vec()
+        };
+        let class_id = byte(9).ok_or_else(nil)? as i64;
+        let ascend_id = byte(10).ok_or_else(nil)? as i64;
+        self.reset_nodes();
+        self.select_class(class_id)?;
+        self.select_ascend_class(ascend_id)?;
+        let mut idx = 12;
+        // Nodes, cluster nodes and ascendancy nodes
+        for offset in [0, 65536, 0] {
+            let end = idx + 2 + int(idx)? * 2;
+            let nodes = sub(idx + 2, end - 1);
+            for c in nodes.as_chunks::<2>().0 {
+                let id = u32::from(c[0]) + u32::from(c[1]) * 256 + offset;
+                if let Some(&i) = self.index.get(&id) {
+                    self.alloc(i);
+                }
+            }
+            idx = end;
+        }
+        // `AllocateMasteryEffects(masteryEffects, "little")`: the node, then
+        // the effect
+        let end = idx + 2 + int(idx)? * 4;
+        let effects = sub(idx + 2, end - 1);
+        for c in effects.as_chunks::<4>().0 {
+            let effect = u32::from(c[2]) + u32::from(c[3]) * 256;
+            let id = u32::from(c[0]) + u32::from(c[1]) * 256;
+            if let Some(&i) = self.index.get(&id) {
+                self.alloc(i);
+            }
+            self.allocate_mastery_effect(id, effect)?;
+        }
+        Ok(())
+    }
+
+    /// A selected mastery effect's lines on its allocated node, and the
+    /// allocated masteries' counts
+    fn apply_mastery_effect(&mut self, i: usize, sel: f64) -> Result<()> {
+        let Some(effect) = self.tree.mastery_effects.get(&sel.to_bits()) else {
+            return Ok(());
+        };
+        let sd = match &self.nodes[i].overlay {
+            Some(o) => o.sd.clone(),
+            None => effect.sd.clone(),
+        };
+        self.set_stats(i, sd, &[])?;
+        self.nodes[i].all_mastery_options = Some(false);
+        self.allocated_mastery_count += 1;
+        let name: Arc<str> = self.dn(i).into();
+        match self
+            .allocated_mastery_types
+            .iter_mut()
+            .find(|(n, _)| *n == name)
+        {
+            None => {
+                self.allocated_mastery_types.push((name, 1));
+                self.allocated_mastery_type_count += 1;
+            }
+            Some((_, count)) => {
+                if *count == 0 {
+                    self.allocated_mastery_type_count += 1;
+                }
+                *count += 1;
+            }
+        }
+        Ok(())
+    }
+
+    /// An effect of `AllocateMasteryEffects`: selected on its allocated
+    /// node, else the node deallocated. Upstream indexes the node without
+    /// a check either way, and fails on one the tree does not have.
+    fn allocate_mastery_effect(&mut self, id: u32, effect: u32) -> Result<()> {
+        if self
+            .tree
+            .mastery_effects
+            .contains_key(&f64::from(effect).to_bits())
+        {
+            let Some(&i) = self.alloc_nodes.get(id) else {
+                return Err(format!("{MASTERY_NODE_MISSING} ({id})"));
+            };
+            self.mastery_selections.insert(id, f64::from(effect));
+            // Its lines at once, as upstream sets the node's `sd`
+            self.apply_mastery_effect(i, f64::from(effect))?;
+        } else {
+            let i = *self
+                .index
+                .get(&id)
+                .ok_or_else(|| format!("{MASTERY_NODE_MISSING} ({id})"))?;
+            self.dealloc(i);
+        }
+        Ok(())
     }
 
     /// `AllocateDecodedNodes(nodes, isCluster, "big")`
@@ -1182,32 +1312,9 @@ impl<'t> PassiveSpec<'t> {
             if kind == NodeType::Mastery
                 && let Some(&sel) = self.mastery_selections.get(id)
             {
-                let effect = self.tree.mastery_effects.get(&sel.to_bits());
-                if let (Some(effect), true) = (effect, self.alloc_nodes.contains(id)) {
-                    let sd = match &self.nodes[i].overlay {
-                        Some(o) => o.sd.clone(),
-                        None => effect.sd.clone(),
-                    };
-                    self.set_stats(i, sd, &[])?;
-                    self.nodes[i].all_mastery_options = Some(false);
-                    self.allocated_mastery_count += 1;
-                    let name: Arc<str> = self.dn(i).into();
-                    match self
-                        .allocated_mastery_types
-                        .iter_mut()
-                        .find(|(n, _)| *n == name)
-                    {
-                        None => {
-                            self.allocated_mastery_types.push((name, 1));
-                            self.allocated_mastery_type_count += 1;
-                        }
-                        Some((_, count)) => {
-                            if *count == 0 {
-                                self.allocated_mastery_type_count += 1;
-                            }
-                            *count += 1;
-                        }
-                    }
+                let effect = self.tree.mastery_effects.contains_key(&sel.to_bits());
+                if effect && self.alloc_nodes.contains(id) {
+                    self.apply_mastery_effect(i, sel)?;
                 } else {
                     self.dealloc(i);
                     self.mastery_selections.remove(id);

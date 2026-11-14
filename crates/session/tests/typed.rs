@@ -2024,7 +2024,7 @@ fn drive_popups(
                 .into_iter()
                 .filter(|c| c["enabled"] == true)
                 .collect();
-            for b in buttons.iter().filter(|b| *b != "shrink") {
+            for b in &buttons {
                 inputs.push(json!({"class": "PopupButton", "name": b}));
             }
             if title == "Manage Passive Trees" {
@@ -2373,21 +2373,54 @@ fn tree_link(d: &mut Dispatcher, rng: &mut Lcg) -> String {
         .flatten()
         .filter_map(J::as_u64)
         .filter(|n| *n < 65536)
-        .take(40)
+        .take(200)
         .collect();
+    // The selected masteries of those nodes: (node, effect)
+    let masteries: Vec<(u64, u64)> = st["ok"]["masteries"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_u64()?)))
+        .filter(|(n, _)| nodes.contains(n))
+        .collect();
+    let class = rng.below(7) as u8;
+    let ascend = rng.below(4) as u8;
+    match rng.below(10) {
+        // A link PoEURL would resolve
+        0 => return "http://poeurl.com/dABz".into(),
+        // poeplanner's: little endian, its own version numbers
+        1 | 2 => {
+            let version: u16 = [51, 47, 33, 99][rng.below(4)];
+            let mut b: Vec<u8> = vec![0, 0, 0, 0, 0, 0];
+            b.extend(version.to_le_bytes());
+            b.extend([class, rng.below(3) as u8, 0]);
+            b.extend((nodes.len() as u16).to_le_bytes());
+            for n in &nodes {
+                b.extend((*n as u16).to_le_bytes());
+            }
+            b.extend([0, 0, 0, 0]);
+            // Masteries on the latest tree only: an old one does not have
+            // their nodes, which upstream fails on
+            let ms: &[(u64, u64)] = if version == 51 { &masteries } else { &[] };
+            b.extend((ms.len() as u16).to_le_bytes());
+            for (n, e) in ms {
+                b.extend((*n as u16).to_le_bytes());
+                b.extend((*e as u16).to_le_bytes());
+            }
+            if rng.below(8) == 0 {
+                b.truncate(10);
+            }
+            let code = base64(&b).replace('+', "-").replace('/', "_");
+            return format!("https://poeplanner.com/{code}");
+        }
+        _ => {}
+    }
     let (version, class) = match rng.below(8) {
         0 => (7, 1),
         1 => (6, 9),
-        k => (if k == 2 { 4 } else { 6 }, rng.below(7) as u8),
+        k => (if k == 2 { 4 } else { 6 }, class),
     };
-    let mut b: Vec<u8> = vec![0, 0, 0, version, class, rng.below(4) as u8];
-    b.push(nodes.len() as u8);
-    for n in &nodes {
-        b.push((n / 256) as u8);
-        b.push((n % 256) as u8);
-    }
-    b.extend([0, 0]);
-    let code = base64(&b).replace('+', "-").replace('/', "_");
+    let k = rng.below(6);
     let prefix = [
         "https://www.pathofexile.com/passive-skill-tree/",
         "https://www.pathofexile.com/passive-skill-tree/3.15.0/",
@@ -2395,11 +2428,88 @@ fn tree_link(d: &mut Dispatcher, rng: &mut Lcg) -> String {
         "https://www.pathofexile.com/passive-skill-tree/2.6.2/",
         "https://poeskilltree.com/?v=3.20.0#",
         "https://www.pathofexile.com/passive-skill-tree/ruthless/",
-    ][rng.below(6)];
+    ][k];
+    let mut b: Vec<u8> = vec![0, 0, 0, version, class, ascend];
+    b.push(nodes.len() as u8);
+    for n in &nodes {
+        b.push((n / 256) as u8);
+        b.push((n % 256) as u8);
+    }
+    b.push(0);
+    // Masteries on the latest tree only (the first and the 2.6.2 links)
+    let ms: &[(u64, u64)] = if k == 0 || k == 3 { &masteries } else { &[] };
+    b.push(ms.len() as u8);
+    for (n, e) in ms {
+        b.extend([
+            (e / 256) as u8,
+            (e % 256) as u8,
+            (n / 256) as u8,
+            (n % 256) as u8,
+        ]);
+    }
+    let code = base64(&b).replace('+', "-").replace('/', "_");
     if rng.below(8) == 0 {
         return format!("{prefix}AAAA");
     }
     format!("{prefix}{code}")
+}
+
+/// The active spec as a tree link of the latest tree, with its class and
+/// masteries: the official format, or poeplanner's
+fn own_tree_link(d: &mut Dispatcher, poe_planner: bool) -> String {
+    let st = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+    let nodes: Vec<u64> = st["ok"]["alloc"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(J::as_u64)
+        .filter(|n| *n < 65536)
+        .take(250)
+        .collect();
+    let masteries: Vec<(u64, u64)> = st["ok"]["masteries"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_u64()?)))
+        .filter(|(n, _)| nodes.contains(n))
+        .collect();
+    let class = st["ok"]["classId"].as_u64().unwrap_or(0) as u8;
+    let ascend = st["ok"]["ascendClassId"].as_u64().unwrap_or(0) as u8;
+    let mut b: Vec<u8> = Vec::new();
+    if poe_planner {
+        b.extend([0, 0, 0, 0, 0, 0, 51, 0, class, ascend, 0]);
+        b.extend((nodes.len() as u16).to_le_bytes());
+        for n in &nodes {
+            b.extend((*n as u16).to_le_bytes());
+        }
+        b.extend([0, 0, 0, 0]);
+        b.extend((masteries.len() as u16).to_le_bytes());
+        for (n, e) in &masteries {
+            b.extend((*n as u16).to_le_bytes());
+            b.extend((*e as u16).to_le_bytes());
+        }
+    } else {
+        b.extend([0, 0, 0, 6, class, ascend, nodes.len() as u8]);
+        for n in &nodes {
+            b.extend([(n / 256) as u8, (n % 256) as u8]);
+        }
+        b.push(0);
+        b.push(masteries.len() as u8);
+        for (n, e) in &masteries {
+            b.extend([
+                (e / 256) as u8,
+                (e % 256) as u8,
+                (n / 256) as u8,
+                (n % 256) as u8,
+            ]);
+        }
+    }
+    let code = base64(&b).replace('+', "-").replace('/', "_");
+    if poe_planner {
+        format!("https://poeplanner.com/{code}")
+    } else {
+        format!("https://www.pathofexile.com/passive-skill-tree/{code}")
+    }
 }
 
 fn base64(b: &[u8]) -> String {
@@ -3609,12 +3719,14 @@ fn shared_lists_survive_a_fallback() {
         answer(d.request(&r.to_string()), "shared");
         assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
     }
+    let mut out = Vec::new();
+    compare_views(&mut d, &["sharedLists"], "before the fallback", &mut out);
     // A key the typed session does not have: the translation holds the build
     let r = json!({"cmd": "control", "path": "items.sharedItemList", "key": "F2"});
     answer(d.request(&r.to_string()), "fallback");
     assert!(!d.typed_active());
     load(&mut d, &builds[1]);
-    let mut out = Vec::new();
+    compare_views(&mut d, &["sharedLists"], "after the fallback", &mut out);
     let shared = json!({"cmd": "controls", "paths": ["items.sharedItemList"]}).to_string();
     let (t, tr) = (
         answer(d.request(&shared), "typed"),
@@ -3676,7 +3788,7 @@ fn tree_links_import_and_export() {
             json!({"cmd": "control", "path": "items.specButton", "click": true}),
             &mut out,
         );
-        for i in 0..4 {
+        for i in 0..8 {
             step(
                 &mut d,
                 json!({"cmd": "control", "path": "popup.2", "click": true}),
@@ -3687,7 +3799,11 @@ fn tree_links_import_and_export() {
                 json!({"cmd": "control", "path": "popup.name", "text": format!("Imported {i}")}),
                 &mut out,
             );
-            let link = tree_link(&mut d, &mut rng);
+            // First the build's own tree with its masteries, in both formats
+            let link = match i {
+                0 | 1 => own_tree_link(&mut d, i == 1),
+                _ => tree_link(&mut d, &mut rng),
+            };
             step(
                 &mut d,
                 json!({"cmd": "control", "path": "popup.edit", "text": link}),
@@ -3715,6 +3831,11 @@ fn tree_links_import_and_export() {
         );
         step(
             &mut d,
+            json!({"cmd": "popupButton", "name": "shrink"}),
+            &mut out,
+        );
+        step(
+            &mut d,
             json!({"cmd": "popupButton", "name": "copy"}),
             &mut out,
         );
@@ -3734,6 +3855,30 @@ fn tree_links_import_and_export() {
         compare_saves(&mut d, &id, &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
+    // A mastery on a node the link's tree does not have: upstream fails,
+    // the typed session hands it over
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let (_, path) = corpus().into_iter().next().unwrap();
+    let xml = std::fs::read_to_string(path).unwrap();
+    answer(
+        d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+        "load",
+    );
+    let link = format!(
+        "https://www.pathofexile.com/passive-skill-tree/3.15.0/{}",
+        base64(&[0, 0, 0, 6, 2, 0, 0, 0, 1, 0, 1, 0, 1])
+    );
+    for r in [
+        json!({"cmd": "control", "path": "items.specButton", "click": true}),
+        json!({"cmd": "control", "path": "popup.2", "click": true}),
+        json!({"cmd": "control", "path": "popup.edit", "text": link}),
+        json!({"cmd": "popupButton", "name": "import"}),
+    ] {
+        answer(d.request(&r.to_string()), "request");
+    }
+    assert!(!d.typed_active());
+    let e = d.typed_error.clone().unwrap_or_default();
+    assert!(e.contains("(upstream fails)"), "{e}");
 }
 
 /// Items dropped on the item slots and on the minion drop-down while it

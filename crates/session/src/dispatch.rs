@@ -32,6 +32,7 @@ const READ_ONLY: &[&str] = &[
     "nodeTooltip",
     "masteryOptions",
     "treeSpecs",
+    "sharedLists",
     "powerStats",
     "nodePower",
     "skills",
@@ -275,6 +276,7 @@ impl<'d> Dispatcher<'d> {
                 self.typed.as_ref()?.mastery_options(id(&req)?),
             ),
             "treeSpecs" => Some(ok(self.typed.as_ref()?.tree_specs())),
+            "sharedLists" => view(&mut self.typed_error, self.typed.as_ref()?.shared_lists()),
             "powerStats" => {
                 self.typed.as_ref()?;
                 Some(ok(TypedSession::power_stats()))
