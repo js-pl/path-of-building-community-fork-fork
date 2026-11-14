@@ -593,6 +593,21 @@ impl Timeless {
         ty: usize,
         path: Option<&[u32]>,
     ) -> Result<Vec<(u32, Arc<Vec<AbyssComponent>>)>> {
+        self.read_abyss_in(seed, socket, ty, path, None)
+    }
+
+    /// `data.readAbyssJewelLUT(seed, socketId, jewelType, path,
+    /// ascendancyName)`: the affected nodes in the order upstream's table
+    /// gets them, Zorath's path visited in `pairs` order and its
+    /// ascendancy selections limited to the named ascendancy
+    pub fn read_abyss_in(
+        &self,
+        seed: f64,
+        socket: u32,
+        ty: usize,
+        path: Option<&[u32]>,
+        ascendancy: Option<&str>,
+    ) -> Result<Vec<(u32, Arc<Vec<AbyssComponent>>)>> {
         let mut out = Vec::new();
         if (7..=10).contains(&ty) {
             let lut = self.abyss_lut(ty)?;
@@ -618,7 +633,12 @@ impl Timeless {
             return Ok(out);
         };
         let lut = self.abyss_lut(ty)?;
+        // `{ [root.id] = true, [other.id] = true }`, then the path's nodes
+        let mut keys: lua::ljtab::LjMap<()> = lua::ljtab::LjMap::with_hash(1);
         for &node in path {
+            keys.insert(node, ());
+        }
+        for (node, _) in keys.iter() {
             let m = self.read_abyss_node(&lut, seed, node, ty)?;
             if !m.is_empty() {
                 out.push((node, Arc::new(m)));
@@ -626,7 +646,10 @@ impl Timeless {
         }
         if let (Some(s), true) = (lut.seed_index(seed), lut.by_node) {
             let d = &lut.data[..];
-            for (_, block) in &lut.ascendancies {
+            for (name, block) in &lut.ascendancies {
+                if ascendancy.is_some_and(|a| a != name) {
+                    continue;
+                }
                 let mut o = lut.record(*block, s, skip_ascendancy_record)?;
                 let n = byte(d, o)?;
                 o += 1;
