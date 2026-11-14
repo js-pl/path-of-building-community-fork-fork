@@ -25,6 +25,7 @@ mod item_popups;
 mod item_sets;
 mod item_tooltip;
 mod items;
+mod loadouts;
 mod node_tooltip;
 mod notes;
 mod party;
@@ -276,6 +277,8 @@ pub struct TypedSession<'d> {
     other_specs: Vec<Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>>,
     /// `ItemsTab.items` as upstream's table: its ids in `pairs` order
     item_keys: lua::ljtab::LjMap<()>,
+    /// The build's loadouts drop-down
+    loadout: loadouts::LoadoutState,
     /// The new or copied spec its name popup holds (`RenameSpec`)
     pending_spec: Option<std::sync::Arc<engine::spec::PassiveSpec<'d>>>,
     /// The jewel sockets' labels `UpdateSockets` last gave
@@ -330,6 +333,7 @@ impl<'d> TypedSession<'d> {
             show_minion_set: false,
             other_specs: Vec::new(),
             item_keys: Default::default(),
+            loadout: Default::default(),
             pending_spec: None,
             socket_labels: HashMap::new(),
             notes: notes::load_notes(&root),
@@ -362,6 +366,8 @@ impl<'d> TypedSession<'d> {
         s.update_display_labels(true);
         s.estimate_progress()?;
         s.refresh_controls()?;
+        // `buildMode:Init`'s last `SyncLoadouts()`
+        s.sync_loadouts_and_rebuild()?;
         Ok(s)
     }
 

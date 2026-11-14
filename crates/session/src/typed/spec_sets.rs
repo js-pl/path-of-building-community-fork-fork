@@ -311,12 +311,7 @@ impl<'d> TypedSession<'d> {
         if index < 1 || index > n || self.other_specs.is_empty() {
             return Err(format!("{NOT_PORTED}: deleting a missing tree"));
         }
-        if index == self.specs.0 {
-            // `SetActiveSpec(m_max(1, index - 1))` of the list without it:
-            // in this list, the one before, or the second
-            let to = if index > 1 { index - 1 } else { 2 };
-            self.select_tree_spec(to as f64)?;
-        }
+        let active = index == self.specs.0;
         self.other_specs.remove(index - 1);
         self.specs.1.remove(index - 1);
         if self.specs.0 > index {
@@ -336,6 +331,19 @@ impl<'d> TypedSession<'d> {
             }
         }
         self.undo = undo;
+        if active {
+            // `SetActiveSpec(m_max(1, index - 1))` of the list without
+            // it: the deleted spec's jewels go nowhere
+            let to = index.saturating_sub(1).max(1);
+            let next = self.other_specs[to - 1].take().ok_or("no spec")?;
+            self.build.spec = next;
+            self.specs.0 = to;
+            if !self.build.items.item_order_list.is_empty() {
+                self.populate_slots();
+            }
+            self.sync_loadouts()?;
+            self.rebuild()?;
+        }
         if let Some(m) = self.editor.popups.iter_mut().find_map(|p| match p {
             ItemPopup::ManageSpecs(m) => Some(m),
             _ => None,

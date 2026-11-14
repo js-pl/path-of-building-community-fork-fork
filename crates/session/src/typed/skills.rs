@@ -352,6 +352,7 @@ impl TypedSession<'_> {
         let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
         let id = id.unwrap_or(tab.active_skill_set_id);
         tab.set_active_skill_set(id, data);
+        self.sync_loadouts()?;
         self.rebuild()?;
         Ok(json!([]))
     }

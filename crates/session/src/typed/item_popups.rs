@@ -338,6 +338,7 @@ impl<'d> TypedSession<'d> {
             }
             (ItemPopup::RenameSpec(p), "save") => {
                 self.rename_spec_save(&p)?;
+                self.sync_loadouts_and_rebuild()?;
                 self.close_item_popup();
             }
             (ItemPopup::RenameSpec(p), "cancel") => {
@@ -389,6 +390,7 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::RenameSet(p), "save") => {
                 // `main:ClosePopup()` after the changes
                 self.rename_set_save(&p)?;
+                self.sync_loadouts_and_rebuild()?;
                 self.close_item_popup();
             }
             (ItemPopup::Confirm { action, .. }, "confirm") => {

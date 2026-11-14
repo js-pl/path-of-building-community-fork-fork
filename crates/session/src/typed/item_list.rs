@@ -69,11 +69,14 @@ fn link_of(title: &str) -> Option<(String, String)> {
 }
 
 /// The loadouts `buildMode:SyncLoadouts` lists, and the special links of
-/// item sets and specs by link id (`setId` of each)
-struct Loadouts {
-    list: Vec<String>,
-    item_links: Vec<(String, f64)>,
-    tree_links: Vec<(String, usize)>,
+/// the sets and specs by link id (`setId` of each)
+#[derive(Clone, Debug, Default)]
+pub(super) struct Loadouts {
+    pub list: Vec<String>,
+    pub item_links: Vec<(String, f64)>,
+    pub skill_links: Vec<(String, f64)>,
+    pub config_links: Vec<(String, f64)>,
+    pub tree_links: Vec<(String, usize)>,
 }
 
 impl<'d> TypedSession<'d> {
@@ -97,7 +100,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `buildMode:SyncLoadouts()`'s list
-    fn loadouts(&self) -> Loadouts {
+    pub(super) fn compute_loadouts(&self) -> Loadouts {
         let latest = self.data.game.latest_tree_version();
         let tab = &self.build.items;
         let mut tree_list: Vec<String> = Vec::new();
@@ -201,6 +204,8 @@ impl<'d> TypedSession<'d> {
         Loadouts {
             list,
             item_links,
+            skill_links,
+            config_links,
             tree_links: last_tree,
         }
     }
@@ -210,7 +215,7 @@ impl<'d> TypedSession<'d> {
         let mut list: Vec<String> = ["Any Loadout", "Current Loadout", "Unused Items"]
             .map(String::from)
             .to_vec();
-        for v in self.loadouts().list {
+        for v in self.loadout.synced.list.clone() {
             if !list.contains(&v) {
                 list.push(v);
             }
@@ -366,7 +371,7 @@ impl<'d> TypedSession<'d> {
                 spec = (1..=self.spec_count())
                     .find(|i| self.spec_entry(*i).is_some_and(|(t, _, _)| t == title));
                 let link = engine::pat::capture(&value, "%{(%w+)%}");
-                let l = self.loadouts();
+                let l = &self.loadout.synced;
                 let item_link = link
                     .as_ref()
                     .and_then(|k| l.item_links.iter().find(|(x, _)| x == k).map(|(_, id)| *id));
@@ -696,8 +701,14 @@ impl<'d> TypedSession<'d> {
         match action {
             Deletion::Item(id) => self.list_delete_item(*id),
             Deletion::AllItems => self.delete_all_items(),
-            Deletion::Set { kind, index, id } => self.confirm_delete_set(*kind, *index, *id),
-            Deletion::Spec { index } => self.confirm_delete_spec(*index),
+            Deletion::Set { kind, index, id } => {
+                self.confirm_delete_set(*kind, *index, *id)?;
+                self.sync_loadouts_and_rebuild()
+            }
+            Deletion::Spec { index } => {
+                self.confirm_delete_spec(*index)?;
+                self.sync_loadouts_and_rebuild()
+            }
         }
     }
 
