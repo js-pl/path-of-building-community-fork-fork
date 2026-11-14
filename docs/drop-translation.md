@@ -214,10 +214,15 @@ of them, so each difference is one between the translation and LuaJIT):
   equals in `pairs` order):
   - with imported party members, a few builds' sidebar and `Ignite*`
     outputs (a party curse's `SelfIgniteChance` is applied on one side);
-  - transfigured gem names: `Vaal Righteous Fire` against `... of Arcane
-    Devotion` as a breakdown row's source and in a saved gem;
-  - unique flavour text: two uniques (`Duskblight`, a flask) show different
-    lore lines;
+  - transfigured gem names, `Vaal Righteous Fire` against `... of Arcane
+    Devotion` as a breakdown row's source and in a saved gem: explained,
+    upstream's `pairs` order. `Data.lua` makes the alternate Vaal gems with
+    the base gem's `grantedEffect`, so `data.gemForSkill[grantedEffect]`
+    names whichever of them `pairs(data.gems)` sets up last;
+  - unique flavour text, two uniques (`Duskblight`, a flask) with other
+    lore lines: explained, upstream's `pairs` order. A unique with several
+    flavour texts shows the first `pairs(flavourTable)` gives
+    (`ItemsTab:AddItemTooltip`);
   - a connector of the 3.21 tree's Necromancer ascendancy, drawn as an arc
     on one side and a line on the other;
   - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
