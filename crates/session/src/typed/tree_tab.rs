@@ -215,12 +215,53 @@ impl TypedSession<'_> {
         }
     }
 
-    /// Remove All Tattoos: on a spec without tattoos, only the tab's
-    /// `modFlag` and `buildFlag`
+    /// Remove All Tattoos: `RemoveTattooFromNode` of each tattooed node
+    /// (its override dropped, the tree's node back, `allMasteryOptions`
+    /// false), then the tab's `modFlag` and `buildFlag`
     pub(super) fn remove_all_tattoos(&mut self) -> Result<()> {
-        let spec = &self.build.spec;
-        if (0..spec.nodes.len()).any(|i| spec.is_tattoo(i)) {
-            return Err(format!("{NOT_PORTED}: removing tattoos"));
+        // `ReplaceNode` empties the tattoo's own reminder text, which other
+        // specs' nodes with the same tattoo share
+        let others = self
+            .other_specs
+            .iter()
+            .flatten()
+            .any(|s| !s.hash_overrides.is_empty());
+        if others {
+            return Err(format!(
+                "{NOT_PORTED}: removing tattoos while another tree has some"
+            ));
+        }
+        let spec = Arc::make_mut(&mut self.build.spec);
+        let ids: Vec<u32> = spec
+            .hash_overrides
+            .iter()
+            .filter(|(_, o)| o.is_tattoo)
+            .map(|(id, _)| *id)
+            .collect();
+        if ids.iter().any(|id| !spec.index.contains_key(id)) {
+            return Err(format!(
+                "{NOT_PORTED}: a tattoo on a node the tree does not have"
+            ));
+        }
+        for id in &ids {
+            // `ReplaceNode(node, tree.nodes[id])` brings the tree node's
+            // reminder text, which the tattoo emptied when it had none
+            if spec
+                .hash_overrides
+                .get(id)
+                .is_some_and(|o| o.reminder_text.is_none())
+            {
+                let i = spec.index[id];
+                spec.nodes[i].reminder_wiped = true;
+            }
+            spec.hash_overrides.remove(id);
+        }
+        if !ids.is_empty() {
+            spec.build_all_depends_and_paths()?;
+        }
+        for id in &ids {
+            let i = spec.index[id];
+            spec.nodes[i].all_mastery_options = Some(false);
         }
         self.ui.unsaved = true;
         self.rebuild()

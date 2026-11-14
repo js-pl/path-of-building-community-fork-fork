@@ -511,6 +511,60 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+            // The build again, its tattoos removed (Reset Tree/Tattoos'
+            // Remove All Tattoos)
+            let steps = [
+                json!({"cmd": "loadXml", "xml": xml}),
+                json!({"cmd": "control", "path": "tree.reset", "click": true}),
+                json!({"cmd": "popupButton", "name": "removeTattoo"}),
+            ];
+            for r in &steps {
+                answer(d.request(&r.to_string()), "remove tattoos");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            let label = format!("{id} tattoos removed");
+            compare_views(
+                d,
+                &["treeState", "state", "outputs", "tree"],
+                &label,
+                &mut out,
+            );
+            compare_saves(d, &label, &mut out);
+            // The nodes' tooltips; a fresh translation for those the
+            // process-wide reminder text wipe changed
+            let tattooed: Vec<u32> = xml
+                .split("<Override ")
+                .skip(1)
+                .filter_map(|o| attr(o, "nodeId")?.parse().ok())
+                .collect();
+            let mut recheck = Vec::new();
+            for n in tattooed {
+                let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                let mut lines = Vec::new();
+                diff(&typed, &tr, &format!("{label} {req}"), &mut lines);
+                if !lines.is_empty() {
+                    recheck.push((req, typed, lines));
+                }
+            }
+            if !recheck.is_empty() {
+                let fresh = session();
+                for r in &steps {
+                    answer(fresh.request(&r.to_string()), "fresh");
+                }
+                for (req, typed, lines) in recheck {
+                    let tr = answer(fresh.request(&req), "fresh");
+                    let mut again = Vec::new();
+                    diff(&typed, &tr, &req, &mut again);
+                    if again.is_empty() {
+                        aligned.push(format!("{label}: {req}"));
+                    } else {
+                        out.extend(lines);
+                    }
+                }
+            }
         }
         if !out.is_empty() {
             let n = out.len();

@@ -447,7 +447,11 @@ What remains for the full migration, in order:
    (in the `tree` phase) changes them at random on every fourth build and
    compares the sidebar, outputs, tooltips, node power and the saved
    file. Its popups are typed too: Reset Tree/Tattoos (Remove All
-   Tattoos only on a spec without tattoos), the version drop-down's
+   Tattoos: `RemoveTattooFromNode` of each tattooed node, its override
+   dropped, `allMasteryOptions` false, and the tree node's reminder text,
+   which a tattoo without one emptied at load, left empty; with another
+   tree holding tattoos it stays on the translation; `overlays_match`
+   removes them on every tattoo variant), the version drop-down's
    Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
    active one's undo state on the other version, inserted after it, the
    old one removed or kept, `SetActiveSpec` once with its loadout sync and

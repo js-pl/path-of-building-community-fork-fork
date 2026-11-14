@@ -201,6 +201,9 @@ pub struct SpecNode {
     pub overlay: Option<Arc<tree::Overlay>>,
     /// The timeless jewel that conquers the node (`conqueredBy`)
     pub conquered: Option<crate::timeless::Conquest>,
+    /// The node's reminder text is the tree node's table that a tattoo
+    /// without one emptied (`ReplaceNode`), as removing the tattoo leaves it
+    pub reminder_wiped: bool,
     visited: bool,
 }
 
@@ -224,6 +227,7 @@ impl SpecNode {
             intuitive: Vec::new(),
             overlay: None,
             conquered: None,
+            reminder_wiped: false,
             visited: false,
         }
     }
@@ -358,6 +362,7 @@ impl<'t> PassiveSpec<'t> {
                     intuitive: Vec::new(),
                     overlay: None,
                     conquered: None,
+                    reminder_wiped: false,
                     visited: false,
                 });
             }
