@@ -19,52 +19,12 @@ use serde_json::{Map, Value as J, json};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-/// The Skills tab's options the gem list reads, as its `Load` sets them
-struct Options {
-    /// `showSupportGemTypes`: `ALL`, `NORMAL` or `EXCEPTIONAL`
-    show: String,
-    show_legacy: bool,
-    sort_by_dps: bool,
-    /// `sortGemsByDPSField`
-    field: String,
-}
-
 impl TypedSession<'_> {
-    fn gem_select_options(&self) -> Options {
-        let xml = self.section("Skills");
-        let attr = |k: &str| xml.and_then(|s| s.attr(k));
-        let show = attr("showSupportGemTypes")
-            .filter(|v| ["ALL", "NORMAL", "EXCEPTIONAL"].contains(v))
-            .unwrap_or("ALL");
-        let field = attr("sortGemsByDPSField")
-            .filter(|v| {
-                [
-                    "FullDPS",
-                    "CombinedDPS",
-                    "TotalDPS",
-                    "AverageDamage",
-                    "TotalDot",
-                    "BleedDPS",
-                    "IgniteDPS",
-                    "TotalPoisonDPS",
-                    "TotalEHP",
-                ]
-                .contains(v)
-            })
-            .unwrap_or("CombinedDPS");
-        Options {
-            show: show.into(),
-            show_legacy: attr("showLegacyGems") == Some("true"),
-            sort_by_dps: attr("sortGemsByDPS").is_none_or(|v| v == "true"),
-            field: field.into(),
-        }
-    }
-
     /// `gemList` of a group's gem slot (both 1-based; the slot after the
     /// last adds a gem): the gems of its dropdown in their order, each
     /// with its DPS in the slot and whether it supports the group's skills
     pub fn gem_select_list(&self, group: f64, slot: f64) -> Result<J> {
-        let opts = self.gem_select_options();
+        let opts = &self.gem_options;
         let skills_tab = self.build.skills.as_ref().ok_or("no skills tab")?;
         let groups = skills_tab.socket_group_list();
         let g = (group as usize)
@@ -146,7 +106,7 @@ impl TypedSession<'_> {
 
         // `DPSBuilder`: each pending gem in the slot
         let calc = MiscCalculator::new(&self.build, &calc_data)?;
-        let base = compare::base_gem_dps(&calc, &opts.field);
+        let base = compare::base_gem_dps(&calc, opts.field);
         let full_dps = opts.field == "FullDPS" || self.view_mode == "TREE";
         let pending: Vec<&Arc<Gem>> = gems
             .iter()
@@ -192,7 +152,7 @@ impl TypedSession<'_> {
                 GemCandidate { build: b }
             })
             .collect();
-        let powers = compare::gem_power(&calc, cands, &opts.field, full_dps, Threads::available());
+        let powers = compare::gem_power(&calc, cands, opts.field, full_dps, Threads::available());
         let mut dps: std::collections::HashMap<&str, f64> = std::collections::HashMap::new();
         for (gem, p) in pending.iter().zip(powers) {
             dps.insert(gem.id.as_str(), p?);

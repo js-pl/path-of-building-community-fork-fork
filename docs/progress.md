@@ -650,6 +650,15 @@ What remains for the full migration, in order:
      now derives), the main socket group and the minion drop-down, and
      the descriptions of Back, Save, Save As and Manage Spectres....
      Their clicks (and Help >>) stay unported.
+     The Skills tab's set drop-down and gem options
+     (`session::typed::skills_controls`, `skills_controls_match`): the
+     skill set drop-down, Sort gems by DPS and its stat, the default gem
+     level (with its entries' tooltips) and quality, the support gem
+     filter and legacy gems, kept as session state that the gem list
+     reads and the build saves (a value no entry has keeps the entry
+     selected, as upstream's `SelByValue` does). Upstream's gem list DPS
+     calculation leaves `skillMinion` on the group's gems, which the
+     typed gem list does not.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor
