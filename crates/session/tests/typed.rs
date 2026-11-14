@@ -982,6 +982,48 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .flat_map(|s| s["vars"].as_array().unwrap())
         .collect();
     if rng.below(5) == 0 {
+        // The custom modifier groups: the shown ones' controls (found by
+        // asking the translation, as their indices follow every control
+        // the tab made), a new group
+        let paths: Vec<String> = (1000..1200)
+            .map(|n| format!("configTab.{n}.textEdit"))
+            .collect();
+        let tr = answer(
+            d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+            "translated controls",
+        );
+        let shown: Vec<String> = tr["ok"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .filter(|(_, c)| c["shown"] == J::Bool(true))
+                    .map(|(p, _)| p.trim_end_matches(".textEdit").to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if shown.is_empty() || rng.below(5) == 0 {
+            return json!({"cmd": "control", "path": "configTab.customModsAddBlock", "click": true});
+        }
+        let b = &shown[rng.below(shown.len())];
+        let texts = [
+            "",
+            "10% increased Damage",
+            "+50 to maximum Life\nAdds 1 to 2 Fire Damage",
+            "nonsense line",
+        ];
+        return match rng.below(5) {
+            0 => json!({"cmd": "control", "path": format!("{b}.deleteBtn"), "click": true}),
+            1 => json!({"cmd": "control", "path": format!("{b}.titleEdit"), "text": "Renamed"}),
+            2 => {
+                json!({"cmd": "control", "path": format!("{b}.enableCheck"), "state": rng.below(2) == 0})
+            }
+            3 => json!({"cmd": "controlTooltip", "path": format!("{b}.enableCheck")}),
+            _ => {
+                json!({"cmd": "control", "path": format!("{b}.textEdit"), "text": texts[rng.below(texts.len())]})
+            }
+        };
+    }
+    if rng.below(5) == 0 {
         // The tab's search, Show All Configurations and the set
         // drop-down, which the tab fills when it draws
         return match rng.below(4) {
@@ -1041,6 +1083,34 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             }
         }
     }
+}
+
+/// `controls` of the shown custom modifier groups and Add Mod Group
+fn compare_custom_mod_groups(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    let paths: Vec<String> = (1000..1200).map(|n| format!("configTab.{n}")).collect();
+    let tr = answer(
+        d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+        "translated controls",
+    );
+    let mut paths = vec!["configTab.customModsAddBlock".to_string()];
+    for (p, c) in tr["ok"].as_object().into_iter().flatten() {
+        if c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl" {
+            paths.push(p.clone());
+            for inner in [
+                "textEdit",
+                "titleEdit",
+                "enableCheck",
+                "deleteBtn",
+                "addModBtn",
+            ] {
+                paths.push(format!("{p}.{inner}"));
+            }
+        }
+    }
+    let q = json!({"cmd": "controls", "paths": paths}).to_string();
+    let t = answer(d.request(&q), "typed controls");
+    let tr = answer(d.translated_request(&q), "translated controls");
+    diff(&t, &tr, &format!("{label} custom modifier groups"), out);
 }
 
 /// Random sequences of Configuration tab edits, class changes and undo
@@ -1114,8 +1184,9 @@ fn config_edits_match(d: &mut Dispatcher) {
                 }
                 break;
             }
-            if typed.get("error").is_some() {
-                // An error changes nothing: the translation's own answer
+            if typed.get("error").is_some() || req["cmd"] == "controlTooltip" {
+                // An error changes nothing, nor does a tooltip: the
+                // translation's own answer
                 let tr = answer(d.translated_request(&r), "translated edit");
                 diff(&typed, &tr, &label, &mut out);
             }
@@ -1123,6 +1194,7 @@ fn config_edits_match(d: &mut Dispatcher) {
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            compare_custom_mod_groups(d, &label, &mut out);
             // An allocated mastery's tooltip with the class change popup
             // open compares reallocating it
             let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
