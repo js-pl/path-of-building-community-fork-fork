@@ -968,3 +968,135 @@ impl<'d> TypedSession<'d> {
         Ok(())
     }
 }
+
+/// `totalModIDs`: the passives each total stands for
+fn total_ids(total: &str) -> &'static [&'static str] {
+    match total {
+        "total_strength" => &TOTAL_IDS[0..3],
+        "total_dexterity" => &TOTAL_IDS[3..6],
+        "total_devotion" => &TOTAL_IDS[6..9],
+        _ => &[],
+    }
+}
+
+impl<'d> TypedSession<'d> {
+    /// `modLib.parseMod(line)`: none when the line is not understood
+    /// (`AddList(nil)` adds nothing)
+    fn timeless_parse(&self, line: &str) -> Vec<engine::mods::Mod> {
+        self.data
+            .parser
+            .parse(line.as_bytes())
+            .0
+            .unwrap_or_default()
+    }
+
+    /// Generate (`setupFallbackWeights`): each passive of the jewel type
+    /// weighed by what it adds to the fallback mode's stat, written to the
+    /// fallback list
+    pub(super) fn timeless_generate(&mut self, p: &mut FindTimeless) -> Result<()> {
+        let t = self
+            .data
+            .timeless()
+            .ok_or_else(|| format!("{NOT_PORTED}: timeless jewels without their data"))?;
+        let jewel = p.jewel();
+        let variable = jewel == 1 || jewel >= 7;
+        let mut nodes: Vec<(String, Vec<engine::mods::Mod>, f64)> = Vec::new();
+        for (id, total) in p.mod_ids() {
+            let matches = |lid: &str| lid == id || total_ids(&id).contains(&lid);
+            let multiple = || unported("a passive with several stats");
+            if let Some(l) = t.nodes.iter().find(|l| matches(&l.node.id)) {
+                let (mods, divisor) = if variable {
+                    if l.sorted_stats.len() > 1 {
+                        return Err(multiple());
+                    }
+                    let original = l.node.sd.first().ok_or_else(multiple)?;
+                    let (key, stat) = l.sorted_stat(0).ok_or_else(multiple)?;
+                    let line = engine::timeless::replace_stat(original, key, stat, 100.0);
+                    let mods = if line == **original && l.node.sd.len() > 1 {
+                        l.node.mod_list.clone()
+                    } else {
+                        self.timeless_parse(&line)
+                    };
+                    (mods, if line != **original { 100.0 } else { 1.0 })
+                } else {
+                    let mods = l.node.mod_list.clone();
+                    let divisor = if total { first_value(&mods)? } else { 1.0 };
+                    (mods, divisor)
+                };
+                nodes.push((id, mods, divisor));
+                continue;
+            }
+            if let Some(a) = t.additions.iter().find(|a| matches(&a.node.id)) {
+                if variable && a.sorted_stats.len() > 1 {
+                    return Err(multiple());
+                }
+                let original = a.node.sd.first().ok_or_else(multiple)?.to_string();
+                let mut line = original.clone();
+                if variable {
+                    for (key, stat) in &a.stats {
+                        line = engine::timeless::replace_stat(&line, key, stat, 100.0);
+                    }
+                }
+                let mods = self.timeless_parse(&line);
+                let mut divisor = if line != original { 100.0 } else { 1.0 };
+                if !variable && total {
+                    divisor = first_value(&mods)?;
+                }
+                nodes.push((id, mods, divisor));
+            }
+        }
+        // `generateFallbackWeights(nodes, powerStat)`
+        let stats: Vec<engine::power::PowerStat> = engine::power::power_stats()
+            .into_iter()
+            .filter(|s| !s.ignore_for_items && s.label != "Name")
+            .collect();
+        let mode = p.fallback_mode();
+        let stat = (mode >= 1.0 && mode.fract() == 0.0)
+            .then(|| stats.get(mode as usize - 1))
+            .flatten()
+            .ok_or_else(|| format!("{UPSTREAM_ERROR}attempt to index a nil value"))?;
+        let data = self.data.calc_data();
+        let calc = engine::calculator::MiscCalculator::new(&self.build, &data)?;
+        let base = stat.value(calc.base());
+        let mut text = String::new();
+        for (id, mods, divisor) in nodes {
+            let node = engine::calc_override::mod_list_node(&self.build.spec, mods)
+                .ok_or("a tree without nodes")?;
+            let out = calc.calculate(
+                &engine::calc_override::Override {
+                    add_nodes: vec![engine::calc_override::OverrideNode::Own(
+                        std::sync::Arc::new(node),
+                    )],
+                    ..Default::default()
+                },
+                true,
+            )?;
+            let weight = if base == 0.0 {
+                0.0
+            } else {
+                (stat.value(&out) - base) / base.abs() / divisor
+            };
+            if weight != 0.0 {
+                if !text.is_empty() {
+                    text.push('\n');
+                }
+                let round = |v: f64| (v * 1000.0 + 0.5).floor() / 1000.0;
+                text.push_str(&format!(
+                    "{id}, {}, {}, 0",
+                    lua::value::format_number(round(weight * 100.0)),
+                    lua::value::format_number(round(0.0))
+                ));
+            }
+        }
+        self.timeless_update_list(p, &text, true);
+        Ok(())
+    }
+}
+
+/// `modList[1].value`: a total's divisor
+fn first_value(mods: &[engine::mods::Mod]) -> Result<f64> {
+    match mods.first().map(|m| &m.value) {
+        Some(engine::mods::ModValue::Number(n)) => Ok(*n),
+        _ => Err(unported("a total whose first mod is no number")),
+    }
+}

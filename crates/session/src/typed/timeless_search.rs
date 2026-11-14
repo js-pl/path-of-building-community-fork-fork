@@ -328,6 +328,28 @@ impl FindTimeless {
         self.conqueror_sel
     }
 
+    /// `modData`'s ids, and whether each is a total (`totalMod`)
+    pub(super) fn mod_ids(&self) -> Vec<(String, bool)> {
+        self.mod_data
+            .iter()
+            .filter_map(|m| {
+                let id = m.id.clone()?;
+                let total = id.starts_with("total_");
+                Some((id, total))
+            })
+            .collect()
+    }
+
+    /// `fallbackWeightsList.selIndex`
+    pub(super) fn fallback_mode(&self) -> f64 {
+        self.fallback_sel
+    }
+
+    /// What Generate sets on the fallback list's button
+    pub(super) fn generated(&mut self) {
+        self.fallback_button = "^4Fallback Nodes".into();
+    }
+
     /// What a search sets on the results list and the trade button
     pub(super) fn searched(&mut self) {
         self.results_sel = Some(1);
@@ -707,7 +729,12 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `updateSearchList(text, fallback)`
-    fn timeless_update_list(&mut self, p: &mut FindTimeless, text: &str, fallback: bool) {
+    pub(super) fn timeless_update_list(
+        &mut self,
+        p: &mut FindTimeless,
+        text: &str,
+        fallback: bool,
+    ) {
         let i = fallback as usize;
         if fallback {
             self.tree_tab.timeless.search_list_fallback = Some(text.to_string());
@@ -1098,6 +1125,10 @@ impl<'d> TypedSession<'d> {
                 self.timeless_set_allocated(p)?;
             }
             "searchButton" => self.timeless_search(p)?,
+            "fallbackWeightsButton" => {
+                self.timeless_generate(p)?;
+                p.generated();
+            }
             "closeButton" => return Ok(true),
             _ => return Err(format!("{NOT_PORTED}: popup button {name}")),
         }
