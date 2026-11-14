@@ -18,3 +18,11 @@ slow-timeout = { period = "120s", terminate-after = 20 }
 fail-fast = false
 final-status-level = "all"
 failure-output = "immediate-final"
+
+# The full variants (.github/workflows/full.yml): longer runs
+[profile.full]
+success-output = "final"
+slow-timeout = { period = "300s", terminate-after = 20 }
+fail-fast = false
+final-status-level = "all"
+failure-output = "immediate-final"

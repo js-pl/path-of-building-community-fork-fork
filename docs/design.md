@@ -278,6 +278,10 @@ written by hand. Details, the JSON format and the determinism checks are in
   others on three, split by binary in `.github/workflows/ci.yml`.
   Equivalence tests side by side are about three times slower each: they
   are bound by the runner's CPU.
+- `.github/workflows/full.yml` runs, nightly and by hand, the variants CI
+  samples in full: every trigger variant (`TRIGGERS_FULL=1`), every node
+  and cluster notable's power (`POWER_FULL=1`) and the session test's edit
+  sequences with 15 steps a build (`SESSION_STEPS=15`).
 
 ### Comparison rules
 
