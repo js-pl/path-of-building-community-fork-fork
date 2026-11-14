@@ -537,6 +537,16 @@ impl<'d> Dispatcher<'d> {
                 )
             }
             "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| p.starts_with("tree."))
+                    && (req["path"] != "tree.specSelect" || req["index"].is_null()) =>
+            {
+                let name = req["path"].as_str()?["tree.".len()..].to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.tree_tooltip(&name),
+                )
+            }
+            "controlTooltip"
                 if req["path"]
                     .as_str()
                     .is_some_and(|p| p.starts_with("party.")) =>

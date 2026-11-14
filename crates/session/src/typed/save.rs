@@ -861,7 +861,7 @@ impl TypedSession<'_> {
             )
             .a("zoomX", tostr(zx))
             .a("zoomY", tostr(zy))
-            .a("searchStr", attr("searchStr").unwrap_or("").to_string())
+            .a("searchStr", self.tree_tab.search.clone())
             .a(
                 "showStatDifferences",
                 b(attr("showStatDifferences").is_none_or(|v| v == "true")),

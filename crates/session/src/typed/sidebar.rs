@@ -978,7 +978,11 @@ impl TypedSession<'_> {
         s.insert("warnings".into(), json!(warnings));
         s.insert("controls".into(), controls);
         s.insert("popups".into(), self.ui.popups.clone());
-        s.insert("unsaved".into(), J::Bool(self.ui.unsaved));
+        // `Build:OnFrame`: the tree tab's search counts too
+        s.insert(
+            "unsaved".into(),
+            J::Bool(self.ui.unsaved || self.tree_tab.search_flag),
+        );
         s.insert("outputRevision".into(), num(self.ui.output_revision));
         Ok(J::Object(s))
     }

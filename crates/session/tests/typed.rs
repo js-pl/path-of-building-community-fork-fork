@@ -221,7 +221,10 @@ fn typed_session_matches_translated() {
         "commands" => commands_match(data, &mut d),
         "geometry" => geometry_matches(&mut d),
         "calcs" => calcs_match(data, &mut d),
-        "tree" => tree_edits_match(&mut d),
+        "tree" => {
+            tree_edits_match(&mut d);
+            tree_controls_match(&mut d);
+        }
         "skills" => skills_edits_match(&mut d),
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
@@ -3243,6 +3246,117 @@ fn party_controls_match(
         }
     }
     eprintln!("{steps} party control edits compared");
+}
+
+/// The Tree tab's controls that open no popup (`tree.*`): the search,
+/// the heat map, its node power depth and the power report's toggle, the
+/// drop-downs the tab fills when it draws, and the compare checkbox, at
+/// random on every fourth corpus build. After each the sidebar (whose
+/// unsaved flag counts the search), the outputs and a control's tooltip,
+/// then node power within the depth chosen and the saved file, are the
+/// translation's.
+fn tree_controls_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut skipped) = (Vec::new(), 0, Vec::new());
+    let names = [
+        "specSelect",
+        "compareCheck",
+        "compareSelect",
+        "versionText",
+        "treeSearch",
+        "treeHeatMap",
+        "nodePowerMaxDepthSelect",
+        "nodePowerMaxDepthCustom",
+        "treeHeatMapStatSelect",
+        "powerReport",
+    ];
+    for (id, path) in mine(corpus()).into_iter().step_by(4) {
+        let id = format!("{id}-tree-controls");
+        at_build(d, &id);
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id));
+        let mut out = Vec::new();
+        for step in 0..8 {
+            if !out.is_empty() {
+                break;
+            }
+            let path = |name: &str| format!("tree.{name}");
+            let req = match rng.below(9) {
+                0 | 1 => {
+                    let s =
+                        ["", "fire", "Life", "(increased.fire.damage|area)", "%d+"][rng.below(5)];
+                    json!({"cmd": "control", "path": path("treeSearch"), "text": s})
+                }
+                2 => {
+                    json!({"cmd": "control", "path": path("treeHeatMap"), "state": rng.below(3) != 0})
+                }
+                3 | 4 => {
+                    json!({"cmd": "control", "path": path("nodePowerMaxDepthSelect"), "sel": rng.below(6) + 1})
+                }
+                5 => {
+                    let s = ["3", "", "12", "x"][rng.below(4)];
+                    json!({"cmd": "control", "path": path("nodePowerMaxDepthCustom"), "text": s})
+                }
+                6 => json!({"cmd": "control", "path": path("powerReport"), "click": true}),
+                7 => {
+                    let n = ["specSelect", "compareSelect", "treeHeatMapStatSelect"][rng.below(3)];
+                    json!({"cmd": "control", "path": path(n), "sel": rng.below(4) + 1})
+                }
+                _ => json!({"cmd": "control", "path": path("compareCheck"), "state": true}),
+            };
+            let label = format!("step {step} {req}");
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed tree control");
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            if typed.get("error").is_some() {
+                let tr = answer(d.translated_request(&r), "translated tree control");
+                diff(&typed, &tr, &label, &mut out);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            compare_views(d, &["state", "outputs"], &label, &mut out);
+            let q = json!({"cmd": "controlTooltip", "path": path(names[rng.below(names.len())])})
+                .to_string();
+            let t = answer(d.request(&q), "typed tooltip");
+            let tr = answer(d.translated_request(&q), "translated tooltip");
+            diff(&t, &tr, &format!("{label} {q}"), &mut out);
+            steps += 1;
+        }
+        if out.is_empty() {
+            // Node power within the depth chosen
+            let q = r#"{"cmd":"nodePower","index":1}"#;
+            let t = answer(d.request(q), "typed nodePower");
+            let tr = answer(d.translated_request(q), "translated nodePower");
+            diff(&t, &tr, "nodePower", &mut out);
+            compare_saves(d, &format!("{id} after the tree controls"), &mut out);
+        }
+        if !out.is_empty() {
+            let m = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({m}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} tree control edits compared; skipped {}:\n{}",
+        skipped.len(),
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
 }
 
 /// The first characters of a request, for a failure's label
