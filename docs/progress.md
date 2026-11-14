@@ -968,7 +968,7 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- A gap in the curse slots, a minion's debuff without a stack count
+- A gap in the curse slots
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)
