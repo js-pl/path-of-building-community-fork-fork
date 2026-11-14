@@ -385,18 +385,18 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
-                    .is_some_and(TypedSession::is_spec_manage_control) =>
-            {
-                let req = req.clone();
-                self.edit(json, |s| s.spec_manage_control(&req))
-            }
-            "control"
-                if req["path"]
-                    .as_str()
                     .is_some_and(TypedSession::is_set_manage_control) =>
             {
                 let req = req.clone();
                 self.edit(json, |s| s.set_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_items_tab_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.items_tab_control(&req))
             }
             "control"
                 if req["path"]
@@ -520,6 +520,13 @@ impl<'d> Dispatcher<'d> {
                 view(
                     &mut self.typed_error,
                     self.typed.as_mut()?.shared_list_tooltip(index),
+                )
+            }
+            "controlTooltip" if req["path"].as_str() == Some("items.setSelect") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_set_select_tooltip(index),
                 )
             }
             "controlTooltip" if req["path"].as_str().is_some_and(|p| p == "items.itemList") => {

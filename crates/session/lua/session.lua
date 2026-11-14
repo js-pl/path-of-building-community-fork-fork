@@ -87,6 +87,19 @@ local function findControl(path)
 	if not control then
 		error("no control " .. tostring(path))
 	end
+	-- The Items tab's set and spec drop-downs, whose lists its draw sets
+	if host == "items" and (name == "setSelect" or name == "specSelect") then
+		local tab = build().itemsTab
+		local sets = { }
+		for index, itemSetId in ipairs(tab.itemSetOrderList) do
+			t_insert(sets, tab.itemSets[itemSetId].title or "Default")
+			if itemSetId == tab.activeItemSetId then
+				tab.controls.setSelect.selIndex = index
+			end
+		end
+		tab.controls.setSelect:SetList(sets)
+		tab.controls.specSelect:SetList(build().treeTab:GetSpecList())
+	end
 	-- An item database's leagues and item types, which its first draw
 	-- loads
 	local db = control._className == "ItemDBControl" and control or (outer and at(list, outer))
