@@ -1520,7 +1520,19 @@ fn items_edits_match(d: &mut Dispatcher) {
                         }
                         let click =
                             |path: &str| json!({"cmd": "control", "path": path, "click": true});
-                        let r = match rng.below(12) {
+                        let r = match rng.below(13) {
+                            12 => {
+                                // Manage Item Sets
+                                let r = json!({"cmd": "control", "path": "items.setManage", "click": true}).to_string();
+                                *popup_inputs.entry("items.setManage".into()).or_default() += 1;
+                                answer(d.request(&r), "manage");
+                                log.push(r);
+                                if !d.typed_active() || drive_popups(d, &mut rng, &label, &mut log, &mut out, &mut popup_inputs) {
+                                    fell_back = true;
+                                    break;
+                                }
+                                continue;
+                            }
                             10 | 11 => {
                                 // A row of an item database
                                 let db = if rng.below(2) == 0 {
@@ -1761,6 +1773,119 @@ fn items_edits_match(d: &mut Dispatcher) {
 /// data (`ProcessSocketGroup` clears a triggered granted skill's level
 /// cost): lines that differ are asked again of a fresh translation, with
 /// the edits of `log` since the load, and aligned when that one agrees
+/// Random choices in the front popup and the ones it opens (a list's
+/// rows clicked and keyed, enabled buttons, edits' text, a row's tooltip),
+/// the state compared after each, then every popup closed; whether the
+/// typed session fell back
+fn drive_popups(
+    d: &mut Dispatcher,
+    rng: &mut Lcg,
+    label: &str,
+    log: &mut Vec<String>,
+    out: &mut Vec<String>,
+    counts: &mut std::collections::BTreeMap<String, usize>,
+) -> bool {
+    let cmp = |d: &mut Dispatcher, req: &J, out: &mut Vec<String>| {
+        let r = req.to_string();
+        let typed = answer(d.request(&r), "typed");
+        let tr = answer(d.translated_request(&r), "translated");
+        diff(&typed, &tr, &format!("{label} {r}"), out);
+        typed
+    };
+    let choices = rng.below(8) + 1;
+    for i in 0..choices + 6 {
+        let st = cmp(d, &json!({"cmd": "state"}), out);
+        let Some(popup) = st["ok"]["popups"].get(0).cloned() else {
+            return false;
+        };
+        let title = popup["title"].as_str().unwrap_or("").to_string();
+        let buttons: Vec<String> = popup["buttons"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|b| b["enabled"] == true)
+            .filter_map(|b| b["name"].as_str().map(String::from))
+            .collect();
+        let r = if i >= choices {
+            // Closing: Done or Cancel, else the popup closed
+            match buttons.iter().find(|b| *b == "close" || *b == "cancel") {
+                Some(b) => json!({"cmd": "popupButton", "name": b}),
+                None => json!({"cmd": "closePopup"}),
+            }
+        } else {
+            let mut inputs: Vec<J> = popup["controls"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|c| c["enabled"] == true)
+                .collect();
+            for b in &buttons {
+                inputs.push(json!({"class": "PopupButton", "name": b}));
+            }
+            if inputs.is_empty() {
+                continue;
+            }
+            let c = &inputs[rng.below(inputs.len())];
+            let path = c["path"].clone();
+            let class = c["class"].as_str().unwrap_or("");
+            let key = format!("{title}: {}", c["path"].as_str().or(c["name"].as_str()).unwrap_or(""));
+            *counts.entry(key).or_default() += 1;
+            if class.ends_with("ListControl") {
+                let n = c["list"].as_array().map_or(0, Vec::len);
+                if n > 0 && rng.below(4) == 0 {
+                    let req = json!({"cmd": "controlTooltip", "path": path, "index": rng.below(n) + 1});
+                    cmp(d, &req, out);
+                }
+                match rng.below(6) {
+                    0 if c["sel"].is_number() => json!({"cmd": "control", "path": path, "key": "DELETE"}),
+                    1 if c["sel"].is_number() => json!({"cmd": "control", "path": path, "key": "F2"}),
+                    _ if n > 0 => {
+                        let mut r = json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1, "click": true});
+                        if rng.below(2) == 0 {
+                            r["doubleClick"] = json!(true);
+                        }
+                        r
+                    }
+                    _ => continue,
+                }
+            } else if class == "PopupButton" {
+                json!({"cmd": "popupButton", "name": c["name"]})
+            } else if class == "ButtonControl" {
+                json!({"cmd": "control", "path": path, "click": true})
+            } else if class == "EditControl" {
+                let text = ["New set", "", " ", "Alt {1}", "Default", "Copy"][rng.below(6)];
+                json!({"cmd": "control", "path": path, "text": text})
+            } else if class == "CheckBoxControl" {
+                json!({"cmd": "control", "path": path, "state": c["state"] != true})
+            } else {
+                let n = c["list"].as_array().map_or(1, Vec::len);
+                json!({"cmd": "control", "path": path, "sel": rng.below(n) + 1})
+            }
+        };
+        let r = r.to_string();
+        answer(d.request(&r), "popup step");
+        log.push(r);
+        if !d.typed_active() {
+            return true;
+        }
+    }
+    // Whatever is still open
+    for _ in 0..8 {
+        let st = cmp(d, &json!({"cmd": "state"}), out);
+        if st["ok"]["popups"].as_array().is_none_or(|p| p.is_empty()) {
+            break;
+        }
+        let r = json!({"cmd": "closePopup"}).to_string();
+        answer(d.request(&r), "close");
+        log.push(r);
+        if !d.typed_active() {
+            return true;
+        }
+    }
+    false
+}
+
 fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Vec<String>) -> J {
     let r = json!({"cmd": "displayItem"}).to_string();
     let mut typed = answer(d.request(&r), "typed");

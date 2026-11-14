@@ -207,6 +207,8 @@ function api.control(req)
 		buildList(control)
 		if req.key == "DELETE" and control.selValue and control.OnSelDelete then
 			control:OnSelDelete(control.selIndex, control.selValue)
+		elseif req.key ~= "DELETE" and control.selValue and control.OnSelKeyDown then
+			control:OnSelKeyDown(control.selIndex, control.selValue, req.key)
 		end
 	elseif req.sel then
 		control:SetSel(req.sel)
@@ -281,15 +283,19 @@ local function layoutControls(controls, prefix, filter)
 		end
 		if type(name) == "string" and not labelOf and (not filter or filter(name, control)) and control.IsShown and control:IsShown() then
 			local cls = control._className
-			if cls == "NotableDBControl" then
-				-- The list, its rows by name, and its own inputs
+			if cls == "NotableDBControl" or (control.SelectIndex and control.GetRowValue and cls ~= "ItemDBControl") then
+				-- A list, its rows, and its own inputs
 				buildList(control)
 				local x, y = control:GetPos()
 				local d = describeControl(control)
-				d.list = arrayOf(control.list, function(node) return node.dn end)
-				for i, node in ipairs(control.list) do
-					if node == control.selValue then
-						d.sel = i
+				if cls == "NotableDBControl" then
+					-- By name, the selection by value
+					d.list = arrayOf(control.list, function(node) return node.dn end)
+					d.sel = nil
+					for i, node in ipairs(control.list) do
+						if node == control.selValue then
+							d.sel = i
+						end
 					end
 				end
 				d.path = prefix .. name

@@ -570,6 +570,20 @@ What remains for the full migration, in order:
      popup's buttons act on the tab it came from). Ported on the way:
      `initEnv`'s write-back of the clamped `build.mainSocketGroup` (an
      item granting the main socket group replaced).
+   - Cluster subgraph id collision (`PassiveSpec:BuildSubgraph`): a
+     subgraph's id is built from its socket's expansion index and the
+     jewel's size (`0x10000 + index << 6 or << 9 + sizeIndex << 4`), so
+     two cluster jewels in sockets with the same index can get the same id
+     (seen after random edits that equip or edit cluster jewels). Upstream
+     keeps only the second in `subGraphs`; the first stays linked to its
+     socket, and the next `BuildClusterJewelGraphs` asserts (`Entrance for
+     subGraph not linked to parent socket???`): in the next edit, and in
+     the session test also on loading the next build, which leaves the
+     translation broken for every build after. The typed spec builds both
+     subgraphs fine, so it could not match what upstream gives from then
+     on; it marks the collision (`PassiveSpec::sub_graph_collision`) and
+     the edit that makes it falls back (`SUB_GRAPH_COLLISION`, a known
+     fallback), and the test starts a fresh session after it.
    - Engine gaps that make a build fall back: none over the corpus.
      Combust (gen-0028), the character level's auto mode, tattoos and
      tree edits with Intuitive Leap no longer do; specs in the old URL

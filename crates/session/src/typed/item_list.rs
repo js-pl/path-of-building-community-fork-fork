@@ -6,7 +6,7 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
-use super::item_popups::{ConfirmAction, ItemPopup};
+use super::item_popups::{Deletion, ItemPopup};
 use super::tooltip::Tooltip;
 use super::{NOT_PORTED, Result, TypedSession, num};
 use engine::calcs::lua_sort;
@@ -567,7 +567,7 @@ impl<'d> TypedSession<'d> {
                 "deleteAll" => self.open_confirm(
                     "Delete All",
                     "Are you sure you want to delete all items in this build?",
-                    ConfirmAction::DeleteAll,
+                    Deletion::AllItems,
                 ),
                 // `OnSelDelete(nil, nil)` indexes the missing item
                 _ if self.editor.list.borrow().sel_value.is_none() => {
@@ -662,7 +662,7 @@ impl<'d> TypedSession<'d> {
             Some(m) => self.open_confirm(
                 "Delete Item",
                 &format!("{m}\nAre you sure you want to delete it?"),
-                ConfirmAction::DeleteItem(id),
+                Deletion::Item(id),
             ),
             None => self.list_delete_item(id)?,
         }
@@ -679,7 +679,7 @@ impl<'d> TypedSession<'d> {
         Ok(())
     }
 
-    fn open_confirm(&mut self, title: &str, msg: &str, action: ConfirmAction) {
+    fn open_confirm(&mut self, title: &str, msg: &str, action: Deletion) {
         self.editor.popups.insert(
             0,
             ItemPopup::Confirm {
@@ -692,10 +692,11 @@ impl<'d> TypedSession<'d> {
     }
 
     /// The confirmation's Delete
-    pub(super) fn confirm_action(&mut self, action: &ConfirmAction) -> Result<()> {
+    pub(super) fn confirm_action(&mut self, action: &Deletion) -> Result<()> {
         match action {
-            ConfirmAction::DeleteItem(id) => self.list_delete_item(*id),
-            ConfirmAction::DeleteAll => self.delete_all_items(),
+            Deletion::Item(id) => self.list_delete_item(*id),
+            Deletion::AllItems => self.delete_all_items(),
+            Deletion::ItemSet { index, id } => self.confirm_delete_item_set(*index, *id),
         }
     }
 
