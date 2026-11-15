@@ -439,8 +439,18 @@ fn power_pass(
     let keys: Vec<String> = (0..spec.nodes.len())
         .map(|i| spec_mod_key(spec, i))
         .collect();
-    // `pairs(spec.nodes)`
-    for (id, &i) in spec.order.iter() {
+    // `pairs(spec.nodes)`, of a table filled in ascending order of the
+    // ids: the order upstream takes is LuaJIT's string hash's (the tree's
+    // nodes, which `spec.nodes` is filled from, have the key `root` too),
+    // and a `modKey`'s nodes share the first one's calculation, so the
+    // session's `nodePower` fixes it so
+    let mut order: LjMap<usize> = LjMap::default();
+    let mut ids: Vec<(u32, usize)> = spec.order.iter().map(|(id, &i)| (id, i)).collect();
+    ids.sort_unstable();
+    for (id, i) in ids {
+        order.insert(id, i);
+    }
+    for (id, &i) in order.iter() {
         let n = &spec.nodes[i];
         let tn = spec.tree_node(i);
         if tn.kind == NodeType::Mastery {
