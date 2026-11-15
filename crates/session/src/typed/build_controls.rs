@@ -8,7 +8,6 @@
 
 use super::item_popups::ItemPopup;
 use super::{NOT_PORTED, Result, TypedSession, num};
-use engine::spec::PassiveSpec;
 use serde_json::{Value as J, json};
 use std::sync::Arc;
 
@@ -344,7 +343,7 @@ impl<'d> TypedSession<'d> {
         )?;
         let config_id = Self::next_set_id(self.build.config.config_sets.values().map(|s| s.id))?;
         let latest = self.data.game.latest_tree_version().to_string();
-        let mut spec = PassiveSpec::new(self.data.tree(&latest)?, &self.data.parser)?;
+        let mut spec = self.new_spec(self.data.tree(&latest)?)?;
         spec.select_class(0)?;
         spec.title = Some(name.clone());
         if self.other_specs.is_empty() {

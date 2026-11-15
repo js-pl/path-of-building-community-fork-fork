@@ -554,6 +554,18 @@ fn out_val(v: &engine::actor::OutVal) -> J {
 }
 
 impl<'d> TypedSession<'d> {
+    /// A new spec of `tree` (`new("PassiveSpec", build, treeVersion)`),
+    /// with the timeless jewels' data the build's spec has: its conquests
+    /// need it, as upstream's every spec reads `data.timelessJewel...`
+    fn new_spec(
+        &self,
+        tree: &'d engine::tree::PassiveTree,
+    ) -> Result<engine::spec::PassiveSpec<'d>> {
+        let mut spec = engine::spec::PassiveSpec::new(tree, &self.data.parser)?;
+        spec.timeless = self.build.spec.timeless.clone();
+        Ok(spec)
+    }
+
     /// Every spec of the tree tab (`TreeTab:Load`, then `PostLoad`)
     fn load_specs(&mut self) -> Result<()> {
         let saved: Vec<engine::xml::Element> = self
@@ -569,7 +581,7 @@ impl<'d> TypedSession<'d> {
                 continue;
             }
             let tree = self.data.tree(e.attr("treeVersion").unwrap_or("2_6"))?;
-            let mut spec = engine::spec::PassiveSpec::new(tree, &self.data.parser)?;
+            let mut spec = self.new_spec(tree)?;
             spec.load(e).map_err(|e| format!("{NOT_PORTED}: {e}"))?;
             spec.build_cluster_jewel_graphs(&self.build.items, &self.data.game.items)?;
             self.other_specs.push(Some(std::sync::Arc::new(spec)));

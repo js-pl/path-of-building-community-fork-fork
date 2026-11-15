@@ -234,7 +234,7 @@ impl<'d> TypedSession<'d> {
                 // A spec of the latest tree with the build's class
                 let latest = self.data.game.latest_tree_version().to_string();
                 let tree = self.data.tree(&latest)?;
-                let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
+                let mut spec = self.new_spec(tree)?;
                 let cur = &self.build.spec;
                 let (class, ascend, secondary) = (
                     cur.cur_class_id.ok_or(missing())?,
@@ -265,7 +265,7 @@ impl<'d> TypedSession<'d> {
                     .collect();
                 let (title, jewels) = (src.title.clone(), src.jewels.clone());
                 let tree = self.data.tree(&src.tree.version)?;
-                let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
+                let mut spec = self.new_spec(tree)?;
                 spec.title = title;
                 spec.jewels = jewels;
                 // The undo state's `hashOverrides`, the same tattoos
