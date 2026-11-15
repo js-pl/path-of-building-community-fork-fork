@@ -757,6 +757,39 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+            // The copy's tattoos removed while the first tree keeps its own,
+            // then the first tree's tattooed nodes. Upstream's `ReplaceNode`
+            // empties the tattoo's reminder text, which every tree shares
+            // (`require("Data.TattooPassives")`, process-wide); the
+            // translation gets it back before the tooltips
+            for r in [
+                json!({"cmd": "control", "path": "tree.reset", "click": true}),
+                json!({"cmd": "popupButton", "name": "removeTattoo"}),
+            ] {
+                answer(d.request(&r.to_string()), "remove the copy's tattoos");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            let label = format!("{id} the copy's tattoos removed");
+            compare_views(d, &["treeState", "state", "outputs"], &label, &mut out);
+            let r = json!({"cmd": "selectTreeSpec", "index": active}).to_string();
+            answer(d.request(&r), "selectTreeSpec");
+            compare_views(
+                d,
+                &["treeSpecs", "treeState", "state", "outputs"],
+                &label,
+                &mut out,
+            );
+            restore_tattoo_reminders(d, tree);
+            for o in xml.split("<Override ").skip(1) {
+                let Some(n) = attr(o, "nodeId") else { continue };
+                let req =
+                    json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{label} first tree {req}"), &mut out);
+                compared += 1;
+            }
+            compare_saves(d, &label, &mut out);
             // The build again, its tattoos removed (Reset Tree/Tattoos'
             // Remove All Tattoos)
             let steps = [
@@ -835,6 +868,38 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// Gives the translation's tattoos back their reminder texts, which
+/// `ReplaceNode` empties in place for the whole process when it removes a
+/// tattoo from a node that has none: the typed engine does not keep that
+/// (`docs/progress.md`, "Upstream quirks")
+fn restore_tattoo_reminders(d: &mut Dispatcher, tree: &engine::tree::PassiveTree) {
+    use lua::{Value, rt};
+    let Some(host) = d.translated().host() else {
+        return;
+    };
+    let get = |v: &Value, k: &str| rt::index(v, &Value::str(k)).unwrap_or_default();
+    let trees = get(&host.global("main"), "tree");
+    let Some(trees) = trees.as_table() else {
+        return;
+    };
+    let Some((_, loaded)) = trees.entries().into_iter().next() else {
+        return;
+    };
+    let nodes = get(&get(&loaded, "tattoo"), "nodes");
+    for (dn, overlay) in &tree.tattoos {
+        let lines = get(&get(&nodes, dn), "reminderText");
+        let (Some(t), Some(want)) = (lines.as_table(), &overlay.reminder_text) else {
+            continue;
+        };
+        for i in 1..=t.array().len().max(want.len()) as i64 {
+            t.set(Value::Number(i as f64), Value::Nil);
+        }
+        for (i, l) in want.iter().enumerate() {
+            t.set(Value::Number(i as f64 + 1.0), Value::str(l));
+        }
+    }
 }
 
 /// Corpus builds with a copy of their active spec on other tree versions,
