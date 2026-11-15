@@ -828,6 +828,7 @@ impl<'t> PassiveSpec<'t> {
             passive_points_granted: 0.0,
             is_proxy: false,
             is_blighted: false,
+            is_bloodline: false,
             is_mastery: s.kind == NodeType::Mastery,
             is_multiple_choice: false,
             is_multiple_choice_option: false,

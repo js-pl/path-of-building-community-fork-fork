@@ -167,6 +167,9 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::Anoint(p), "save" | "notableDB") => {
                 self.anoint_tooltip(&mut tip, p, &name, idx)?;
             }
+            (ItemPopup::ModBrowser(p), _) => {
+                return self.mod_browser_tooltip(p, &name, index);
+            }
             (ItemPopup::FindTimeless(p), _) => {
                 return self.find_timeless_tooltip(p, &name, index);
             }

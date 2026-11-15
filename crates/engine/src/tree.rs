@@ -44,12 +44,13 @@ impl NodeType {
 }
 
 /// The parse of one stat line of a node: `node.mods[i]`. Lines combined
-/// into an earlier one have an empty list.
+/// into an earlier one have an empty list and are `combined`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StatLine {
     /// `nil` when the parser did not know the line
     pub list: Option<Vec<Mod>>,
     pub extra: Option<Arc<str>>,
+    pub combined: bool,
 }
 
 /// A stat group of the tree data: nodes on orbits around a centre.
@@ -105,6 +106,8 @@ pub struct Node {
     pub passive_points_granted: f64,
     pub is_proxy: bool,
     pub is_blighted: bool,
+    /// `isBloodline`: a bloodline ascendancy's node
+    pub is_bloodline: bool,
     pub is_mastery: bool,
     pub is_multiple_choice: bool,
     pub is_multiple_choice_option: bool,
@@ -470,6 +473,7 @@ pub(crate) fn process_stats_from(
                         mods[ci] = Some(StatLine {
                             list: Some(vec![]),
                             extra: None,
+                            combined: true,
                         });
                     }
                     break;
@@ -485,7 +489,11 @@ pub(crate) fn process_stats_from(
         if mods.len() <= i {
             mods.resize(i + 1, None);
         }
-        mods[i] = Some(StatLine { list, extra });
+        mods[i] = Some(StatLine {
+            list,
+            extra,
+            combined: false,
+        });
         i += 1;
         while i < mods.len() && mods[i].is_some() {
             i += 1;
@@ -972,6 +980,7 @@ impl PassiveTree {
                 passive_points_granted: points,
                 is_proxy: truthy(nt, "isProxy"),
                 is_blighted: truthy(nt, "isBlighted"),
+                is_bloodline: truthy(nt, "isBloodline"),
                 is_mastery,
                 is_multiple_choice: truthy(nt, "isMultipleChoice"),
                 is_multiple_choice_option,
@@ -1181,7 +1190,11 @@ impl crate::codec::Codec for NodeType {
     }
 }
 
-crate::codec_struct!(StatLine { list, extra });
+crate::codec_struct!(StatLine {
+    list,
+    extra,
+    combined
+});
 crate::codec_struct!(Group {
     x,
     y,
@@ -1220,6 +1233,7 @@ crate::codec_struct!(Node {
     passive_points_granted,
     is_proxy,
     is_blighted,
+    is_bloodline,
     is_mastery,
     is_multiple_choice,
     is_multiple_choice_option,

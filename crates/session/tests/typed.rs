@@ -5395,6 +5395,107 @@ fn timeless_search_match() {
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 
+/// The Configuration tab's Mod Browser (a custom modifier group's Add
+/// Mod) in the typed session as in the translated one: its list of
+/// supported lines, the search's ranking, the rows' sources, Add and a
+/// double click appending the line to the group
+#[test]
+fn mod_browser_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    for id in ["gen-0016", "gen-0032"] {
+        let path = corpus().into_iter().find(|(i, _)| i == id).unwrap().1;
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        // The shown group's controls get new indices with each Add
+        let open = json!({"open": true});
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let steps = [
+            open.clone(),
+            c("listControl", json!({"sel": 3})),
+            c("search", json!({"text": "  Maximum LIFE "})),
+            c("listControl", json!({"sel": 2, "click": true})),
+            button("whatDoesItDo"),
+            button("save"),
+            open.clone(),
+            c("search", json!({"text": "inc fire dam"})),
+            c("search", json!({"text": "firedam"})),
+            c(
+                "listControl",
+                json!({"sel": 4, "click": true, "doubleClick": true}),
+            ),
+            open.clone(),
+            c("search", json!({"text": "zzzzqqqq"})),
+            button("save"),
+            open.clone(),
+            c("search", json!({"text": "mana"})),
+            c("listControl", json!({"sel": 99999})),
+            button("close"),
+        ];
+        for mut r in steps {
+            if r["open"] == true {
+                let paths: Vec<String> = (1000..1300).map(|n| format!("configTab.{n}")).collect();
+                let tr = answer(
+                    d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+                    "translated controls",
+                );
+                let group = tr["ok"]
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                    .find(|(_, c)| {
+                        c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl"
+                    })
+                    .map(|(p, _)| p.clone())
+                    .expect("a custom modifier group");
+                r = json!({"cmd": "control", "path": format!("{group}.addModBtn"), "click": true});
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let label = format!("{id} {r}");
+            compare_views(&mut d, &["state", "outputs"], &label, &mut out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_some_and(|p| !p.is_empty()) {
+                for index in [1, 2, 7, 999999] {
+                    let q = json!({"cmd": "controlTooltip", "path": "popup.listControl", "index": index})
+                        .to_string();
+                    d.typed_error = None;
+                    let (mut t, mut tr) = (
+                        answer(d.request(&q), "typed"),
+                        answer(d.translated_request(&q), "translated"),
+                    );
+                    assert!(d.typed_error.is_none(), "{label} {q}: {:?}", d.typed_error);
+                    // A row's sources, in the `pairs` order of string keys
+                    // (which LuaJIT seeds per process)
+                    if oracle() {
+                        for v in [&mut t, &mut tr] {
+                            if let Some(a) = v["ok"]["lines"].as_array_mut() {
+                                a.sort_by_key(|l| l.to_string());
+                            }
+                        }
+                    }
+                    diff(&t, &tr, &format!("{label} {q}"), &mut out);
+                }
+            }
+        }
+        compare_saves(&mut d, id, &mut out);
+    }
+    out.truncate(30);
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
 /// The Skills tab's socket group list, in the typed session as in the
 /// translated one: rows, selection, rows' tooltips, New, Delete with its
 /// confirmation, the Delete key, Delete All and reordering
