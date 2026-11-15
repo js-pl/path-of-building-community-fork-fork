@@ -278,6 +278,13 @@ of them, so each difference is one between the translation and LuaJIT):
     explained, upstream's `pairs` order. `ItemsTab` gathers them in
     `pairs` order and `table.sort`s by the first line with numbers as `$`;
     against the oracle such runs of ties are compared sorted;
+  - an item edit that puts a non-weapon into Weapon 1 (the items
+    phase's random `addItem`/`editItem`): upstream equips it, then
+    `ItemsTab:PopulateSlots` goes through `pairs(self.slots)`; reaching
+    Weapon 2 before Weapon 1 has dropped the item, `IsItemValidForSlot`
+    indexes `weaponTypeInfo` with its type and fails, leaving the build
+    broken (about half of the oracle runs). Against the oracle the rest
+    of such a build is skipped;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
