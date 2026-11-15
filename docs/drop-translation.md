@@ -13,9 +13,9 @@ and how the tests keep a reference without them.
 | Code | Uses | Shipped? |
 | --- | --- | --- |
 | `crates/upstream` | upstream's whole program translated by `luagen` in its build script, plus the headless host | only through the features below |
-| `crates/session`, feature `translation` (default; `wasm` turns it off) | `translated.rs`, `lua/session.lua` (translated too), the dispatcher's fallback and replay (`Dispatcher::fallbacks`, `pending`) | native CLI (`pob serve --typed`, `--translated`) and the wasm build with `--translation` |
-| `crates/wasm`, feature `translation` (not default) | `session/translation` | `web/scripts/build-wasm.mjs --translation` (80 MB, 15 MB gzipped, against 8.2 MB, 2 MB typed) |
-| `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve --typed`, `--translated`, `bundle --lua`, `bench`) |
+| `crates/session`, feature `translation` (default; `wasm` and the CLI turn it off) | `translated.rs`, `lua/session.lua` (translated too), the dispatcher's own fallback and replay (`Dispatcher::new`, `pending`) | tests only (the session tests' local reference) |
+| `crates/wasm` | typed only: the `translation` feature and `has_translation` are gone | the browser |
+| `crates/cli` | typed only: `pob serve`, `bundle` and `bench` on the typed engine (`--typed`, `--translated` and `bundle --lua` are gone) | the native CLI |
 | `crates/equivalence` | `upstream`; `bridge.rs` converts the translated program's stores into typed ones | tests only |
 | `crates/importer::luagen` | the translator (1.9k lines), run by `crates/upstream/build.rs` | build only |
 | `crates/lua` | the library pieces: values and tables (`value`, with the `gc` cycle collector), table operations (`rt`), Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | in the typed engine and shipped |

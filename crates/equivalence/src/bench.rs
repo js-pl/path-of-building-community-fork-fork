@@ -1,9 +1,8 @@
-//! Timings of the typed engine's calculations on corpus builds, with the
-//! translation's for the same operation: the median of `reps` runs of
-//! each, per build and summed over the builds.
+//! Timings of the typed engine's calculations on corpus builds: the median
+//! of `reps` runs of each, per build and summed over the builds.
 
+use crate::corpus_builds;
 use crate::typed_build::TypedData;
-use crate::{corpus_builds, upstream_src};
 use engine::calc_cache::Recalculator;
 use engine::calc_env::{CalcMode, init_env};
 use engine::calc_override::Override;
@@ -11,11 +10,7 @@ use engine::calc_perform::{PerformInput, perform};
 use engine::calculator::MiscCalculator;
 use engine::power::{PowerOptions, node_power, node_power_with};
 use engine::tree::NodeType;
-use lua::{LuaStr, TableRef, Value, rt};
-use std::rc::Rc;
 use std::time::Instant;
-use upstream::host::Host;
-use upstream::imported::Imported;
 
 pub struct Options {
     /// Builds whose id contains this; empty for every tenth build
@@ -27,7 +22,6 @@ pub struct Options {
     pub power_depth: Option<f64>,
     /// Nodes added and removed in the calculator's overrides
     pub overrides: usize,
-    pub translation: bool,
     pub power: bool,
     /// Threads of the typed node power; the machine's by default, 0 for
     /// calculating each candidate when needed
@@ -43,7 +37,6 @@ impl Default for Options {
             power_reps: 1,
             power_depth: Some(1.0),
             overrides: 3,
-            translation: true,
             power: true,
             power_threads: None,
         }
@@ -62,11 +55,10 @@ pub const OPS: [&str; 8] = [
     "node power",
 ];
 
-/// A build's medians in ms by operation, typed and translated
+/// A build's medians in ms by operation
 pub struct Row {
     pub id: String,
     pub typed: [Option<f64>; OPS.len()],
-    pub lua: [Option<f64>; OPS.len()],
     pub error: Option<String>,
     /// The overrides' nodes, by id, and whether each is added
     nodes: Vec<(u32, bool)>,
@@ -103,14 +95,6 @@ fn time<S, T, E>(
     Ok(median(v).unwrap_or(0.0))
 }
 
-fn get(v: &Value, k: &str) -> Value {
-    rt::index(v, &Value::str(k)).unwrap_or_default()
-}
-
-fn lua_err(e: lua::LuaError) -> String {
-    lua::to_string(e.value()).to_str_lossy().into_owned()
-}
-
 /// The builds of the run
 fn builds(opts: &Options) -> Vec<(String, String)> {
     corpus_builds()
@@ -129,9 +113,6 @@ fn builds(opts: &Options) -> Vec<(String, String)> {
 
 /// Runs the benchmark, printing each build's row as it finishes
 pub fn run(opts: &Options) -> Vec<Row> {
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", lua_err(e)));
     let mut data = TypedData::load();
     let mut rows = Vec::new();
     for (id, xml) in builds(opts) {
@@ -140,17 +121,11 @@ pub fn run(opts: &Options) -> Vec<Row> {
         let mut row = Row {
             id: id.clone(),
             typed: [None; OPS.len()],
-            lua: [None; OPS.len()],
             error: None,
             nodes: vec![],
         };
         if let Err(e) = typed(&data, &xml, opts, &mut row) {
             row.error = Some(e);
-        }
-        if opts.translation
-            && let Err(e) = translated(&host, &id, &xml, opts, &mut row)
-        {
-            row.error.get_or_insert(format!("translation: {e}"));
         }
         eprintln!("{}", format_row(&row));
         rows.push(row);
@@ -269,90 +244,6 @@ fn typed(data: &TypedData, xml: &str, opts: &Options, row: &mut Row) -> Result<(
     Ok(())
 }
 
-fn translated(
-    host: &Host,
-    id: &str,
-    xml: &str,
-    opts: &Options,
-    row: &mut Row,
-) -> Result<(), String> {
-    let reps = opts.reps;
-    host.load_build_xml(xml.as_bytes(), id).map_err(lua_err)?;
-    let build = host.build().map_err(lua_err)?;
-    let tab = get(&build, "calcsTab");
-    let calcs = get(&tab, "calcs");
-    let call = |f: &str, args: &[Value]| rt::call(&get(&calcs, f), args).map_err(lua_err);
-    let main = || [build.clone(), Value::str("MAIN")];
-    row.lua[1] = Some(time(reps, || (), |_| call("initEnv", &main()))?);
-    row.lua[2] = Some(time(
-        reps,
-        || call("initEnv", &main()).map(|r| r.into_iter().next().unwrap_or_default()),
-        |env| call("perform", &[env?]),
-    )?);
-    row.lua[3] = Some(time(
-        reps,
-        || (),
-        |_| {
-            call("buildOutput", &main())?;
-            call("buildOutput", &[build.clone(), Value::str("CALCS")])
-        },
-    )?);
-    row.lua[4] = Some(time(
-        reps,
-        || (),
-        |_| call("getMiscCalculator", std::slice::from_ref(&build)),
-    )?);
-    let method = |name: &str| rt::method(&tab, &LuaStr::from(name), &[]).map_err(lua_err);
-    row.lua[5] = Some(time(reps, || (), |_| method("BuildOutput"))?);
-    let misc = get(&tab, "miscCalculator");
-    let calc_func = rt::index(&misc, &Value::Number(1.0)).map_err(lua_err)?;
-    let lnodes = get(&get(&build, "spec"), "nodes");
-    let lovrs: Vec<Value> = row
-        .nodes
-        .iter()
-        .map(|&(nid, add)| {
-            let set = TableRef::new();
-            let n = rt::index(&lnodes, &Value::Number(nid as f64)).unwrap_or_default();
-            set.set(n, Value::Bool(true));
-            let t = TableRef::new();
-            t.set_str(
-                if add { "addNodes" } else { "removeNodes" },
-                Value::Table(set),
-            );
-            Value::Table(t)
-        })
-        .collect();
-    if !lovrs.is_empty() {
-        let total = time(
-            reps,
-            || (),
-            |_| {
-                lovrs
-                    .iter()
-                    .try_for_each(|o| rt::call(&calc_func, std::slice::from_ref(o)).map(drop))
-                    .map_err(lua_err)
-            },
-        )?;
-        row.lua[6] = Some(total / lovrs.len() as f64);
-    }
-    if opts.power {
-        let t = tab.as_table().ok_or("calcsTab")?;
-        t.set_str("powerStat", Value::Nil);
-        t.set_str(
-            "nodePowerMaxDepth",
-            opts.power_depth.map_or(Value::Nil, Value::Number),
-        );
-        let ltree = get(&get(&build, "spec"), "tree");
-        let lt = ltree.as_table().ok_or("tree")?;
-        let full_map = get(&ltree, "clusterNodeMap");
-        lt.set_str("clusterNodeMap", Value::Table(TableRef::new()));
-        let r = time(opts.power_reps, || (), |_| method("PowerBuilder"));
-        lt.set_str("clusterNodeMap", full_map);
-        row.lua[7] = Some(r?);
-    }
-    Ok(())
-}
-
 fn ms(v: Option<f64>) -> String {
     match v {
         Some(v) if v >= 100.0 => format!("{v:.0}"),
@@ -361,17 +252,8 @@ fn ms(v: Option<f64>) -> String {
     }
 }
 
-fn ratio(t: Option<f64>, l: Option<f64>) -> String {
-    match (t, l) {
-        (Some(t), Some(l)) if t > 0.0 => format!("{:.1}x", l / t),
-        _ => "-".into(),
-    }
-}
-
 fn format_row(r: &Row) -> String {
-    let cells: Vec<String> = (0..OPS.len())
-        .map(|k| format!("{} / {}", ms(r.typed[k]), ms(r.lua[k])))
-        .collect();
+    let cells: Vec<String> = (0..OPS.len()).map(|k| ms(r.typed[k])).collect();
     let err = r
         .error
         .as_deref()
@@ -379,9 +261,7 @@ fn format_row(r: &Row) -> String {
     format!("{}: {}{err}", r.id, cells.join(", "))
 }
 
-/// The table: per build, typed / translated ms per operation, then the
-/// sums over the builds every operation of which has both times, and
-/// their ratio
+/// The table: per build, ms per operation, then the sums over the builds
 pub fn table(rows: &[Row]) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -390,29 +270,16 @@ pub fn table(rows: &[Row]) -> String {
         "---|".repeat(OPS.len())
     ));
     for r in rows {
-        let cells: Vec<String> = (0..OPS.len())
-            .map(|k| format!("{} / {}", ms(r.typed[k]), ms(r.lua[k])))
-            .collect();
+        let cells: Vec<String> = (0..OPS.len()).map(|k| ms(r.typed[k])).collect();
         out.push_str(&format!("| {} | {} |\n", r.id, cells.join(" | ")));
     }
-    out.push_str(
-        "\n| operation | builds | typed ms | translation ms | speedup |\n|---|---|---|---|---|\n",
-    );
+    out.push_str("\n| operation | builds | ms |\n|---|---|---|\n");
     for (k, op) in OPS.iter().enumerate() {
-        let both: Vec<&Row> = rows.iter().filter(|r| r.typed[k].is_some()).collect();
-        let typed: f64 = both.iter().filter_map(|r| r.typed[k]).sum();
-        let with_lua: Vec<&&Row> = both.iter().filter(|r| r.lua[k].is_some()).collect();
-        let (t2, l2): (f64, f64) = with_lua
-            .iter()
-            .map(|r| (r.typed[k].unwrap(), r.lua[k].unwrap()))
-            .fold((0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
-        let lua = (!with_lua.is_empty()).then_some(l2);
+        let timed: Vec<f64> = rows.iter().filter_map(|r| r.typed[k]).collect();
         out.push_str(&format!(
-            "| {op} | {} | {} | {} | {} |\n",
-            both.len(),
-            ms(Some(typed)),
-            ms(lua),
-            ratio((!with_lua.is_empty()).then_some(t2), lua),
+            "| {op} | {} | {} |\n",
+            timed.len(),
+            ms(Some(timed.iter().sum()))
         ));
     }
     out

@@ -1,5 +1,5 @@
 //! The benchmark (`src/bin/bench.rs`) runs: one build, one run of each
-//! operation but node power, typed and translated.
+//! operation but node power.
 
 use equivalence::bench::{OPS, Options, run, table};
 
@@ -18,12 +18,7 @@ fn bench_runs() {
     assert!(r.error.is_none(), "{:?}", r.error);
     for (k, op) in OPS.iter().enumerate() {
         let power = *op == "node power";
-        assert_eq!(r.typed[k].is_some(), !power, "typed {op}");
-        assert_eq!(
-            r.lua[k].is_some(),
-            !power && *op != "load",
-            "translated {op}"
-        );
+        assert_eq!(r.typed[k].is_some(), !power, "{op}");
     }
     assert!(table(&rows).contains("| gen-0029 |"));
 }

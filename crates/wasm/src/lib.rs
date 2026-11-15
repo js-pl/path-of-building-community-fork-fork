@@ -6,10 +6,8 @@
 //! module instance; the engine does no I/O, data files are handed in.
 //!
 //! Commands run on the typed engine, whose data comes in its binary form
-//! (`session::bundle`). With the `translation` feature (the default) the
-//! commands it does not have yet run on upstream's translated program,
-//! which reads upstream's Lua data files from the bundle; without it they
-//! are "not ported" errors.
+//! (`session::bundle`). Commands it does not have yet are "not ported"
+//! errors.
 
 use session::typed::TypedData;
 use session::{Dispatcher, Files};
@@ -80,13 +78,6 @@ pub extern "C" fn result_len() -> usize {
     RESULT.with(|r| r.borrow().len())
 }
 
-/// 1 when commands the typed engine does not have fall back to the
-/// translation, 0 when they are "not ported" errors
-#[unsafe(no_mangle)]
-pub extern "C" fn has_translation() -> u32 {
-    cfg!(feature = "translation") as u32
-}
-
 /// Adds one data file (path relative to upstream's `src/`).
 ///
 /// # Safety
@@ -147,18 +138,6 @@ fn dispatcher() -> Result<Dispatcher<'static>, String> {
     Ok(d)
 }
 
-#[cfg(feature = "translation")]
-fn session() -> Result<Dispatcher<'static>, String> {
-    let data = typed_data()?;
-    let translated = session::Session::new(FILES.with(|f| f.clone()))?;
-    Ok(Dispatcher::new(
-        translated,
-        Some(data),
-        session::Prefer::Typed,
-    ))
-}
-
-#[cfg(not(feature = "translation"))]
 fn session() -> Result<Dispatcher<'static>, String> {
     Ok(Dispatcher::typed(typed_data()?))
 }

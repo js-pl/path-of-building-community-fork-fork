@@ -13,7 +13,6 @@ type Exports = {
   add_bundle(ptr: number, len: number): void;
   start(): void;
   request(ptr: number, len: number): void;
-  has_translation?(): number;
 };
 
 export type WorkerRequest = { id: number; req: Record<string, unknown> } | { init: string };
@@ -93,8 +92,7 @@ async function init() {
     const r = result();
     if (!r.error) {
       const ms = (t: number) => Math.round(t - t0);
-      const mode = ex.has_translation?.() === 0 ? "typed engine only" : "with the translation";
-      console.info(`engine ready in ${ms(performance.now())} ms (${mode}): data fetched at ${ms(tFetch)} ms, module compiled at ${ms(tCompile)} ms, bundle read at ${ms(tBundle)} ms`);
+      console.info(`engine ready in ${ms(performance.now())} ms: data fetched at ${ms(tFetch)} ms, module compiled at ${ms(tCompile)} ms, bundle read at ${ms(tBundle)} ms`);
       return;
     }
     if (!(await addMissing(r.missing))) throw new Error(r.error);
