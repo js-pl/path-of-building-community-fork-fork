@@ -842,6 +842,11 @@ impl TypedSession<'_> {
         self.class_popups = prev.class_popups.clone();
     }
 
+    /// Whether any popup is open
+    pub fn popup_open(&self) -> bool {
+        self.ui.popups.as_array().is_some_and(|p| !p.is_empty())
+    }
+
     /// Whether the front popup is a class change popup
     pub fn has_class_popup(&self) -> bool {
         !self.class_popups.is_empty()

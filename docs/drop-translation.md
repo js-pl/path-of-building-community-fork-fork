@@ -43,8 +43,9 @@ makes cyclic environments).
 | Tests | Reference today |
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
-| `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
-| `equivalence/tests/{perform,breakdown,calculator,power,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
+| `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
+| `equivalence/tests/{calculator,power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
 | `session/tests/typed.rs` (15 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
@@ -326,5 +327,49 @@ goes with them.
   load and after random edits, on every corpus build.
 - `config.rs` `config_matches_upstream` (corpus): the session test's config
   phase (views and outputs after option edits) and `build_output.rs`.
-  `every_option_matches_upstream` (every option and value) stays until it
-  runs against the oracle.
+- `config.rs` `every_option_matches_upstream`: the mods each
+  Configuration option builds for a few values each, against the
+  translation's. `oracle_variants.rs` sets every option to the same values
+  (checks on, each list entry, 3, 12 and -2) in a corpus build and
+  compares the whole build with the oracle (1231 builds).
+- `perform.rs` (7 tests): `calcs.perform`'s state at the defences (the
+  player's output, every database's mods, conditions and multipliers), on
+  the corpus and the variant families. The corpus as whole builds in
+  `build_output.rs`; skill functions, triggers (a sample in CI, every one
+  in the nightly), mods, tattoos, timeless jewels and mirages as whole
+  builds (`MAIN` and `CALCS`) in `oracle_variants.rs`, live oracle.
+- `breakdown.rs` (4 tests): the Calcs tab's breakdowns. The corpus in the
+  session test's calcs phase (every cell's `breakdown` command); the
+  breakdown-writing skill functions, the mirages and the Calcs inputs in
+  its `variants` phase, against the oracle.
+
+## Moved to the oracle
+
+Tests of typed structures against upstream's tables read them from the
+oracle instead of the translation. `oracle/values.lua` makes the tables on
+upstream on LuaJIT and encodes them with what a Lua value has (number and
+string keys, sharing, cycles, functions as `<file>:<line>`), and
+`equivalence::lua_json` reads them back into Lua values, so the tests keep
+their comparison code (`from_lua`, the mod `Converter`). Entries come in a
+fixed order, number keys ascending, then strings, since LuaJIT's `pairs`
+order over strings changes from run to run.
+
+- `item.rs`: `new("Item"):Item(raw, rarity, true)` for every unique and
+  rare template, and every item of every corpus build loaded from XML;
+  same comparison as before, nothing canonicalised.
+- `tree.rs`: `main:LoadTree` for each version. Upstream builds the node
+  list, the connectors and the class notables in `pairs` order over
+  `tree.nodes`, whose string key `root` makes it follow the string hash:
+  nodes compare by id, connectors undirected, class notables sorted.
+- `game_data.rs`: `from_lua` over the oracle's `data` (with the skills'
+  stat map flags as after their first calculation) against `from_lua` over
+  the importer's `data`, the typed data's source, rebuilt in the same
+  order (`lua_json::canonical`), since the typed data keeps string-keyed
+  lists (item mods and bases, record fields) in the data files' order and
+  upstream in hash order. A mod table a gem shares with its transfigured
+  variants takes `Skill:<id>` from whichever `pairs(data.skills)` visits
+  last, so shared tables get the first id on both sides. What the typed
+  data keeps in `pairs` order over number keys, the same in every run
+  (`next(levels)`, pantheon soul mods, flavour texts), is compared with
+  the oracle's order directly. The binary form's round trip stays as it
+  was.

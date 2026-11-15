@@ -217,7 +217,16 @@ function buildList(control)
 	end
 end
 
+-- What a control request answers while a popup is in front of another
+-- host's controls: main:OnFrame gives input to the front popup alone
+local function behindPopup(path)
+	return "control " .. tostring(path) .. " is behind a popup"
+end
+
 function api.control(req)
+	if main.popups[1] and not tostring(req.path):match("^popup%.") then
+		error(behindPopup(req.path), 0)
+	end
 	local control = findControl(req.path)
 	if req.moveTo and control.SelectIndex then
 		-- A list's row dragged within the list to before row `moveTo`, as
