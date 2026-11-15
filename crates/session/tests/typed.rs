@@ -214,6 +214,32 @@ fn unordered(v: &mut J) {
                 {
                     *n = short.clone();
                 }
+                // A control's list of mods, which upstream gathers in
+                // `pairs` order and sorts by the first line with numbers
+                // and ranges as `$` (`ItemsTab`'s corruption and crafting
+                // popups): ties in either order
+                if k == "list"
+                    && let J::Array(a) = x
+                    && a.len() > 1
+                    && a.iter().all(J::is_string)
+                {
+                    let norm = |l: &J| {
+                        let s = l.as_str().unwrap_or("").to_lowercase();
+                        let s = s.split('/').next().unwrap_or("").to_string();
+                        let s = engine::pat::gsub(&s, "%(.-%)", "$");
+                        let s = engine::pat::gsub(&s, "[%+%-%%]", "");
+                        engine::pat::gsub(&s, "%d+", "$")
+                    };
+                    let mut i = 0;
+                    while i < a.len() {
+                        let mut j = i + 1;
+                        while j < a.len() && norm(&a[j]) == norm(&a[i]) {
+                            j += 1;
+                        }
+                        a[i..j].sort_by_key(|l| l.to_string());
+                        i = j;
+                    }
+                }
                 // Connectors between two nodes that both link to the other
                 // keep the direction of the node `pairs(tree.nodes)`
                 // visits first; the nodes' table has a string key too

@@ -265,6 +265,11 @@ of them, so each difference is one between the translation and LuaJIT):
     `GlobalCache` entries keyed by socket slot that the candidates
     calculated before left; against the oracle the candidates of builds
     with a mirage are compared without their DPS;
+  - tied mods in the item editor's corruption and crafting lists
+    (`(4-6)% increased Strength/... Dexterity` against `... Intelligence`):
+    explained, upstream's `pairs` order. `ItemsTab` gathers them in
+    `pairs` order and `table.sort`s by the first line with numbers as `$`;
+    against the oracle such runs of ties are compared sorted;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
