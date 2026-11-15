@@ -182,10 +182,10 @@ not available.
 | 2 | `equivalence::bridge` deleted | done (#173) |
 | 3 | `equivalence/tests/calcs.rs` retired | done (#173) |
 | 4 | the remaining equivalence tests to the oracle (`calculator.rs` on `oracleCalculator`; `spec.rs`, `power.rs`, `compare.rs` retired into session phases) | done (#160, #164, #168, #169, #171) |
-| 5 | `session::Paired`: the typed `Dispatcher` and a reference `Session` kept in step, the replay out of the `Dispatcher` | under way (#175) |
-| 6 | the web test against the native typed `pob serve` | under way (#174) |
-| 7 | CLI, bench and wasm: `--typed`, `--translated` and `bundle --lua` go, the bench is typed-only, the wasm `translation` feature and `has_translation` go, and so does the `Dispatcher`'s fallback | next |
-| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc`, the rest of the fallback code; the session test's reference is the oracle only. Needs the owner's confirmation first | after 7 |
+| 5 | `session::Paired`: the typed `Dispatcher` and a reference `Session` kept in step, the replay out of the `Dispatcher` | merged (#175) |
+| 6 | the web test against the native typed `pob serve` | merged (#174) |
+| 7 | CLI, bench and wasm: `--typed`, `--translated` and `bundle --lua` go, the bench is typed-only, the wasm `translation` feature and `has_translation` go, and so does the `Dispatcher`'s fallback | merged (#180); the `Dispatcher`'s own fallback is still in `crates/session` (`translation` feature) |
+| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc`, the rest of the fallback code; the session test's reference is the oracle only | next: confirmed by the owner on 2026-11-15 |
 
 Other docs mark what only holds after sub-step 7 or 8 as such.
 
