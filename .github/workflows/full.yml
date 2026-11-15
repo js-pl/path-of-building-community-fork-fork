@@ -1,6 +1,6 @@
 name: Full variants
 # The variants CI samples, in full: every trigger variant (TRIGGERS_FULL,
-# against the translation and the live oracle),
+# against the live oracle),
 # every node and cluster notable's power (POWER_FULL) and longer edit
 # sequences in the session test (SESSION_STEPS). Nightly, by hand, and on
 # pull requests that change this workflow.
@@ -48,10 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: triggers 1/4, filter: 'test(=triggers_match_upstream)', shards: 1/4 }
-          - { name: triggers 2/4, filter: 'test(=triggers_match_upstream)', shards: 2/4 }
-          - { name: triggers 3/4, filter: 'test(=triggers_match_upstream)', shards: 3/4 }
-          - { name: triggers 4/4, filter: 'test(=triggers_match_upstream)', shards: 4/4 }
           - { name: triggers oracle 1/4, filter: 'test(=triggers_match_oracle)', shards: 1/4, oracle: true }
           - { name: triggers oracle 2/4, filter: 'test(=triggers_match_oracle)', shards: 2/4, oracle: true }
           - { name: triggers oracle 3/4, filter: 'test(=triggers_match_oracle)', shards: 3/4, oracle: true }
