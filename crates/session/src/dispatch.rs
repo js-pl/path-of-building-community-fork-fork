@@ -10,6 +10,8 @@
 
 #[cfg(feature = "translation")]
 use crate::Session;
+#[cfg(feature = "translation")]
+use crate::paired::{READ_ONLY, outlives_build};
 use crate::typed::{NOT_PORTED, TypedData, TypedSession, UPSTREAM_ERROR};
 use serde_json::{Value as J, json};
 
@@ -19,40 +21,6 @@ pub enum Prefer {
     Translated,
     Typed,
 }
-
-/// Commands of the translation that leave the build as it is
-#[cfg(feature = "translation")]
-const READ_ONLY: &[&str] = &[
-    "state",
-    "outputs",
-    "controls",
-    "tree",
-    "treeState",
-    "nodePath",
-    "nodeTooltip",
-    "masteryOptions",
-    "treeSpecs",
-    "sharedLists",
-    "powerStats",
-    "nodePower",
-    "skills",
-    "copySocketGroup",
-    "gemList",
-    "socketGroupTooltip",
-    "items",
-    "itemTooltip",
-    "previewItem",
-    "itemDb",
-    "displayItem",
-    "controlTooltip",
-    "config",
-    "calcs",
-    "breakdown",
-    "party",
-    "notes",
-    "saveXml",
-    "saveCode",
-];
 
 /// A build session answering JSON requests, as [`Session::request`]
 pub struct Dispatcher<'d> {
@@ -73,26 +41,22 @@ pub struct Dispatcher<'d> {
     /// Whether the typed sessions still know the shared item lists: not
     /// once the translation held a build
     shared_known: bool,
+    /// Whether the typed engine answered the last request
+    pub typed_answered: bool,
+    /// With `record_replays`, what the last requests did to the build that a
+    /// reference session must repeat to stay in step ([`crate::Paired`])
+    pub record_replays: bool,
+    pub replays: Vec<Replay>,
 }
 
-/// Whether a request may change what outlives the build: a popup (opened
-/// by a click, used or closed) or the shared item lists
-#[cfg(feature = "translation")]
-fn outlives_build(json: &str) -> bool {
-    let Ok(r) = serde_json::from_str::<J>(json) else {
-        return true;
-    };
-    let path = r["path"].as_str().unwrap_or("");
-    match r["cmd"].as_str() {
-        Some("closePopup" | "popupButton") => true,
-        Some("control") => {
-            path.starts_with("popup.")
-                || path.starts_with("items.sharedItemList")
-                || r["click"] == json!(true)
-                || r["dragTo"].is_string()
-        }
-        _ => false,
-    }
+/// A request the typed engine answered that changed the build, as a
+/// reference session repeats it
+#[derive(Clone, Debug, PartialEq)]
+pub enum Replay {
+    /// An edit, as the reference replays it
+    Edit(String),
+    /// A build loaded or made: it replaces what the edits before did
+    Load(String),
 }
 
 fn ok(v: J) -> String {
@@ -111,6 +75,9 @@ impl<'d> Dispatcher<'d> {
             pending: Vec::new(),
             typed_error: None,
             fallbacks: Vec::new(),
+            typed_answered: false,
+            record_replays: false,
+            replays: Vec::new(),
         }
     }
 
@@ -128,6 +95,9 @@ impl<'d> Dispatcher<'d> {
             pending: Vec::new(),
             typed_error: None,
             fallbacks: Vec::new(),
+            typed_answered: false,
+            record_replays: false,
+            replays: Vec::new(),
         }
     }
 
@@ -137,6 +107,31 @@ impl<'d> Dispatcher<'d> {
         self.translated
             .as_ref()
             .expect("a dispatcher on the typed engine alone")
+    }
+
+    /// Leaves the build to a reference session: the typed engine holds no
+    /// build and does not know the shared item lists until given them
+    pub fn drop_build(&mut self) {
+        self.typed = None;
+        self.shared_known = false;
+    }
+
+    /// The shared item lists, as a reference session has them
+    /// (`sharedLists`), for the typed build just opened
+    pub fn set_shared(&mut self, v: &J) -> bool {
+        let Some(t) = self.typed.as_mut() else {
+            return false;
+        };
+        match t.set_shared(v) {
+            Ok(()) => {
+                self.shared_known = true;
+                true
+            }
+            Err(_) => {
+                t.forget_shared();
+                false
+            }
+        }
     }
 
     /// Whether the typed engine holds the current build
@@ -191,7 +186,9 @@ impl<'d> Dispatcher<'d> {
         if !self.has_translation() || held || load {
             self.typed_error = None;
         }
+        self.typed_answered = false;
         if let Some(r) = self.typed_request(json) {
+            self.typed_answered = true;
             return Ok(r);
         }
         if (held || load) && self.prefer == Prefer::Typed && self.has_translation() {
@@ -793,6 +790,11 @@ impl<'d> Dispatcher<'d> {
                 {
                     self.pending.push(r.to_string());
                 }
+                if self.record_replays
+                    && let Some(r) = &replay
+                {
+                    self.replays.push(Replay::Edit(r.to_string()));
+                }
                 let _ = &replay;
                 let _ = json;
                 Some(ok(v))
@@ -869,6 +871,9 @@ impl<'d> Dispatcher<'d> {
                         let _ = self.sync();
                     }
                     self.pending = vec![json.to_string()];
+                }
+                if self.record_replays {
+                    self.replays.push(Replay::Load(json.to_string()));
                 }
                 let _ = json;
                 Some(ok(json!([])))

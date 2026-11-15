@@ -3,7 +3,9 @@
 
 use serde_json::{Value as J, json};
 use session::typed::{TypedData, TypedSession};
-use session::{Dispatcher, Prefer, Session};
+// The typed engine with its reference kept in step, under the name the
+// tests were written with
+use session::{Paired as Dispatcher, Prefer, Session};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
