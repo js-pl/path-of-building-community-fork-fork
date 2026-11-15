@@ -8,9 +8,8 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 The typed engine answers the whole engine API the web app and the tests use,
 and upstream itself is the reference: the translation is being deleted in
 the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
-(1 to 4 done; 5 `session::Paired` and 6 the web test on the native typed
-`pob serve` under way; 7 the CLI, bench and wasm cleanup next; 8 the
-deletion itself after the owner's confirmation). To pick the work up:
+(1 to 7 merged; 8, the deletion itself, is next: the owner confirmed it on
+2026-11-15). To pick the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule) and
    `oracle/setup.sh` (LuaJIT and its rocks into `.oracle/`, for every test
