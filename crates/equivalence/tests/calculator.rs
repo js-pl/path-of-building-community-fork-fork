@@ -1,74 +1,43 @@
 //! Calculators with overrides: `engine::calculator::MiscCalculator` gives
-//! the outputs of the translated `calcs.getMiscCalculator(build)`'s base
-//! calculation and of its `calcFunc(override)`, for a sample of overrides
-//! per corpus build: unallocated nodes next to the tree allocated,
-//! allocated nodes removed, items replaced or taken off, flasks toggled and
-//! a condition set. Builds that reach a part not ported yet are skipped and
-//! listed. A build that differs is calculated again by a fresh translation,
-//! since upstream changes shared skill data for the rest of the process.
+//! the outputs of upstream's `calcs.getMiscCalculator(build)` on the live
+//! oracle (upstream on LuaJIT, `oracleCalculator` of `oracle/session.lua`):
+//! its base calculation and its `calcFunc(override)`, for a sample of
+//! overrides per corpus build: unallocated nodes next to the tree
+//! allocated, allocated nodes removed, items replaced or taken off, flasks
+//! toggled and a condition set. Numbers compare bitwise. Builds that reach
+//! a part not ported yet are skipped and listed. A build that differs is
+//! asked of a fresh oracle, since upstream changes shared skill data for
+//! the rest of the process.
 //!
-//! `CALCS_FILTER=<substring>` limits the builds run.
+//! The corpus runs in shards (`testkit::run_shards`), each with an oracle
+//! process of its own. `CALCS_FILTER=<substring>` limits the builds run.
 
 use engine::calc_override::Override;
 use engine::calculator::{CalcOutput, MiscCalculator};
 use engine::tree::NodeType;
-use equivalence::outputs::{compare, lua_outputs, typed_outputs};
+use equivalence::oracle::{J, diff, output_json, parse};
 use equivalence::typed_build::TypedData;
 use equivalence::{corpus_builds, upstream_src};
-use lua::{LuaError, TableRef, Value, rt};
+use serde_json::{Value, json};
+use session::Session;
 use std::collections::BTreeMap;
-use std::rc::Rc;
-use upstream::host::Host;
-use upstream::imported::Imported;
-
-fn s(x: &str) -> Value {
-    Value::str(x)
-}
-
-fn get(v: &Value, k: &str) -> Value {
-    rt::index(v, &s(k)).unwrap_or_default()
-}
-
-fn describe(e: &LuaError) -> String {
-    format!(
-        "{}\n  {}",
-        lua::to_string(e.value()),
-        e.traceback().join("\n  ")
-    )
-}
 
 /// Nodes per build allocated and removed
 const NODES: usize = 3;
 
-/// A set of Lua values, as upstream's override tables hold them
-fn set_of(values: &[Value]) -> Value {
-    let t = TableRef::new();
-    for v in values {
-        t.set(v.clone(), Value::Bool(true));
-    }
-    Value::Table(t)
-}
-
-/// An override of the sample, typed and as upstream's table
+/// An override of the sample, typed and as the oracle request's case
 struct Case {
     name: String,
     typed: Override,
-    lua: Value,
+    oracle: Value,
 }
 
-/// The sample of overrides for a build
-fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
+fn cases(b: &engine::build::Build) -> Vec<Case> {
     let spec = &b.spec;
-    let lnodes = get(&get(lbuild, "spec"), "nodes");
-    let lnode = |i: usize| rt::index(&lnodes, &Value::Number(spec.nodes[i].id as f64)).unwrap();
-    let litems = get(&get(lbuild, "itemsTab"), "items");
-    let litem = |id: f64| rt::index(&litems, &Value::Number(id)).unwrap();
+    let lnode = |i: usize| json!(spec.nodes[i].id);
+    let litem = |id: f64| json!(id);
     let table = |pairs: Vec<(&str, Value)>| {
-        let t = TableRef::new();
-        for (k, v) in pairs {
-            t.set_str(k, v);
-        }
-        Value::Table(t)
+        Value::Object(pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
     };
     let kind_ok = |i: usize| {
         let n = spec.tree_node(i);
@@ -89,7 +58,7 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
         out.push(Case {
             name: format!("add {}", spec.nodes[i].id),
             typed: Override::default().add_node(i),
-            lua: table(vec![("addNodes", set_of(&[lnode(i)]))]),
+            oracle: table(vec![("addNodes", json!([lnode(i)]))]),
         });
     }
     let removes: Vec<usize> = by_id
@@ -103,24 +72,24 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
         out.push(Case {
             name: format!("remove {}", spec.nodes[i].id),
             typed: Override::default().remove_node(i),
-            lua: table(vec![("removeNodes", set_of(&[lnode(i)]))]),
+            oracle: table(vec![("removeNodes", json!([lnode(i)]))]),
         });
     }
     if let [a, b, ..] = removes[..] {
         // Two at once, with a node added
         let mut typed = Override::default().remove_node(a).remove_node(b);
-        let mut lua = vec![("removeNodes", set_of(&[lnode(a), lnode(b)]))];
+        let mut lua = vec![("removeNodes", json!([lnode(a), lnode(b)]))];
         if let Some(c) = out.first().and_then(|c| c.typed.add_nodes.first()).cloned() {
             let engine::calc_override::OverrideNode::Spec(c) = c else {
                 unreachable!()
             };
             typed = typed.add_node(c);
-            lua.push(("addNodes", set_of(&[lnode(c)])));
+            lua.push(("addNodes", json!([lnode(c)])));
         }
         out.push(Case {
             name: "remove two, add one".into(),
             typed,
-            lua: table(lua),
+            oracle: table(lua),
         });
     }
     let tab = &b.items;
@@ -139,7 +108,7 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
                     rep_item: Some((slot.into(), None)),
                     ..Override::default()
                 },
-                lua: table(vec![("repSlotName", s(slot))]),
+                oracle: table(vec![("repSlotName", json!(slot))]),
             });
         }
     }
@@ -151,7 +120,7 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
                     rep_item: Some((slot.into(), tab.item(id).cloned())),
                     ..Override::default()
                 },
-                lua: table(vec![("repSlotName", s(slot)), ("repItem", litem(id))]),
+                oracle: table(vec![("repSlotName", json!(slot)), ("repItem", litem(id))]),
             });
         }
     }
@@ -179,64 +148,139 @@ fn cases(b: &engine::build::Build, lbuild: &Value) -> Vec<Case> {
         out.push(Case {
             name: format!("toggle {key} {n}"),
             typed,
-            lua: table(vec![(key, litem(id))]),
+            oracle: table(vec![(key, litem(id))]),
         });
     }
-    let conditions = TableRef::new();
-    conditions.set(Value::Number(1.0), s("Onslaught"));
     out.push(Case {
         name: "condition".into(),
         typed: Override {
             conditions: vec!["Onslaught".into()],
             ..Override::default()
         },
-        lua: table(vec![("conditions", Value::Table(conditions))]),
+        oracle: table(vec![("conditions", json!(["Onslaught"]))]),
     });
     out
 }
 
-fn compare_outputs(what: &str, got: &CalcOutput, want: &Value, fail: &mut Vec<String>) {
-    compare(
-        &format!("{what}: player"),
-        &typed_outputs(&got.player),
-        &lua_outputs(want),
-        fail,
-    );
-    let minion = get(want, "Minion");
-    match (&got.minion, minion.is_nil()) {
-        (None, true) => {}
-        (Some(g), false) => compare(
-            &format!("{what}: minion"),
-            &typed_outputs(g),
-            &lua_outputs(&minion),
-            fail,
-        ),
-        (g, _) => fail.push(format!("{what}: minion typed {}", g.is_some())),
+/// An actor's outputs as the oracle gives them (`Minion` left out)
+fn actors(out: &CalcOutput) -> J {
+    let player = match output_json(&out.player) {
+        J::Obj(mut o) => {
+            o.remove("Minion");
+            J::Obj(o)
+        }
+        j => j,
+    };
+    let mut obj = BTreeMap::from([("player".to_string(), player)]);
+    if let Some(m) = &out.minion {
+        obj.insert("minion".to_string(), output_json(m));
     }
+    J::Obj(obj)
 }
+
+fn compare_outputs(what: &str, got: &CalcOutput, want: &J, fail: &mut Vec<String>) {
+    let mut d = Vec::new();
+    diff(&actors(got), want, "", &mut d);
+    fail.extend(d.into_iter().map(|d| format!("{what}: {d}")));
+}
+
+/// The oracle's answer for a build and its cases: the base outputs and
+/// each case's (or upstream's error)
+fn ask(
+    oracle: &Session,
+    id: &str,
+    xml: &str,
+    cases: &[Case],
+) -> Result<(J, Vec<Result<J, String>>), String> {
+    let req = json!({
+        "cmd": "oracleCalculator",
+        "id": id,
+        "xml": xml,
+        "cases": cases.iter().map(|c| c.oracle.clone()).collect::<Vec<_>>(),
+    })
+    .to_string();
+    let res = oracle.request(&req)?;
+    let J::Obj(mut o) = parse(res.as_bytes(), &mut 0) else {
+        return Err(format!("not an object: {res}"));
+    };
+    if let Some(J::Str(e)) = o.remove("error") {
+        return Err(e);
+    }
+    let Some(J::Obj(mut ok)) = o.remove("ok") else {
+        return Err(format!("an answer of neither ok nor error: {res}"));
+    };
+    let base = ok.remove("base").unwrap_or(J::Null);
+    let answers = match ok.remove("cases") {
+        Some(J::Arr(a)) => a,
+        _ => Vec::new(),
+    };
+    let answers = answers
+        .into_iter()
+        .map(|a| match a {
+            J::Obj(mut a) if a.contains_key("error") => match a.remove("error") {
+                Some(J::Str(e)) => Err(e),
+                e => Err(format!("{e:?}")),
+            },
+            a => Ok(a),
+        })
+        .collect();
+    Ok((base, answers))
+}
+
+/// The differences of a build's calculator from the oracle's
+fn differences(
+    calc: &MiscCalculator,
+    cases: &[Case],
+    base: &J,
+    answers: &[Result<J, String>],
+) -> Vec<String> {
+    let mut fail = Vec::new();
+    compare_outputs("base", calc.base(), base, &mut fail);
+    for (case, want) in cases.iter().zip(answers) {
+        let want = match want {
+            Ok(w) => w,
+            Err(e) => {
+                fail.push(format!("{}: upstream failed: {e}", case.name));
+                continue;
+            }
+        };
+        match calc.calculate(&case.typed, true) {
+            Ok(got) => compare_outputs(&case.name, &got, want, &mut fail),
+            Err(e) => fail.push(format!("{}: typed failed: {e}", case.name)),
+        }
+    }
+    fail
+}
+
+/// Shards of the corpus, each with an oracle of its own
+const SHARDS: usize = 4;
 
 #[test]
 fn overrides_match_upstream() {
+    let test = "overrides_match_upstream";
+    if let Some(shard) = testkit::shard() {
+        let (k, n) = shard.split_once('/').unwrap();
+        return run_shard(k.parse().unwrap(), n.parse().unwrap());
+    }
+    let shards: Vec<String> = (0..SHARDS).map(|k| format!("{k}/{SHARDS}")).collect();
+    testkit::run_shards(test, &shards, &[" builds", "aligned "]);
+}
+
+fn run_shard(k: usize, n: usize) {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
     let mut data = TypedData::load();
+    let mut oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
     let mut failures = Vec::new();
     let (mut compared, mut calcs) = (0, 0);
     let mut aligned: Vec<String> = Vec::new();
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for (id, xml) in corpus_builds() {
-        if !id.contains(&filter) {
-            continue;
-        }
-        host.load_build_xml(xml.as_bytes(), &id)
-            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
-        let lbuild = host.build().unwrap();
-        let misc = get(&get(&lbuild, "calcsTab"), "miscCalculator");
-        let calc_func = rt::index(&misc, &Value::Number(1.0)).unwrap();
-        let calc_base = rt::index(&misc, &Value::Number(2.0)).unwrap();
-
+    let builds = corpus_builds()
+        .into_iter()
+        .filter(|(id, _)| id.contains(&filter))
+        .enumerate()
+        .filter(|(i, _)| i % n == k)
+        .map(|(_, b)| b);
+    for (id, xml) in builds {
         let root = engine::xml::parse(&xml).unwrap_or_else(|e| panic!("{id}: {e}"));
         data.load_tree(&root);
         let mut build = match data.load_build(&root) {
@@ -260,69 +304,31 @@ fn overrides_match_upstream() {
                 continue;
             }
         };
-        compared += 1;
-        let mut fail = Vec::new();
-        compare_outputs("base", calc.base(), &calc_base, &mut fail);
-        for case in cases(&build, &lbuild) {
-            calcs += 1;
-            let want = match rt::call(&calc_func, std::slice::from_ref(&case.lua)) {
-                Ok(r) => r.into_iter().next().unwrap_or_default(),
-                Err(e) => {
-                    fail.push(format!(
-                        "{}: translated failed: {}",
-                        case.name,
-                        describe(&e)
-                    ));
-                    continue;
-                }
-            };
-            match calc.calculate(&case.typed, true) {
-                Ok(got) => compare_outputs(&case.name, &got, &want, &mut fail),
+        // Typed parts not ported yet leave their cases out
+        let cases: Vec<Case> = cases(&build)
+            .into_iter()
+            .filter(|c| match calc.calculate(&c.typed, true) {
                 Err(e) if e.starts_with("not ported") => {
-                    skips
-                        .entry(e)
-                        .or_default()
-                        .push(format!("{id} {}", case.name));
+                    skips.entry(e).or_default().push(format!("{id} {}", c.name));
+                    false
                 }
-                Err(e) => fail.push(format!("{}: typed failed: {e}", case.name)),
-            }
-        }
+                _ => true,
+            })
+            .collect();
+        compared += 1;
+        calcs += cases.len();
+        let (base, answers) =
+            ask(&oracle, &id, &xml, &cases).unwrap_or_else(|e| panic!("{id}: oracle: {e}"));
+        let mut fail = differences(&calc, &cases, &base, &answers);
         // Upstream changes shared skill data for good (`ProcessSocketGroup`
         // clears a triggered granted skill's level cost), so a build loaded
-        // earlier can change the translation's answers: a build that
-        // differs is calculated again by a fresh translation, and aligned
-        // when that one agrees
+        // earlier can change the oracle's answers: a build that differs is
+        // asked of a fresh oracle, and aligned when that one agrees
         if !fail.is_empty() {
-            let fresh = Host::new(Rc::new(Imported::new(upstream_src())));
-            fresh
-                .start()
-                .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
-            fresh
-                .load_build_xml(xml.as_bytes(), &id)
-                .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
-            let lbuild = fresh.build().unwrap();
-            let misc = get(&get(&lbuild, "calcsTab"), "miscCalculator");
-            let calc_func = rt::index(&misc, &Value::Number(1.0)).unwrap();
-            let calc_base = rt::index(&misc, &Value::Number(2.0)).unwrap();
-            let mut again = Vec::new();
-            compare_outputs("base", calc.base(), &calc_base, &mut again);
-            for case in cases(&build, &lbuild) {
-                let Ok(got) = calc.calculate(&case.typed, true) else {
-                    continue;
-                };
-                match rt::call(&calc_func, std::slice::from_ref(&case.lua)) {
-                    Ok(r) => {
-                        let want = r.into_iter().next().unwrap_or_default();
-                        compare_outputs(&case.name, &got, &want, &mut again);
-                    }
-                    Err(e) => again.push(format!(
-                        "{}: translated failed: {}",
-                        case.name,
-                        describe(&e)
-                    )),
-                }
-            }
-            if again.is_empty() {
+            oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+            let (base, answers) =
+                ask(&oracle, &id, &xml, &cases).unwrap_or_else(|e| panic!("{id}: oracle: {e}"));
+            if differences(&calc, &cases, &base, &answers).is_empty() {
                 aligned.push(id.clone());
                 fail.clear();
             }
@@ -338,7 +344,7 @@ fn overrides_match_upstream() {
     }
     let skipped: usize = skips.values().map(Vec::len).sum();
     eprintln!("{compared} builds, {calcs} overrides compared, {skipped} skipped: {skips:?}");
-    eprintln!("aligned with a fresh translation: {aligned:?}");
+    eprintln!("aligned with a fresh oracle: {aligned:?}");
     assert!(
         failures.is_empty(),
         "{} builds differ:\n{}",

@@ -107,10 +107,62 @@ local function oracleValue(req)
 	return '{"ok":' .. res .. '}'
 end
 
+-- `{"cmd":"oracleCalculator","xml":..,"id":..,"cases":[..]}` loads a
+-- build and answers its `calcsTab.miscCalculator`: the base outputs and
+-- `calcFunc(override)`'s for each case, an override with nodes and items
+-- by id (`addNodes`, `removeNodes`, `repSlotName`, `repItem`,
+-- `toggleFlask`, `toggleTincture`, `conditions`), each actor's outputs as
+-- `{player=..,minion=..}` (crates/equivalence/tests/calculator.rs)
+local function oracleCalculator(req)
+	local ok, res = pcall(function()
+		loadBuildFromXML(req.xml, req.id or "calculator")
+		local calcFunc, calcBase = build.calcsTab.miscCalculator[1], build.calcsTab.miscCalculator[2]
+		local function actors(output)
+			local player = { }
+			for k, v in pairs(output) do
+				if k ~= "Minion" then
+					player[k] = v
+				end
+			end
+			return { player = player, minion = output.Minion }
+		end
+		local nodes, items = build.spec.nodes, build.itemsTab.items
+		local function set(ids)
+			local s = { }
+			for _, id in ipairs(ids) do
+				s[nodes[id]] = true
+			end
+			return s
+		end
+		local answer = { base = actors(calcBase), cases = { } }
+		for i, c in ipairs(req.cases) do
+			local override = {
+				addNodes = c.addNodes and set(c.addNodes),
+				removeNodes = c.removeNodes and set(c.removeNodes),
+				repSlotName = c.repSlotName,
+				repItem = c.repItem and items[c.repItem],
+				toggleFlask = c.toggleFlask and items[c.toggleFlask],
+				toggleTincture = c.toggleTincture and items[c.toggleTincture],
+				conditions = c.conditions,
+			}
+			local okCase, output = pcall(calcFunc, override)
+			answer.cases[i] = okCase and actors(output) or { error = tostring(output) }
+		end
+		return answer
+	end)
+	if not ok then
+		return dkjson.encode({ error = tostring(res) })
+	end
+	return '{"ok":' .. toJSON(res) .. '}'
+end
+
 local lastError
 for line in io.lines() do
 	if line:match('^{"cmd":"oracleOutputs"') then
 		out:write(oracleOutputs(dkjson.decode(line)), "\n")
+		out:flush()
+	elseif line:match('^{"cmd":"oracleCalculator"') then
+		out:write(oracleCalculator(dkjson.decode(line)), "\n")
 		out:flush()
 	elseif line:match('^{"cmd":"oracleValue"') then
 		out:write(oracleValue(dkjson.decode(line)), "\n")
