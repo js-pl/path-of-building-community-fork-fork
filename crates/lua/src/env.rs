@@ -434,9 +434,10 @@ fn install_math(env: &Env) {
                     let mut m = check_num(a, 0, "max")?;
                     for i in 1..a.len() {
                         let x = check_num(a, i, "max")?;
-                        if x > m {
-                            m = x;
-                        }
+                        // LuaJIT keeps the left operand only when it is
+                        // strictly greater: a NaN or a -0 on either side
+                        // gives the right one
+                        m = if m > x { m } else { x };
                     }
                     ok1(num(m))
                 }),
@@ -447,9 +448,10 @@ fn install_math(env: &Env) {
                     let mut m = check_num(a, 0, "min")?;
                     for i in 1..a.len() {
                         let x = check_num(a, i, "min")?;
-                        if x < m {
-                            m = x;
-                        }
+                        // LuaJIT keeps the left operand only when it is
+                        // strictly less: a NaN or a -0 on either side
+                        // gives the right one
+                        m = if m < x { m } else { x };
                     }
                     ok1(num(m))
                 }),
