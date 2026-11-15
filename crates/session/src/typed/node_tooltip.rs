@@ -210,6 +210,8 @@ impl TypedSession<'_> {
             } else {
                 o.reminder_text.as_deref()
             }
+        } else if node.reminder_wiped {
+            None
         } else {
             tn.reminder_text.as_deref()
         };

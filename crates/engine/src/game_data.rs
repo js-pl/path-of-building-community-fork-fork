@@ -25,6 +25,13 @@ pub struct GameData {
     pub tree_versions: Vec<String>,
     /// `treeVersions[v]` of each of `tree_versions`
     pub tree_version_info: Vec<TreeVersion>,
+    /// `poePlannerVersions`: poeplanner's tree version numbers
+    pub poe_planner_versions: Vec<(f64, String)>,
+    /// `data.monsterExperienceLevelMap`: each area level's effective
+    /// monster level for experience
+    pub monster_experience_levels: Vec<f64>,
+    /// The descriptions of the gems' quality stats
+    pub stat_descriptions: crate::stat_describer::StatDescriptions,
     /// `data.uniques`: each type's item texts, in `pairs` order, with the
     /// uniques `Generated.lua` adds before a tree loads as `generated`
     pub uniques: Vec<(String, Vec<String>)>,
@@ -77,6 +84,9 @@ crate::codec_struct!(GameData {
     jewel_radius,
     tree_versions,
     tree_version_info,
+    poe_planner_versions,
+    monster_experience_levels,
+    stat_descriptions,
     uniques,
     rares,
     item_base_lists,

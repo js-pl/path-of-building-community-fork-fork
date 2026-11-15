@@ -167,6 +167,12 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::Anoint(p), "save" | "notableDB") => {
                 self.anoint_tooltip(&mut tip, p, &name, idx)?;
             }
+            (ItemPopup::FindTimeless(p), _) => {
+                return self.find_timeless_tooltip(p, &name, index);
+            }
+            (ItemPopup::SpectreLibrary(p), "list" | "source") => {
+                return self.spectre_row_tooltip(p, &name, idx);
+            }
             (ItemPopup::ManageSets(_), "sharedList") => {
                 return self.shared_set_tooltip(index);
             }

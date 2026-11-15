@@ -351,6 +351,8 @@ pub struct ConfigVar {
     pub hide_if_invalid: bool,
     pub include_transfigured: bool,
     pub resizable: bool,
+    /// `legacy`: hidden even when all options are shown
+    pub legacy: bool,
 }
 
 /// The rules `ConfigTab` checks, in the order it adds them
@@ -432,6 +434,7 @@ pub fn config_vars(var_list: &Value) -> Vec<ConfigVar> {
             hide_if_invalid: g("hideIfInvalid").truthy(),
             include_transfigured: g("includeTransfigured").truthy(),
             resizable: g("resizable").truthy(),
+            legacy: g("legacy").truthy(),
         });
     }
     out
@@ -457,4 +460,5 @@ crate::codec_struct!(ConfigVar {
     hide_if_invalid,
     include_transfigured,
     resizable,
+    legacy,
 });

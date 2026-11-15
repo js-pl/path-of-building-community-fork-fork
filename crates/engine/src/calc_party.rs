@@ -187,7 +187,9 @@ impl Perform<'_> {
                 Some((_, mods, false)) => match &mods[0].value {
                     ModValue::Number(n) => *n,
                     ModValue::Bool(false) => 0.0,
-                    _ => return Err("not ported: a mine's stack count that is no number".into()),
+                    // Invariant: upstream's data sets every mine aura's stack
+                    // multiplier as a number, so no other value reaches here
+                    _ => return Err("invariant: a mine's stack count that is no number".into()),
                 },
                 _ => 0.0,
             };

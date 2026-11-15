@@ -95,7 +95,7 @@ impl<'d> TypedSession<'d> {
     }
 
     /// The specs in the list's order (`treeTab.specList`)
-    fn spec_list(&self) -> Vec<&PassiveSpec<'d>> {
+    pub(super) fn spec_list(&self) -> Vec<&PassiveSpec<'d>> {
         if self.other_specs.is_empty() {
             return vec![&*self.build.spec];
         }

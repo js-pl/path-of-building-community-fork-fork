@@ -64,7 +64,29 @@ pub enum ItemPopup {
     RenameSpec(Box<super::spec_sets::RenameSpec>),
     RenameSet(Box<super::item_sets::RenameSet>),
     ImportTree(Box<super::tree_import::ImportTree>),
+    NewLoadout(Box<super::build_controls::NewLoadout>),
+    SpectreLibrary(Box<super::spectre_library::SpectreLibrary>),
+    /// Back with unsaved changes: `OpenSavePopup("LIST")`
+    SaveChanges,
+    /// Help >>: the help file's section
+    Help {
+        title: String,
+        lines: Vec<String>,
+    },
     ExportTree(Box<super::tree_import::ExportTree>),
+    /// The Tree tab's Reset Tree/Tattoos
+    ResetTree,
+    /// `TreeTab:OpenVersionConvertPopup(version, true)`
+    ConvertVersion(String),
+    /// `TreeTab:OpenVersionConvertAllPopup(version)`
+    ConvertAll(String),
+    /// `TreeTab:FindTimelessJewel()`
+    FindTimeless(Box<super::timeless_search::FindTimeless>),
+    /// `main:OpenMessagePopup(title, msg)`: the message's lines and Ok
+    Message {
+        title: String,
+        lines: Vec<String>,
+    },
     /// `main:OpenConfirmPopup(title, msg, "Delete", ...)` of the item list
     Confirm {
         title: String,
@@ -89,6 +111,12 @@ pub enum Deletion {
     SharedSet {
         index: usize,
     },
+    /// The Skills tab's socket group at this row, and all of them
+    Group {
+        index: usize,
+        uid: u64,
+    },
+    AllGroups,
     /// The set at this index of its list
     Set {
         kind: super::item_sets::SetKind,
@@ -177,6 +205,10 @@ impl<'d> TypedSession<'d> {
                 name.split('.').next() == Some(m.kind_list()) || name.starts_with("sharedList")
             }
             Some(ItemPopup::ManageSpecs(_)) => name.split('.').next() == Some("1"),
+            Some(ItemPopup::SpectreLibrary(_)) => {
+                name.starts_with("list") || name.starts_with("source")
+            }
+            Some(ItemPopup::FindTimeless(_)) => name == "searchResults",
             _ => false,
         };
         if req["click"].as_bool() == Some(true) && !list_click {
@@ -229,6 +261,27 @@ impl<'d> TypedSession<'d> {
             let mut p = p.clone();
             let r = self.rename_set_control(&mut p, name, req);
             self.editor.popups[0] = ItemPopup::RenameSet(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::SpectreLibrary(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.spectre_library_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::SpectreLibrary(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::FindTimeless(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.find_timeless_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::FindTimeless(p);
+            self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::NewLoadout(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.new_loadout_control(&mut p, name, req);
+            self.editor.popups[0] = ItemPopup::NewLoadout(p);
             self.refresh_item_popups();
             return r.map(|_| json!([]));
         }
@@ -384,6 +437,40 @@ impl<'d> TypedSession<'d> {
                 self.rename_set_cancel(&p);
                 self.close_item_popup();
             }
+            (ItemPopup::ResetTree, "reset") => {
+                // `ResetNodes`, `BuildAllDependsAndPaths`, `AddUndoState`,
+                // `buildFlag`, then `main:ClosePopup()`
+                self.reset_tree()?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ResetTree, "removeTattoo") => {
+                self.remove_all_tattoos()?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertVersion(v), "convert" | "convertCopy") => {
+                self.convert_to_version(&v, name == "convert", false, true)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertVersion(_), "cancel") => {
+                // `versionSelect:SelByValue(spec.treeVersion, 'value')`
+                self.select_current_version();
+                self.close_item_popup();
+            }
+            (ItemPopup::ConvertAll(v), "convert") => {
+                self.convert_all_to_version(&v)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::FindTimeless(mut p), name) => {
+                let closes = self.find_timeless_button(&mut p, name)?;
+                if closes {
+                    self.close_item_popup();
+                } else {
+                    self.editor.popups[0] = ItemPopup::FindTimeless(p);
+                }
+            }
+            (ItemPopup::Message { .. }, "close") => {
+                self.close_item_popup();
+            }
             (ItemPopup::Anoint(_), "close") | (_, "cancel") => {
                 self.close_item_popup();
             }
@@ -429,8 +516,36 @@ impl<'d> TypedSession<'d> {
                 self.close_item_popup();
             }
             (ItemPopup::ExportTree(_), "copy") => {}
-            (ItemPopup::ExportTree(_), "shrink") => {
-                return Err(format!("{NOT_PORTED}: shrinking a tree link with PoEURL"));
+            (ItemPopup::ExportTree(mut p), "shrink") => {
+                self.export_tree_shrink(&mut p);
+                self.editor.popups[0] = ItemPopup::ExportTree(p);
+            }
+            (ItemPopup::SaveChanges | ItemPopup::Help { .. }, "close") => {
+                self.close_item_popup();
+            }
+            (ItemPopup::SaveChanges, "save") => {
+                // `SaveDBFile()` with `actionOnSave = "LIST"`: the build saved
+                // (the session's file is its XML), then closed
+                self.close_item_popup();
+                let xml = self.save_db_file()?;
+                self.refresh_item_popups();
+                return Ok(json!({ "xml": xml, "closed": true }));
+            }
+            (ItemPopup::SaveChanges, "noSave") => {
+                // `CloseBuild()`
+                self.close_item_popup();
+                self.refresh_item_popups();
+                return Ok(json!({ "closed": true }));
+            }
+            (ItemPopup::SpectreLibrary(p), "save") => {
+                // `self.spectreList = destList`, then `main:ClosePopup()`
+                self.spectre_library_save(&p)?;
+                self.close_item_popup();
+            }
+            (ItemPopup::NewLoadout(p), "save") => {
+                // The sets added, then `main:ClosePopup()`
+                self.new_loadout_save(&p)?;
+                self.close_item_popup();
             }
             (ItemPopup::ImportTree(mut p), "import") => {
                 let closes = self.import_tree(&mut p)?;
@@ -519,7 +634,18 @@ impl<'d> TypedSession<'d> {
     /// `ItemsTab:EditDisplayItemText()`: opens Edit Item Text on the
     /// display item
     pub(super) fn edit_display_item_text(&mut self) -> Result<()> {
-        let item = self.display_item.as_ref().ok_or("no item in the editor")?;
+        let Some(item) = self.display_item.as_ref() else {
+            // No item: an empty text, Rare
+            self.editor.popups.insert(
+                0,
+                ItemPopup::EditText {
+                    rarity: 3,
+                    edit: String::new(),
+                    with_item: false,
+                },
+            );
+            return Ok(());
+        };
         let edit = engine::pat::gsub(&item.build_raw(), "Rarity: %w+\n", "");
         let rarity = RARITIES
             .iter()
@@ -587,7 +713,62 @@ impl<'d> TypedSession<'d> {
             ItemPopup::RenameShared(p) => self.describe_rename_shared(p),
             ItemPopup::RenameSpec(p) => self.describe_rename_spec(p),
             ItemPopup::ImportTree(p) => self.describe_import_tree(p),
+            ItemPopup::NewLoadout(p) => self.describe_new_loadout(p),
+            ItemPopup::SpectreLibrary(p) => self.describe_spectre_library(p),
+            ItemPopup::SaveChanges => json!({
+                "title": "Save Changes",
+                // Its message is a named label, which `lines` leaves out
+                "lines": [],
+                "buttons": [
+                    { "name": "close", "label": "Cancel", "enabled": true },
+                    { "name": "noSave", "label": "Don't Save", "enabled": true },
+                    { "name": "save", "label": "Save", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::Help { title, lines } => json!({
+                "title": title,
+                "lines": lines,
+                "buttons": [{ "name": "close", "label": "Close", "enabled": true }],
+                "controls": [],
+            }),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
+            ItemPopup::FindTimeless(p) => self.describe_find_timeless(p),
+            ItemPopup::ResetTree => json!({
+                "title": "Reset Tree/Tattoos",
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "removeTattoo", "label": "Remove All Tattoos", "enabled": true },
+                    { "name": "reset", "label": "Reset Tree", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::ConvertVersion(v) => json!({
+                "title": format!("Convert to Version {}", self.tree_display(v)),
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "convert", "label": "Convert", "enabled": true },
+                    { "name": "convertCopy", "label": "Copy + Convert", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::ConvertAll(v) => json!({
+                "title": format!("Convert all to Version {}", self.tree_display(v)),
+                "lines": [],
+                "buttons": [
+                    { "name": "cancel", "label": "Cancel", "enabled": true },
+                    { "name": "convert", "label": "Convert", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::Message { title, lines } => json!({
+                "title": title,
+                "lines": lines,
+                "buttons": [{ "name": "close", "label": "Ok", "enabled": true }],
+                "controls": [],
+            }),
             ItemPopup::Confirm { title, lines, .. } => json!({
                 "title": title,
                 "lines": lines,

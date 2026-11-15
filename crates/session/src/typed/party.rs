@@ -152,7 +152,7 @@ const CONTROLS: &str = r##"[
 ]"##;
 
 /// `partyDestinations`, which the import destination drop-down lists
-const DESTINATIONS: [&str; 8] = [
+pub(super) const DESTINATIONS: [&str; 8] = [
     "All",
     "Party Member Stats",
     "Aura",
@@ -222,7 +222,7 @@ fn framed(mut lines: Vec<String>) -> String {
 }
 
 /// `ParseBuffs`' label of the auras
-fn aura_label(list: &BuffList) -> Result<String> {
+pub(super) fn aura_label(list: &BuffList) -> Result<String> {
     let mut label = "^7---------------------------\n".to_string();
     let mut lines = Vec::new();
     let aura = list.group("Aura");
@@ -266,7 +266,7 @@ fn aura_label(list: &BuffList) -> Result<String> {
 }
 
 /// `ParseBuffs`' label of warcries, links or curses
-fn buff_label(list: &BuffList, typ: &str) -> Result<String> {
+pub(super) fn buff_label(list: &BuffList, typ: &str) -> Result<String> {
     let mut lines = Vec::new();
     if let Some(g) = list.group(typ) {
         for (n, b) in g.buffs.iter().chain(g.vaal.iter().flatten()) {
@@ -280,42 +280,19 @@ impl TypedSession<'_> {
     /// `party`: the Party tab's controls, in the order of their
     /// positions, as upstream lays them out on a tab never drawn (width 0)
     pub fn party(&self) -> Result<J> {
-        let p = self
-            .root
-            .child("PathOfBuilding")
-            .and_then(|p| p.child("Party"));
-        let attr = |k: &str| p.and_then(|p| p.attr(k));
-        let advanced = attr("ShowAdvanceTools") == Some("true");
-        let dest = attr("destination").unwrap_or("All");
-        let sel = DESTINATIONS
-            .iter()
-            .position(|d| *d == dest)
-            .ok_or_else(|| format!("{NOT_PORTED}: a party destination {dest}"))?;
-        let party = &self.build.party;
-        let text = |name: &str| {
-            party
-                .texts
+        let tab = self.party_tab()?;
+        let advanced = tab.advanced;
+        let sel = tab.dest;
+        let buf = |name: &str| {
+            let i = super::party_tab::BUFS
                 .iter()
-                .rev()
-                .find(|(n, _)| n == name)
-                .map(|(_, t)| t.clone())
+                .position(|b| *b == name)
+                .unwrap();
+            tab.bufs[i].clone()
         };
-        // The labels `PartyTab:Load` gives, where it loads the buffs
-        let label = |name: &str, f: &dyn Fn() -> Result<String>, default: &str| -> Result<String> {
-            match text(name) {
-                Some(_) => f(),
-                None => Ok(default.to_string()),
-            }
-        };
-        let auras = label("Aura", &|| aura_label(&party.aura), "")?;
-        let warcries = label("Warcry Skills", &|| buff_label(&party.warcry, "Warcry"), "")?;
-        let links = label("Link Skills", &|| buff_label(&party.link, "Link"), "")?;
-        let curses = label("Curse", &|| buff_label(&party.curse, "Curse"), "")?;
-        let enemy_mods = party
-            .enemy_mods_label
-            .clone()
-            .unwrap_or_else(|| "\n".into());
-        let enemy_cond = "^7---------------------------\n";
+        let (auras, warcries, links, curses) = (&tab.auras, &tab.warcries, &tab.links, &tab.curses);
+        let enemy_mods = &tab.enemy_mods;
+        let enemy_cond = tab.enemy_cond.as_str();
 
         let template: Vec<J> = serde_json::from_str(CONTROLS).map_err(|e| e.to_string())?;
         let mut by_path: std::collections::HashMap<String, J> = template
@@ -348,14 +325,20 @@ impl TypedSession<'_> {
         let mut put = |x: i64, y: i64, c: J| rows.push((y, x, c));
         put(8, 8, notes);
         put(8, h, take("importCodeHeader"));
-        put(8, h + 20, take("importCodeIn"));
-        put(-84, h + 22, take("importCodeState"));
+        let mut code = take("importCodeIn");
+        code["text"] = json!(tab.code);
+        put(8, h + 20, code);
+        let mut state = take("importCodeState");
+        state["label"] = json!(tab.detail);
+        put(-84, h + 22, state);
         let mut d = take("importCodeDestination");
         d["sel"] = json!(sel + 1);
         put(8, h + 44, d);
-        put(176, h + 44, take("importCodeGo"));
+        let mut go = take("importCodeGo");
+        go["enabled"] = json!(tab.valid);
+        put(176, h + 44, go);
         let mut a = take("appendNotReplace");
-        a["state"] = json!(attr("append") == Some("true"));
+        a["state"] = json!(tab.append);
         put(60, h + 68, a);
         put(88, h + 68, take("clear"));
         let mut t = take("ShowAdvanceTools");
@@ -369,7 +352,7 @@ impl TypedSession<'_> {
                 "enabled": true,
                 "shown": true,
                 "path": format!("party.{name}"),
-                "text": text(buff).unwrap_or_default(),
+                "text": buf(buff),
                 "multiline": true,
                 "label": label,
             })
@@ -422,17 +405,17 @@ impl TypedSession<'_> {
             );
             put(0, curses_y + 18, edit("editCurses", "^7Curses", "Curse"));
         } else {
-            let warcries_y = auras_y + 16 + line_counter(&auras) + 4;
-            let links_y = warcries_y + 16 + line_counter(&warcries) + 4;
-            put(8, auras_y + 18, simple("simpleAuras", &auras));
-            put(8, warcries_y + 18, simple("simpleWarcries", &warcries));
-            put(8, links_y + 18, simple("simpleLinks", &links));
+            let warcries_y = auras_y + 16 + line_counter(auras) + 4;
+            let links_y = warcries_y + 16 + line_counter(warcries) + 4;
+            put(8, auras_y + 18, simple("simpleAuras", auras));
+            put(8, warcries_y + 18, simple("simpleWarcries", warcries));
+            put(8, links_y + 18, simple("simpleLinks", links));
             let cond_y = 8 + 16 + 4;
             let mods_y = cond_y + 16 + line_counter(enemy_cond) + 4;
-            let curses_y = mods_y + 16 + line_counter(&enemy_mods) + 4;
+            let curses_y = mods_y + 16 + line_counter(enemy_mods) + 4;
             put(0, cond_y + 18, simple("simpleEnemyCond", enemy_cond));
-            put(0, mods_y + 18, simple("simpleEnemyMods", &enemy_mods));
-            put(0, curses_y + 18, simple("simpleCurses", &curses));
+            put(0, mods_y + 18, simple("simpleEnemyMods", enemy_mods));
+            put(0, curses_y + 18, simple("simpleCurses", curses));
         }
         rows.sort_by(|a, b| {
             (a.0, a.1)

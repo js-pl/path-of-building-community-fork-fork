@@ -412,7 +412,9 @@ pub(crate) fn can_support(
     weapons: &ActorWeapons,
     data: &SkillData,
 ) -> bool {
-    can_support_summoned(support, skill, None, from_item, groups, weapons, data)
+    can_support_summoned(
+        support, skill, None, from_item, groups, weapons, data, false,
+    )
 }
 
 /// `calcLib.canGrantedEffectSupportActiveSkill(grantedEffect, activeSkill)`
@@ -436,8 +438,31 @@ pub fn effect_supports(
     )
 }
 
+/// `effect_supports` for an imbued support (`imbuedSupport`), which
+/// takes the skill's own types, not those its supports add
+pub fn effect_supports_imbued(
+    effect: &Arc<GrantedEffect>,
+    skills: &SkillsSetup,
+    i: usize,
+    groups: &[SocketGroup],
+    data: &SkillData,
+) -> bool {
+    let weapons = ActorWeapons::new(&skills.weapon_data);
+    can_support_summoned(
+        &SkillEffect::new(effect.clone(), None, 0.0),
+        &skills.active_skills[i],
+        None,
+        &skills.from_item,
+        groups,
+        &weapons,
+        data,
+        true,
+    )
+}
+
 /// The same for a minion's skill: the summoning skill's types count
 /// (`activeSkill.summonSkill`), and triggers support no minion skills
+#[allow(clippy::too_many_arguments)]
 fn can_support_summoned(
     effect_of_support: &SkillEffect,
     skill: &ActiveSkill,
@@ -446,9 +471,18 @@ fn can_support_summoned(
     groups: &[SocketGroup],
     actor: &ActorWeapons,
     data: &SkillData,
+    imbued: bool,
 ) -> bool {
     let support = &*effect_of_support.granted_effect;
     let types = summon.unwrap_or(skill);
+    // An imbued support takes the skill's own types, without those its
+    // supports add
+    let (skill_types, minion_skill_types) = if imbued {
+        let e = &types.active_effect.granted_effect;
+        (&e.skill_types, e.minion_skill_types.as_ref())
+    } else {
+        (&types.skill_types, types.minion_skill_types.as_ref())
+    };
     let active = &skill.active_effect;
     let effect = &active.granted_effect;
     if support.unsupported || effect.cannot_be_supported {
@@ -477,10 +511,10 @@ fn can_support_summoned(
     let minion = if support.ignore_minion_types {
         None
     } else {
-        types.minion_skill_types.as_ref()
+        minion_skill_types
     };
     if !support.exclude_skill_types.is_empty()
-        && type_expression_matches(&support.exclude_skill_types, &types.skill_types, None, data)
+        && type_expression_matches(&support.exclude_skill_types, skill_types, None, data)
     {
         return false;
     }
@@ -497,7 +531,7 @@ fn can_support_summoned(
         if effect.weapon_types.is_none()
             && data
                 .skill_type("SkillGrantedBySupport")
-                .is_some_and(|t| types.skill_types.contains(&t))
+                .is_some_and(|t| skill_types.contains(&t))
         {
             lookup.extend(actor.types.iter().map(String::as_str));
         }
@@ -518,12 +552,7 @@ fn can_support_summoned(
         }
     }
     support.require_skill_types.is_empty()
-        || type_expression_matches(
-            &support.require_skill_types,
-            &types.skill_types,
-            minion,
-            data,
-        )
+        || type_expression_matches(&support.require_skill_types, skill_types, minion, data)
 }
 
 /// `calcs.createActiveSkill(activeEffect, supportList, actor, socketGroup)`
@@ -606,7 +635,7 @@ pub fn create_minion_skill(
     }
     skill.effect_list.push(skill.active_effect.clone());
     let can = |e: &SkillEffect, skill: &ActiveSkill| {
-        can_support_summoned(e, skill, Some(summon), from_item, &[], weapons, data)
+        can_support_summoned(e, skill, Some(summon), from_item, &[], weapons, data, false)
     };
     // Pass 1: the skill types compatible supports add
     for i in 0..skill.support_list.len() {

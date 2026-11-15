@@ -32,6 +32,7 @@ const READ_ONLY: &[&str] = &[
     "nodeTooltip",
     "masteryOptions",
     "treeSpecs",
+    "sharedLists",
     "powerStats",
     "nodePower",
     "skills",
@@ -155,7 +156,9 @@ impl<'d> Dispatcher<'d> {
     /// Answers a request on the translation, whatever is preferred. A save
     /// the typed engine answered just before a save asked of the
     /// translation is the same save: it is not replayed, so both have
-    /// saved (and re-parsed their items) as often.
+    /// saved (and re-parsed their items) as often. So is a gem slot's
+    /// list asked again just after, whose calculations leave selections
+    /// on the gems.
     #[cfg(feature = "translation")]
     pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
         let is_save = |r: &str| {
@@ -163,7 +166,14 @@ impl<'d> Dispatcher<'d> {
                 .ok()
                 .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
         };
-        if is_save(json) && self.pending.last().is_some_and(|p| is_save(p)) {
+        let is_gem_list = |r: &str| {
+            serde_json::from_str::<J>(r)
+                .ok()
+                .is_some_and(|r| r["cmd"] == "gemList" && !r["group"].is_null())
+        };
+        if (is_save(json) && self.pending.last().is_some_and(|p| is_save(p)))
+            || (is_gem_list(json) && self.pending.last().is_some_and(|p| p == json))
+        {
             self.pending.pop();
         }
         self.sync()?
@@ -217,12 +227,14 @@ impl<'d> Dispatcher<'d> {
     }
 
     fn fallback(&mut self, json: &str) -> Result<String, String> {
-        let cmd = serde_json::from_str::<J>(json)
-            .ok()
-            .and_then(|r| r["cmd"].as_str().map(String::from));
+        let req = serde_json::from_str::<J>(json).unwrap_or_default();
+        let cmd = req["cmd"].as_str().map(String::from);
         #[cfg(feature = "translation")]
         if let Some(translated) = &self.translated {
-            if !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
+            // A gem slot's list leaves its calculations' selections on the
+            // gems
+            let gem_slot = cmd.as_deref() == Some("gemList") && !req["group"].is_null();
+            if gem_slot || !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
                 self.typed = None;
                 self.shared_known = false;
             }
@@ -275,6 +287,7 @@ impl<'d> Dispatcher<'d> {
                 self.typed.as_ref()?.mastery_options(id(&req)?),
             ),
             "treeSpecs" => Some(ok(self.typed.as_ref()?.tree_specs())),
+            "sharedLists" => view(&mut self.typed_error, self.typed.as_ref()?.shared_lists()),
             "powerStats" => {
                 self.typed.as_ref()?;
                 Some(ok(TypedSession::power_stats()))
@@ -290,10 +303,8 @@ impl<'d> Dispatcher<'d> {
             "resetTree" => self.edit(json, |s| s.reset_tree()),
             "skills" => view(&mut self.typed_error, self.typed.as_ref()?.skills()),
             "gemList" => match (req["group"].as_f64(), req["slot"].as_f64()) {
-                (Some(g), Some(k)) => view(
-                    &mut self.typed_error,
-                    self.typed.as_ref()?.gem_select_list(g, k),
-                ),
+                // Its calculations leave selections on the gems
+                (Some(g), Some(k)) => self.edit(json, |s| s.gem_select_list(g, k)),
                 _ => Some(ok(self.typed.as_ref()?.gem_list())),
             },
             "setMainSocketGroup" => {
@@ -383,18 +394,66 @@ impl<'d> Dispatcher<'d> {
             "control"
                 if req["path"]
                     .as_str()
-                    .is_some_and(TypedSession::is_spec_manage_control) =>
-            {
-                let req = req.clone();
-                self.edit(json, |s| s.spec_manage_control(&req))
-            }
-            "control"
-                if req["path"]
-                    .as_str()
                     .is_some_and(TypedSession::is_set_manage_control) =>
             {
                 let req = req.clone();
                 self.edit(json, |s| s.set_manage_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_build_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.build_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_skills_sockets_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.skills_sockets_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_gem_slot_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.gem_slot_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_group_detail_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.group_detail_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_group_list_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.group_list_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_skills_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.skills_control(&req))
+            }
+            "control"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_items_tab_control) =>
+            {
+                let req = req.clone();
+                self.edit(json, |s| s.items_tab_control(&req))
             }
             "control"
                 if req["path"]
@@ -520,11 +579,115 @@ impl<'d> Dispatcher<'d> {
                     self.typed.as_mut()?.shared_list_tooltip(index),
                 )
             }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(TypedSession::is_build_tooltip) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.build_control_tooltip(&path, index),
+                )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_count_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                Some(ok(self.typed.as_ref()?.gem_slot_count_tooltip()))
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_enable_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_slot_enable_tooltip(&path),
+                )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_quality_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_slot_quality_tooltip(&path),
+                )
+            }
+            "controlTooltip" if req["path"].as_str() == Some("skills.groupSlot") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.group_slot_tooltip(index),
+                )
+            }
+            "controlTooltip" if req["path"].as_str() == Some("skills.groupList") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.group_list_tooltip(index),
+                )
+            }
+            "controlTooltip" if req["path"].as_str() == Some("skills.defaultLevel") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.skills_control_tooltip(index),
+                )
+            }
+            "controlTooltip" if req["path"].as_str() == Some("items.setSelect") => {
+                let index = req["index"].as_f64();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.item_set_select_tooltip(index),
+                )
+            }
             "controlTooltip" if req["path"].as_str().is_some_and(|p| p == "items.itemList") => {
                 let index = req["index"].as_f64();
                 view(
                     &mut self.typed_error,
                     self.typed.as_mut()?.item_list_tooltip(index),
+                )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    p.starts_with("configTab.") && p.matches('.').count() == 2
+                }) =>
+            {
+                let name = req["path"].as_str()?["configTab.".len()..].to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_mut()?.custom_block_tooltip(&name),
+                )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| p.starts_with("tree."))
+                    && (req["path"] != "tree.specSelect" || req["index"].is_null()) =>
+            {
+                let name = req["path"].as_str()?["tree.".len()..].to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.tree_tooltip(&name),
+                )
+            }
+            "controlTooltip"
+                if req["path"]
+                    .as_str()
+                    .is_some_and(|p| p.starts_with("party.")) =>
+            {
+                let name = req["path"].as_str()?["party.".len()..].to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.party_tooltip(&name),
                 )
             }
             "controlTooltip" if self.typed.as_ref()?.has_item_popup() => {
@@ -606,15 +769,22 @@ impl<'d> Dispatcher<'d> {
         json: &str,
         f: impl FnOnce(&mut TypedSession<'d>) -> crate::typed::Result<J>,
     ) -> Option<String> {
+        // What the translation replays, as the build was before
+        let replay = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|req| self.typed.as_ref()?.translation_replay(&req));
         let r = f(self.typed.as_mut()?);
         match r {
             // The translation fails the same way, before changing the build
             Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
                 #[cfg(feature = "translation")]
-                if self.translated.is_some() {
-                    self.pending.push(json.to_string());
+                if self.translated.is_some()
+                    && let Some(r) = &replay
+                {
+                    self.pending.push(r.to_string());
                 }
+                let _ = &replay;
                 let _ = json;
                 Some(ok(v))
             }

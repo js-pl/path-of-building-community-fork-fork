@@ -124,76 +124,94 @@ impl Party {
             export_buffs: export,
             ..Party::default()
         };
-        let ctx = Ctx { mf, kf, skill };
         for e in party.iter().flat_map(|x| x.elements()) {
             if e.elem != "ImportedBuffs" {
                 continue;
             }
             let Some(name) = e.attr("name") else { continue };
             let text = first_text(e);
-            match name {
-                "PartyMemberStats" => p.parse_member_stats(text)?,
-                "Aura" => parse_list(&mut p.aura, text, "Aura", &ctx)?,
-                "Curse" => parse_list(&mut p.curse, text, "Curse", &ctx)?,
-                "Warcry Skills" => parse_list(&mut p.warcry, text, "Warcry", &ctx)?,
-                "Link Skills" => parse_list(&mut p.link, text, "Link", &ctx)?,
-                "EnemyConditions" => {
-                    for line in lines(text) {
-                        if !line.is_empty() {
-                            let name = pat::gsub(&line, "Condition:", "Condition:Party:");
-                            p.enemy_mods
-                                .push(Mod::new(&name, ModType::Flag, true, Some("Party")));
-                        }
-                    }
-                }
-                "EnemyMods" => {
-                    // The label's mods by name, in the order the names come
-                    let mut names: Vec<(String, Vec<String>)> = Vec::new();
-                    let mut current: Option<String> = None;
-                    for line in lines(text) {
-                        if !line.contains('|') {
-                            if !line.is_empty() && !names.iter().any(|(n, _)| *n == line) {
-                                names.push((line.clone(), Vec::new()));
-                            }
-                            current = Some(line);
-                        } else if let Some(mut m) = ctx.parse_mod(&line)? {
-                            let s = format!("Party{}", m.source.as_deref().unwrap_or(""));
-                            m.source = Some(s.into());
-                            // `(mod[1] and "True" or mod[1])`
-                            if !m.value.truthy() {
-                                return Err("attempt to concatenate a boolean value".into());
-                            }
-                            let typ = match m.typ {
-                                ModType::Flag => String::new(),
-                                t => t.name().to_string(),
-                            };
-                            let entry = current
-                                .as_deref()
-                                .and_then(|c| names.iter_mut().find(|(n, _)| n == c))
-                                .ok_or("attempt to index a nil value (an enemy modifier's name)")?;
-                            entry.1.push(format!(" True {typ}, "));
-                            p.enemy_mods.push(m);
-                        }
-                    }
-                    let mut label = "^7---------------------------".to_string();
-                    for (name, mods) in &names {
-                        label.push_str(&format!("\n{name}:"));
-                        for m in mods {
-                            label.push_str(m);
-                        }
-                    }
-                    label.push_str(if names.is_empty() {
-                        "\n"
-                    } else {
-                        "\n---------------------------\n"
-                    });
-                    p.enemy_mods_label = Some(label);
-                }
-                _ => continue,
+            if p.add(name, text, mf, kf, skill)? {
+                p.texts.push((name.to_string(), text.to_string()));
             }
-            p.texts.push((name.to_string(), text.to_string()));
         }
         Ok(p)
+    }
+
+    /// `ParseBuffs` of one of the tab's texts into what it holds, without
+    /// wiping it first: `PartyMemberStats`, `Aura`, `Curse`, `Warcry
+    /// Skills`, `Link Skills`, `EnemyConditions`, `EnemyMods`. False for
+    /// other names.
+    pub fn add(
+        &mut self,
+        name: &str,
+        text: &str,
+        mf: &dyn Fn(&str) -> Option<u32>,
+        kf: &dyn Fn(&str) -> Option<u32>,
+        skill: &dyn Fn(&str) -> bool,
+    ) -> Result<bool> {
+        let ctx = Ctx { mf, kf, skill };
+        let p = self;
+        match name {
+            "PartyMemberStats" => p.parse_member_stats(text)?,
+            "Aura" => parse_list(&mut p.aura, text, "Aura", &ctx)?,
+            "Curse" => parse_list(&mut p.curse, text, "Curse", &ctx)?,
+            "Warcry Skills" => parse_list(&mut p.warcry, text, "Warcry", &ctx)?,
+            "Link Skills" => parse_list(&mut p.link, text, "Link", &ctx)?,
+            "EnemyConditions" => {
+                for line in lines(text) {
+                    if !line.is_empty() {
+                        let name = pat::gsub(&line, "Condition:", "Condition:Party:");
+                        p.enemy_mods
+                            .push(Mod::new(&name, ModType::Flag, true, Some("Party")));
+                    }
+                }
+            }
+            "EnemyMods" => {
+                // The label's mods by name, in the order the names come
+                let mut names: Vec<(String, Vec<String>)> = Vec::new();
+                let mut current: Option<String> = None;
+                for line in lines(text) {
+                    if !line.contains('|') {
+                        if !line.is_empty() && !names.iter().any(|(n, _)| *n == line) {
+                            names.push((line.clone(), Vec::new()));
+                        }
+                        current = Some(line);
+                    } else if let Some(mut m) = ctx.parse_mod(&line)? {
+                        let s = format!("Party{}", m.source.as_deref().unwrap_or(""));
+                        m.source = Some(s.into());
+                        // `(mod[1] and "True" or mod[1])`
+                        if !m.value.truthy() {
+                            return Err("attempt to concatenate a boolean value".into());
+                        }
+                        let typ = match m.typ {
+                            ModType::Flag => String::new(),
+                            t => t.name().to_string(),
+                        };
+                        let entry = current
+                            .as_deref()
+                            .and_then(|c| names.iter_mut().find(|(n, _)| n == c))
+                            .ok_or("attempt to index a nil value (an enemy modifier's name)")?;
+                        entry.1.push(format!(" True {typ}, "));
+                        p.enemy_mods.push(m);
+                    }
+                }
+                let mut label = "^7---------------------------".to_string();
+                for (name, mods) in &names {
+                    label.push_str(&format!("\n{name}:"));
+                    for m in mods {
+                        label.push_str(m);
+                    }
+                }
+                label.push_str(if names.is_empty() {
+                    "\n"
+                } else {
+                    "\n---------------------------\n"
+                });
+                p.enemy_mods_label = Some(label);
+            }
+            _ => return Ok(false),
+        }
+        Ok(true)
     }
 
     /// Whether the tab adds anything to a calculation

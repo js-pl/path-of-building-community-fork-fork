@@ -420,11 +420,110 @@ What remains for the full migration, in order:
    effect, sorted; extra auras and other effects with their mods; the
    enemy modifiers by name, recorded as `Party::load` reads them), or
    the texts in edit boxes with the advanced info shown, in the order of
-   their positions on a tab never drawn (width 0). Its first layout
-   positions the import header with the notes unwrapped, then the notes'
-   width wraps them at every space (no string has a width headless) for
-   every later control and layout; `party_match` asks for the view twice
-   on every party build. A radius jewel's
+   their positions on a tab never drawn (width 0). `layoutControls`
+   positions the controls by name: on the first layout `ShowAdvanceTools`
+   sees the notes unwrapped, then the notes' width wraps them at every
+   space (no string has a width headless) for every later control and
+   layout; `party_match` asks for the view twice on every party build.
+   The tab's controls are typed too (`typed/party_tab.rs`): the import
+   code (codes, links, invalid text) to each destination, appended or
+   replacing, Import, Clear, Disable Party Effects, Rebuild All, Show
+   Advanced Info and the edit boxes, with upstream's split between the
+   boxes' texts, the labels and the parsed actor (an edited box is parsed
+   only by Rebuild All or an import; Disable Party Effects empties the
+   actor alone; party member stats accumulate over imports, as
+   `clearInputText` leaves `actor.modDB`). `party_controls_match`
+   changes them at random on party builds (about 260 edits) and compares
+   the tab, sidebar, outputs, a control's tooltip and the saved file.
+   Downloading a linked build stays on the translation. The Tree tab's
+   controls that open no popup are typed (`typed/tree_tab.rs`): the
+   search (saved as `TreeView`'s `searchStr`; one other than the saved
+   leaves the build unsaved, as `Build:OnFrame` counts
+   `treeTab.searchFlag`), the heat map, its node power depth (which
+   `nodePower` then searches within) and the power report's toggle; the
+   spec, compare and heat map stat drop-downs get their lists only when
+   the tab draws, so selecting in them headless changes nothing, and the
+   compare checkbox's spec only the drawing reads. `tree_controls_match`
+   (in the `tree` phase) changes them at random on every fourth build and
+   compares the sidebar, outputs, tooltips, node power and the saved
+   file. Its popups are typed too: Reset Tree/Tattoos (Remove All
+   Tattoos: `RemoveTattooFromNode` of each tattooed node, its override
+   dropped, `allMasteryOptions` false, and the tree node's reminder text,
+   which a tattoo without one emptied at load, left empty; with another
+   tree holding tattoos it stays on the translation; `overlays_match`
+   removes them on every tattoo variant), the version drop-down's
+   Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
+   active one's undo state on the other version, inserted after it, the
+   old one removed or kept, `SetActiveSpec` once with its loadout sync and
+   version drop-down), Convert to the latest version and Convert all
+   (each spec on another version in turn, then the active one again), the
+   "Tree Converted" message; `tree_controls_match` presses their buttons
+   at random, and compares node power after them. Find Timeless Jewel's
+   settings are typed (`typed/timeless_search.rs`): the build's
+   `timelessData` (loaded, saved, kept for the next opening), jewel type,
+   conqueror, socket (its list by nearest keystone), the socket filter
+   with its node distance and the protected notables, devotion and Abyss
+   ascendancy choices, the node weight sliders and node drop-down writing
+   the desired and fallback lists, the lists' edit boxes, Reset, the trade
+   choices the tab remembers, and the tooltips; `find_timeless_jewel_match`
+   drives them on three builds. Its Search is typed too
+   (`typed/timeless_seeds.rs`), the Abyss jewels' included (the affected
+   nodes from their tables, Zorath's along the socket's path to the class
+   start in its `pairs` order and the build's ascendancy, rolls from the
+   components): the desired and
+   fallback rows read as weights (required, minimum, the totals, protected
+   notables), each seed scored from the jewel's look-up table on the
+   socket's notables, one seed after the other (on `engine::parallel`
+   a search took longer for types 1 to 6 on 4 cores, the look-up table
+   reads sharing a lock; only the Abyss search gained, 4.8 s to 1.4 s on
+   one socket), the results by
+   total weight (the radius and the seeds kept in LuaJIT's `pairs` order,
+   so ties come out the same), All
+   Sockets, and the results list: rows, selection, each row's tooltip (the
+   nodes it changes, the jewel's stat differences) and double click, which
+   adds the jewel and with Socket Jewel sockets it.
+   `timeless_search_match` searches each jewel type on two builds. Upstream
+   fails on a required weight before a minimum given as text (it compares
+   the text with a number); the typed search fails the same way.
+   Generate is typed (`setupFallbackWeights`): each passive of the jewel
+   type added to the calculator as a node of its own
+   (`calc_override::mod_list_node`), weighed by what it adds to the
+   fallback mode's stat, written to the fallback list; a line the parser
+   does not know weighs nothing (`AddList(nil)`). Generate on passives
+   with several stats (Glorious Vanity's, the Abyss jewels', which
+   upstream describes with `describeStats`), the trade URL and the
+   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
+   notable, a protected notable) stay on the translation, and so does
+   Militant Faith's item while a devotion variant is Any (upstream picks
+   one at random). Against the oracle, a row tooltip's node names and the
+   results list are compared unordered (the `pairs` order of the tree
+   data's string keys orders the radius, and with it the order weights
+   add up in, so totals that tie on one side differ in the last bit on
+   the other).
+   Upstream names the Abyss additions the game only numbers
+   (`data.abyssNotableNames`, `PassiveTree`); the typed timeless data does
+   too. Two engine fixes came out of a General's Cry
+   build converted to a newer tree: the skill types General's Cry adds to
+   its main skill reach the skill's cfgs (upstream's `skillCfg.skillTypes`
+   is the skill's table), and a socket in a cluster jewel's subgraph has
+   no radius (`env.spec.nodes[id]`, not the tree's proxy). The Configuration tab's search
+   and Show All Configurations are typed (`ConfigUi` in `typed/config.rs`):
+   an option shows when its label matches the search (magic characters
+   escaped, `string.matchOrPattern`) and its rules pass, or Show All is on
+   and `configVisibility.isShowAllExcluded` keeps it (`ifOption`,
+   `ifSkill...`, `legacy`, "recently" and the like in the label); the set
+   drop-down is filled only when the tab draws, so selecting in it headless
+   changes nothing. `config_edits_match` mixes them into its edits. The
+   custom modifier groups' controls are typed too: Add Mod Group and each
+   shown group's title, enable box, text and delete button, its
+   `controls` and the enable box's tooltip (the stats with the group
+   toggled; its two `BuildModList`s set `buildFlag` through the options'
+   notified placeholders, so the frame calculates again). The groups'
+   controls are `configTab.<index>`, after every control the tab made: two
+   per section, one per option and its label, then each
+   `UpdateCustomModsControls` appends one per group of the active set (the
+   old ones stay, hidden; `ConfigUi::blocks`). Add Mod (its mod browser)
+   and the hidden groups' controls stay on the translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).
@@ -473,8 +572,7 @@ What remains for the full migration, in order:
    per phase and fails on any not in its `KNOWN_FALLBACKS`.
 
    Still on the translation, before it can be dropped:
-   - Read-only views: `party` with imported party data,
-     `controls` of other tabs.
+   - Read-only views: `controls` of other tabs (also `party.*`).
    - Tooltips in the cases above that fall back.
    - Items and crafting: the item editor's enchant, anoint, corrupt,
      add implicit, custom and crucible modifier popups, its modifier
@@ -582,10 +680,19 @@ What remains for the full migration, in order:
      tree's or poeskilltree's format, its version validated as
      `validateTreeVersion` does (`treeVersions`' numbers and links are
      game data now), decoded into a new spec that becomes the active one,
-     or the message `DecodeURL` returns for a broken one; the active
-     spec's link (`EncodeURL` with its version's prefix). PoEURL links,
-     shrinking and poeplanner's format need the network or are not ported
-     (`tree_links_import_and_export`, and the popup driver). Rows dragged
+     or the message `DecodeURL` returns for a broken one; poeplanner's
+     format (`DecodePoePlannerURL`: little endian, `poePlannerVersions`
+     as game data); the active spec's link (`EncodeURL` with its
+     version's prefix). A link's masteries take their lines at once, as
+     `AllocateMasteryEffects` sets the node's; one whose effect the tree
+     lacks deallocates its node, and one on a node the tree lacks (an
+     old tree's link) is a third failure of upstream's own: it indexes
+     nil and leaves its session broken, so the typed session falls back
+     with `(upstream fails)`. PoEURL links and shrinking start a
+     download, which the session has none of: their button is disabled
+     with its message, as upstream leaves it (`tree_links_import_and_export`,
+     the build's own trees in both formats with their masteries, and the
+     popup driver). Rows dragged
      within a list reorder it (`control` with `sel` and `moveTo`, which
      the translated session runs as ListControl's drop on a mutable
      list does, `session::typed::list_order`): the item list while
@@ -598,6 +705,138 @@ What remains for the full migration, in order:
      of a set or spec, its drop-down's selection, and the sets a changed
      selection switches to (a new spec named as the active one's
      loadout activates it), calculated once per request.
+     The Items tab's own controls (`session::typed::items_tab_controls`,
+     `items_tab_controls_match` and a step of `items_edits_match`): the
+     item set and passive tree drop-downs (`setSelect`, `specSelect`;
+     their lists are what the tab's draw sets them to, which the
+     translated session now sets before it reads or uses them), the set
+     drop-down's tooltip (`AddItemSetTooltip`, which fails past the
+     list), the weapon set buttons (the main socket group moves to the
+     first group in a slot of the set used), Craft item... and Create
+     custom... (Edit Item Text, empty without an item), and the Manage...
+     buttons' descriptions. Trade for these items and Buy similar query
+     the trade site and stay on the translation. Porting them needs
+     network access from the session (upstream's `launch:DownloadPage`,
+     asynchronous, with `TradeQueryRateLimiter`'s rate limits and the
+     POESESSID the user gives) and the trade API: `api/trade/data/static`
+     and `api/trade/data/stats` (the stat ids, which
+     `TradeQueryGenerator` maps the item's mods to and caches as
+     `QueryMods.lua`), `api/trade/search/<league>` and
+     `api/trade/fetch/...` for the results (`TradeQuery`,
+     `TradeQueryRequests`), the leagues and realms (`PoEAPI`), and the
+     DPS of each result's item in the slot to sort and weigh them
+     (`TradeQuery`'s item comparison, a misc calculation per item). Buy
+     similar (`displayItemBuySimilar`, `CompareBuySimilar`) builds a
+     search URL from the item's mods and opens it (`OpenURL`), which a
+     web session would hand to the browser.
+     The build's own controls (`session::typed::build_controls`,
+     `build_controls_match`): the view mode buttons, the loadouts
+     drop-down with New Loadout's name popup (a latest-tree spec and an
+     item, skill and config set named after it), the level scaling
+     button (auto mode re-estimates the level and rebuilds again when it
+     changes), the tooltips of the level box (experience multiplier by
+     area level, from `data.monsterExperienceLevelMap`, which gamedata
+     now derives), the main socket group and the minion drop-down, and
+     the descriptions of Back, Save, Save As and Manage Spectres....
+     Their clicks (`build_buttons_match`), where the session has no
+     file and stays in the build: Save and Save As give the build's XML
+     (`saveXml`) and count the changes as saved (`SaveDBFile` with the
+     XML as the file), Back without changes reports the build closed
+     (`{"closed": true}`, `CloseBuild`), Back with changes opens Save
+     Changes (Cancel, Don't Save, which reports it closed, and Save,
+     which saves and reports it closed), and the loadouts' Help >> shows
+     the help file's Loadouts section (`help.txt`, which upstream's About
+     popup shows). The translated session cannot do these (file access,
+     leaving the build): the dispatcher replays none of them on it, and
+     Save Changes' buttons as the popup's closing. Before that, Manage
+     Spectres...: the Spectre Library (`session::typed::spectre_library`,
+     `spectre_library_match`) with the build's spectres and all spectres
+     by name, the search by names, skills or both, the rows' tooltips,
+     adding (Add, a double click, a drag), reordering, Remove and Delete,
+     and Save.
+     The Skills tab's socket group list (`session::typed::group_list`,
+     `skills_group_list_match`): rows (labels with their gem colours,
+     disabled, active and Full DPS marks), the selection, which shows the
+     group (`SetDisplayGroup`), the rows' tooltips (empty for a group the
+     sidebar's calculation never listed), New, Delete with its
+     confirmation (an empty group goes at once), the Delete key and
+     Delete All, and the keys over a row (`OnHoverKeyUp`, `control` with
+     `hover`, `hoverKey` and the keys held, which the translated session
+     runs with the list's hover methods answering that row): Ctrl and the
+     right button toggle Full DPS, the right button makes the row the
+     main socket group, Ctrl and the left button enable or disable it.
+     Upstream holds the shown group and the selection by
+     reference; socket groups carry an identity (`GroupUid`, which clones
+     keep and equality ignores) for them. Every rebuild clamps the Calcs
+     tab's skill to the list, as the Calcs tab's calculation does.
+     The shown group's controls (`session::typed::group_detail`,
+     `skills_group_detail_match`): label, socketed-in slot (with its
+     tooltips; an imbued support moves with the group to a slot without
+     one), enabled, Full DPS, an item's group's count and the note on its
+     source. Upstream sets their texts and states only when it shows a
+     group and when they are edited, so they are kept as such. The
+     The item sockets line, Optimise Sockets (the selected slot's item
+     gets a socket of its colour per gem of the groups socketed in it,
+     linked by group, then its abyssal ones) and the imbued support's
+     label, box and clear button (`session::typed::skills_sockets`,
+     `skills_sockets_match`); choosing an imbued support by name stays on
+     the translation.
+     The shown group's gem slots (`session::typed::gem_slots`,
+     `skills_gem_slots_match`): the slots the tab has made so far (it
+     makes them as groups need them and keeps them), their texts and
+     states as a group is shown and as they are edited, the count's
+     tooltip, a gem's level, quality, enabled box, count and Vaal skill
+     boxes, and deleting gems. Choosing a gem by name
+     (`GemSelectControl`), typing in the slot after the last gem (which
+     adds one) is ported apart; the enabled box's tooltip compares the
+     stats with the gem toggled. The quality box's tooltip describes the
+     gem's quality stats at 20% (`describeStats`,
+     `engine::stat_describer`, with the descriptions of the gems' quality
+     stats that gamedata takes from `Data/StatDescriptions` in their
+     skills' scopes and the scopes' parents) and compares the stats at 20
+     quality (`skills_quality_tooltips_match`).
+     The Skills tab's set drop-down and gem options
+     (`session::typed::skills_controls`, `skills_controls_match`): the
+     skill set drop-down, Sort gems by DPS and its stat, the default gem
+     level (with its entries' tooltips) and quality, the support gem
+     filter and legacy gems, kept as session state that the gem list
+     reads and the build saves (a value no entry has keeps the entry
+     selected, as upstream's `SelByValue` does). A gem slot's gem list
+     (`gemList` with a group) is an edit: upstream's DPS loop puts back
+     only the slot's gem data and level, so the selections each pending
+     gem's calculation writes on the gems (`skillMinion`, `skillPart`,
+     ...) carry on to the next and stay, and the save shows them: the
+     typed list runs the pending gems' skill setups one after another on
+     the group's gems. It takes them in data order, the order of a fresh
+     gem table; `pairs` over the slot's table is random in LuaJIT, and in
+     the translation keeps the order of an earlier fill, so after the
+     options widen the list the order can differ. A candidate whose
+     calculation fails upstream leaves its gem in the slot. One does in
+     the corpus, an upstream bug: `hasGlobalEffect` is set when a skill's
+     stat with a `GlobalEffect` mod is first looked up in
+     `data.skillStatMap`, so a Vaal transfigured gem's base skill (Cleave
+     of Rage) is active in the first `initEnv` and gone from the next;
+     triggered by General's Cry it is the main skill, and `calcs.mirages`
+     does not find it again (`UPSTREAM_GEM_LIST_FAILS` in
+     `skills_gem_select_match`). The typed engine keeps the flags as the
+     data loads them, as a skill's first calculation upstream sees them,
+     and does not fail. The list also shows its group and the
+     shown one again (`SetDisplayGroup`), and gives the slot's name box a
+     sort cache by DPS.
+     Choosing a gem by name in a gem slot (`GemSelectControl`'s text,
+     `skills_gem_select_match`): the box's list drops (a sort cache by
+     support and name unless the one it has still holds), the first gem
+     of `BuildList(text)` (the names that are the text, its initials,
+     start with it, contain it, each round with the text's tag) is
+     chosen, and the slot's gem changes to it, calculated only when the
+     text is its name; the slot after the last gem adds one. A text
+     with tags (`:tag`, `:-tag`, and the aliases `active`, `int`, `str`,
+     `dex`, `aoe`) keeps the names with them (or without). The imbued
+     support's box lists the supports that can support the group's
+     skills by the skills' own types (`canGrantedEffectSupportActiveSkill`
+     with `imbuedSupport`, `engine::calc_skills::effect_supports_imbued`),
+     sorted by name, and only a text that is a support's name imbues it
+     into the group's slot; another text clears the slot's.
      The shared item list and shared item sets
      (`session::typed::shared_lists`, `items.sharedItemList` and Manage
      Item Sets' `popup.sharedList`): rows (the list shown while the editor
@@ -615,8 +854,9 @@ What remains for the full migration, in order:
      Guardian's Weapon). They outlive the
      build: a typed session hands them to the next build it loads, and
      after the translation held a build the next typed session reads
-     them from it (`sharedLists`: each item's text and quality, the
-     sets' slots in `pairs` order; `shared_lists_survive_a_fallback`).
+     them from it (`sharedLists`, a view of both sessions: each item's
+     text and quality, the sets' slots in `pairs` order;
+     `shared_lists_survive_a_fallback`).
      A shared set dragged into the build gives its items ids in the
      `pairs` order of its slot names, which the session's tables keep in
      the order they were set (LuaJIT's string hashes are seeded, so
@@ -848,7 +1088,7 @@ copying Lua tables).
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
 
-- A gap in the curse slots, a minion's debuff without a stack count
+- A gap in the curse slots
 - What `buildOutput` collects for the Configuration tab
   (`env.conditionsUsed`, `env.modsUsed`, ...; `env.multipliersUsed` is
   ported)

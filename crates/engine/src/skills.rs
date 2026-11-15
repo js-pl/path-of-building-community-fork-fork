@@ -83,9 +83,30 @@ impl GemInstance {
     }
 }
 
+/// A socket group's identity, as upstream's tables have one: a new group
+/// gets a new one, a clone keeps it. Groups compare equal whatever theirs.
+#[derive(Clone, Copy, Debug)]
+pub struct GroupUid(pub u64);
+
+impl Default for GroupUid {
+    fn default() -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        GroupUid(NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
+impl PartialEq for GroupUid {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
 /// A socket group: linked gems, or the skills an item grants.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SocketGroup {
+    /// Which group this is, for references to it (the Skills tab's
+    /// `displayGroup`)
+    pub uid: GroupUid,
     pub enabled: bool,
     /// `nil` until the file or an edit sets it
     pub include_in_full_dps: Option<bool>,
@@ -107,6 +128,9 @@ pub struct SocketGroup {
     /// `displayLabel`, which the sidebar's calculation sets on the groups
     /// it uses
     pub display_label: Option<String>,
+    /// Whether the sidebar's calculation listed the group's skills
+    /// (`displaySkillList` is set), which it keeps
+    pub display_skill_list: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

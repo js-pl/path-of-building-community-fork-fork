@@ -625,6 +625,20 @@ impl<'d> TypedSession<'d> {
         }
     }
 
+    /// `controlTooltip` of the Items tab's set drop-down: its `tooltipFunc`
+    /// on hover, `AddItemSetTooltip` of the entry's set
+    pub fn item_set_select_tooltip(&mut self, index: Option<f64>) -> Result<J> {
+        // `AddItemSetTooltip(tooltip, nil)` past the list fails upstream
+        let n = self.build.items.item_set_order_list.len();
+        if !index.is_some_and(|i| i >= 1.0 && i.fract() == 0.0 && i as usize <= n) {
+            return Err(format!(
+                "{}attempt to index a nil value",
+                super::UPSTREAM_ERROR
+            ));
+        }
+        self.set_list_tooltip(SetKind::Item, index)
+    }
+
     /// `controlTooltip` of a row: `AddItemSetTooltip` for an item set; the
     /// other lists have none
     pub(super) fn set_list_tooltip(&mut self, kind: SetKind, index: Option<f64>) -> Result<J> {
@@ -632,12 +646,26 @@ impl<'d> TypedSession<'d> {
         if kind != SetKind::Item {
             return Ok(tip.json());
         }
-        self.update_sockets();
-        let tab = &self.build.items;
         let id = index
             .filter(|i| *i >= 1.0 && i.fract() == 0.0)
-            .and_then(|i| tab.item_set_order_list.get(i as usize - 1).copied());
-        if let Some(set) = id.and_then(|id| tab.item_sets.get(&(id as i64))) {
+            .and_then(|i| {
+                self.build
+                    .items
+                    .item_set_order_list
+                    .get(i as usize - 1)
+                    .copied()
+            });
+        if let Some(id) = id {
+            self.add_item_set_tooltip(&mut tip, id);
+        }
+        Ok(tip.json())
+    }
+
+    /// `ItemsTab:AddItemSetTooltip(tooltip, itemSet)`: each slot's item
+    pub(super) fn add_item_set_tooltip(&mut self, tip: &mut Tooltip, id: f64) {
+        self.update_sockets();
+        let tab = &self.build.items;
+        if let Some(set) = tab.item_sets.get(&(id as i64)) {
             for s in tab.ordered_slots.iter().filter(|s| s.node_id.is_none()) {
                 let sel = set.slots.get(&s.slot_name).map_or(0.0, |e| e.sel_item_id);
                 if let Some(item) = tab.item(sel) {
@@ -653,6 +681,5 @@ impl<'d> TypedSession<'d> {
                 }
             }
         }
-        Ok(tip.json())
     }
 }

@@ -78,13 +78,57 @@ fn oracle() -> bool {
 fn unordered(v: &mut J) {
     match v {
         J::Object(m) => {
+            // Timeless jewel seeds whose totals differ only by the order
+            // their weights were added in (the radius' `pairs` order)
+            if m.get("class").and_then(J::as_str) == Some("TimelessJewelListControl")
+                && let Some(J::Array(a)) = m.get_mut("list")
+            {
+                a.sort_by_key(|r| r.to_string());
+                m.remove("sel");
+            }
             for (k, x) in m.iter_mut() {
                 if k == "code"
                     && let Some(xml) = x.as_str().and_then(session::dispatch::decode_build_code)
                 {
                     *x = J::String(xml);
                 }
+                // LuaJIT names what it indexed; the translation does not
+                if k == "error"
+                    && let J::String(e) = x
+                    && let Some(i) = e.find("attempt to index ")
+                    && e.ends_with("(a nil value)")
+                {
+                    *e = format!("{}attempt to index a nil value", &e[..i]);
+                }
                 unordered(x);
+                // A timeless jewel seed's node names, which upstream lists
+                // in the `pairs` order of the tree data's string keys
+                if k == "lines"
+                    && let J::Array(a) = x
+                {
+                    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+                    let mut i = 0;
+                    while i < a.len() {
+                        if !text(&a[i]).starts_with("^8                ") {
+                            i += 1;
+                            continue;
+                        }
+                        let start = i;
+                        i += 1;
+                        while i < a.len() && text(&a[i]).starts_with("                ") {
+                            i += 1;
+                        }
+                        let mut names: Vec<String> = a[start..i]
+                            .iter()
+                            .map(|l| text(l).trim_start_matches("^8").to_string())
+                            .collect();
+                        names.sort();
+                        for (k, n) in names.into_iter().enumerate() {
+                            let n = if k == 0 { format!("^8{n}") } else { n };
+                            a[start + k]["text"] = J::String(n);
+                        }
+                    }
+                }
                 if (k == "rows" || k == "connectors")
                     && let J::Array(a) = x
                 {
@@ -221,7 +265,10 @@ fn typed_session_matches_translated() {
         "commands" => commands_match(data, &mut d),
         "geometry" => geometry_matches(&mut d),
         "calcs" => calcs_match(data, &mut d),
-        "tree" => tree_edits_match(&mut d),
+        "tree" => {
+            tree_edits_match(&mut d);
+            tree_controls_match(&mut d);
+        }
         "skills" => skills_edits_match(&mut d),
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
@@ -508,6 +555,60 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+            // The build again, its tattoos removed (Reset Tree/Tattoos'
+            // Remove All Tattoos)
+            let steps = [
+                json!({"cmd": "loadXml", "xml": xml}),
+                json!({"cmd": "control", "path": "tree.reset", "click": true}),
+                json!({"cmd": "popupButton", "name": "removeTattoo"}),
+            ];
+            for r in &steps {
+                answer(d.request(&r.to_string()), "remove tattoos");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            let label = format!("{id} tattoos removed");
+            compare_views(
+                d,
+                &["treeState", "state", "outputs", "tree"],
+                &label,
+                &mut out,
+            );
+            compare_saves(d, &label, &mut out);
+            // The nodes' tooltips; a fresh translation for those the
+            // process-wide reminder text wipe changed
+            let tattooed: Vec<u32> = xml
+                .split("<Override ")
+                .skip(1)
+                .filter_map(|o| attr(o, "nodeId")?.parse().ok())
+                .collect();
+            let mut recheck = Vec::new();
+            for n in tattooed {
+                let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                let mut lines = Vec::new();
+                diff(&typed, &tr, &format!("{label} {req}"), &mut lines);
+                if !lines.is_empty() {
+                    recheck.push((req, typed, lines));
+                }
+            }
+            if !recheck.is_empty() {
+                let fresh = session();
+                for r in &steps {
+                    answer(fresh.request(&r.to_string()), "fresh");
+                }
+                for (req, typed, lines) in recheck {
+                    let tr = answer(fresh.request(&req), "fresh");
+                    let mut again = Vec::new();
+                    diff(&typed, &tr, &req, &mut again);
+                    if again.is_empty() {
+                        aligned.push(format!("{label}: {req}"));
+                    } else {
+                        out.extend(lines);
+                    }
+                }
+            }
         }
         if !out.is_empty() {
             let n = out.len();
@@ -978,6 +1079,70 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .iter()
         .flat_map(|s| s["vars"].as_array().unwrap())
         .collect();
+    if rng.below(5) == 0 {
+        // The custom modifier groups: the shown ones' controls (found by
+        // asking the translation, as their indices follow every control
+        // the tab made), a new group
+        let paths: Vec<String> = (1000..1200)
+            .map(|n| format!("configTab.{n}.textEdit"))
+            .collect();
+        let tr = answer(
+            d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+            "translated controls",
+        );
+        let shown: Vec<String> = tr["ok"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .filter(|(_, c)| c["shown"] == J::Bool(true))
+                    .map(|(p, _)| p.trim_end_matches(".textEdit").to_string())
+                    .collect()
+            })
+            .unwrap_or_default();
+        if shown.is_empty() || rng.below(5) == 0 {
+            return json!({"cmd": "control", "path": "configTab.customModsAddBlock", "click": true});
+        }
+        let b = &shown[rng.below(shown.len())];
+        let texts = [
+            "",
+            "10% increased Damage",
+            "+50 to maximum Life\nAdds 1 to 2 Fire Damage",
+            "nonsense line",
+        ];
+        return match rng.below(5) {
+            0 => json!({"cmd": "control", "path": format!("{b}.deleteBtn"), "click": true}),
+            1 => json!({"cmd": "control", "path": format!("{b}.titleEdit"), "text": "Renamed"}),
+            2 => {
+                json!({"cmd": "control", "path": format!("{b}.enableCheck"), "state": rng.below(2) == 0})
+            }
+            3 => json!({"cmd": "controlTooltip", "path": format!("{b}.enableCheck")}),
+            _ => {
+                json!({"cmd": "control", "path": format!("{b}.textEdit"), "text": texts[rng.below(texts.len())]})
+            }
+        };
+    }
+    if rng.below(5) == 0 {
+        // The tab's search, Show All Configurations and the set
+        // drop-down, which the tab fills when it draws
+        return match rng.below(4) {
+            0 | 1 => {
+                let s = [
+                    "",
+                    "life",
+                    "enemy",
+                    "is the",
+                    "%",
+                    "[",
+                    "  ",
+                    "(burning|shocked)",
+                    "x^7y",
+                ][rng.below(9)];
+                json!({"cmd": "control", "path": "configTab.search", "text": s})
+            }
+            2 => json!({"cmd": "control", "path": "configTab.toggleConfigs", "click": true}),
+            _ => json!({"cmd": "control", "path": "configTab.setSelect", "sel": rng.below(3) + 1}),
+        };
+    }
     match rng.below(10) {
         0 | 1 => {
             let path = [
@@ -996,6 +1161,8 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             let id = &sets[rng.below(sets.len())]["id"];
             json!({"cmd": "selectConfigSet", "id": id})
         }
+        // A search that hides every option: cleared
+        _ if vars.is_empty() => json!({"cmd": "control", "path": "configTab.search", "text": ""}),
         _ => {
             let v = vars[rng.below(vars.len())];
             let path = format!("config.{}", v["var"].as_str().unwrap());
@@ -1014,6 +1181,34 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
             }
         }
     }
+}
+
+/// `controls` of the shown custom modifier groups and Add Mod Group
+fn compare_custom_mod_groups(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    let paths: Vec<String> = (1000..1200).map(|n| format!("configTab.{n}")).collect();
+    let tr = answer(
+        d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+        "translated controls",
+    );
+    let mut paths = vec!["configTab.customModsAddBlock".to_string()];
+    for (p, c) in tr["ok"].as_object().into_iter().flatten() {
+        if c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl" {
+            paths.push(p.clone());
+            for inner in [
+                "textEdit",
+                "titleEdit",
+                "enableCheck",
+                "deleteBtn",
+                "addModBtn",
+            ] {
+                paths.push(format!("{p}.{inner}"));
+            }
+        }
+    }
+    let q = json!({"cmd": "controls", "paths": paths}).to_string();
+    let t = answer(d.request(&q), "typed controls");
+    let tr = answer(d.translated_request(&q), "translated controls");
+    diff(&t, &tr, &format!("{label} custom modifier groups"), out);
 }
 
 /// Random sequences of Configuration tab edits, class changes and undo
@@ -1087,8 +1282,9 @@ fn config_edits_match(d: &mut Dispatcher) {
                 }
                 break;
             }
-            if typed.get("error").is_some() {
-                // An error changes nothing: the translation's own answer
+            if typed.get("error").is_some() || req["cmd"] == "controlTooltip" {
+                // An error changes nothing, nor does a tooltip: the
+                // translation's own answer
                 let tr = answer(d.translated_request(&r), "translated edit");
                 diff(&typed, &tr, &label, &mut out);
             }
@@ -1096,6 +1292,7 @@ fn config_edits_match(d: &mut Dispatcher) {
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
+            compare_custom_mod_groups(d, &label, &mut out);
             // An allocated mastery's tooltip with the class change popup
             // open compares reallocating it
             let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
@@ -1603,7 +1800,67 @@ fn items_edits_match(d: &mut Dispatcher) {
                         let shared = c["ok"]["items.sharedItemList"]["list"]
                             .as_array()
                             .map_or(0, Vec::len);
-                        let r = match rng.below(15) {
+                        let r = match rng.below(16) {
+                            15 => {
+                                // The tab's own controls: their descriptions,
+                                // a set's tooltip, then one of them used
+                                let paths = [
+                                    "items.setSelect",
+                                    "items.specSelect",
+                                    "items.weaponSwap1",
+                                    "items.weaponSwap2",
+                                    "items.craftDisplayItem",
+                                    "items.newDisplayItem",
+                                    "items.setManage",
+                                    "items.specButton",
+                                ];
+                                let c = compare(
+                                    d,
+                                    &json!({"cmd": "controls", "paths": paths}),
+                                    &label,
+                                    &mut out,
+                                );
+                                let sets = c["ok"]["items.setSelect"]["list"]
+                                    .as_array()
+                                    .map_or(1, Vec::len);
+                                let tip = json!({"cmd": "controlTooltip", "path": "items.setSelect", "index": rng.below(sets) + 1});
+                                compare(d, &tip, &label, &mut out);
+                                let path = paths[rng.below(6)];
+                                *popup_inputs.entry(path.into()).or_default() += 1;
+                                match path {
+                                    "items.setSelect" => {
+                                        json!({"cmd": "control", "path": path, "sel": rng.below(sets + 1) + 1})
+                                    }
+                                    "items.specSelect" => {
+                                        let n =
+                                            c["ok"][path]["list"].as_array().map_or(1, Vec::len);
+                                        json!({"cmd": "control", "path": path, "sel": rng.below(n + 1) + 1})
+                                    }
+                                    "items.craftDisplayItem" | "items.newDisplayItem" => {
+                                        // A popup opens: driven, then closed
+                                        let r =
+                                            json!({"cmd": "control", "path": path, "click": true})
+                                                .to_string();
+                                        answer(d.request(&r), "items control");
+                                        log.push(r);
+                                        if !d.typed_active()
+                                            || drive_popups(
+                                                d,
+                                                &mut rng,
+                                                &label,
+                                                &mut log,
+                                                &mut out,
+                                                &mut popup_inputs,
+                                            )
+                                        {
+                                            fell_back = true;
+                                            break;
+                                        }
+                                        continue;
+                                    }
+                                    _ => json!({"cmd": "control", "path": path, "click": true}),
+                                }
+                            }
                             13 if rng.below(3) == 0 => {
                                 // A row of the item list or the shared item
                                 // list dragged within its list
@@ -2024,7 +2281,7 @@ fn drive_popups(
                 .into_iter()
                 .filter(|c| c["enabled"] == true)
                 .collect();
-            for b in buttons.iter().filter(|b| *b != "shrink") {
+            for b in &buttons {
                 inputs.push(json!({"class": "PopupButton", "name": b}));
             }
             if title == "Manage Passive Trees" {
@@ -2373,21 +2630,54 @@ fn tree_link(d: &mut Dispatcher, rng: &mut Lcg) -> String {
         .flatten()
         .filter_map(J::as_u64)
         .filter(|n| *n < 65536)
-        .take(40)
+        .take(200)
         .collect();
+    // The selected masteries of those nodes: (node, effect)
+    let masteries: Vec<(u64, u64)> = st["ok"]["masteries"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_u64()?)))
+        .filter(|(n, _)| nodes.contains(n))
+        .collect();
+    let class = rng.below(7) as u8;
+    let ascend = rng.below(4) as u8;
+    match rng.below(10) {
+        // A link PoEURL would resolve
+        0 => return "http://poeurl.com/dABz".into(),
+        // poeplanner's: little endian, its own version numbers
+        1 | 2 => {
+            let version: u16 = [51, 47, 33, 99][rng.below(4)];
+            let mut b: Vec<u8> = vec![0, 0, 0, 0, 0, 0];
+            b.extend(version.to_le_bytes());
+            b.extend([class, rng.below(3) as u8, 0]);
+            b.extend((nodes.len() as u16).to_le_bytes());
+            for n in &nodes {
+                b.extend((*n as u16).to_le_bytes());
+            }
+            b.extend([0, 0, 0, 0]);
+            // Masteries on the latest tree only: an old one does not have
+            // their nodes, which upstream fails on
+            let ms: &[(u64, u64)] = if version == 51 { &masteries } else { &[] };
+            b.extend((ms.len() as u16).to_le_bytes());
+            for (n, e) in ms {
+                b.extend((*n as u16).to_le_bytes());
+                b.extend((*e as u16).to_le_bytes());
+            }
+            if rng.below(8) == 0 {
+                b.truncate(10);
+            }
+            let code = base64(&b).replace('+', "-").replace('/', "_");
+            return format!("https://poeplanner.com/{code}");
+        }
+        _ => {}
+    }
     let (version, class) = match rng.below(8) {
         0 => (7, 1),
         1 => (6, 9),
-        k => (if k == 2 { 4 } else { 6 }, rng.below(7) as u8),
+        k => (if k == 2 { 4 } else { 6 }, class),
     };
-    let mut b: Vec<u8> = vec![0, 0, 0, version, class, rng.below(4) as u8];
-    b.push(nodes.len() as u8);
-    for n in &nodes {
-        b.push((n / 256) as u8);
-        b.push((n % 256) as u8);
-    }
-    b.extend([0, 0]);
-    let code = base64(&b).replace('+', "-").replace('/', "_");
+    let k = rng.below(6);
     let prefix = [
         "https://www.pathofexile.com/passive-skill-tree/",
         "https://www.pathofexile.com/passive-skill-tree/3.15.0/",
@@ -2395,11 +2685,88 @@ fn tree_link(d: &mut Dispatcher, rng: &mut Lcg) -> String {
         "https://www.pathofexile.com/passive-skill-tree/2.6.2/",
         "https://poeskilltree.com/?v=3.20.0#",
         "https://www.pathofexile.com/passive-skill-tree/ruthless/",
-    ][rng.below(6)];
+    ][k];
+    let mut b: Vec<u8> = vec![0, 0, 0, version, class, ascend];
+    b.push(nodes.len() as u8);
+    for n in &nodes {
+        b.push((n / 256) as u8);
+        b.push((n % 256) as u8);
+    }
+    b.push(0);
+    // Masteries on the latest tree only (the first and the 2.6.2 links)
+    let ms: &[(u64, u64)] = if k == 0 || k == 3 { &masteries } else { &[] };
+    b.push(ms.len() as u8);
+    for (n, e) in ms {
+        b.extend([
+            (e / 256) as u8,
+            (e % 256) as u8,
+            (n / 256) as u8,
+            (n % 256) as u8,
+        ]);
+    }
+    let code = base64(&b).replace('+', "-").replace('/', "_");
     if rng.below(8) == 0 {
         return format!("{prefix}AAAA");
     }
     format!("{prefix}{code}")
+}
+
+/// The active spec as a tree link of the latest tree, with its class and
+/// masteries: the official format, or poeplanner's
+fn own_tree_link(d: &mut Dispatcher, poe_planner: bool) -> String {
+    let st = answer(d.request(r#"{"cmd":"treeState"}"#), "treeState");
+    let nodes: Vec<u64> = st["ok"]["alloc"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(J::as_u64)
+        .filter(|n| *n < 65536)
+        .take(250)
+        .collect();
+    let masteries: Vec<(u64, u64)> = st["ok"]["masteries"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter_map(|(k, v)| Some((k.parse().ok()?, v.as_u64()?)))
+        .filter(|(n, _)| nodes.contains(n))
+        .collect();
+    let class = st["ok"]["classId"].as_u64().unwrap_or(0) as u8;
+    let ascend = st["ok"]["ascendClassId"].as_u64().unwrap_or(0) as u8;
+    let mut b: Vec<u8> = Vec::new();
+    if poe_planner {
+        b.extend([0, 0, 0, 0, 0, 0, 51, 0, class, ascend, 0]);
+        b.extend((nodes.len() as u16).to_le_bytes());
+        for n in &nodes {
+            b.extend((*n as u16).to_le_bytes());
+        }
+        b.extend([0, 0, 0, 0]);
+        b.extend((masteries.len() as u16).to_le_bytes());
+        for (n, e) in &masteries {
+            b.extend((*n as u16).to_le_bytes());
+            b.extend((*e as u16).to_le_bytes());
+        }
+    } else {
+        b.extend([0, 0, 0, 6, class, ascend, nodes.len() as u8]);
+        for n in &nodes {
+            b.extend([(n / 256) as u8, (n % 256) as u8]);
+        }
+        b.push(0);
+        b.push(masteries.len() as u8);
+        for (n, e) in &masteries {
+            b.extend([
+                (e / 256) as u8,
+                (e % 256) as u8,
+                (n / 256) as u8,
+                (n % 256) as u8,
+            ]);
+        }
+    }
+    let code = base64(&b).replace('+', "-").replace('/', "_");
+    if poe_planner {
+        format!("https://poeplanner.com/{code}")
+    } else {
+        format!("https://www.pathofexile.com/passive-skill-tree/{code}")
+    }
 }
 
 fn base64(b: &[u8]) -> String {
@@ -2878,10 +3245,15 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         tr["ok"]["xml"].as_str().map(String::from)
     };
     let mut exports: Vec<Vec<(String, String)>> = Vec::new();
+    let mut codes: Vec<String> = Vec::new();
     for (k, (id, xml)) in builds.iter().enumerate() {
         let groups = PARTY_GROUPS[k % PARTY_GROUPS.len()];
         let xml = with_groups(data, &with_export(xml), groups).unwrap_or_else(|| with_export(xml));
         let saved = check(d, &format!("{id}-export"), &xml, &mut failures);
+        if let Some(x) = &saved {
+            let z = miniz_oxide::deflate::compress_to_vec_zlib(x.as_bytes(), 9);
+            codes.push(base64(&z).replace('+', "-").replace('/', "_"));
+        }
         exports.push(saved.map(|x| exported(&x)).unwrap_or_default());
     }
     let n = builds.len();
@@ -2913,6 +3285,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         );
         check(d, &format!("{id}-party-stats"), &xml, &mut failures);
     }
+    party_controls_match(d, &builds, &exports, &codes, &mut failures, &mut skipped);
     eprintln!(
         "{compared} party builds compared, {aligned} keystone sources aligned; skipped {}:\n{}",
         skipped.len(),
@@ -2924,6 +3297,316 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// The Party tab's views after a change
+const PARTY_VIEWS: [&str; 3] = ["party", "state", "outputs"];
+
+/// The Party tab's controls (`party.*`) changed at random on corpus builds
+/// with a party: import codes (other builds' exports, invalid text, a
+/// link) to each destination, appended or replacing, Clear, Disable Party
+/// Effects, Rebuild All, Show Advanced Info and the edit boxes' texts.
+/// After each change the tab, the sidebar and the outputs, and at the end
+/// the saved file, are the translation's.
+fn party_controls_match(
+    d: &mut Dispatcher,
+    builds: &[(String, String)],
+    exports: &[Vec<(String, String)>],
+    codes: &[String],
+    failures: &mut Vec<String>,
+    skipped: &mut Vec<String>,
+) {
+    if codes.is_empty() {
+        return;
+    }
+    let steps_per_build: usize = std::env::var("SESSION_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10);
+    let n = builds.len();
+    let mut steps = 0;
+    for (k, (id, xml)) in builds.iter().enumerate() {
+        let buffs = &exports[(k + 1) % n];
+        let xml = if buffs.is_empty() {
+            xml.clone()
+        } else {
+            with_party(xml, buffs)
+        };
+        let id = format!("{id}-party-controls");
+        at_build(d, &id);
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id));
+        let mut out = Vec::new();
+        let edits = [
+            ("editPartyMemberStats", "PartyMemberStats"),
+            ("editAuras", "Aura"),
+            ("editCurses", "Curse"),
+            ("editWarcries", "Warcry Skills"),
+            ("editLinks", "Link Skills"),
+            ("enemyCond", "EnemyConditions"),
+            ("enemyMods", "EnemyMods"),
+        ];
+        for step in 0..steps_per_build {
+            if !out.is_empty() {
+                break;
+            }
+            let path = |name: &str| format!("party.{name}");
+            let req = match rng.below(12) {
+                0..=2 => {
+                    let code = match rng.below(6) {
+                        0 => "not a code".to_string(),
+                        1 => String::new(),
+                        2 => format!(" {}? ", codes[rng.below(codes.len())]),
+                        _ => codes[rng.below(codes.len())].clone(),
+                    };
+                    json!({"cmd": "control", "path": path("importCodeIn"), "text": code})
+                }
+                3 => {
+                    json!({"cmd": "control", "path": path("importCodeDestination"), "sel": rng.below(9) + 1})
+                }
+                4 => {
+                    json!({"cmd": "control", "path": path("appendNotReplace"), "state": rng.below(2) == 0})
+                }
+                5 => {
+                    json!({"cmd": "control", "path": path("ShowAdvanceTools"), "state": rng.below(2) == 0})
+                }
+                6 | 7 => json!({"cmd": "control", "path": path("importCodeGo"), "click": true}),
+                8 => json!({"cmd": "control", "path": path("clear"), "click": true}),
+                9 => json!({"cmd": "control", "path": path("removeEffects"), "click": true}),
+                10 => json!({"cmd": "control", "path": path("rebuild"), "click": true}),
+                _ => {
+                    let (name, buf) = edits[rng.below(edits.len())];
+                    let from = &exports[rng.below(n)];
+                    let text = from
+                        .iter()
+                        .find(|(b, _)| b == buf)
+                        .map(|(_, t)| t.clone())
+                        .unwrap_or_default();
+                    json!({"cmd": "control", "path": path(name), "text": text})
+                }
+            };
+            let label = format!("step {step} {}", truncate(&req.to_string()));
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed party edit");
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(
+                    e.starts_with("not ported") || e.contains("upstream fails"),
+                    "{id}: {label}: {e}"
+                );
+                skipped.push(format!("{id}: {e}"));
+                if e.contains("upstream fails") {
+                    // Upstream's failure leaves its session broken: a
+                    // fresh one for the builds after
+                    at_build(d, &id);
+                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                }
+                break;
+            }
+            if typed.get("error").is_some() {
+                let tr = answer(d.translated_request(&r), "translated party edit");
+                diff(&typed, &tr, &label, &mut out);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            compare_views(d, &PARTY_VIEWS, &label, &mut out);
+            // A control's hover tooltip
+            let names = [
+                "importCodeDestination",
+                "importCodeGo",
+                "rebuild",
+                "editAuras",
+                "simpleCurses",
+            ];
+            let q = json!({"cmd": "controlTooltip", "path": format!("party.{}", names[rng.below(names.len())])});
+            let q = q.to_string();
+            let t = answer(d.request(&q), "typed tooltip");
+            let tr = answer(d.translated_request(&q), "translated tooltip");
+            diff(&t, &tr, &format!("{label} {q}"), &mut out);
+            steps += 1;
+        }
+        if out.is_empty() {
+            compare_saves(d, &format!("{id} after the party edits"), &mut out);
+        }
+        if !out.is_empty() {
+            let m = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({m}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!("{steps} party control edits compared");
+}
+
+/// The Tree tab's controls that open no popup (`tree.*`): the search,
+/// the heat map, its node power depth and the power report's toggle, the
+/// drop-downs the tab fills when it draws, and the compare checkbox, at
+/// random on every fourth corpus build. After each the sidebar (whose
+/// unsaved flag counts the search), the outputs and a control's tooltip,
+/// then node power within the depth chosen and the saved file, are the
+/// translation's.
+fn tree_controls_match(d: &mut Dispatcher) {
+    let (mut failures, mut steps, mut skipped) = (Vec::new(), 0, Vec::new());
+    let names = [
+        "specSelect",
+        "compareCheck",
+        "compareSelect",
+        "versionText",
+        "treeSearch",
+        "treeHeatMap",
+        "nodePowerMaxDepthSelect",
+        "nodePowerMaxDepthCustom",
+        "treeHeatMapStatSelect",
+        "powerReport",
+    ];
+    for (id, path) in mine(corpus()).into_iter().step_by(4) {
+        let id = format!("{id}-tree-controls");
+        at_build(d, &id);
+        let xml = std::fs::read_to_string(&path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        if !d.typed_active() {
+            continue;
+        }
+        let mut rng = Lcg(seed(&id));
+        let mut out = Vec::new();
+        for step in 0..12 {
+            if !out.is_empty() {
+                break;
+            }
+            let path = |name: &str| format!("tree.{name}");
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let popup = state["ok"]["popups"]
+                .as_array()
+                .and_then(|p| p.first())
+                .cloned();
+            let req = if let Some(p) = popup {
+                // A button of the popup in front
+                let names: Vec<&str> = p["buttons"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(|b| b["name"].as_str())
+                    .collect();
+                json!({"cmd": "popupButton", "name": names[rng.below(names.len())]})
+            } else if rng.below(3) == 0 {
+                // Reset, the version drop-down and the conversions
+                match rng.below(4) {
+                    0 => json!({"cmd": "control", "path": path("reset"), "click": true}),
+                    1 => {
+                        json!({"cmd": "control", "path": path("versionSelect"), "sel": rng.below(41) + 1})
+                    }
+                    2 => json!({"cmd": "control", "path": path("specConvert"), "click": true}),
+                    _ => json!({"cmd": "control", "path": path("specConvertAll"), "click": true}),
+                }
+            } else {
+                match rng.below(9) {
+                    0 | 1 => {
+                        let s = ["", "fire", "Life", "(increased.fire.damage|area)", "%d+"]
+                            [rng.below(5)];
+                        json!({"cmd": "control", "path": path("treeSearch"), "text": s})
+                    }
+                    2 => {
+                        json!({"cmd": "control", "path": path("treeHeatMap"), "state": rng.below(3) != 0})
+                    }
+                    3 | 4 => {
+                        json!({"cmd": "control", "path": path("nodePowerMaxDepthSelect"), "sel": rng.below(6) + 1})
+                    }
+                    5 => {
+                        let s = ["3", "", "12", "x"][rng.below(4)];
+                        json!({"cmd": "control", "path": path("nodePowerMaxDepthCustom"), "text": s})
+                    }
+                    6 => json!({"cmd": "control", "path": path("powerReport"), "click": true}),
+                    7 => {
+                        let n =
+                            ["specSelect", "compareSelect", "treeHeatMapStatSelect"][rng.below(3)];
+                        json!({"cmd": "control", "path": path(n), "sel": rng.below(4) + 1})
+                    }
+                    _ => json!({"cmd": "control", "path": path("compareCheck"), "state": true}),
+                }
+            };
+            let label = format!("step {step} {req}");
+            if std::env::var("SESSION_DUMP").is_ok() {
+                eprintln!("{id} {label}");
+            }
+            let r = req.to_string();
+            let typed = answer(d.request(&r), "typed tree control");
+            if !d.typed_active() {
+                let e = d.typed_error.clone().unwrap_or_default();
+                assert!(e.starts_with("not ported"), "{id}: {label}: {e}");
+                skipped.push(format!("{id}: {e}"));
+                break;
+            }
+            if typed.get("error").is_some() {
+                let tr = answer(d.translated_request(&r), "translated tree control");
+                diff(&typed, &tr, &label, &mut out);
+            }
+            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            compare_views(
+                d,
+                &["state", "outputs", "treeSpecs", "treeState"],
+                &label,
+                &mut out,
+            );
+            let q = json!({"cmd": "controlTooltip", "path": path(names[rng.below(names.len())])})
+                .to_string();
+            let t = answer(d.request(&q), "typed tooltip");
+            let tr = answer(d.translated_request(&q), "translated tooltip");
+            diff(&t, &tr, &format!("{label} {q}"), &mut out);
+            steps += 1;
+        }
+        // Popups stay open over the next build's load in upstream: closed
+        for _ in 0..4 {
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            if state["ok"]["popups"]
+                .as_array()
+                .is_none_or(|p| p.is_empty())
+            {
+                break;
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
+        }
+        if out.is_empty() {
+            // Node power within the depth chosen
+            compare_node_power(d, &mut out);
+            compare_saves(d, &format!("{id} after the tree controls"), &mut out);
+        }
+        if !out.is_empty() {
+            let m = out.len();
+            out.truncate(8);
+            failures.push(format!("{id} ({m}):\n  {}", out.join("\n  ")));
+        }
+    }
+    eprintln!(
+        "{steps} tree control edits compared; skipped {}:\n{}",
+        skipped.len(),
+        skipped.join("\n")
+    );
+    assert!(
+        failures.is_empty(),
+        "{} builds differ:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+/// `nodePower` of the first power stat, typed against translated
+fn compare_node_power(d: &mut Dispatcher, out: &mut Vec<String>) {
+    let q = r#"{"cmd":"nodePower","index":1}"#;
+    let t = answer(d.request(q), "typed nodePower");
+    let tr = answer(d.translated_request(q), "translated nodePower");
+    diff(&t, &tr, "nodePower", out);
+}
+
+/// The first characters of a request, for a failure's label
+fn truncate(s: &str) -> String {
+    s.chars().take(160).collect()
 }
 
 /// The colour codes the sidebar uses are upstream's
@@ -3609,12 +4292,14 @@ fn shared_lists_survive_a_fallback() {
         answer(d.request(&r.to_string()), "shared");
         assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
     }
+    let mut out = Vec::new();
+    compare_views(&mut d, &["sharedLists"], "before the fallback", &mut out);
     // A key the typed session does not have: the translation holds the build
     let r = json!({"cmd": "control", "path": "items.sharedItemList", "key": "F2"});
     answer(d.request(&r.to_string()), "fallback");
     assert!(!d.typed_active());
     load(&mut d, &builds[1]);
-    let mut out = Vec::new();
+    compare_views(&mut d, &["sharedLists"], "after the fallback", &mut out);
     let shared = json!({"cmd": "controls", "paths": ["items.sharedItemList"]}).to_string();
     let (t, tr) = (
         answer(d.request(&shared), "typed"),
@@ -3676,7 +4361,7 @@ fn tree_links_import_and_export() {
             json!({"cmd": "control", "path": "items.specButton", "click": true}),
             &mut out,
         );
-        for i in 0..4 {
+        for i in 0..8 {
             step(
                 &mut d,
                 json!({"cmd": "control", "path": "popup.2", "click": true}),
@@ -3687,7 +4372,11 @@ fn tree_links_import_and_export() {
                 json!({"cmd": "control", "path": "popup.name", "text": format!("Imported {i}")}),
                 &mut out,
             );
-            let link = tree_link(&mut d, &mut rng);
+            // First the build's own tree with its masteries, in both formats
+            let link = match i {
+                0 | 1 => own_tree_link(&mut d, i == 1),
+                _ => tree_link(&mut d, &mut rng),
+            };
             step(
                 &mut d,
                 json!({"cmd": "control", "path": "popup.edit", "text": link}),
@@ -3715,6 +4404,11 @@ fn tree_links_import_and_export() {
         );
         step(
             &mut d,
+            json!({"cmd": "popupButton", "name": "shrink"}),
+            &mut out,
+        );
+        step(
+            &mut d,
             json!({"cmd": "popupButton", "name": "copy"}),
             &mut out,
         );
@@ -3734,6 +4428,30 @@ fn tree_links_import_and_export() {
         compare_saves(&mut d, &id, &mut out);
     }
     assert!(out.is_empty(), "{}", out.join("\n"));
+    // A mastery on a node the link's tree does not have: upstream fails,
+    // the typed session hands it over
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let (_, path) = corpus().into_iter().next().unwrap();
+    let xml = std::fs::read_to_string(path).unwrap();
+    answer(
+        d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+        "load",
+    );
+    let link = format!(
+        "https://www.pathofexile.com/passive-skill-tree/3.15.0/{}",
+        base64(&[0, 0, 0, 6, 2, 0, 0, 0, 1, 0, 1, 0, 1])
+    );
+    for r in [
+        json!({"cmd": "control", "path": "items.specButton", "click": true}),
+        json!({"cmd": "control", "path": "popup.2", "click": true}),
+        json!({"cmd": "control", "path": "popup.edit", "text": link}),
+        json!({"cmd": "popupButton", "name": "import"}),
+    ] {
+        answer(d.request(&r.to_string()), "request");
+    }
+    assert!(!d.typed_active());
+    let e = d.typed_error.clone().unwrap_or_default();
+    assert!(e.contains("(upstream fails)"), "{e}");
 }
 
 /// Items dropped on the item slots and on the minion drop-down while it
@@ -3851,5 +4569,1730 @@ fn items_dropped_on_slots_and_minion_sets() {
         );
     }
     compare_saves(&mut d, &id, &mut out);
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Items tab's own controls on a few builds: their descriptions, the
+/// set drop-down's tooltips, both weapon sets, a second item set and tree
+/// picked from the drop-downs, Craft item... and Create custom...
+#[test]
+fn items_tab_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "items.setSelect",
+        "items.specSelect",
+        "items.weaponSwap1",
+        "items.weaponSwap2",
+        "items.craftDisplayItem",
+        "items.newDisplayItem",
+        "items.setManage",
+        "items.specButton",
+    ];
+    for (id, path) in corpus().into_iter().step_by(11).take(5) {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {r} controls"), out);
+            compare_views(d, &["state", "items", "outputs"], &format!("{id} {r}"), out);
+        };
+        for r in [
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.weaponSwap1", "click": true}),
+            // A second set, then each picked
+            json!({"cmd": "control", "path": "items.setManage", "click": true}),
+            json!({"cmd": "control", "path": "popup.setList.new", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "control", "path": "items.setSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "items.weaponSwap2", "click": true}),
+            json!({"cmd": "control", "path": "items.setSelect", "sel": 9}),
+            // A second tree, then each picked
+            json!({"cmd": "control", "path": "items.specButton", "click": true}),
+            json!({"cmd": "control", "path": "popup.1.new", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "control", "path": "items.specSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "items.specSelect", "sel": 1}),
+            // A crafted item, and a custom one
+            json!({"cmd": "control", "path": "items.craftDisplayItem", "click": true}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "saveDisplayItem"}),
+            json!({"cmd": "control", "path": "items.newDisplayItem", "click": true}),
+            json!({"cmd": "control", "path": "popup.edit", "text": "Custom Band\nIron Ring"}),
+            json!({"cmd": "popupButton", "name": "save"}),
+            json!({"cmd": "control", "path": "items.newDisplayItem", "click": true}),
+            json!({"cmd": "popupButton", "name": "cancel"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        for index in 1..=3 {
+            let r = json!({"cmd": "controlTooltip", "path": "items.setSelect", "index": index});
+            let (t, tr) = (
+                answer(d.request(&r.to_string()), "typed"),
+                answer(d.translated_request(&r.to_string()), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {r}"), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The build's own controls: their descriptions, the level box's, main
+/// socket group's and minion drop-down's tooltips, level scaling, the view
+/// modes, and each entry of the loadouts drop-down (New Loadout's popup
+/// saved), on a few builds and gen-0006's Animate Guardian's Weapon
+#[test]
+fn build_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut paths: Vec<String> = [
+        "buildLoadouts",
+        "levelScalingButton",
+        "back",
+        "save",
+        "saveAs",
+        "mainSkillMinionLibrary",
+        "modeImport",
+        "modeNotes",
+        "modeConfig",
+        "modeTree",
+        "modeSkills",
+        "modeItems",
+        "modeCalcs",
+        "modeParty",
+        "modeCompare",
+    ]
+    .iter()
+    .map(|p| format!("build.{p}"))
+    .collect();
+    paths.push("build.mainSkillMinion".into());
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 13 == 0 || id == "gen-0006")
+        .map(|(_, b)| b)
+        .take(6)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
+            for (path, n) in [
+                ("build.characterLevel", 1),
+                ("build.mainSocketGroup", 12),
+                ("build.mainSkillMinion", 3),
+            ] {
+                for index in 1..=n {
+                    let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
+                    let (t, tr) = (
+                        answer(d.request(&r.to_string()), "typed"),
+                        answer(d.translated_request(&r.to_string()), "translated"),
+                    );
+                    diff(&t, &tr, &format!("{id} {label} {r}"), out);
+                }
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        check(&mut d, "load", &mut out);
+        if id == "gen-0006" {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["groups"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|g| g.to_string().contains("Animate Guardian"))
+                .unwrap()
+                + 1;
+            step(
+                &mut d,
+                json!({"cmd": "setMainSocketGroup", "index": group}),
+                &mut out,
+            );
+        }
+        for r in [
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "96"}),
+            json!({"cmd": "control", "path": "build.levelScalingButton", "click": true}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        for m in [
+            "Import", "Notes", "Config", "Skills", "Items", "Calcs", "Party", "Compare", "Tree",
+        ] {
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": format!("build.mode{m}"), "click": true}),
+                &mut out,
+            );
+        }
+        // Each loadout entry but Help, New Loadout's popup saved
+        let c = answer(
+            d.request(&json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string()),
+            "controls",
+        );
+        let list: Vec<String> = c["ok"]["build.buildLoadouts"]["list"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect();
+        for (k, entry) in list.iter().enumerate() {
+            if entry.contains("Help") {
+                continue;
+            }
+            step(
+                &mut d,
+                json!({"cmd": "control", "path": "build.buildLoadouts", "sel": k + 1}),
+                &mut out,
+            );
+            if entry.contains("New Loadout") {
+                step(
+                    &mut d,
+                    json!({"cmd": "control", "path": "popup.edit", "text": format!("Loadout {k}")}),
+                    &mut out,
+                );
+                step(
+                    &mut d,
+                    json!({"cmd": "popupButton", "name": "save"}),
+                    &mut out,
+                );
+                // The new loadout picked, if it is listed
+                let c = answer(
+                    d.request(
+                        &json!({"cmd": "controls", "paths": ["build.buildLoadouts"]}).to_string(),
+                    ),
+                    "controls",
+                );
+                let name = format!("Loadout {k}");
+                let at = c["ok"]["build.buildLoadouts"]["list"]
+                    .as_array()
+                    .and_then(|l| l.iter().position(|v| v.as_str() == Some(&name)));
+                if let Some(at) = at {
+                    step(
+                        &mut d,
+                        json!({"cmd": "control", "path": "build.buildLoadouts", "sel": at + 1}),
+                        &mut out,
+                    );
+                }
+            }
+        }
+        // Whatever popup is left, closed
+        while answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+            .as_array()
+            .is_some_and(|p| !p.is_empty())
+        {
+            step(&mut d, json!({"cmd": "closePopup"}), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+        // The file saved with the level's auto mode on, loaded again
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        compare_views(
+            &mut d,
+            &["state", "outputs"],
+            &format!("{id} reloaded"),
+            &mut out,
+        );
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's set drop-down and gem options, in the typed session
+/// as in the translated one: their descriptions, the default level's
+/// tooltips, the gem list they change, the save, and a reload
+#[test]
+fn skills_controls_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths: Vec<String> = [
+        "setSelect",
+        "setManage",
+        "sortGemsByDPS",
+        "sortGemsByDPSFieldControl",
+        "defaultLevel",
+        "defaultQuality",
+        "showSupportGemTypes",
+        "showLegacyGems",
+    ]
+    .iter()
+    .map(|p| format!("skills.{p}"))
+    .collect();
+    let mut builds: Vec<(String, Option<PathBuf>)> = vec![("new".into(), None)];
+    builds.extend(
+        corpus()
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| i % 17 == 0)
+            .map(|(_, (id, p))| (id, Some(p)))
+            .take(4),
+    );
+    for (id, path) in builds {
+        match path {
+            Some(path) => {
+                let xml = std::fs::read_to_string(path).unwrap();
+                answer(
+                    d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+                    "load",
+                );
+            }
+            None => {
+                answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
+            }
+        }
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(d, &["state", "skills"], &format!("{id} {label}"), out);
+            for index in 0..=6 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.defaultLevel", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        // The gem list of the slot after the main group's last gem
+        let gem_list = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+            let group = skills["ok"]["mainSocketGroup"].as_f64().unwrap_or(1.0);
+            let Some(gems) = skills["ok"]["groups"][group as usize - 1]["gems"].as_array() else {
+                return;
+            };
+            let r = json!({"cmd": "gemList", "group": group, "slot": gems.len() + 1});
+            let (t, tr) = (
+                answer(d.request(&r.to_string()), "typed"),
+                answer(d.translated_request(&r.to_string()), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} {r}"), out);
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": false}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 3}),
+            json!({"cmd": "control", "path": "skills.showLegacyGems", "state": true}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 4}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "15"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // A gem list (its calculations leave selections on the gems), then
+        // saved and loaded again
+        gem_list(&mut d, "options", &mut out);
+        compare_views(
+            &mut d,
+            &["state", "skills"],
+            &format!("{id} gem list"),
+            &mut out,
+        );
+        compare_saves(&mut d, &id, &mut out);
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save");
+        let xml = saved["ok"]["xml"].as_str().unwrap_or("").to_string();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "reload",
+        );
+        assert!(d.typed_active(), "{id} reload: {:?}", d.typed_error);
+        check(&mut d, "reloaded", &mut out);
+        for r in [
+            json!({"cmd": "control", "path": "skills.sortGemsByDPS", "state": true}),
+            json!({"cmd": "control", "path": "skills.sortGemsByDPSFieldControl", "sel": 20}),
+            json!({"cmd": "control", "path": "skills.showSupportGemTypes", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.defaultLevel", "sel": 0}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "abc"}),
+            json!({"cmd": "control", "path": "skills.defaultQuality", "text": "30"}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 2}),
+            json!({"cmd": "control", "path": "skills.setSelect", "sel": 1}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // Not saved: which gem the list calculates last (whose selections
+        // stay) is `pairs` order over the slot's gem table, which keeps the
+        // order of an earlier, wider fill (random in LuaJIT)
+        gem_list(&mut d, "options changed", &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Spectre Library (Manage Spectres...), in the typed session as in the
+/// translated one: its lists, search, rows' tooltips, adding, dragging,
+/// removing, Save and Cancel
+#[test]
+fn spectre_library_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 23 == 0 || id == "gen-0006")
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_none_or(|p| p.is_empty()) {
+                return;
+            }
+            for (path, n) in [("popup.list", 4), ("popup.source", 3)] {
+                for index in 0..=n {
+                    let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
+                    let (t, tr) = (
+                        answer(d.request(&r.to_string()), "typed"),
+                        answer(d.translated_request(&r.to_string()), "translated"),
+                    );
+                    diff(&t, &tr, &format!("{id} {label} {r}"), out);
+                }
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": path});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        for r in [
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            c(
+                "popup.source",
+                json!({"sel": 2, "click": true, "doubleClick": true}),
+            ),
+            c("popup.source", json!({"sel": 5})),
+            c("popup.source.add", json!({"click": true})),
+            c("popup.source.add", json!({"click": true})),
+            c("popup.source.searchText", json!({"text": "ze"})),
+            c(
+                "popup.source",
+                json!({"sel": 2, "dragTo": "popup.list", "at": 1}),
+            ),
+            c("popup.source.searchModeDropDown", json!({"sel": 2})),
+            c("popup.source.searchText", json!({"text": "fire"})),
+            c("popup.source.searchModeDropDown", json!({"sel": 3})),
+            c("popup.source", json!({"sel": 1, "dragTo": "popup.list"})),
+            c("popup.source.searchText", json!({"text": "zzzz"})),
+            c("popup.source.searchText", json!({"text": "("})),
+            c("popup.source.searchText", json!({"text": ""})),
+            c("popup.list", json!({"sel": 1, "moveTo": 4})),
+            c("popup.list", json!({"sel": 2})),
+            c("popup.list.delete", json!({"click": true})),
+            c("popup.list", json!({"sel": 1})),
+            c("popup.list", json!({"key": "DELETE"})),
+            c("popup.list", json!({"sel": 9})),
+            json!({"cmd": "popupButton", "name": "save"}),
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            c("popup.list", json!({"sel": 1, "key": "DELETE"})),
+            c("popup.list", json!({"key": "DELETE"})),
+            json!({"cmd": "popupButton", "name": "cancel"}),
+            c("build.mainSkillMinionLibrary", json!({"click": true})),
+            json!({"cmd": "closePopup"}),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Find a Timeless Jewel in the typed session as in the translated one:
+/// the popup's settings, the node lists the sliders and the node
+/// drop-down write, the protected notables, the trade choices, Reset, the
+/// tooltips, the build's `timelessData` saved and kept for the next opening
+#[test]
+fn find_timeless_jewel_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 29 == 7 || id == "gen-0016")
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    let tooltips = [
+        ("socketFilter", None),
+        ("socketAllocate", None),
+        ("socketFilterAdditionalDistance", None),
+        ("nodeSlider", None),
+        ("nodeSlider2", None),
+        ("nodeSlider3", None),
+        ("nodeSelect", Some(2)),
+        ("nodeSelect", Some(7)),
+        ("nodeSelect", None),
+        ("fallbackWeightsButton", None),
+        ("totalMinimumWeight", None),
+        ("searchListButton", None),
+        ("searchListFallbackButton", None),
+        ("searchTradeButton", None),
+        ("jewelSelect", Some(3)),
+        ("conquerorSelect", Some(1)),
+        ("conquerorSelect", None),
+        ("abyssAscendancySelect", Some(1)),
+        ("abyssAscendancySelect", None),
+    ];
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            compare_views(d, &["state"], &format!("{id} {label}"), out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_none_or(|p| p.is_empty()) {
+                return;
+            }
+            for (path, index) in tooltips {
+                let mut r = json!({"cmd": "controlTooltip", "path": format!("popup.{path}")});
+                if let Some(i) = index {
+                    r["index"] = json!(i);
+                }
+                let (mut t, mut tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                if oracle() {
+                    unordered(&mut t);
+                    unordered(&mut tr);
+                }
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let open = json!({"cmd": "control", "path": "tree.findTimelessJewel", "click": true});
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let steps = [
+            open.clone(),
+            c("jewelSelect", json!({"sel": 2})),
+            c("conquerorSelect", json!({"sel": 3})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("nodeSlider", json!({"val": 0.5})),
+            c("nodeSelect", json!({"sel": 5})),
+            c("nodeSlider2", json!({"val": 0.3})),
+            c("nodeSlider3", json!({"val": 0.2})),
+            c("nodeSlider3", json!({"val": 1})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("nodeSelect", json!({"sel": 9})),
+            c("jewelSelect", json!({"sel": 4})),
+            c("devotionSelect1", json!({"sel": 5})),
+            c("devotionSelect2", json!({"sel": 17})),
+            c("socketSelect", json!({"sel": 3})),
+            c("socketFilter", json!({"state": true})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("socketSelect", json!({"sel": 7})),
+            c("socketFilterAdditionalDistance", json!({"val": 0.35})),
+            c("socketAllocate", json!({"state": true})),
+            c("fallbackWeightsList", json!({"sel": 3})),
+            c("totalMinimumWeight", json!({"text": "12"})),
+            button("searchListFallbackButton"),
+            c("nodeSelect", json!({"sel": 7})),
+            c("nodeSlider", json!({"val": 0.9})),
+            c("nodeSelect", json!({"sel": 2})),
+            c("searchListFallback", json!({"text": "a, 1, 2, 3\nb"})),
+            button("searchListButton"),
+            c(
+                "searchList",
+                json!({"text": "templar_notable_x, required, 0, required"}),
+            ),
+            c("nodeSlider3", json!({"val": 0.5})),
+            c("jewelSelect", json!({"sel": 11})),
+            c("abyssAscendancySelect", json!({"sel": 3})),
+            c("nodeSelect", json!({"sel": 4})),
+            c("abyssAscendancySelect", json!({"sel": 2})),
+            c("socketSelect", json!({"sel": 2})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("realmSelection", json!({"sel": 2})),
+            c("tradeTypeSelection", json!({"sel": 4})),
+            c("searchMore", json!({"state": true})),
+            c("searchTradeLeagueSelect", json!({"sel": 2})),
+            c("jewelSelect", json!({"sel": 7})),
+            c("nodeSelect", json!({"sel": 3})),
+            button("closeButton"),
+            open.clone(),
+            c("socketFilter", json!({"state": false})),
+            button("resetButton"),
+            c("jewelSelect", json!({"sel": 1})),
+            c("nodeSelect", json!({"sel": 3})),
+            json!({"cmd": "closePopup"}),
+            open,
+            json!({"cmd": "closePopup"}),
+        ];
+        for r in steps {
+            // A protection checkbox only when the socket has one
+            if r["path"] == "popup.protectAllocatedBox1" {
+                let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                let shown = state["ok"]["popups"][0]["controls"]
+                    .as_array()
+                    .is_some_and(|c| c.iter().any(|c| c["path"] == r["path"]));
+                if !shown {
+                    continue;
+                }
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(&mut d, &r.to_string(), &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Find a Timeless Jewel's Search in the typed session as in the
+/// translated one: each non-Abyss jewel type on a socket, with desired and
+/// fallback weights, required and minimum weights, protected notables, a
+/// total minimum weight and All Sockets; the results' rows, selection and
+/// the trade button, kept for the next opening
+#[test]
+fn timeless_search_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .filter(|(id, _)| id == "gen-0016" || id == "gen-0032")
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let open = json!({"cmd": "control", "path": "tree.findTimelessJewel", "click": true});
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let search = button("searchButton");
+        let mut most = 0;
+        let mut steps = vec![open.clone()];
+        // Each jewel type on the fourth socket, a few nodes wanted
+        for (jewel, nodes) in [
+            (2, &[3, 8, 2][..]),
+            (3, &[4, 9][..]),
+            (5, &[5, 2, 12][..]),
+            (6, &[3, 7][..]),
+            (1, &[6, 15, 30][..]),
+            (4, &[2, 6, 10][..]),
+            (7, &[3, 9][..]),
+            (8, &[4, 12][..]),
+            (9, &[2, 6, 40][..]),
+            (10, &[5, 8][..]),
+        ] {
+            steps.push(c("jewelSelect", json!({"sel": jewel})));
+            steps.push(c("socketSelect", json!({"sel": 4})));
+            if jewel == 4 {
+                // Not "Any": the jewel's item would take random variants
+                steps.push(c("devotionSelect1", json!({"sel": 3})));
+                steps.push(c("devotionSelect2", json!({"sel": 9})));
+            }
+            for (k, n) in nodes.iter().enumerate() {
+                steps.push(c("nodeSelect", json!({"sel": n})));
+                steps.push(c("nodeSlider", json!({"val": 0.1 + 0.2 * k as f64})));
+            }
+            steps.push(search.clone());
+            steps.push(c("searchResults", json!({"sel": 2})));
+            steps.push(json!({"tips": true}));
+        }
+        // Reclaimed Malevolence: an ascendancy outcome required, on sockets
+        // the class start's path may run through
+        steps.push(c("jewelSelect", json!({"sel": 11})));
+        steps.push(c("nodeSelect", json!({"sel": 3})));
+        steps.push(c("nodeSlider", json!({"val": 0.4})));
+        steps.push(c("nodeSelect", json!({"sel": 9})));
+        steps.push(c("abyssAscendancySelect", json!({"sel": 2})));
+        for socket in 2..=9 {
+            steps.push(c("socketSelect", json!({"sel": socket})));
+            steps.push(search.clone());
+            steps.push(json!({"tips": true}));
+        }
+        steps.push(c("abyssAscendancySelect", json!({"sel": 1})));
+        steps.push(search.clone());
+        steps.push(json!({"tips": true}));
+        steps.extend([
+            // Militant Faith with the socket's notables protected
+            c("socketFilter", json!({"state": true})),
+            c("protectAllocatedBox1", json!({"state": true})),
+            c("protectAllocatedBox2", json!({"state": true})),
+            search.clone(),
+            c("socketFilterAdditionalDistance", json!({"val": 0.3})),
+            search.clone(),
+            c("socketFilter", json!({"state": false})),
+            // Lethal Pride: required and minimum weights, the fallback list
+            c("jewelSelect", json!({"sel": 2})),
+            c("searchList", json!({"text": "total_strength, 1, 0, 0\nkarui_notable_add_life, required, 0, 0"})),
+            c("searchListFallback", json!({"text": "karui_notable_add_armour, 2, 0, 0\nkarui_notable_add_life, 9, 0, 0"})),
+            search.clone(),
+            c("searchList", json!({"text": "total_strength, 1, 0, 40"})),
+            search.clone(),
+            c("totalMinimumWeight", json!({"text": "60"})),
+            search.clone(),
+            c("totalMinimumWeight", json!({"text": ""})),
+            c("searchResults", json!({"sel": 3, "click": true})),
+            c("searchResults", json!({"sel": 99999})),
+            // A jewel added, then one socketed
+            c("searchResults", json!({"sel": 2, "click": true, "doubleClick": true})),
+            json!({"tips": true}),
+            c("socketAllocate", json!({"state": true})),
+            json!({"tips": true}),
+            c("searchResults", json!({"sel": 1, "click": true, "doubleClick": true})),
+            c("searchResults", json!({"sel": 1, "click": true, "doubleClick": true})),
+            json!({"tips": true}),
+            // Fallback weights generated by stat, then searched with
+            c("fallbackWeightsList", json!({"sel": 11})),
+            button("fallbackWeightsButton"),
+            c("jewelSelect", json!({"sel": 3})),
+            button("fallbackWeightsButton"),
+            c("fallbackWeightsList", json!({"sel": 1})),
+            c("jewelSelect", json!({"sel": 4})),
+            button("fallbackWeightsButton"),
+            c("jewelSelect", json!({"sel": 6})),
+            c("fallbackWeightsList", json!({"sel": 14})),
+            button("fallbackWeightsButton"),
+            c("jewelSelect", json!({"sel": 5})),
+            c("fallbackWeightsList", json!({"sel": 3})),
+            button("fallbackWeightsButton"),
+            search.clone(),
+            c("jewelSelect", json!({"sel": 2})),
+            button("fallbackWeightsButton"),
+            search.clone(),
+            // All Sockets
+            c("socketSelect", json!({"sel": 1})),
+            search.clone(),
+            c("searchResults", json!({"sel": 1})),
+            button("closeButton"),
+            open,
+            c("searchResults", json!({"sel": 2})),
+            button("resetButton"),
+            json!({"cmd": "closePopup"}),
+        ]);
+        for r in steps {
+            if r["tips"] == true {
+                // The first rows' tooltips (and one past the list)
+                for index in [1, 2, 3, 100000] {
+                    let q = json!({"cmd": "controlTooltip", "path": "popup.searchResults", "index": index})
+                        .to_string();
+                    d.typed_error = None;
+                    let (mut t, mut tr) = (
+                        answer(d.request(&q), "typed"),
+                        answer(d.translated_request(&q), "translated"),
+                    );
+                    assert!(d.typed_error.is_none(), "{id} {q}: {:?}", d.typed_error);
+                    if oracle() {
+                        unordered(&mut t);
+                        unordered(&mut tr);
+                    }
+                    diff(&t, &tr, &format!("{id} {q}"), &mut out);
+                }
+                continue;
+            }
+            if r["path"]
+                .as_str()
+                .is_some_and(|p| p.starts_with("popup.protectAllocatedBox"))
+            {
+                let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+                let shown = state["ok"]["popups"][0]["controls"]
+                    .as_array()
+                    .is_some_and(|c| c.iter().any(|c| c["path"] == r["path"]));
+                if !shown {
+                    continue;
+                }
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let views: &[&str] = if r["doubleClick"] == true {
+                &["state", "items", "outputs"]
+            } else {
+                &["state"]
+            };
+            compare_views(&mut d, views, &format!("{id} {r}"), &mut out);
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let rows = state["ok"]["popups"][0]["controls"]
+                .as_array()
+                .and_then(|c| c.iter().find(|c| c["path"] == "popup.searchResults"))
+                .and_then(|c| c["list"].as_array())
+                .map_or(0, Vec::len);
+            most = most.max(rows);
+        }
+        assert!(most > 10, "{id}: the searches found {most} seeds");
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's socket group list, in the typed session as in the
+/// translated one: rows, selection, rows' tooltips, New, Delete with its
+/// confirmation, the Delete key, Delete All and reordering
+#[test]
+fn skills_group_list_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupList",
+        "skills.groupList.new",
+        "skills.groupList.delete",
+        "skills.groupList.deleteAll",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 11 == 3)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            let n = t["ok"]["skills.groupList"]["list"]
+                .as_array()
+                .map_or(0, Vec::len);
+            for index in 0..=n + 1 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.groupList", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |v: J| {
+            let mut r = json!({"cmd": "control", "path": "skills.groupList"});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        for r in [
+            c(json!({"sel": 2})),
+            c(json!({"sel": 99})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"key": "DELETE"})),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+            c(json!({"sel": 1, "moveTo": 4})),
+            c(json!({"sel": 3, "moveTo": 1})),
+            c(json!({"sel": 2})),
+            c(json!({"path": "skills.groupList.delete", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"sel": 1})),
+            c(json!({"key": "DELETE"})),
+            json!({"cmd": "closePopup"}),
+            json!({"cmd": "pasteSocketGroup", "text": "Label: Pasted\r\nFireball 20/0 Default  1\r\n"}),
+            c(json!({"sel": 1, "click": true})),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "closePopup"}),
+            c(json!({"path": "skills.groupList.deleteAll", "click": true})),
+            json!({"cmd": "popupButton", "name": "confirm"}),
+            c(json!({"path": "skills.groupList.new", "click": true})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's controls of the shown socket group, in the typed
+/// session as in the translated one: each row shown in turn, the slot
+/// drop-down's tooltips, and edits of the label, slot, enabled, Full DPS
+/// and an item's group's count
+#[test]
+fn skills_group_detail_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupLabel",
+        "skills.groupSlot",
+        "skills.groupEnabled",
+        "skills.includeInFullDPS",
+        "skills.groupCount",
+        "skills.sourceNote",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, (id, _))| i % 11 == 3 || id.contains("mirage"))
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for index in 0..=15 {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": "skills.groupSlot", "index": index});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for k in 1..=groups.len() {
+            step(&mut d, c("groupList", json!({"sel": k})), &mut out);
+        }
+        // An item's group, if there is one
+        if let Some(k) = groups.iter().position(|g| g["source"].is_string()) {
+            for r in [
+                c("groupList", json!({"sel": k + 1})),
+                c("groupCount", json!({"text": "3"})),
+                c("groupCount", json!({"text": "x"})),
+                c("groupEnabled", json!({"state": false})),
+            ] {
+                step(&mut d, r, &mut out);
+            }
+        }
+        for r in [
+            c("groupList", json!({"sel": 2})),
+            c("groupLabel", json!({"text": "Renamed"})),
+            c("groupLabel", json!({"text": ""})),
+            c("groupEnabled", json!({"state": false})),
+            c("includeInFullDPS", json!({"state": true})),
+            c("groupEnabled", json!({"state": true})),
+            c("groupSlot", json!({"sel": 6})),
+            c("groupSlot", json!({"sel": 99})),
+            c("groupSlot", json!({"sel": 1})),
+            c("groupList", json!({"sel": 1, "moveTo": 3})),
+            c("groupLabel", json!({"text": "Moved"})),
+            c("groupList.new", json!({"click": true})),
+            c("groupSlot", json!({"sel": 11})),
+            c("groupList", json!({"sel": 1})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's gem slots, in the typed session as in the translated
+/// one: their texts and states as groups are shown, the count's tooltip,
+/// and edits of a gem's level, quality, enabled box, count and Vaal
+/// skill boxes, and deleting gems
+#[test]
+fn skills_gem_slots_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let parts = [
+        "Delete",
+        "Name",
+        "Level",
+        "Quality",
+        "Enable",
+        "Count",
+        "ErrMsg",
+        "EnableGlobal1",
+        "EnableGlobal2",
+    ];
+    let paths: Vec<String> = (1..=8)
+        .flat_map(|i| parts.iter().map(move |p| format!("skills.gemSlot{i}{p}")))
+        .collect();
+    // gen-0030 has a Vaal gem
+    let mut builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 11 == 5)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    builds.extend(corpus().into_iter().filter(|(id, _)| id == "gen-0030"));
+    assert_eq!(builds.len(), 4);
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for i in 1..=3 {
+                let r = json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Count")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for k in 1..=groups.len().min(6) {
+            step(&mut d, c("groupList", json!({"sel": k})), &mut out);
+        }
+        // A Vaal gem's boxes
+        let vaal = groups.iter().enumerate().find_map(|(k, g)| {
+            g["gems"]
+                .as_array()?
+                .iter()
+                .position(|gem| gem["name"].as_str().is_some_and(|n| n.starts_with("Vaal")))
+                .map(|s| (k + 1, s + 1))
+        });
+        if let Some((k, s)) = vaal {
+            for r in [
+                c("groupList", json!({"sel": k})),
+                c(&format!("gemSlot{s}EnableGlobal1"), json!({"state": false})),
+                c(&format!("gemSlot{s}EnableGlobal2"), json!({"state": false})),
+                c(&format!("gemSlot{s}Enable"), json!({"state": false})),
+                c(&format!("gemSlot{s}EnableGlobal1"), json!({"state": true})),
+            ] {
+                step(&mut d, r, &mut out);
+            }
+        }
+        // The largest group of linked gems
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        let n = groups[k]["gems"].as_array().map_or(0, Vec::len);
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c("gemSlot1Level", json!({"text": "15"})),
+            c("gemSlot1Level", json!({"text": "x"})),
+            c("gemSlot2Quality", json!({"text": "7"})),
+            c("gemSlot2Quality", json!({"text": ""})),
+            c("gemSlot1Enable", json!({"state": false})),
+            c("gemSlot1Enable", json!({"state": true})),
+            c("gemSlot1Count", json!({"text": "3"})),
+            c("gemSlot1Count", json!({"text": "abc"})),
+            c(&format!("gemSlot{}Delete", n + 1), json!({"click": true})),
+            c("gemSlot1Delete", json!({"click": true})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Skills tab's sockets line, Optimise Sockets and the imbued support's
+/// controls, in the typed session as in the translated one, as groups are
+/// shown, slots selected, sockets rebuilt and imbued supports cleared
+#[test]
+fn skills_sockets_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.socketsLabel",
+        "skills.optimiseSockets",
+        "skills.imbuedSupportLabel",
+        "skills.imbuedSupport",
+        "skills.imbuedSupportClear",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 9 == 4)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs", "items"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        check(&mut d, "load", &mut out);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for (k, g) in groups.iter().enumerate().take(6) {
+            step(&mut d, c("groupList", json!({"sel": k + 1})), &mut out);
+            if g["slot"].is_string() && g["source"].is_null() {
+                step(
+                    &mut d,
+                    c("optimiseSockets", json!({"click": true})),
+                    &mut out,
+                );
+                step(
+                    &mut d,
+                    c("imbuedSupportClear", json!({"click": true})),
+                    &mut out,
+                );
+            }
+        }
+        // Another slot's item, and no slot
+        for r in [
+            c("groupList", json!({"sel": 1})),
+            c("groupSlot", json!({"sel": 7})),
+            c("optimiseSockets", json!({"click": true})),
+            c("groupSlot", json!({"sel": 1})),
+            c("optimiseSockets", json!({"click": true})),
+            c("imbuedSupportClear", json!({"click": true})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// `gemList`s that fail upstream, by build: the candidate gem and the error.
+/// Upstream's `hasGlobalEffect` of a skill is set the first time a stat of
+/// the skill with a `GlobalEffect` mod is looked up in `data.skillStatMap`
+/// (`skillStatMapMeta`), so a Vaal transfigured gem's base skill (Cleave of
+/// Rage: `gain_x_rage_on_attack_hit`) is an active skill in the first
+/// `initEnv` that sees it and no longer in later ones without
+/// `enableGlobal2`. Here the base skill is the main skill, triggered by
+/// General's Cry; `calcs.mirages` sets it up again in a new environment
+/// (`calcs.buildActiveSkill`), which no longer has it, so nothing is
+/// cached and `GlobalCache.cachedData[mode][uuid]` is indexed nil. In the
+/// application the DPS sort's coroutine dies silently and leaves the gem
+/// data in the slot. The typed engine takes `hasGlobalEffect` as the data
+/// loads it, as upstream's first calculation of a skill does, and answers.
+const UPSTREAM_GEM_LIST_FAILS: &[(&str, &str, &str)] = &[(
+    "3.13-generals-perforate-zerker",
+    "Vaal Cleave of Rage",
+    "attempt to index a nil value",
+)];
+
+/// Choosing gems by name in the Skills tab's gem slots, in the typed session
+/// as in the translated one: exact names, prefixes, initials, tags, no
+/// match, the slot after the last gem, and a name after a gem list
+#[test]
+fn skills_gem_select_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut upstream_fails = Vec::new();
+    let parts = ["Name", "Level", "Quality", "Enable", "Count", "ErrMsg"];
+    let paths: Vec<String> = (1..=7)
+        .flat_map(|i| parts.iter().map(move |p| format!("skills.gemSlot{i}{p}")))
+        .collect();
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 13 == 2)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        let n = groups[k]["gems"].as_array().map_or(0, Vec::len);
+        let name = |i: usize| format!("gemSlot{i}Name");
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c(&name(1), json!({"text": "fireball"})),
+            c(&name(1), json!({"text": "Arc"})),
+            c(&name(2), json!({"text": "ctf"})),
+            c(&name(2), json!({"text": "fire"})),
+            c(&name(2), json!({"text": "added lig"})),
+            c(&name(n + 1), json!({"text": "Faster Attacks"})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+            c(&name(n + 2), json!({"text": "melee"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        // A name chosen after the slot's gem list, sorted by DPS
+        let r = json!({"cmd": "gemList", "group": k + 1, "slot": 3});
+        let (t, tr) = (
+            answer(d.request(&r.to_string()), "typed"),
+            answer(d.translated_request(&r.to_string()), "translated"),
+        );
+        if tr.get("error").is_some() {
+            // Only the documented upstream failure: its calculation leaves
+            // the candidate's gem data in the translation's slot, so the
+            // build's remaining steps cannot be compared
+            match UPSTREAM_GEM_LIST_FAILS.iter().find(|(b, _, _)| *b == id) {
+                Some(&(_, gem, error)) if tr["error"] == error => {
+                    let has = t["ok"]["gems"]
+                        .as_array()
+                        .is_some_and(|g| g.iter().any(|x| x["name"] == gem));
+                    if t.get("error").is_some() || !has {
+                        out.push(format!("{id} {r}: typed {t} without {gem}"));
+                    }
+                    upstream_fails.push(id.clone());
+                }
+                _ => out.push(format!(
+                    "{id} {r}: translated {tr}, typed {}",
+                    truncate(&t.to_string())
+                )),
+            }
+            continue;
+        }
+        diff(&t, &tr, &format!("{id} {r}"), &mut out);
+        check(&mut d, "gem list", &mut out);
+        for r in [
+            c(&name(3), json!({"text": "support"})),
+            c(&name(3), json!({"text": "a"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    let expected: Vec<String> = UPSTREAM_GEM_LIST_FAILS
+        .iter()
+        .map(|(b, _, _)| b.to_string())
+        .collect();
+    assert_eq!(upstream_fails, expected, "the gem lists that fail upstream");
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Keys over the Skills tab's socket group rows (`OnHoverKeyUp`) and the gem
+/// slots' enabled boxes' tooltips, in the typed session as in the
+/// translated one
+#[test]
+fn skills_hover_keys_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.groupList",
+        "skills.groupEnabled",
+        "skills.includeInFullDPS",
+        "skills.gemSlot1Enable",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 15 == 6)
+        .map(|(_, b)| b)
+        .take(3)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+            for (i, part) in (1..=3).flat_map(|i| [(i, "Enable"), (i, "Quality")]) {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}{part}")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                diff(&t, &tr, &format!("{id} {label} {r}"), out);
+            }
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let key = |hover: usize, k: &str, ctrl: bool| json!({"cmd": "control", "path": "skills.groupList", "hover": hover, "hoverKey": k, "ctrl": ctrl});
+        check(&mut d, "load", &mut out);
+        for r in [
+            key(1, "RIGHTBUTTON", true),
+            key(2, "RIGHTBUTTON", false),
+            key(1, "LEFTBUTTON", true),
+            key(2, "LEFTBUTTON", true),
+            key(1, "LEFTBUTTON", true),
+            key(3, "F1", false),
+            key(99, "RIGHTBUTTON", false),
+            key(1, "LEFTBUTTON", false),
+            json!({"cmd": "control", "path": "skills.groupList", "sel": 2}),
+            key(2, "RIGHTBUTTON", true),
+            key(2, "LEFTBUTTON", true),
+            key(1, "RIGHTBUTTON", false),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Gem names with tags (`:`) in the Skills tab's gem slots, and imbued
+/// supports chosen by name, in the typed session as in the translated one
+#[test]
+fn skills_gem_tags_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let paths = [
+        "skills.gemSlot1Level",
+        "skills.gemSlot2Level",
+        "skills.imbuedSupport",
+        "skills.imbuedSupportClear",
+    ];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 7 == 4)
+        .map(|(_, b)| b)
+        .take(4)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let check = |d: &mut Dispatcher, label: &str, out: &mut Vec<String>| {
+            let views = json!({"cmd": "controls", "paths": paths}).to_string();
+            let (t, tr) = (
+                answer(d.request(&views), "typed"),
+                answer(d.translated_request(&views), "translated"),
+            );
+            diff(&t, &tr, &format!("{id} {label} controls"), out);
+            compare_views(
+                d,
+                &["state", "skills", "outputs"],
+                &format!("{id} {label}"),
+                out,
+            );
+        };
+        let step = |d: &mut Dispatcher, r: J, out: &mut Vec<String>| {
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            check(d, &r.to_string(), out);
+        };
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("skills.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let Some(k) = (0..groups.len())
+            .filter(|&k| groups[k]["source"].is_null() && groups[k]["slot"].is_string())
+            .max_by_key(|&k| groups[k]["gems"].as_array().map_or(0, Vec::len))
+        else {
+            continue;
+        };
+        for r in [
+            c("groupList", json!({"sel": k + 1})),
+            c("gemSlot1Name", json!({"text": "fire:melee"})),
+            c("gemSlot1Name", json!({"text": ":aura"})),
+            c("gemSlot2Name", json!({"text": "a:-support:aoe"})),
+            c("gemSlot2Name", json!({"text": "cold:active:int"})),
+            c("gemSlot2Name", json!({"text": ":"})),
+            c("imbuedSupport", json!({"text": "added fire damage"})),
+            c("imbuedSupport", json!({"text": "Added Cold"})),
+            c("imbuedSupport", json!({"text": "Faster Attacks"})),
+            c("groupList", json!({"sel": 1})),
+            c("groupList", json!({"sel": k + 1})),
+            c("imbuedSupportClear", json!({"click": true})),
+            c("imbuedSupport", json!({"text": "Faster Attacks"})),
+        ] {
+            step(&mut d, r, &mut out);
+        }
+        compare_saves(&mut d, &id, &mut out);
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The build's Back, Save, Save As and Help >>: Back with unsaved changes
+/// asks as the translated session does (its Cancel and Don't Save too);
+/// what the translation cannot do (save files, leave the build, read the
+/// help file) answers in the typed session alone: Save gives the build's
+/// XML and counts the changes as saved, Back without changes and Don't
+/// Save report the build closed, Help >> shows the help's Loadouts section
+#[test]
+fn build_buttons_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let builds: Vec<(String, PathBuf)> = corpus().into_iter().take(2).collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let typed = |d: &mut Dispatcher, r: J| {
+            let a = answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            a
+        };
+        let state =
+            |d: &mut Dispatcher| answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"].clone();
+        let back = json!({"cmd": "control", "path": "build.back", "click": true});
+        // Saved, nothing changed: the build closes
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.save", "click": true}),
+        );
+        let a = typed(&mut d, back.clone());
+        assert_eq!(a["ok"]["closed"], json!(true), "{id}: {a}");
+        // A change: Back asks, Cancel and Don't Save
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "90"}),
+        );
+        for (button, closed) in [("close", false), ("noSave", true)] {
+            typed(&mut d, back.clone());
+            compare_views(&mut d, &["state"], &format!("{id} back unsaved"), &mut out);
+            let a = typed(&mut d, json!({"cmd": "popupButton", "name": button}));
+            assert_eq!(
+                a["ok"]["closed"].as_bool() == Some(true),
+                closed,
+                "{id} {button}: {a}"
+            );
+            compare_views(
+                &mut d,
+                &["state", "outputs"],
+                &format!("{id} {button}"),
+                &mut out,
+            );
+        }
+        // Save from the popup and from the button: the build's XML, saved
+        typed(&mut d, back.clone());
+        let a = typed(&mut d, json!({"cmd": "popupButton", "name": "save"}));
+        let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save")["ok"]["xml"].clone();
+        assert_eq!(a["ok"]["xml"], saved, "{id}: the popup's save");
+        assert_eq!(a["ok"]["closed"], json!(true));
+        assert_eq!(state(&mut d)["unsaved"], json!(false), "{id}: saved");
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.characterLevel", "text": "91"}),
+        );
+        for button in ["build.save", "build.saveAs"] {
+            let a = typed(
+                &mut d,
+                json!({"cmd": "control", "path": button, "click": true}),
+            );
+            let saved = answer(d.request(r#"{"cmd":"saveXml"}"#), "save")["ok"]["xml"].clone();
+            assert_eq!(a["ok"]["xml"], saved, "{id}: {button}");
+            assert_eq!(
+                state(&mut d)["unsaved"],
+                json!(false),
+                "{id}: {button} saved"
+            );
+        }
+        // Help >>
+        let loadouts = |d: &mut Dispatcher| {
+            let r = json!({"cmd": "controls", "paths": ["build.buildLoadouts"]});
+            answer(d.request(&r.to_string()), "controls")["ok"]["build.buildLoadouts"].clone()
+        };
+        let n = loadouts(&mut d)["list"].as_array().map_or(0, Vec::len);
+        typed(
+            &mut d,
+            json!({"cmd": "control", "path": "build.buildLoadouts", "sel": n}),
+        );
+        let s = state(&mut d);
+        assert_eq!(
+            s["popups"][0]["title"],
+            json!("Loadouts"),
+            "{id}: {}",
+            s["popups"]
+        );
+        assert!(
+            s["popups"][0]["lines"]
+                .as_array()
+                .is_some_and(|l| l.len() > 3)
+        );
+        assert_eq!(loadouts(&mut d)["sel"], json!(1));
+        typed(&mut d, json!({"cmd": "popupButton", "name": "close"}));
+        assert_eq!(state(&mut d)["popups"], json!([]));
+    }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The gem slots' quality tooltips (the gems' quality stats described,
+/// `describeStats`) of every gem of a few builds, in the typed session as
+/// in the translated one
+#[test]
+fn skills_quality_tooltips_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut count = 0;
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 6 == 1)
+        .map(|(_, b)| b)
+        .take(8)
+        .collect();
+    for (id, path) in builds {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let skills = answer(d.request(r#"{"cmd":"skills"}"#), "skills");
+        let groups = skills["ok"]["groups"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        for (k, g) in groups.iter().enumerate() {
+            if !g["source"].is_null() {
+                continue;
+            }
+            let r = json!({"cmd": "control", "path": "skills.groupList", "sel": k + 1});
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let n = g["gems"].as_array().map_or(0, Vec::len);
+            for i in 1..=n {
+                let r =
+                    json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Quality")});
+                let (t, tr) = (
+                    answer(d.request(&r.to_string()), "typed"),
+                    answer(d.translated_request(&r.to_string()), "translated"),
+                );
+                if let Some(e) = d.typed_error.take() {
+                    out.push(format!("{id} group {} {r}: fell back: {e}", k + 1));
+                }
+                diff(&t, &tr, &format!("{id} group {} {r}", k + 1), &mut out);
+                count += 1;
+            }
+        }
+    }
+    eprintln!("{count} quality tooltips compared");
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

@@ -87,6 +87,31 @@ local function findControl(path)
 	if not control then
 		error("no control " .. tostring(path))
 	end
+	-- The Items tab's set and spec drop-downs, whose lists its draw sets
+	if host == "items" and (name == "setSelect" or name == "specSelect") then
+		local tab = build().itemsTab
+		local sets = { }
+		for index, itemSetId in ipairs(tab.itemSetOrderList) do
+			t_insert(sets, tab.itemSets[itemSetId].title or "Default")
+			if itemSetId == tab.activeItemSetId then
+				tab.controls.setSelect.selIndex = index
+			end
+		end
+		tab.controls.setSelect:SetList(sets)
+		tab.controls.specSelect:SetList(build().treeTab:GetSpecList())
+	end
+	-- The Skills tab's set drop-down, whose list its draw sets
+	if host == "skills" and name == "setSelect" then
+		local tab = build().skillsTab
+		local sets = { }
+		for index, skillSetId in ipairs(tab.skillSetOrderList) do
+			t_insert(sets, tab.skillSets[skillSetId].title or "Default")
+			if skillSetId == tab.activeSkillSetId then
+				tab.controls.setSelect.selIndex = index
+			end
+		end
+		tab.controls.setSelect:SetList(sets)
+	end
 	-- An item database's leagues and item types, which its first draw
 	-- loads
 	local db = control._className == "ItemDBControl" and control or (outer and at(list, outer))
@@ -242,6 +267,36 @@ function api.control(req)
 				end
 				control.selValue = nil
 			end
+		end
+	elseif req.hoverKey and control.OnHoverKeyUp then
+		-- A key released over row `hover` of a list (`OnHoverKeyUp`), with
+		-- the keys held: the list's hover methods answer that row
+		buildList(control)
+		local function hoverIndex()
+			return control.list[req.hover] ~= nil and req.hover or nil
+		end
+		local function hoverValue()
+			return control.list[req.hover]
+		end
+		local saved = { }
+		local tables = { control, common.classes[control._className], common.classes.ListControl }
+		for _, t in ipairs(tables) do
+			saved[t] = { rawget(t, "GetHoverIndex"), rawget(t, "GetHoverValue") }
+			rawset(t, "GetHoverIndex", hoverIndex)
+			rawset(t, "GetHoverValue", hoverValue)
+		end
+		local isKeyDown = IsKeyDown
+		IsKeyDown = function(key)
+			return (key == "CTRL" and req.ctrl) or (key == "SHIFT" and req.shift) or false
+		end
+		local ok, err = pcall(control.OnHoverKeyUp, control, req.hoverKey)
+		IsKeyDown = isKeyDown
+		for _, t in ipairs(tables) do
+			rawset(t, "GetHoverIndex", saved[t][1])
+			rawset(t, "GetHoverValue", saved[t][2])
+		end
+		if not ok then
+			error(err, 0)
 		end
 	elseif req.sel and control.SelectIndex and not control.SetSel then
 		-- A row of a list, clicked with the keys held as ListControl's

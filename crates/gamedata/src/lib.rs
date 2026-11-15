@@ -110,6 +110,64 @@ impl Source {
             .collect()
     }
 
+    /// The stat descriptions of the gems' quality stats, in the scopes of
+    /// their skills (`Data/StatDescriptions`)
+    pub fn stat_descriptions(
+        &self,
+        skills: &SkillData,
+    ) -> Result<engine::stat_describer::StatDescriptions> {
+        let mut scopes = std::collections::BTreeSet::new();
+        let mut stats = std::collections::HashSet::new();
+        for e in skills.skills.values() {
+            if let Some(s) = &e.stat_description_scope {
+                scopes.insert(s.clone());
+            }
+            stats.extend(e.quality_stats.iter().map(|(s, _)| s.clone()));
+        }
+        let mut im = self.importer();
+        let names: Vec<String> = scopes.into_iter().collect();
+        engine::stat_describer::StatDescriptions::from_lua(
+            &names,
+            &mut |name| {
+                im.load1(&format!("Data/StatDescriptions/{name}"), vec![])
+                    .map_err(|e| e.to_string())
+            },
+            &stats,
+        )
+    }
+
+    /// `data.monsterExperienceLevelMap`
+    pub fn monster_experience_levels(&self) -> Result<Vec<f64>> {
+        let map = self.data.get_str("monsterExperienceLevelMap");
+        map.as_table()
+            .ok_or("no monsterExperienceLevelMap")?
+            .array()
+            .iter()
+            .map(|v| {
+                v.as_number()
+                    .ok_or_else(|| "a level that is no number".to_string())
+            })
+            .collect()
+    }
+
+    /// `poePlannerVersions` of `GameVersions.lua`, by number
+    pub fn poe_planner_versions(&self) -> Result<Vec<(f64, String)>> {
+        let mut im = self.importer();
+        im.load("GameVersions", vec![]).map_err(|e| e.to_string())?;
+        let all = im.global("poePlannerVersions");
+        let all = all.as_table().ok_or("no poePlannerVersions")?;
+        let mut out: Vec<(f64, String)> = all
+            .borrow()
+            .iter()
+            .filter_map(|(k, v)| match k {
+                Key::Int(n) => Some((n as f64, v.as_str()?.to_str_lossy().into_owned())),
+                _ => None,
+            })
+            .collect();
+        out.sort_by(|a, b| a.0.total_cmp(&b.0));
+        Ok(out)
+    }
+
     /// The options' defaults, from `Modules/ConfigOptions.lua` evaluated as
     /// data: its functions are ported by name in `engine::config`
     pub fn option_defaults(&self) -> Result<Vec<OptionDefault>> {
@@ -201,11 +259,14 @@ impl Source {
         let mapping = im
             .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
             .map_err(|e| e.to_string())?;
+        let names = im
+            .load1("Data/TimelessJewelData/AbyssNotableNames", vec![])
+            .map_err(|e| e.to_string())?;
         let src_dir = self.src_dir.clone();
         let loader = move |name: &str| -> Option<Vec<u8>> {
             miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
         };
-        engine::timeless::Timeless::from_lua(&legion, &mapping, parser, Box::new(loader))
+        engine::timeless::Timeless::from_lua(&legion, &mapping, &names, parser, Box::new(loader))
     }
 
     pub fn global(&self, name: &str) -> Value {
@@ -258,15 +319,19 @@ impl Source {
 
     pub fn game_data(&self) -> Result<GameData> {
         let versions = self.tree_versions()?;
+        let skills = self.skills()?;
         Ok(GameData {
             items: self.items()?,
-            skills: self.skills()?,
+            stat_descriptions: self.stat_descriptions(&skills)?,
+            skills,
             setup: self.setup()?,
             config: self.config()?,
             option_defaults: self.option_defaults()?,
             config_vars: self.config_vars()?,
             jewel_radius: self.jewel_radius(versions.last().unwrap())?,
             tree_version_info: self.tree_version_info(&versions)?,
+            poe_planner_versions: self.poe_planner_versions()?,
+            monster_experience_levels: self.monster_experience_levels()?,
             tree_versions: versions,
             uniques: self.uniques()?,
             rares: self.rares()?,

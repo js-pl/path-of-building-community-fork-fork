@@ -9,7 +9,7 @@
 
 use super::{Result, TypedSession, num};
 use engine::calc_env::{CalcMode, init_env};
-use engine::calc_skills::effect_supports;
+use engine::calc_skills::{effect_supports, effect_supports_imbued};
 use engine::calculator::MiscCalculator;
 use engine::compare::{self, GemCandidate};
 use engine::parallel::Threads;
@@ -19,52 +19,85 @@ use serde_json::{Map, Value as J, json};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-/// The Skills tab's options the gem list reads, as its `Load` sets them
-struct Options {
-    /// `showSupportGemTypes`: `ALL`, `NORMAL` or `EXCEPTIONAL`
-    show: String,
-    show_legacy: bool,
-    sort_by_dps: bool,
-    /// `sortGemsByDPSField`
-    field: String,
-}
+/// `gemList`'s rows, the build the last pending gem's calculation ran
+/// on, and the gems' order
+pub(super) type GemRows = (J, Vec<(Arc<Gem>, f64, f64)>, Vec<String>);
 
-impl TypedSession<'_> {
-    fn gem_select_options(&self) -> Options {
-        let xml = self.section("Skills");
-        let attr = |k: &str| xml.and_then(|s| s.attr(k));
-        let show = attr("showSupportGemTypes")
-            .filter(|v| ["ALL", "NORMAL", "EXCEPTIONAL"].contains(v))
-            .unwrap_or("ALL");
-        let field = attr("sortGemsByDPSField")
-            .filter(|v| {
-                [
-                    "FullDPS",
-                    "CombinedDPS",
-                    "TotalDPS",
-                    "AverageDamage",
-                    "TotalDot",
-                    "BleedDPS",
-                    "IgniteDPS",
-                    "TotalPoisonDPS",
-                    "TotalEHP",
-                ]
-                .contains(v)
-            })
-            .unwrap_or("CombinedDPS");
-        Options {
-            show: show.into(),
-            show_legacy: attr("showLegacyGems") == Some("true"),
-            sort_by_dps: attr("sortGemsByDPS").is_none_or(|v| v == "true"),
-            field: field.into(),
-        }
-    }
-
+impl<'d> TypedSession<'d> {
     /// `gemList` of a group's gem slot (both 1-based; the slot after the
     /// last adds a gem): the gems of its dropdown in their order, each
     /// with its DPS in the slot and whether it supports the group's skills
-    pub fn gem_select_list(&self, group: f64, slot: f64) -> Result<J> {
-        let opts = self.gem_select_options();
+    pub fn gem_select_list(&mut self, group: f64, slot: f64) -> Result<J> {
+        let (out, seq, order) = self.gem_select_rows(group, slot, true, false)?;
+        // `DPSBuilder` runs each pending gem's calculation on the group's
+        // own gems: `CalcOutputWithThisGem` puts back only the slot's gem
+        // data and level, so the selections each calculation writes on the
+        // gems (`skillMinion`, `skillPart`, ...) carry on to the next one
+        // and stay
+        let (g, k) = (group as usize - 1, slot as usize - 1);
+        let calc_data = self.data.calc_data();
+        let tab = self.build.skills.as_ref().ok_or("no skills tab")?;
+        let mut groups = tab.socket_group_list().to_vec();
+        let old = groups[g].gem_list.get(k).map(|o| (o.gem.clone(), o.level));
+        for (gem, level, quality) in seq {
+            let mut b = self.build.clone();
+            let list = b
+                .skills
+                .as_mut()
+                .and_then(|s| s.socket_group_list_mut())
+                .ok_or("no socket groups")?;
+            *list = groups;
+            let slot_gems = &mut list[g].gem_list;
+            match slot_gems.get_mut(k) {
+                Some(o) => {
+                    o.gem = Some(gem.clone());
+                    o.level = Some(level);
+                }
+                None => slot_gems.push(GemInstance {
+                    level: Some(level),
+                    quality: Some(quality),
+                    count: Some(1.0),
+                    enabled: true,
+                    enable_global1: true,
+                    enable_global2: true,
+                    gem_id: Some(gem.id.clone()),
+                    name_spec: gem.name.clone(),
+                    skill_id: Some(gem.granted_effect.id.clone()),
+                    gem: Some(gem.clone()),
+                    ..GemInstance::default()
+                }),
+            }
+            init_env(&mut b, &calc_data, CalcMode::Calculator)?;
+            groups = b
+                .skills
+                .as_ref()
+                .map(|s| s.socket_group_list().to_vec())
+                .unwrap_or_default();
+            match &old {
+                Some((data, level)) => {
+                    let o = &mut groups[g].gem_list[k];
+                    o.gem = data.clone();
+                    o.level = *level;
+                }
+                None => groups[g].gem_list.truncate(k),
+            }
+        }
+        let tab = self.build.skills.as_mut().ok_or("no skills tab")?;
+        *tab.socket_group_list_mut().ok_or("no socket groups")? = groups;
+        self.gem_list_shown(group, slot, order);
+        Ok(out)
+    }
+
+    /// The rows of `gemList`, and the build the last pending gem's
+    /// calculation ran on
+    pub(super) fn gem_select_rows(
+        &self,
+        group: f64,
+        slot: f64,
+        with_dps: bool,
+        imbued: bool,
+    ) -> Result<GemRows> {
+        let opts = &self.gem_options;
         let skills_tab = self.build.skills.as_ref().ok_or("no skills tab")?;
         let groups = skills_tab.socket_group_list();
         let g = (group as usize)
@@ -97,6 +130,17 @@ impl TypedSession<'_> {
                     .tag_string
                     .as_deref()
                     .is_some_and(|t| t.contains("Exceptional"));
+                if imbued {
+                    // Supports that are not exceptional and grant no
+                    // active skill
+                    return e.support
+                        && !exceptional
+                        && !legacy_awakened
+                        && gem
+                            .secondary_granted_effect
+                            .as_ref()
+                            .is_none_or(|s| s.support);
+                }
                 let (all, normal, exc) = (
                     opts.show == "ALL",
                     opts.show == "NORMAL",
@@ -121,7 +165,17 @@ impl TypedSession<'_> {
                 .filter(|gem| gem.granted_effect.support)
                 .filter(|gem| {
                     skills.iter().any(|&i| {
-                        effect_supports(&gem.granted_effect, &env.skills, i, &env.groups, data)
+                        if imbued {
+                            effect_supports_imbued(
+                                &gem.granted_effect,
+                                &env.skills,
+                                i,
+                                &env.groups,
+                                data,
+                            )
+                        } else {
+                            effect_supports(&gem.granted_effect, &env.skills, i, &env.groups, data)
+                        }
                     })
                 })
                 .map(|gem| gem.id.clone())
@@ -144,58 +198,71 @@ impl TypedSession<'_> {
             }
         }
 
-        // `DPSBuilder`: each pending gem in the slot
-        let calc = MiscCalculator::new(&self.build, &calc_data)?;
-        let base = compare::base_gem_dps(&calc, &opts.field);
-        let full_dps = opts.field == "FullDPS" || self.view_mode == "TREE";
-        let pending: Vec<&Arc<Gem>> = gems
-            .iter()
-            .copied()
-            .filter(|gem| {
-                can_support.contains(&gem.id)
-                    || (gem.granted_effect.has_global_effect && !gem.granted_effect.support)
-            })
-            .collect();
-        let default_level = skills_tab.default_gem_level;
-        let quality = skills_tab.default_gem_quality;
-        let cands: Vec<GemCandidate> = pending
-            .iter()
-            .map(|gem| {
-                let mut b = self.build.clone();
-                let level = process_gem_level(gem, false, default_level, char_level);
-                let list = &mut b
-                    .skills
-                    .as_mut()
-                    .and_then(|s| s.socket_group_list_mut())
-                    .expect("socket groups")[g]
-                    .gem_list;
-                match list.get_mut(k) {
-                    // The gem in the slot keeps all but its data and level
-                    Some(old) => {
-                        old.gem = Some((*gem).clone());
-                        old.level = Some(level);
-                    }
-                    None => list.push(GemInstance {
-                        level: Some(level),
-                        quality: Some(quality),
-                        count: Some(1.0),
-                        enabled: true,
-                        enable_global1: true,
-                        enable_global2: true,
-                        gem_id: Some(gem.id.clone()),
-                        name_spec: gem.name.clone(),
-                        skill_id: Some(gem.granted_effect.id.clone()),
-                        gem: Some((*gem).clone()),
-                        ..GemInstance::default()
-                    }),
-                }
-                GemCandidate { build: b }
-            })
-            .collect();
-        let powers = compare::gem_power(&calc, cands, &opts.field, full_dps, Threads::available());
+        // `DPSBuilder`: each pending gem in the slot, which only a draw (or
+        // `gemList`) runs
         let mut dps: std::collections::HashMap<&str, f64> = std::collections::HashMap::new();
-        for (gem, p) in pending.iter().zip(powers) {
-            dps.insert(gem.id.as_str(), p?);
+        let mut base = 0.0;
+        let mut seq = Vec::new();
+        if with_dps {
+            let calc = MiscCalculator::new(&self.build, &calc_data)?;
+            base = compare::base_gem_dps(&calc, opts.field);
+            let full_dps = opts.field == "FullDPS" || self.view_mode == "TREE";
+            let pending: Vec<&Arc<Gem>> = gems
+                .iter()
+                .copied()
+                .filter(|gem| {
+                    can_support.contains(&gem.id)
+                        || (gem.granted_effect.has_global_effect && !gem.granted_effect.support)
+                })
+                .collect();
+            let default_level = skills_tab.default_gem_level;
+            let quality = skills_tab.default_gem_quality;
+            let cands: Vec<GemCandidate> = pending
+                .iter()
+                .map(|gem| {
+                    let mut b = self.build.clone();
+                    let level = process_gem_level(gem, false, default_level, char_level);
+                    let list = &mut b
+                        .skills
+                        .as_mut()
+                        .and_then(|s| s.socket_group_list_mut())
+                        .expect("socket groups")[g]
+                        .gem_list;
+                    match list.get_mut(k) {
+                        // The gem in the slot keeps all but its data and level
+                        Some(old) => {
+                            old.gem = Some((*gem).clone());
+                            old.level = Some(level);
+                        }
+                        None => list.push(GemInstance {
+                            level: Some(level),
+                            quality: Some(quality),
+                            count: Some(1.0),
+                            enabled: true,
+                            enable_global1: true,
+                            enable_global2: true,
+                            gem_id: Some(gem.id.clone()),
+                            name_spec: gem.name.clone(),
+                            skill_id: Some(gem.granted_effect.id.clone()),
+                            gem: Some((*gem).clone()),
+                            ..GemInstance::default()
+                        }),
+                    }
+                    GemCandidate { build: b }
+                })
+                .collect();
+            seq = pending
+                .iter()
+                .map(|gem| {
+                    let level = process_gem_level(gem, false, default_level, char_level);
+                    ((*gem).clone(), level, quality)
+                })
+                .collect();
+            let powers =
+                compare::gem_power(&calc, cands, opts.field, full_dps, Threads::available());
+            for (gem, p) in pending.iter().zip(powers) {
+                dps.insert(gem.id.as_str(), p?);
+            }
         }
 
         // `BuildList("")` with `FilterSupport`, sorted by `SortGemList`
@@ -205,6 +272,9 @@ impl TypedSession<'_> {
                 let e = &gem.granted_effect;
                 if e.legacy && !opts.show_legacy {
                     return false;
+                }
+                if imbued {
+                    return can_support.contains(&gem.id);
                 }
                 let legacy_awakened = e.legacy && e.plus_version_of.is_some();
                 let exceptional = gem
@@ -241,6 +311,7 @@ impl TypedSession<'_> {
                 J::Object(o)
             })
             .collect();
-        Ok(json!({ "baseDps": num(base), "gems": rows }))
+        let order = list.iter().map(|gem| gem.id.clone()).collect();
+        Ok((json!({ "baseDps": num(base), "gems": rows }), seq, order))
     }
 }

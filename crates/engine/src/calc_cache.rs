@@ -329,6 +329,7 @@ impl Recalc for Recalculator<'_, '_> {
         let other = data.skills.skill_type("OtherThingUsesSkill").unwrap_or(-1);
         copy.skill_types.insert(other);
         let mods = copy.mods.as_mut().ok_or("a copy without its mod list")?;
+        mods.add_skill_type(other);
         let cond = Sym::new("usedByMirage");
         for c in std::iter::once(&mut mods.skill_cfg).chain(mods.weapon_cfgs.iter_mut().flatten()) {
             c.skill_cond

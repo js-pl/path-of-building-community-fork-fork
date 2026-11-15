@@ -11,7 +11,7 @@ use super::{Result, TypedSession};
 use engine::actor::OutVal;
 use engine::config::Val;
 use engine::pat::{self, num};
-use engine::xml::{Element, Node};
+use engine::xml::Element;
 use std::collections::BTreeMap;
 
 /// An element under construction: attributes left out when `None`
@@ -142,14 +142,6 @@ fn same(a: &Val, b: &Val) -> bool {
     }
 }
 
-/// The text children of an element, joined as upstream keeps the first
-fn first_text(e: &Element) -> Option<&str> {
-    e.children.iter().find_map(|c| match c {
-        Node::Text(t) => Some(t.as_str()),
-        Node::Element(_) => None,
-    })
-}
-
 const PARTY_BUFFS: [&str; 7] = [
     "PartyMemberStats",
     "Aura",
@@ -188,7 +180,7 @@ impl TypedSession<'_> {
         root.push(self.save_import());
         root.push(self.save_items()?);
         root.push(self.save_notes());
-        root.push(self.save_party(&exported));
+        root.push(self.save_party(&exported)?);
         root.push(self.save_skills());
         root.push(self.save_tree()?);
         root.push(self.save_tree_view());
@@ -308,49 +300,20 @@ impl TypedSession<'_> {
                 }
             }
         }
-        let t = self.section("Build").and_then(|b| b.child("TimelessData"));
-        let attr = |k: &str| t.and_then(|t| t.attr(k));
-        let num_attr = |k: &str| attr(k).and_then(pat::to_number);
-        let mut tl = X::new("TimelessData")
-            .a("jewelTypeId", num_attr("jewelTypeId").map(n))
-            .a("conquerorTypeId", num_attr("conquerorTypeId").map(n))
-            .a(
-                "devotionVariant1",
-                n(num_attr("devotionVariant1").unwrap_or(1.0)),
-            )
-            .a(
-                "devotionVariant2",
-                n(num_attr("devotionVariant2").unwrap_or(1.0)),
-            )
-            .a("jewelSocketId", num_attr("jewelSocketId").map(n))
-            .a(
-                "fallbackWeightModeIdx",
-                num_attr("fallbackWeightModeIdx").map(n),
-            );
-        if t.is_some() {
-            tl = tl
-                .a(
-                    "socketFilter",
-                    (attr("socketFilter") == Some("true")).then(|| "true".into()),
-                )
-                .a(
-                    "socketAllocate",
-                    (attr("socketAllocate") == Some("true")).then(|| "true".into()),
-                )
-                .a(
-                    "socketFilterDistance",
-                    n(num_attr("socketFilterDistance").unwrap_or(0.0)),
-                )
-                .a("searchList", attr("searchList").map(String::from))
-                .a(
-                    "searchListFallback",
-                    attr("searchListFallback").map(String::from),
-                );
-        } else {
-            tl = tl
-                .a("searchList", String::new())
-                .a("searchListFallback", String::new());
-        }
+        // `timelessData`, as `buildMode:Save` writes it
+        let t = &self.tree_tab.timeless;
+        let tl = X::new("TimelessData")
+            .a("jewelTypeId", t.jewel_type.map(n))
+            .a("conquerorTypeId", t.conqueror.map(n))
+            .a("devotionVariant1", n(t.devotion[0]))
+            .a("devotionVariant2", n(t.devotion[1]))
+            .a("jewelSocketId", t.socket.map(n))
+            .a("fallbackWeightModeIdx", t.fallback_mode.map(n))
+            .a("socketFilter", t.socket_filter.then(|| "true".into()))
+            .a("socketAllocate", t.socket_allocate.then(|| "true".into()))
+            .a("socketFilterDistance", t.socket_filter_distance.map(n))
+            .a("searchList", t.search_list.clone())
+            .a("searchListFallback", t.search_list_fallback.clone());
         x.push(tl);
         Ok(x)
     }
@@ -692,44 +655,19 @@ impl TypedSession<'_> {
         x
     }
 
-    fn save_party(&self, exported: &[(&str, String)]) -> X {
-        let p = self.section("Party");
-        let mut bufs: BTreeMap<&str, &str> = BTreeMap::new();
-        for e in p.iter().flat_map(|p| p.elements()) {
-            if e.elem == "ImportedBuffs"
-                && let Some(name) = e.attr("name")
-                && PARTY_BUFFS.contains(&name)
-            {
-                bufs.insert(name, first_text(e).unwrap_or(""));
-            }
-        }
-        let attr = |k: &str| p.and_then(|p| p.attr(k));
-        let destination = attr("destination")
-            .filter(|d| {
-                [
-                    "All",
-                    "Party Member Stats",
-                    "Aura",
-                    "Curse",
-                    "Warcry Skills",
-                    "Link Skills",
-                    "EnemyConditions",
-                    "EnemyMods",
-                ]
-                .contains(d)
-            })
-            .unwrap_or("All");
+    fn save_party(&self, exported: &[(&str, String)]) -> Result<X> {
+        let tab = self.party_tab()?;
         let mut x = X::new("Party")
-            .a("destination", destination.to_string())
-            .a("append", b(attr("append") == Some("true")))
             .a(
-                "ShowAdvanceTools",
-                b(attr("ShowAdvanceTools") == Some("true")),
-            );
-        for name in PARTY_BUFFS {
-            if let Some(t) = bufs.get(name).filter(|t| !t.is_empty()) {
+                "destination",
+                super::party::DESTINATIONS[tab.dest].to_string(),
+            )
+            .a("append", b(tab.append))
+            .a("ShowAdvanceTools", b(tab.advanced));
+        for (name, t) in PARTY_BUFFS.iter().zip(&tab.bufs) {
+            if !t.is_empty() {
                 let mut c = X::new("ImportedBuffs").a("name", name.to_string());
-                c.text(*t);
+                c.text(t);
                 x.push(c);
             }
         }
@@ -738,34 +676,14 @@ impl TypedSession<'_> {
             c.text(t);
             x.push(c);
         }
-        x
+        Ok(x)
     }
 
     fn save_skills(&self) -> X {
-        let xml = self.section("Skills");
-        let attr = |k: &str| xml.and_then(|s| s.attr(k));
         let Some(skills) = &self.build.skills else {
             return X::new("Skills");
         };
-        let show = attr("showSupportGemTypes")
-            .filter(|v| ["ALL", "NORMAL", "EXCEPTIONAL"].contains(v))
-            .unwrap_or("ALL");
-        let field = attr("sortGemsByDPSField")
-            .filter(|v| {
-                [
-                    "FullDPS",
-                    "CombinedDPS",
-                    "TotalDPS",
-                    "AverageDamage",
-                    "TotalDot",
-                    "BleedDPS",
-                    "IgniteDPS",
-                    "TotalPoisonDPS",
-                    "TotalEHP",
-                ]
-                .contains(v)
-            })
-            .unwrap_or("CombinedDPS");
+        let o = &self.gem_options;
         let mut x = X::new("Skills")
             .a("activeSkillSet", n(skills.active_skill_set_id))
             .a(
@@ -780,13 +698,10 @@ impl TypedSession<'_> {
                     n(skills.default_gem_quality)
                 },
             )
-            .a(
-                "sortGemsByDPS",
-                b(attr("sortGemsByDPS").is_none_or(|v| v == "true")),
-            )
-            .a("showSupportGemTypes", show.to_string())
-            .a("sortGemsByDPSField", field.to_string())
-            .a("showLegacyGems", b(attr("showLegacyGems") == Some("true")));
+            .a("sortGemsByDPS", b(o.sort_by_dps))
+            .a("showSupportGemTypes", o.show.to_string())
+            .a("sortGemsByDPSField", o.field.to_string())
+            .a("showLegacyGems", b(o.show_legacy));
         for id in &skills.skill_set_order_list {
             let Some(set) = skills.skill_sets.get(&(*id as i64)) else {
                 continue;
@@ -894,7 +809,7 @@ impl TypedSession<'_> {
             )
             .a("zoomX", tostr(zx))
             .a("zoomY", tostr(zy))
-            .a("searchStr", attr("searchStr").unwrap_or("").to_string())
+            .a("searchStr", self.tree_tab.search.clone())
             .a(
                 "showStatDifferences",
                 b(attr("showStatDifferences").is_none_or(|v| v == "true")),

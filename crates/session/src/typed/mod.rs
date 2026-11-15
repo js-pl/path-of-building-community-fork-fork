@@ -3,11 +3,15 @@
 //! ported so far answered from it with the JSON the translated session
 //! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
 
+mod build_controls;
 mod calcs;
 mod config;
 pub mod display_stats;
 mod gem_select;
+mod gem_slots;
 mod geometry;
+mod group_detail;
+mod group_list;
 mod item_add_implicit;
 mod item_add_modifier;
 mod item_anoint;
@@ -25,21 +29,29 @@ mod item_popups;
 mod item_sets;
 mod item_tooltip;
 mod items;
+mod items_tab_controls;
 mod list_order;
 mod loadouts;
 mod node_tooltip;
 mod notes;
 mod party;
+mod party_tab;
 mod save;
 mod sets;
 mod shared_lists;
 mod sidebar;
 mod skills;
+mod skills_controls;
+mod skills_sockets;
 mod slot_drops;
 mod spec_sets;
+mod spectre_library;
+mod timeless_search;
+mod timeless_seeds;
 pub mod tooltip;
 mod tree;
 mod tree_import;
+mod tree_tab;
 mod undo;
 
 pub use skills::{GemEdit, GroupEdit};
@@ -304,11 +316,25 @@ pub struct TypedSession<'d> {
     undo: HashMap<usize, Vec<undo::UndoState>>,
     /// A new build's skills tab, whose default gem quality is nil
     gem_quality_nil: bool,
+    /// The Skills tab's gem options
+    gem_options: skills_controls::GemOptions,
+    /// `SkillsTab.displayGroup`, the group shown
+    display_group: Option<u64>,
+    /// The socket group list's selection
+    group_sel: group_list::GroupSel,
+    /// The shown group's controls
+    detail: group_detail::DetailControls,
     /// `ItemsTab.displayItem`: the item in the editor
     display_item: Option<engine::item::Item>,
     /// Whether the Party tab was laid out since the build loaded: its
     /// first layout wraps the notes label for good
     party_laid_out: std::cell::Cell<bool>,
+    /// The Party tab once its controls changed it
+    party_tab: Option<party_tab::PartyTab>,
+    /// The Configuration tab's search and Show All Configurations
+    config_ui: config::ConfigUi,
+    /// The Tree tab's search, heat map and power report
+    tree_tab: tree_tab::TreeTab,
     /// The item editor's controls
     editor: item_editor::Editor,
     /// The unique and rare item database lists' inputs
@@ -355,8 +381,15 @@ impl<'d> TypedSession<'d> {
             class_popups: Vec::new(),
             undo: HashMap::new(),
             gem_quality_nil: false,
+            gem_options: skills_controls::GemOptions::load(None, None),
+            display_group: None,
+            group_sel: Default::default(),
+            detail: Default::default(),
             display_item: None,
             party_laid_out: Default::default(),
+            party_tab: None,
+            tree_tab: tree_tab::TreeTab::load(&root, data.game.tree_versions.len()),
+            config_ui: config::ConfigUi::new(&data.game.config_vars),
             editor: Default::default(),
             item_db_lists: Default::default(),
             select_db: 1,
@@ -370,6 +403,12 @@ impl<'d> TypedSession<'d> {
         {
             s.update_config_controls();
         }
+        s.gem_options = skills_controls::GemOptions::load(
+            s.section("Skills"),
+            s.build.skills.as_ref().map(|k| k.default_gem_quality),
+        );
+        // `SetActiveSkillSet` shows the set's first group
+        s.reset_display_group();
         s.config_mods_built();
         s.clamp_main_socket_group();
         s.load_specs()?;
@@ -393,9 +432,26 @@ impl<'d> TypedSession<'d> {
         for p in paths {
             let c = match p.split_once('.')? {
                 ("calcs", name) => self.calcs_control(name)?,
+                ("build", _) if Self::is_build_control(p) => self.build_control_json(p)?,
                 ("build", _) => state["controls"].get(*p)?.clone(),
                 ("config", var) => self.config_control_json(var)?,
+                ("configTab", name) => match self.custom_block_json(name)? {
+                    Some(c) => c,
+                    None => continue,
+                },
+                ("skills", _) if Self::is_skills_control(p) => self.skills_control_json(p)?,
+                ("skills", _) if Self::is_group_list_control(p) => self.group_list_json(p)?,
+                ("skills", _) if Self::is_group_detail_control(p) => self.group_detail_json(p)?,
+                ("skills", _) if Self::is_skills_sockets_control(p) => {
+                    self.skills_sockets_json(p)?
+                }
+                // A slot the tab has not made is no control
+                ("skills", _) if Self::is_gem_slot_control(p) && !self.gem_slot_exists(p) => {
+                    continue;
+                }
+                ("skills", _) if Self::is_gem_slot_control(p) => self.gem_slot_json(p)?,
                 ("items", _) if Self::is_item_db_control(p) => self.item_db_control_json(p).ok()?,
+                ("items", _) if Self::is_items_tab_control(p) => self.items_tab_control_json(p)?,
                 ("items", _) if Self::is_shared_list_control(p) => {
                     self.shared_list_control_json(p).ok()?
                 }
@@ -533,7 +589,7 @@ impl<'d> TypedSession<'d> {
         let calc = engine::calculator::MiscCalculator::new(&self.build, &data)?;
         let opts = PowerOptions {
             stat,
-            max_depth: None,
+            max_depth: self.tree_tab.max_depth,
             cluster_nodes: Vec::new(),
         };
         let p = node_power(&calc, &opts)?;
@@ -571,4 +627,19 @@ impl<'d> TypedSession<'d> {
             .collect();
         Ok(json!({ "combined": combined, "max": object(max), "nodes": object(nodes) }))
     }
+}
+
+/// Whether a path is a gem slot's count (`skills.gemSlot<i>Count`)
+pub fn gem_slots_count_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Count")
+}
+
+/// Whether a path is a gem slot's enabled box (`skills.gemSlot<i>Enable`)
+pub fn gem_slots_enable_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Enable")
+}
+
+/// Whether a path is a gem slot's quality box (`skills.gemSlot<i>Quality`)
+pub fn gem_slots_quality_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Quality")
 }

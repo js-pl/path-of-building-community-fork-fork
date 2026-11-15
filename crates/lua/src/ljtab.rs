@@ -581,6 +581,15 @@ impl<V> Default for LjMap<V> {
 }
 
 impl<V> LjMap<V> {
+    /// A table a constructor made with room for `hbits` bits of hash part
+    /// (`{ [a] = x, [b] = y }` reserves its entries)
+    pub fn with_hash(hbits: u32) -> Self
+    where
+        V: Clone,
+    {
+        LjMap(LjTable::with_sizes(0, hbits))
+    }
+
     #[inline]
     pub fn get(&self, k: u32) -> Option<&V> {
         self.0.get(NKey::int(k as i64)).and_then(Option::as_ref)

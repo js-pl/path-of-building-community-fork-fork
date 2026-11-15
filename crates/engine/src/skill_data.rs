@@ -95,6 +95,8 @@ pub struct GrantedEffect {
     /// The keys of `minionUses`
     pub minion_uses: Option<Vec<String>>,
     pub base_effectiveness: Option<f64>,
+    /// `statDescriptionScope`: the stat descriptions of its stats
+    pub stat_description_scope: Option<String>,
     pub incremental_effectiveness: Option<f64>,
     /// The offence functions the effect has (`initialFunc`,
     /// `preDamageFunc`, ...), ported by hand per effect
@@ -467,6 +469,8 @@ impl GrantedEffect {
                 x => Some(truthy_keys(&x)?),
             },
             base_effectiveness: opt_number(&get(v, "baseEffectiveness"))?,
+            stat_description_scope: opt_string(&get(v, "statDescriptionScope"))?
+                .map(|s| s.to_string()),
             incremental_effectiveness: opt_number(&get(v, "incrementalEffectiveness"))?,
             cast_time: opt_number(&get(v, "castTime"))?,
             funcs: [
@@ -768,6 +772,7 @@ crate::codec_struct!(GrantedEffect {
     minion_has_item_set,
     minion_uses,
     base_effectiveness,
+    stat_description_scope,
     incremental_effectiveness,
     funcs,
     cast_time,
