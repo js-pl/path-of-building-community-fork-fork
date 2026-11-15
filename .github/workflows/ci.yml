@@ -85,11 +85,11 @@ jobs:
             filter: 'binary(=perform)'
             shards: 2/2
           - name: setup and breakdowns
-            filter: 'binary(=calculator) | binary(=calc_setup) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
+            filter: 'binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
           - name: items, config and skills
-            filter: 'binary(=item) | binary(=items_tab) | binary(=config) | binary(=calcs) | binary(=skills) | binary(=tree)'
+            filter: 'binary(=item) | binary(=config) | binary(=calcs) | binary(=tree)'
           - name: rest
-            filter: 'not (test(=typed_session_matches_translated) | binary(=perform) | binary(=calculator) | binary(=calc_setup) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=items_tab) | binary(=config) | binary(=calcs) | binary(=skills) | binary(=tree))'
+            filter: 'not (test(=typed_session_matches_translated) | binary(=perform) | binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=config) | binary(=calcs) | binary(=tree))'
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}

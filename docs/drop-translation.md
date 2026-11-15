@@ -43,7 +43,7 @@ makes cyclic environments).
 | Tests | Reference today |
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
-| `equivalence/tests/{calc_setup,perform,breakdown,calculator,power,mods,item,items_tab,spec,tree,skills,config,game_data}.rs` | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `equivalence/tests/{perform,breakdown,calculator,power,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
 | `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
@@ -291,3 +291,26 @@ of them, so each difference is one between the translation and LuaJIT):
     LuaJIT, a NaN or a -0 on either side giving the right operand;
   - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
     another order: explained with the party's curses above.
+
+## Retired tests
+
+Intermediate-state tests against the translation go once the oracle
+covers what they checked; the diagnostic value (where a difference starts)
+goes with them.
+
+- `mods.rs` (`mod_queries`, corpus): the typed mod queries on every corpus
+  build's stores. Every output, breakdown and Calcs cell runs on them:
+  `build_output.rs` (every corpus build, `MAIN` and `CALCS`, bitwise),
+  `oracle_variants.rs` (the variant builds) and the session test's calcs
+  phase (every cell's breakdown), all against the oracle.
+- `calc_setup.rs` (`base_dbs`, `initial_node_mods`, `items_setup`,
+  corpus): the setup slices of `initEnv`, which every output stands on;
+  the same coverage, plus the session's item and config edits
+  recalculating after each change.
+- `items_tab.rs`, `skills.rs` (corpus): the Items and Skills tabs after
+  loading; the session test's items and skills views and saves, after the
+  load and after random edits, on every corpus build.
+- `config.rs` `config_matches_upstream` (corpus): the session test's config
+  phase (views and outputs after option edits) and `build_output.rs`.
+  `every_option_matches_upstream` (every option and value) stays until it
+  runs against the oracle.
