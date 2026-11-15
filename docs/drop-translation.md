@@ -264,8 +264,10 @@ of them, so each difference is one between the translation and LuaJIT):
     upstream's `pairs` order. `GemSelectControl` calculates the candidates
     in `pairs` order of their ids, and a mirage picks its skill from
     `GlobalCache` entries keyed by socket slot that the candidates
-    calculated before left; against the oracle the candidates of builds
-    with a mirage are compared without their DPS;
+    calculated before left (also when the candidate is the mirage:
+    gen-0020's General's Cry, 0 on one oracle run); against the oracle the
+    candidates of builds with a mirage are compared without their DPS, and
+    mirage candidates (General's Cry, Mirage Archer) are left out;
   - Bonespire's Intimidating Cry without cost, after a Tempest Shield
     trigger variant in the same oracle process: upstream keeps state from
     the builds loaded before (like the shared-state alignments of the

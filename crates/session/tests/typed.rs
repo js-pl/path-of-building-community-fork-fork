@@ -565,7 +565,7 @@ fn power_sorts_match(d: &mut Dispatcher) {
         // global cache by socket slot, where the candidates calculated
         // before left theirs: on the oracle, which LuaJIT's string hash
         // decides, so the candidates of builds with one are compared
-        // without their DPS (and so their order)
+        // without their DPS (and their order, which follows it)
         let mirage = [
             "The Saviour",
             "Tawhoa's Felling",
@@ -574,15 +574,25 @@ fn power_sorts_match(d: &mut Dispatcher) {
         ]
         .iter()
         .any(|m| xml.contains(m));
-        if oracle() && mirage {
+        // A mirage among the candidates (General's Cry, Mirage Archer)
+        // picks from the same cache: on any build, so these candidates
+        // are left out
+        let mirage_gem = |g: &J| {
+            let id = g["id"].as_str().unwrap_or("");
+            id.contains("GeneralsCry") || id.contains("MirageArcher")
+        };
+        if oracle() {
             for v in [&mut typed, &mut tr] {
                 if let Some(a) = v["ok"]["gems"].as_array_mut() {
-                    for g in a.iter_mut() {
-                        if let Some(o) = g.as_object_mut() {
-                            o.remove("dps");
+                    a.retain(|g| !mirage_gem(g));
+                    if mirage {
+                        for g in a.iter_mut() {
+                            if let Some(o) = g.as_object_mut() {
+                                o.remove("dps");
+                            }
                         }
+                        a.sort_by_key(|g| g["id"].to_string());
                     }
-                    a.sort_by_key(|g| g["id"].to_string());
                 }
             }
         }
