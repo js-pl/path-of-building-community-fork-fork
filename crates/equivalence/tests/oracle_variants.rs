@@ -36,6 +36,7 @@ fn family(name: &str, data: &mut TypedData) -> Vec<(String, String)> {
         "mirages" => variants::mirage_variants(data),
         "jewels" => variants::jewel_variants(data),
         "calcs_inputs" => variants::calcs_input_variants(data),
+        "config" => variants::config_variants(),
         _ => panic!("no variant family {name}"),
     }
 }
@@ -171,4 +172,10 @@ fn jewels_match_oracle() {
 #[test]
 fn calcs_inputs_match_oracle() {
     run("calcs_inputs_match_oracle", "calcs_inputs", 1);
+}
+
+/// Every Configuration tab option at a few values each
+#[test]
+fn config_options_match_oracle() {
+    run("config_options_match_oracle", "config", 4);
 }

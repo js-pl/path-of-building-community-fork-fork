@@ -860,3 +860,78 @@ pub fn breakdown_skill_variants(data: &mut TypedData) -> Vec<(String, String)> {
         !ge.funcs.is_empty() && WRITERS.iter().any(|w| ge.id.starts_with(w))
     })
 }
+
+/// Every Configuration tab option set to each of a few values, in the
+/// active config set of a generated corpus build: checks on, each entry
+/// of a list, numbers 3, 12 and -2 (as `every_option_matches_upstream`
+/// tried them); ids `config-<var>-<value>-<template>`
+pub fn config_variants() -> Vec<(String, String)> {
+    use engine::config::Val;
+    let src = gamedata::Source::load(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+    let vars = src.config_vars().unwrap_or_else(|e| panic!("{e}"));
+    let Some((tid, xml)) = corpus_builds()
+        .into_iter()
+        .find(|(id, x)| id.starts_with("gen-") && x.contains("<ConfigSet "))
+    else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for v in &vars {
+        let (Some(var), Some(kind)) = (&v.var, &v.kind) else {
+            continue;
+        };
+        let values: Vec<Val> = match kind.as_str() {
+            "check" => vec![Val::Bool(true)],
+            "list" => v.list.iter().filter_map(|(_, val)| val.clone()).collect(),
+            "text" => continue,
+            _ => vec![Val::Number(3.0), Val::Number(12.0), Val::Number(-2.0)],
+        };
+        for val in values {
+            let (attr, text) = match &val {
+                Val::Bool(b) => ("boolean", b.to_string()),
+                Val::Number(n) if n.fract() == 0.0 => ("number", format!("{}", *n as i64)),
+                Val::Number(n) => ("number", n.to_string()),
+                Val::Str(s) => ("string", s.to_string()),
+            };
+            let Some(x) = with_config_input(&xml, var, attr, &text) else {
+                continue;
+            };
+            out.push((format!("config-{var}-{text}-{tid}"), x));
+        }
+    }
+    out
+}
+
+/// A build with `<Input name="var" attr="value"/>` in its active config
+/// set, in place of the input it had
+fn with_config_input(xml: &str, var: &str, attr: &str, value: &str) -> Option<String> {
+    let active = engine::pat::gmatch(xml, "<Config activeConfigSet=\"(%d+)\"")
+        .into_iter()
+        .next()?
+        .into_iter()
+        .next()?;
+    let open = format!("<ConfigSet id=\"{active}\"");
+    let start = xml.find(&open)?;
+    let body = start + xml[start..].find('>')? + 1;
+    let end = body + xml[body..].find("</ConfigSet>")?;
+    let esc = |s: &str| {
+        s.replace('&', "&amp;")
+            .replace('"', "&quot;")
+            .replace('<', "&lt;")
+    };
+    let input = format!("<Input name=\"{var}\" {attr}=\"{}\"/>", esc(value));
+    let kept: String = xml[body..end]
+        .lines()
+        .filter(|l| {
+            !l.trim_start()
+                .starts_with(&format!("<Input name=\"{var}\" "))
+        })
+        .map(|l| format!("{l}\n"))
+        .collect();
+    Some(format!(
+        "{}\n{input}\n{}{}",
+        &xml[..body],
+        kept.trim_start_matches('\n'),
+        &xml[end..]
+    ))
+}

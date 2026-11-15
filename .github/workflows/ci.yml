@@ -89,10 +89,10 @@ jobs:
             shards: 2/2
           - name: setup and breakdowns
             filter: 'binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
-          - name: items, config and skills
-            filter: 'binary(=item) | binary(=config) | binary(=calcs) | binary(=tree)'
+          - name: items, calcs and tree
+            filter: 'binary(=item) | binary(=calcs) | binary(=tree)'
           - name: rest
-            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=perform) | binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=config) | binary(=calcs) | binary(=tree))'
+            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=perform) | binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=calcs) | binary(=tree))'
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
