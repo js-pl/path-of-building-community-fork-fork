@@ -330,6 +330,8 @@ struct Alternates {
     /// skill whose `Skill:` source `processMod` set last on mods their
     /// skills share, in `pairs(data.skills)` order
     variants: std::collections::HashMap<String, String>,
+    /// The skills of curse gems (marks too)
+    curse_skills: std::collections::HashSet<String>,
     /// A unique's flavour texts but the first, to its first
     /// (`flavourLookup` is read in `pairs` order)
     flavours: Vec<(Vec<String>, Vec<String>)>,
@@ -375,9 +377,18 @@ impl Alternates {
                 flavours.push((t.clone(), list[0].1.clone()));
             }
         }
+        let curse_skills = data
+            .game
+            .skills
+            .gems()
+            .iter()
+            .filter(|g| g.tags.contains("curse"))
+            .map(|g| g.granted_effect.id.clone())
+            .collect();
         Alternates {
             gems,
             variants,
+            curse_skills,
             flavours,
         }
     }
@@ -3560,7 +3571,17 @@ fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
         .unwrap_or(1);
     // A curse is its name line after a "---" separator (or the limit)
     let curses = lines.iter().filter(|l| l.trim() == "---").count();
-    curses > limit
+    // The party's curses take the slots the build's own leave free, so
+    // with one of those, too, fewer of them may fit (marks and curses
+    // also share the one mark slot)
+    let own = engine::pat::gmatch(xml, "<Gem [^>]-enabled=\"true\"[^>]-skillId=\"([^\"]+)\"")
+        .iter()
+        .any(|c| {
+            ALTERNATES
+                .get()
+                .is_some_and(|a| a.curse_skills.contains(&c[0]))
+        });
+    curses > limit || (curses > 1 && own)
 }
 
 /// The Party tab's controls (`party.*`) changed at random on corpus builds

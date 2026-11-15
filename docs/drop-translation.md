@@ -218,8 +218,12 @@ of them, so each difference is one between the translation and LuaJIT):
     curses in `pairs` order over a table keyed by curse name, all of
     priority 0, so with more curses than the limit which ones apply
     follows LuaJIT's string hash (gen-0025 with gen-0029's Despair and
-    Flammability under a limit of 1). Against the oracle such party builds
-    are skipped (`party_curses_ambiguous`), and the curse list
+    Flammability under a limit of 1). The party's curses also take only
+    the slots the build's own curses leave free (gen-0001 with Assassin's
+    Mark and Frostbite under a limit of 2 beside its own curse). Against
+    the oracle such party builds are skipped (`party_curses_ambiguous`:
+    more party curses than their limit, or several beside a curse gem of
+    the build's), and the curse list
     (`CurseList`, the Calcs tab's Curses and Debuffs row) is compared
     unordered;
   - gem names sharing a granted effect, `Vaal Righteous Fire` against
