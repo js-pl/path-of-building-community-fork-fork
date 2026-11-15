@@ -42,13 +42,15 @@ pub fn number(v: &ModValue) -> Result<f64> {
     }
 }
 
-/// `math.min` and `math.max` as LuaJIT computes them
+/// `math.min` and `math.max` as LuaJIT computes them: the left operand
+/// only when it is strictly less (greater), so a NaN or a -0 on either
+/// side gives the right one
 pub fn m_min(a: f64, b: f64) -> f64 {
-    if b < a { b } else { a }
+    if a < b { a } else { b }
 }
 
 pub fn m_max(a: f64, b: f64) -> f64 {
-    if b > a { b } else { a }
+    if a > b { a } else { b }
 }
 
 /// `round(val, dec)` of `Modules/Common.lua`

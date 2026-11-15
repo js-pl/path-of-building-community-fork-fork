@@ -148,6 +148,81 @@ fn unordered(v: &mut J) {
                         }
                     }
                 }
+                // A unique's flavour text, which upstream picks in `pairs`
+                // order when it has several
+                if k == "lines"
+                    && let J::Array(a) = x
+                    && let Some(alt) = ALTERNATES.get()
+                {
+                    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+                    let mut i = 0;
+                    while i < a.len() {
+                        let found = alt.flavours.iter().find(|(f, _)| {
+                            a.len() - i >= f.len()
+                                && f.iter()
+                                    .enumerate()
+                                    .all(|(j, l)| text(&a[i + j]) == format!("^xAF6025{l}"))
+                        });
+                        let Some((f, first)) = found else {
+                            i += 1;
+                            continue;
+                        };
+                        let model = a[i].clone();
+                        let lines: Vec<J> = first
+                            .iter()
+                            .map(|l| {
+                                let mut m = model.clone();
+                                m["text"] = J::String(format!("^xAF6025{l}"));
+                                m
+                            })
+                            .collect();
+                        let n = lines.len();
+                        a.splice(i..i + f.len(), lines);
+                        i += n;
+                    }
+                }
+                // A weapon that uses both hand slots compared in a weapon
+                // slot while the other holds one too: each disables the
+                // other, and `calcs.initEnv` breaks the cycle starting from
+                // the slot `pairs(itemDisablers)` gives first
+                if k == "lines"
+                    && let J::Array(a) = x
+                    && a.iter()
+                        .any(|l| l["text"] == "^x8888FFUses both hand slots")
+                {
+                    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+                    let header = |t: &str| {
+                        t.starts_with("^7Equipping this item in ")
+                            || t.starts_with("^7Removing this item from ")
+                    };
+                    let mut keep = Vec::new();
+                    let mut dropping = false;
+                    for l in a.drain(..) {
+                        let t = text(&l);
+                        if header(&t) || l.get("separator").is_some() {
+                            dropping = header(&t) && t.contains(" Weapon ");
+                        }
+                        if !dropping {
+                            keep.push(l);
+                        }
+                    }
+                    *a = keep;
+                }
+                // Connectors between two nodes that both link to the other
+                // keep the direction of the node `pairs(tree.nodes)`
+                // visits first; the nodes' table has a string key too
+                if k == "connectors"
+                    && let J::Array(a) = x
+                {
+                    for c in a.iter_mut() {
+                        if let (Some(p), Some(q)) = (c["a"].as_u64(), c["b"].as_u64())
+                            && p > q
+                        {
+                            c["a"] = json!(q);
+                            c["b"] = json!(p);
+                        }
+                    }
+                }
                 if (k == "rows" || k == "connectors")
                     && let J::Array(a) = x
                 {
@@ -168,6 +243,20 @@ fn unordered(v: &mut J) {
                     "Vaal Righteous Fire",
                 )
                 .replace("VaalRighteousFireAltX", "VaalRighteousFire");
+            unordered(v);
+        }
+        // `data.gemForSkill` names whichever gem sharing a granted effect
+        // `pairs(data.gems)` sets up last
+        J::String(s)
+            if ALTERNATES
+                .get()
+                .is_some_and(|alt| alt.gems.iter().any(|(n, _)| s.contains(n.as_str()))) =>
+        {
+            for (n, short) in &ALTERNATES.get().unwrap().gems {
+                if s.contains(n.as_str()) {
+                    *s = s.replace(n.as_str(), short);
+                }
+            }
             unordered(v);
         }
         J::String(s) if s.contains('\n') => {
@@ -219,7 +308,50 @@ fn data() -> &'static TypedData {
         TypedData::from_source(&src()).unwrap_or_else(|e| panic!("{e}")),
     ));
     eprintln!("typed data in {:.1?}", t.elapsed());
+    ALTERNATES.get_or_init(|| Alternates::of(data));
     data
+}
+
+/// What upstream picks in `pairs` order over string keys, so the oracle
+/// may pick another of (see [`unordered`])
+#[derive(Default)]
+struct Alternates {
+    /// Gem names sharing a granted effect (`data.gemForSkill` keeps the
+    /// one `pairs(data.gems)` sets up last), to the shortest of them
+    gems: Vec<(String, String)>,
+    /// A unique's flavour texts but the first, to its first
+    /// (`flavourLookup` is read in `pairs` order)
+    flavours: Vec<(Vec<String>, Vec<String>)>,
+}
+
+static ALTERNATES: std::sync::OnceLock<Alternates> = std::sync::OnceLock::new();
+
+impl Alternates {
+    fn of(data: &TypedData) -> Self {
+        let mut by_effect: std::collections::BTreeMap<&str, Vec<&str>> = Default::default();
+        for g in data.game.skills.gems() {
+            let names = by_effect.entry(g.granted_effect.id.as_str()).or_default();
+            if !names.contains(&g.name.as_str()) {
+                names.push(&g.name);
+            }
+        }
+        let mut gems = Vec::new();
+        for names in by_effect.values().filter(|n| n.len() > 1) {
+            let short = names.iter().min_by_key(|n| (n.len(), **n)).unwrap();
+            for n in names.iter().filter(|n| *n != short) {
+                gems.push((n.to_string(), short.to_string()));
+            }
+        }
+        // Longer names first, as a shorter one can be part of them
+        gems.sort_by_key(|(n, _)| std::cmp::Reverse(n.len()));
+        let mut flavours = Vec::new();
+        for list in data.game.items.flavour_text.values() {
+            for (_, t) in list.iter().skip(1) {
+                flavours.push((t.clone(), list[0].1.clone()));
+            }
+        }
+        Alternates { gems, flavours }
+    }
 }
 
 /// The reference session: the translation, or with
