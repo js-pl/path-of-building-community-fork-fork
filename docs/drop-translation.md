@@ -263,6 +263,12 @@ of them, so each difference is one between the translation and LuaJIT):
     stat `pairs(changedNode.stats)` visits first, so both lines get the
     attack or the cast speed roll depending on the string hash; against
     the oracle the value of such a node's two equal lines is left out;
+  - an item popup's mod list hovered on an entry tied with its neighbour
+    on the sort key (gen-0055, Global Accuracy Rating (15-17)% against
+    (18-20)% in the nightly): explained, upstream's `pairs` order. Tied
+    entries keep the order they were gathered in, so one index names
+    either mod; against the oracle such entries are not hovered (the lists
+    themselves compare with ties sorted);
   - a shared item set dragged back into the build: explained, upstream's
     `pairs` order. `ItemSetListControl:ReceiveDrag` adds the set's items in
     `pairs` order of their slot names, so their ids, and with them every
