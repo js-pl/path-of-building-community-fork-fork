@@ -1,0 +1,78 @@
+name: Full variants
+# The variants CI samples, in full: every trigger variant (TRIGGERS_FULL),
+# every node and cluster notable's power (POWER_FULL) and longer edit
+# sequences in the session test (SESSION_STEPS). Nightly, by hand, and on
+# pull requests that change this workflow.
+on:
+  schedule:
+    - cron: '23 1 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/full.yml
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: cargo nextest archive --release --workspace --archive-file tests.tar.zst
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tests-full
+          path: tests.tar.zst
+          retention-days: 1
+          compression-level: 0
+
+  # Each test's shards (`testkit::run_shards`) split over runners with
+  # TEST_SHARD_PARTITION; node power runs in one process
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: triggers 1/4, filter: 'test(=triggers_match_upstream)', shards: 1/4 }
+          - { name: triggers 2/4, filter: 'test(=triggers_match_upstream)', shards: 2/4 }
+          - { name: triggers 3/4, filter: 'test(=triggers_match_upstream)', shards: 3/4 }
+          - { name: triggers 4/4, filter: 'test(=triggers_match_upstream)', shards: 4/4 }
+          - { name: power, filter: 'test(=node_power_matches_upstream)' }
+          - { name: session 1/5, filter: 'test(=typed_session_matches_translated)', shards: 1/5 }
+          - { name: session 2/5, filter: 'test(=typed_session_matches_translated)', shards: 2/5 }
+          - { name: session 3/5, filter: 'test(=typed_session_matches_translated)', shards: 3/5 }
+          - { name: session 4/5, filter: 'test(=typed_session_matches_translated)', shards: 4/5 }
+          - { name: session 5/5, filter: 'test(=typed_session_matches_translated)', shards: 5/5 }
+    name: full (${{ matrix.name }})
+    env:
+      TRIGGERS_FULL: "1"
+      POWER_FULL: "1"
+      SESSION_STEPS: "15"
+      # Smaller shards: the edit phases take 2.5 times as long
+      SESSION_SHARDS: "6"
+      TEST_SHARD_PARTITION: ${{ matrix.shards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: actions/download-artifact@v4
+        with:
+          name: tests-full
+      - run: cargo nextest run --profile full --archive-file tests.tar.zst --workspace-remap . -E '${{ matrix.filter }}'
