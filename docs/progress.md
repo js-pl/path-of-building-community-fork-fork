@@ -1359,8 +1359,10 @@ the tests align these:
   against LuaJIT by `tests/oracle/tables.jsonl`); one typed table that
   upstream visits with `pairs` over number keys still keeps insertion
   order: `legacyClusterNodeMap` and the oidx maps of the legacy cluster
-  conversion (`PassiveSpec:ConvertLegacyClusterNodes`), which no corpus
-  build reaches.
+  conversion (`BuildLegacyClusterOrbitMappings`,
+  `ApplyLegacyClusterNodeRemap`), which the 3.13 corpus builds with
+  cluster jewels (saved before `clusterHashFormatVersion`) go through;
+  they agree with the oracle, no two nodes sharing an orbit index there.
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
