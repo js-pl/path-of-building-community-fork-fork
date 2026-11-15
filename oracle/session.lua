@@ -69,18 +69,38 @@ local api = dofile(oracleDir .. "/../crates/session/lua/session.lua")
 local first = api.handle('{"cmd":"newBuild"}')
 assert(first:match('^{"ok"'), "newBuild failed: " .. first)
 
--- Not the engine API: `{"cmd":"oracleLastError"}` answers the last error
--- with its source position, which the answers leave out (the session test
--- checks which upstream failure it is)
+-- Not the engine API: `{"cmd":"oracleOutputs","xml":..,"id":..}` loads a
+-- build as `dump.lua` does and answers its outputs in `dump.lua`'s JSON,
+-- `{"ok":<outputs>}` (the variant tests' reference, see
+-- crates/equivalence/src/oracle.rs); `{"cmd":"oracleLastError"}` answers
+-- the last error with its source position, which the answers leave out
+-- (the session test checks which upstream failure it is)
+local toJSON = dofile(oracleDir .. "/json.lua")
+local dkjson = require("dkjson")
+local function oracleOutputs(req)
+	local ok, res = pcall(function()
+		loadBuildFromXML(req.xml, req.id or "variant")
+		assert(build.calcsTab.mainEnv, "build did not calculate")
+		return headless.outputs()
+	end)
+	if not ok then
+		return dkjson.encode({ error = tostring(res) })
+	end
+	return '{"ok":' .. toJSON(res) .. '}'
+end
+
 local lastError
 for line in io.lines() do
-	if line == '{"cmd":"oracleLastError"}' then
-		out:write(require("dkjson").encode({ ok = lastError }), "\n")
+	if line:match('^{"cmd":"oracleOutputs"') then
+		out:write(oracleOutputs(dkjson.decode(line)), "\n")
+		out:flush()
+	elseif line == '{"cmd":"oracleLastError"}' then
+		out:write(dkjson.encode({ ok = lastError }), "\n")
 		out:flush()
 	elseif line:match("%S") then
 		local raw = api.handle(line)
 		if raw:match('^{"error"') then
-			lastError = require("dkjson").decode(raw).error
+			lastError = dkjson.decode(raw).error
 		end
 		-- The translation's errors carry no source positions
 		local res = raw:gsub('^{"error":"[^"]-%.lua:%d+: ', '{"error":"')

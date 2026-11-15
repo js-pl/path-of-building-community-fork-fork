@@ -15,28 +15,9 @@ headless.start()
 
 local toJSON = dofile(oracleDir .. "/json.lua")
 
--- player.output holds a reference to the minion's output table as Minion; it is
--- dumped separately as minion.output, so drop the alias here.
-local function actorOutputs(env)
-	local player = { }
-	for k, v in pairs(env.player.output) do
-		if not (k == "Minion" and env.minion and v == env.minion.output) then
-			player[k] = v
-		end
-	end
-	return {
-		player = player,
-		minion = env.minion and env.minion.output or nil,
-	}
-end
-
 for _, b in ipairs(builds) do
 	headless.loadBuild(b.id, b.path)
-	local calcsTab = build.calcsTab
-	local result = {
-		MAIN = actorOutputs(calcsTab.mainEnv),
-		CALCS = actorOutputs(calcsTab.calcsEnv),
-	}
+	local result = headless.outputs()
 	local f = assert(io.open(outDir .. "/" .. b.id .. ".json", "wb"))
 	f:write(toJSON(result), "\n")
 	f:close()
