@@ -3,7 +3,7 @@
 //! (`configTable`), by the gems and uniques its keys name.
 
 use crate::typed_build::TypedData;
-use crate::{corpus_builds, gem_variants, upstream_src, with_group};
+use crate::{corpus_builds, gem_variants, skill_variants, upstream_src, with_group};
 use engine::skill_data::{Gem, GrantedEffect};
 use std::sync::Arc;
 
@@ -841,4 +841,22 @@ pub fn calcs_input_variants(data: &mut TypedData) -> Vec<(String, String)> {
     );
     out.extend(active.into_iter().take(6));
     out
+}
+
+/// The skills whose functions write breakdowns, in each of their parts
+/// (`skill_variants`)
+pub fn breakdown_skill_variants(data: &mut TypedData) -> Vec<(String, String)> {
+    const WRITERS: [&str; 8] = [
+        "BallLightning",
+        "ExplosiveTrap",
+        "FlamethrowerTrap",
+        "ForbiddenRite",
+        "KineticFusillade",
+        "LightningSpireTrap",
+        "MoltenStrike",
+        "SeismicTrap",
+    ];
+    skill_variants(&data.skills, |ge| {
+        !ge.funcs.is_empty() && WRITERS.iter().any(|w| ge.id.starts_with(w))
+    })
 }

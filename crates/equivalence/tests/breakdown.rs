@@ -13,7 +13,7 @@ use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
 use equivalence::outputs::{compare, entries, key_str, list, lua_outputs, number, typed_outputs};
 use equivalence::typed_build::TypedData;
-use equivalence::{corpus_builds, skill_variants, typed_json, upstream_src};
+use equivalence::{corpus_builds, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use serde_json::{Map, Value as J, json};
@@ -253,21 +253,7 @@ fn breakdowns_match_upstream() {
 /// The skills whose functions write breakdowns, in each of their parts
 #[test]
 fn skill_function_breakdowns_match_upstream() {
-    const WRITERS: [&str; 8] = [
-        "BallLightning",
-        "ExplosiveTrap",
-        "FlamethrowerTrap",
-        "ForbiddenRite",
-        "KineticFusillade",
-        "LightningSpireTrap",
-        "MoltenStrike",
-        "SeismicTrap",
-    ];
-    run(&|data| {
-        skill_variants(&data.skills, |ge| {
-            !ge.funcs.is_empty() && WRITERS.iter().any(|w| ge.id.starts_with(w))
-        })
-    });
+    run(&equivalence::variants::breakdown_skill_variants);
 }
 
 /// The Calcs tab's inputs the corpus leaves at their defaults: its other
