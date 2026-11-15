@@ -463,7 +463,10 @@ What remains for the full migration, in order:
    already did; `overlays_match` removes them on every tattoo variant,
    and on a tattooed copy with the first tree's tattoos left), the version drop-down's
    Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
-   active one's undo state on the other version, inserted after it, the
+   active one's undo state on the other version, with its tattoos (the
+   state's `hashOverrides`: those on nodes the version has replace them,
+   the others are kept and saved; `overlays_match` converts the tattoo
+   variants to 3_25), inserted after it, the
    old one removed or kept, `SetActiveSpec` once with its loadout sync and
    version drop-down), Convert to the latest version and Convert all
    (each spec on another version in turn, then the active one again), the
@@ -499,12 +502,16 @@ What remains for the full migration, in order:
    type added to the calculator as a node of its own
    (`calc_override::mod_list_node`), weighed by what it adds to the
    fallback mode's stat, written to the fallback list; a line the parser
-   does not know weighs nothing (`AddList(nil)`). Generate on passives
-   with several stats (Glorious Vanity's, the Abyss jewels', which
-   upstream describes with `describeStats`), the trade URL and the
-   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
-   notable, a protected notable) stay on the translation, and so does
-   Militant Faith's item while a devotion variant is Any (upstream picks
+   does not know weighs nothing (`AddList(nil)`); a passive with several
+   stats (Glorious Vanity's, the Abyss jewels') gets a mod list per stat
+   (`buildStatModLists`: that stat at 100, the others at 0, described by
+   `StatDescriptions::describe_stats` in `stat_descriptions`, whose
+   descriptions of the legion passives' stats the game data keeps) and a
+   weight per stat. The tooltips that show a node (a conqueror's
+   keystone, from the tree or the legion keystones; an Abyss ascendancy
+   notable, the legion node; a protected notable, the tree's) are
+   `AddNodeTooltip(..., returnEarly)` of the node's data. The trade URL
+   stays on the translation, and so does Militant Faith's item while a devotion variant is Any (upstream picks
    one at random). Against the oracle, a row tooltip's node names and the
    results list are compared unordered (the `pairs` order of the tree
    data's string keys orders the radius, and with it the order weights
@@ -579,7 +586,11 @@ What remains for the full migration, in order:
    opened keeps it, as upstream's popups belong to `main` (the
    dispatcher carries the typed popups over; a popup the translation
    opened while the build was on it is not carried). Saviour's mirage as
-   the main skill falls back.
+   the main skill falls back. As upstream's `main:OnFrame` gives input
+   to the front popup alone, both sessions answer a `control` of another
+   host while a popup is open with `control <path> is behind a popup`
+   and change nothing (`tab_controls_behind_a_popup_fail`); the web UI's
+   popups cover the tabs and always offer Cancel (`closePopup`).
 
    A typed error starting with `UPSTREAM_ERROR` is one the translation
    answers the same request with (`no node <id>` of `clickNode`,

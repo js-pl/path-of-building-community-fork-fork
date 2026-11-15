@@ -4,7 +4,7 @@
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
-use super::{NOT_PORTED, Result, TypedData, TypedSession};
+use super::{Result, TypedData, TypedSession};
 use serde_json::{Value as J, json};
 
 /// `PassiveSpec:CreateUndoState()`; `secondaryAscendClassId` reads a field
@@ -77,7 +77,8 @@ impl TypedSession<'_> {
         // `allocSubgraphNodes`
         let (class, ascend) = match (state.class, state.ascend) {
             (Some(c), Some(a)) => (c, a),
-            _ => return Err(format!("{NOT_PORTED}: undo to a spec without a class")),
+            // `PassiveSpec::new` selects class 0, as upstream's constructor
+            _ => return Err("invariant: a spec without a class".into()),
         };
         let list = self.undo.get_mut(&self.specs.0).unwrap();
         list.drain(..2);
