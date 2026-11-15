@@ -46,7 +46,7 @@ makes cyclic environments).
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
-| `equivalence/tests/{power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `equivalence/tests/power.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown`, `config` and `spec` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
 | `session/tests/typed.rs` (15 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
@@ -349,6 +349,18 @@ goes with them.
   session test's calcs phase (every cell's `breakdown` command); the
   breakdown-writing skill functions, the mirages and the Calcs inputs in
   its `variants` phase, against the oracle.
+- `spec.rs` (4 tests): the typed `PassiveSpec` field by field (allocation,
+  dependencies, connection to the start, path and distance, stat lines
+  and mods, mastery selections) on the corpus specs and on the jewel,
+  tattoo and timeless variant builds. The session test's tree phase on
+  the corpus, and its `specs` phase on those same variant builds, ask the
+  oracle after every step of random tree edits: the tree (each node's
+  stat lines), the tree state (allocated nodes, masteries, class), the
+  sidebar and the outputs. A click on an unallocated node allocates its
+  path and one on an allocated node removes its dependents, so paths,
+  distances and dependencies show in the allocation after the step; the
+  mods show in the outputs. What the session does not see (a path or a
+  dependency list that no edit uses) no longer has a reference.
 
 ## Moved to the oracle
 
