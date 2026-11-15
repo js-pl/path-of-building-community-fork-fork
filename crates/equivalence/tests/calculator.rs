@@ -192,13 +192,14 @@ fn ask(
     xml: &str,
     cases: &[Case],
 ) -> Result<(J, Vec<Result<J, String>>), String> {
-    let req = json!({
-        "cmd": "oracleCalculator",
+    // `cmd` first: the oracle tells its own requests by their start
+    let rest = json!({
         "id": id,
         "xml": xml,
         "cases": cases.iter().map(|c| c.oracle.clone()).collect::<Vec<_>>(),
     })
     .to_string();
+    let req = format!(r#"{{"cmd":"oracleCalculator",{}"#, &rest[1..]);
     let res = oracle.request(&req)?;
     let J::Obj(mut o) = parse(res.as_bytes(), &mut 0) else {
         return Err(format!("not an object: {res}"));
