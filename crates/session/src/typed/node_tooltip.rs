@@ -48,17 +48,59 @@ impl TypedSession<'_> {
 
     /// `addModInfoToTooltip(node, i, line)`, from 0
     fn add_mod_info(&self, tip: &mut Tooltip, i: usize, k: usize, line: &str) {
-        let Some(m) = self.node_mods(i).get(k) else {
-            return;
-        };
-        if line != " " && (m.extra.is_some() || m.list.is_none()) {
-            let line = format!("{}{line}{NOT_SUPPORTED}", cc("UNSUPPORTED"));
-            tip.add_line(FONT_BIG, &line);
-        } else {
-            tip.add_line(FONT_BIG, &format!("{}{line}", cc("MAGIC")));
-        }
+        add_line_mod_info(tip, self.node_mods(i), k, line);
     }
 
+    /// `PassiveTreeView:AddNodeTooltip(tooltip, node, build, true)` of a
+    /// node of the tree's data (`spec.tree.nodes`, `keystoneMap`, the
+    /// timeless jewels' legion nodes) rather than the spec's: its name,
+    /// stats, reminder and flavour texts, then `returnEarly`
+    pub(super) fn base_node_tooltip(
+        &self,
+        tip: &mut Tooltip,
+        dn: &str,
+        sd: &[std::sync::Arc<str>],
+        mods: &[StatLine],
+        reminder: Option<&[std::sync::Arc<str>]>,
+        flavour: Option<&[std::sync::Arc<str>]>,
+    ) {
+        tip.header = true;
+        tip.add_line(24.0, &format!("^xF8E6CA{dn}"));
+        if !sd.is_empty() {
+            tip.add_line(16.0, "");
+            for (k, line) in sd.iter().enumerate() {
+                add_line_mod_info(tip, mods, k, line);
+            }
+        }
+        if let Some(r) = reminder {
+            tip.add_separator(14.0);
+            for line in r {
+                tip.add_line(14.0, &format!("^xA0A080{line}"));
+            }
+        }
+        if let Some(f) = flavour {
+            tip.add_separator(14.0);
+            for line in f {
+                tip.add_line(FONT_BIG, &format!("{}{line}", cc("UNIQUE")));
+            }
+        }
+    }
+}
+
+/// `addModInfoToTooltip(node, i, line)` of a node's parsed lines, from 0
+fn add_line_mod_info(tip: &mut Tooltip, mods: &[StatLine], k: usize, line: &str) {
+    let Some(m) = mods.get(k) else {
+        return;
+    };
+    if line != " " && (m.extra.is_some() || m.list.is_none()) {
+        let line = format!("{}{line}{NOT_SUPPORTED}", cc("UNSUPPORTED"));
+        tip.add_line(FONT_BIG, &line);
+    } else {
+        tip.add_line(FONT_BIG, &format!("{}{line}", cc("MAGIC")));
+    }
+}
+
+impl TypedSession<'_> {
     /// `PassiveTreeView:AddNodeName`
     fn add_node_name(&self, tip: &mut Tooltip, i: usize) -> Result<()> {
         let spec = &self.build.spec;

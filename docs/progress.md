@@ -498,12 +498,16 @@ What remains for the full migration, in order:
    type added to the calculator as a node of its own
    (`calc_override::mod_list_node`), weighed by what it adds to the
    fallback mode's stat, written to the fallback list; a line the parser
-   does not know weighs nothing (`AddList(nil)`). Generate on passives
-   with several stats (Glorious Vanity's, the Abyss jewels', which
-   upstream describes with `describeStats`), the trade URL and the
-   tooltips that show a node (a conqueror's keystone, an Abyss ascendancy
-   notable, a protected notable) stay on the translation, and so does
-   Militant Faith's item while a devotion variant is Any (upstream picks
+   does not know weighs nothing (`AddList(nil)`); a passive with several
+   stats (Glorious Vanity's, the Abyss jewels') gets a mod list per stat
+   (`buildStatModLists`: that stat at 100, the others at 0, described by
+   `StatDescriptions::describe_stats` in `stat_descriptions`, whose
+   descriptions of the legion passives' stats the game data keeps) and a
+   weight per stat. The tooltips that show a node (a conqueror's
+   keystone, from the tree or the legion keystones; an Abyss ascendancy
+   notable, the legion node; a protected notable, the tree's) are
+   `AddNodeTooltip(..., returnEarly)` of the node's data. The trade URL
+   stays on the translation, and so does Militant Faith's item while a devotion variant is Any (upstream picks
    one at random). Against the oracle, a row tooltip's node names and the
    results list are compared unordered (the `pairs` order of the tree
    data's string keys orders the radius, and with it the order weights

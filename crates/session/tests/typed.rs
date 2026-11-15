@@ -5347,8 +5347,14 @@ fn find_timeless_jewel_match() {
         ("searchTradeButton", None),
         ("jewelSelect", Some(3)),
         ("conquerorSelect", Some(1)),
+        // Conquerors with a keystone: its node's tooltip
+        ("conquerorSelect", Some(2)),
+        ("conquerorSelect", Some(3)),
         ("conquerorSelect", None),
         ("abyssAscendancySelect", Some(1)),
+        // Abyss ascendancy notables: the legion node's tooltip
+        ("abyssAscendancySelect", Some(2)),
+        ("abyssAscendancySelect", Some(3)),
         ("abyssAscendancySelect", None),
     ];
     for (id, path) in builds {
@@ -5364,7 +5370,12 @@ fn find_timeless_jewel_match() {
             if popups.as_array().is_none_or(|p| p.is_empty()) {
                 return;
             }
-            for (path, index) in tooltips {
+            // A protected notable's checkbox when the socket has one
+            let protect = popups[0]["controls"]
+                .as_array()
+                .is_some_and(|c| c.iter().any(|c| c["path"] == "popup.protectAllocatedBox1"));
+            let extra = protect.then_some(("protectAllocatedBox1", None));
+            for (path, index) in tooltips.into_iter().chain(extra) {
                 let mut r = json!({"cmd": "controlTooltip", "path": format!("popup.{path}")});
                 if let Some(i) = index {
                     r["index"] = json!(i);
@@ -5588,6 +5599,13 @@ fn timeless_search_match() {
             c("jewelSelect", json!({"sel": 2})),
             button("fallbackWeightsButton"),
             search.clone(),
+            // Jewels with variable rolls, whose passives with several stats
+            // get one weight per stat (`buildStatModLists`, `describeStats`)
+            c("jewelSelect", json!({"sel": 1})),
+            button("fallbackWeightsButton"),
+            c("jewelSelect", json!({"sel": 9})),
+            button("fallbackWeightsButton"),
+            c("jewelSelect", json!({"sel": 2})),
             // All Sockets
             c("socketSelect", json!({"sel": 1})),
             search.clone(),
@@ -5629,6 +5647,15 @@ fn timeless_search_match() {
                 if !shown {
                     continue;
                 }
+                // The protected notable's tooltip, typed
+                let q = json!({"cmd": "controlTooltip", "path": r["path"]}).to_string();
+                d.typed_error = None;
+                let (t, tr) = (
+                    answer(d.request(&q), "typed"),
+                    answer(d.translated_request(&q), "translated"),
+                );
+                assert!(d.typed_error.is_none(), "{id} {q}: {:?}", d.typed_error);
+                diff(&t, &tr, &format!("{id} {q}"), &mut out);
             }
             answer(d.request(&r.to_string()), "typed");
             assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
