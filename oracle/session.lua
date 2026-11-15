@@ -89,10 +89,31 @@ local function oracleOutputs(req)
 	return '{"ok":' .. toJSON(res) .. '}'
 end
 
+-- `{"cmd":"oracleValue","fn":..,"params":..}`: one of values.lua's
+-- functions, its result in values.lua's encoding (the reference of the
+-- equivalence tests of items, trees and the data table)
+local values = dofile(oracleDir .. "/values.lua")
+local function oracleValue(req)
+	local f = values[req.fn]
+	if type(f) ~= "function" or req.fn == "encode" then
+		return dkjson.encode({ error = "no oracle value " .. tostring(req.fn) })
+	end
+	local ok, res = pcall(function()
+		return values.encode(f(req.params or { }))
+	end)
+	if not ok then
+		return dkjson.encode({ error = tostring(res) })
+	end
+	return '{"ok":' .. res .. '}'
+end
+
 local lastError
 for line in io.lines() do
 	if line:match('^{"cmd":"oracleOutputs"') then
 		out:write(oracleOutputs(dkjson.decode(line)), "\n")
+		out:flush()
+	elseif line:match('^{"cmd":"oracleValue"') then
+		out:write(oracleValue(dkjson.decode(line)), "\n")
 		out:flush()
 	elseif line == '{"cmd":"oracleLastError"}' then
 		out:write(dkjson.encode({ ok = lastError }), "\n")

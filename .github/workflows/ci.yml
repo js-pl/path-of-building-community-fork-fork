@@ -83,9 +83,10 @@ jobs:
           - name: calculator and outputs
             filter: 'binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
           - name: items, calcs and tree
-            filter: 'binary(=item) | binary(=calcs) | binary(=tree)'
+            filter: 'binary(=item) | binary(=calcs) | binary(=tree) | binary(=game_data)'
+            oracle: true
           - name: rest
-            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=calcs) | binary(=tree))'
+            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=calcs) | binary(=tree) | binary(=game_data))'
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
