@@ -232,9 +232,9 @@ impl TypedSession<'_> {
     /// (its override dropped, the tree's node back, `allMasteryOptions`
     /// false), then the tab's `modFlag` and `buildFlag`
     pub(super) fn remove_all_tattoos(&mut self) -> Result<()> {
-        // `ReplaceNode` also empties the tattoo's own reminder text in
-        // place, which every tree shares (`require`d, process-wide): other
-        // specs keep theirs here (`docs/progress.md`, "Upstream quirks")
+        // `ReplaceNode` empties the tattoo's own reminder text, which other
+        // specs' nodes with the tattoo share, only when the tree node has
+        // none: as `BuildAllDependsAndPaths` did when they loaded
         let spec = Arc::make_mut(&mut self.build.spec);
         let ids: Vec<u32> = spec
             .hash_overrides

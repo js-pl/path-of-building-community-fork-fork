@@ -758,10 +758,9 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
             // The copy's tattoos removed while the first tree keeps its own,
-            // then the first tree's tattooed nodes. Upstream's `ReplaceNode`
-            // empties the tattoo's reminder text, which every tree shares
-            // (`require("Data.TattooPassives")`, process-wide); the
-            // translation gets it back before the tooltips
+            // then the first tree's tattooed nodes: `ReplaceNode` empties
+            // the tattoo's shared reminder text only where the load's
+            // `BuildAllDependsAndPaths` already did
             for r in [
                 json!({"cmd": "control", "path": "tree.reset", "click": true}),
                 json!({"cmd": "popupButton", "name": "removeTattoo"}),
@@ -779,7 +778,6 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 &label,
                 &mut out,
             );
-            restore_tattoo_reminders(d, tree);
             for o in xml.split("<Override ").skip(1) {
                 let Some(n) = attr(o, "nodeId") else { continue };
                 let req =
@@ -868,38 +866,6 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
-}
-
-/// Gives the translation's tattoos back their reminder texts, which
-/// `ReplaceNode` empties in place for the whole process when it removes a
-/// tattoo from a node that has none: the typed engine does not keep that
-/// (`docs/progress.md`, "Upstream quirks")
-fn restore_tattoo_reminders(d: &mut Dispatcher, tree: &engine::tree::PassiveTree) {
-    use lua::{Value, rt};
-    let Some(host) = d.translated().host() else {
-        return;
-    };
-    let get = |v: &Value, k: &str| rt::index(v, &Value::str(k)).unwrap_or_default();
-    let trees = get(&host.global("main"), "tree");
-    let Some(trees) = trees.as_table() else {
-        return;
-    };
-    let Some((_, loaded)) = trees.entries().into_iter().next() else {
-        return;
-    };
-    let nodes = get(&get(&loaded, "tattoo"), "nodes");
-    for (dn, overlay) in &tree.tattoos {
-        let lines = get(&get(&nodes, dn), "reminderText");
-        let (Some(t), Some(want)) = (lines.as_table(), &overlay.reminder_text) else {
-            continue;
-        };
-        for i in 1..=t.array().len().max(want.len()) as i64 {
-            t.set(Value::Number(i as f64), Value::Nil);
-        }
-        for (i, l) in want.iter().enumerate() {
-            t.set(Value::Number(i as f64 + 1.0), Value::str(l));
-        }
-    }
 }
 
 /// Corpus builds with a copy of their active spec on other tree versions,
