@@ -254,6 +254,13 @@ of them, so each difference is one between the translation and LuaJIT):
     `pairs` order of their slot names, so their ids, and with them every
     later item step, follow the string hash; that drag is left out
     against the oracle;
+  - the gem dropdown's DPS of an attack candidate with The Saviour
+    (3.13-dual-savior's Smite, in two of four oracle runs): explained,
+    upstream's `pairs` order. `GemSelectControl` calculates the candidates
+    in `pairs` order of their ids, and a mirage picks its skill from
+    `GlobalCache` entries keyed by socket slot that the candidates
+    calculated before left; against the oracle the candidates of builds
+    with a mirage are compared without their DPS;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
