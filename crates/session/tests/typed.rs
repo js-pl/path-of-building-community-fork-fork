@@ -584,8 +584,14 @@ fn typed_session_matches_translated() {
 /// Items tab's item databases (`controls` of `items.uniqueDB` sorted by a
 /// stat and searched, its inputs, `items.rareDB` searched) give the
 /// translation's, on every eighth corpus build
+/// Power stats the anoint popup is sorted by per build, and its rows
+/// hovered after each
+const ANOINT_SORTS: usize = 4;
+const ANOINT_ROWS: usize = 3;
+
 fn power_sorts_match(d: &mut Dispatcher) {
     let (mut failures, mut compared, mut items_compared) = (Vec::new(), 0, 0);
+    let mut anoints_compared = 0;
     let (mut t_typed, mut t_tr) = (Duration::ZERO, Duration::ZERO);
     let builds: Vec<_> = corpus().into_iter().step_by(8).collect();
     for (n, (id, path)) in mine(builds).into_iter().enumerate() {
@@ -738,9 +744,77 @@ fn power_sorts_match(d: &mut Dispatcher) {
                     .map_or(0, Vec::len);
             }
         }
+        // The anoint popup of the equipped amulet sorted by power stats
+        // in turn (each notable's power: the calculator with the amulet
+        // anointed with it, less without), its first rows hovered (the
+        // stats anointing each gives)
+        let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+        let amulet = items["ok"]["slots"]
+            .as_array()
+            .and_then(|s| s.iter().find(|s| s["name"] == "Amulet"))
+            .and_then(|s| s["item"].as_f64());
+        if let Some(amulet) = amulet {
+            let mut out = Vec::new();
+            let mut ok = true;
+            for e in [
+                json!({"cmd": "setDisplayItem", "id": amulet}),
+                json!({"cmd": "control", "path": "items.displayItemAnoint", "click": true}),
+            ] {
+                let r = answer(d.request(&e.to_string()), "anoint popup");
+                if let Some(err) = d.typed_error.take() {
+                    failures.push(format!("{id}: {e}: fell back: {err}"));
+                    ok = false;
+                    break;
+                }
+                if r.get("error").is_some() {
+                    ok = false;
+                    break;
+                }
+            }
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let sorts = state["ok"]["popups"][0]["controls"]
+                .as_array()
+                .and_then(|c| c.iter().find(|c| c["path"] == "popup.notableDB.sort"))
+                .and_then(|c| c["list"].as_array())
+                .map_or(0, Vec::len);
+            if ok && sorts > 1 {
+                for k in 0..ANOINT_SORTS {
+                    let sel = 2 + (n * ANOINT_SORTS + k) % (sorts - 1);
+                    let e = json!({"cmd": "control", "path": "popup.notableDB.sort", "sel": sel});
+                    answer(d.request(&e.to_string()), "anoint sort");
+                    if let Some(err) = d.typed_error.take() {
+                        failures.push(format!("{id}: {e}: fell back: {err}"));
+                        break;
+                    }
+                    let label = format!("anoint sort {sel}");
+                    let r = r#"{"cmd":"state"}"#;
+                    let typed = answer(d.request(r), "typed state");
+                    let tr = answer(d.translated_request(r), "translated state");
+                    diff(&typed, &tr, &label, &mut out);
+                    for index in 1..=ANOINT_ROWS {
+                        let r = json!({"cmd": "controlTooltip", "path": "popup.notableDB", "index": index})
+                            .to_string();
+                        let typed = answer(d.request(&r), "typed anoint tooltip");
+                        let tr = answer(d.translated_request(&r), "translated anoint tooltip");
+                        diff(&typed, &tr, &format!("{label} {r}"), &mut out);
+                    }
+                    anoints_compared += 1;
+                }
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
+            d.typed_error = None;
+            if !out.is_empty() {
+                let k = out.len();
+                out.truncate(10);
+                failures.push(format!(
+                    "{id}: {k} anoint differences\n    {}",
+                    out.join("\n    ")
+                ));
+            }
+        }
     }
     eprintln!(
-        "{compared} gem lists and item databases compared ({items_compared} unique rows): typed {t_typed:.1?}, translated {t_tr:.1?}"
+        "{compared} gem lists and item databases compared ({items_compared} unique rows), {anoints_compared} anoint sorts: typed {t_typed:.1?}, translated {t_tr:.1?}"
     );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
