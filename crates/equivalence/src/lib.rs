@@ -12,7 +12,6 @@ use lua::Value;
 use std::path::PathBuf;
 
 pub mod bench;
-pub mod bridge;
 pub mod lua_json;
 pub mod oracle;
 pub mod outputs;

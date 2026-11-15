@@ -361,7 +361,9 @@ each optimisation's numbers are in `docs/progress.md`.
 2. **Core calcs.** Whole builds match. Done by translating upstream's whole
    program (see [Mirroring upstream](#mirroring-upstream)): every corpus build
    calculates to the oracle's outputs exactly, in `MAIN` and `CALCS` mode
-   (`crates/equivalence/tests/calcs.rs`). Variants follow with the engine API.
+   (`crates/equivalence/tests/calcs.rs`, retired with the translation: the
+   typed engine's `build_output.rs` compares the same builds). Variants
+   follow with the engine API.
 3. **Engine API and WASM.** Done on the translation: build load and save
    (XML and build codes), edits, outputs, sidebar, calcs tab and breakdowns,
    tooltips and node power, natively and in the browser
