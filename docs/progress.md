@@ -837,9 +837,12 @@ What remains for the full migration, in order:
      of Rage) is active in the first `initEnv` and gone from the next;
      triggered by General's Cry it is the main skill, and `calcs.mirages`
      does not find it again (`UPSTREAM_GEM_LIST_FAILS` in
-     `skills_gem_select_match`). The typed engine keeps the flags as the
-     data loads them, as a skill's first calculation upstream sees them,
-     and does not fail. The list also shows its group and the
+     `skills_gem_select_match`). The typed engine sets the flag from the
+     shared stat maps at load (`engine::data`), as every calculation
+     after a skill's first one upstream sees it, the intended behaviour
+     (the gem's disabled effect stays off); only a fresh process's first
+     calculation of such a skill differs
+     (`vaal_global_effect_matches_after_the_first_calculation`). The list also shows its group and the
      shown one again (`SetDisplayGroup`), and gives the slot's name box a
      sort cache by DPS.
      Choosing a gem by name in a gem slot (`GemSelectControl`'s text,
@@ -1222,6 +1225,19 @@ instantiate per worker, so it dominates regardless of the link.
 The typed port keeps upstream's results but not its shared mutable state;
 the tests align these:
 
+- `hasGlobalEffect` is set when a calculation first looks a skill's stat
+  up in `data.skillStatMap` (`skillStatMapMeta`, `processMod`), so it
+  depends on what the process calculated before: a fresh process's first
+  calculation of a Vaal transfigured gem with its second effect disabled
+  still has the second skill, and the gem select's DPS sort skips General's
+  Cry, Intimidating Cry, Chain Hook, Cleave of Rage, Rage and Blind
+  (`canSupport or hasGlobalEffect`) unless they were calculated before.
+  The typed engine has the flags as after every skill's first calculation
+  (`engine::data`); `typed_session_matches_translated` primes the
+  translation (`Host::look_up_skill_stats`), `game_data` compares with
+  upstream after the lookups, and
+  `vaal_global_effect_matches_after_the_first_calculation` shows the fresh
+  process's difference.
 - `modLib.setSource` in `mergeKeystones` rewrites the tree's shared keystone
   mods, so their source depends on earlier calculations
 - `grantedEffect.fromItem = true` marks a support on the shared skill data
