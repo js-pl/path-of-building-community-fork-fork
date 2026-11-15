@@ -1,6 +1,7 @@
-//! Typed items (`engine::item`) equal the translated program's `Item`: every
-//! item of every corpus build loaded from XML, and every unique and rare
-//! template of the data as upstream's item databases parse them. Compared are the item's
+//! Typed items (`engine::item`) equal upstream's `Item` on the oracle
+//! (`oracle/values.lua`'s `items` and `buildItems`): every item of every
+//! corpus build loaded from XML, and every unique and rare template of the
+//! data as upstream's item databases parse them. Compared are the item's
 //! properties, its mod lines and their mods, its sockets and requirements,
 //! the mods it grants in each slot and its weapon, armour, flask, tincture
 //! and jewel data.
@@ -12,13 +13,11 @@ use engine::item::{Fields, INFLUENCES, Item, ItemContext, LineFlags, ModLine};
 use engine::item_tools::Range;
 use engine::mods::convert::Converter;
 use engine::mods::{Mod, ModValue};
-use equivalence::{corpus, mod_parser_preloaded, typed_json, upstream_src};
+use equivalence::{corpus, lua_json, mod_parser_preloaded, typed_json, upstream_src};
 use lua::rt;
-use lua::{Key, LuaError, Value};
+use lua::{Key, Value};
+use session::Session;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::rc::Rc;
-use upstream::host::Host;
-use upstream::imported::Imported;
 
 fn s(x: &str) -> Value {
     Value::str(x)
@@ -26,14 +25,6 @@ fn s(x: &str) -> Value {
 
 fn get(v: &Value, k: &str) -> Value {
     rt::index(v, &s(k)).unwrap_or_default()
-}
-
-fn describe(e: &LuaError) -> String {
-    format!(
-        "{}\n  {}",
-        lua::to_string(e.value()),
-        e.traceback().join("\n  ")
-    )
 }
 
 fn text(v: &Value) -> Option<String> {
@@ -106,7 +97,7 @@ fn no_funcs(v: &mut ModValue) {
 fn mods_diff(t: &[Mod], l: &Value) -> Option<String> {
     let mut lm = match lua_mods(l) {
         Ok(m) => m,
-        Err(e) => return Some(format!("translated mods do not convert: {e}")),
+        Err(e) => return Some(format!("upstream mods do not convert: {e}")),
     };
     let mut t = t.to_vec();
     for m in t.iter_mut().chain(lm.iter_mut()) {
@@ -119,7 +110,7 @@ fn mods_diff(t: &[Mod], l: &Value) -> Option<String> {
     if t.len() != lm.len() {
         let names = |m: &[Mod]| m.iter().map(|m| m.name.as_str()).collect::<Vec<_>>();
         return Some(format!(
-            "{} mods != {}\n    typed {:?}\n    translated {:?}",
+            "{} mods != {}\n    typed {:?}\n    upstream {:?}",
             t.len(),
             lm.len(),
             names(t),
@@ -128,7 +119,7 @@ fn mods_diff(t: &[Mod], l: &Value) -> Option<String> {
     }
     let i = (0..t.len()).find(|&i| t[i] != lm[i]).unwrap();
     Some(format!(
-        "mod {}:\n    typed {}\n    translated {}",
+        "mod {}:\n    typed {}\n    upstream {}",
         i + 1,
         typed_json::mod_(&t[i]),
         typed_json::mod_(&lm[i])
@@ -216,7 +207,7 @@ fn compare_lines(what: &str, t: &[ModLine], l: &Value, fail: &mut dyn FnMut(Stri
     let ll = array(l);
     if t.len() != ll.len() {
         fail(format!(
-            "{what}: {} lines != {}\n    typed {:?}\n    translated {:?}",
+            "{what}: {} lines != {}\n    typed {:?}\n    upstream {:?}",
             t.len(),
             ll.len(),
             t.iter().map(|m| &m.line).collect::<Vec<_>>(),
@@ -610,19 +601,23 @@ fn compare(t: &Item, l: &Value, fail: &mut dyn FnMut(String)) {
     }
 }
 
-fn jewel_radius(host: &Host) -> Vec<String> {
-    array(&get(&host.global("data"), "jewelRadius"))
+/// One of `oracle/values.lua`'s values
+fn oracle_value(oracle: &Session, f: &str, params: serde_json::Value) -> Result<Value, String> {
+    let req = serde_json::json!({"cmd": "oracleValue", "fn": f, "params": params});
+    lua_json::answer(&oracle.request(&req.to_string())?)
+}
+
+fn jewel_radius(v: &Value) -> Vec<String> {
+    array(&get(v, "jewelRadius"))
         .iter()
-        .map(|r| text(&get(r, "label")).unwrap_or_default())
+        .filter_map(text)
         .collect()
 }
 
 #[test]
 fn items_match_upstream() {
     let filter = std::env::var("CALCS_FILTER").unwrap_or_default();
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    let oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
     let parser = mod_parser_preloaded();
     let data = equivalence::game_data().items;
     let mut failures = Vec::new();
@@ -634,65 +629,37 @@ fn items_match_upstream() {
     };
 
     if std::env::var("ITEM_UNIQUES").map_or(true, |v| v != "0") && filter.is_empty() {
-        let radius = jewel_radius(&host);
+        let templates = oracle_value(&oracle, "items", serde_json::json!({"templates": true}))
+            .unwrap_or_else(|e| panic!("{e}"));
+        let radius = jewel_radius(&templates);
         let ctx = ItemContext {
             data: &data,
             parser: &parser,
             jewel_radius: &radius,
             default_affix_quality: 0.5,
         };
-        let new = host.global("new");
-        let data_table = host.global("data");
-        let mut texts: Vec<(String, Value, &str)> = Vec::new();
-        for (ty, list) in get(&data_table, "uniques").as_table().unwrap().entries() {
-            for (_, raw) in list.as_table().map(|t| t.entries()).unwrap_or_default() {
-                texts.push((
-                    format!("unique {:?}", lua::to_string(&ty.to_value())),
-                    raw,
-                    "UNIQUE",
-                ));
+        for entry in array(&get(&templates, "items")) {
+            let raw_text = text(&get(&entry, "raw")).unwrap();
+            let rarity = text(&get(&entry, "rarity")).unwrap();
+            let first_line = raw_text
+                .trim()
+                .lines()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" / ");
+            let what = format!("{} {first_line}", text(&get(&entry, "kind")).unwrap());
+            if let Some(e) = text(&get(&entry, "error")) {
+                record(what, vec![format!("upstream failed: {e}")], &mut failures);
+                continue;
             }
-        }
-        // The rare templates, as the rare database parses them before
-        // crafting them
-        for (_, raw) in get(&data_table, "rares").as_table().unwrap().entries() {
-            texts.push(("rare".into(), raw, "RARE"));
-        }
-        {
-            for (kind, raw, rarity) in texts {
-                let raw_text = text(&raw).unwrap();
-                let first_line = raw_text
-                    .trim()
-                    .lines()
-                    .take(2)
-                    .collect::<Vec<_>>()
-                    .join(" / ");
-                let what = format!("{kind} {first_line}");
-                let lua_item = match rt::call(&new, &[s("Item")]).and_then(|v| {
-                    rt::method(
-                        &rt::first(v),
-                        &"Item".into(),
-                        &[raw.clone(), s(rarity), Value::Bool(true)],
-                    )
-                }) {
-                    Ok(v) => v.into_iter().next().unwrap_or_default(),
-                    Err(e) => {
-                        record(
-                            what,
-                            vec![format!("translated failed: {}", describe(&e))],
-                            &mut failures,
-                        );
-                        continue;
-                    }
-                };
-                compared += 1;
-                let mut item_failures = Vec::new();
-                match Item::new(&ctx, &raw_text, Some(rarity), true) {
-                    Ok(item) => compare(&item, &lua_item, &mut |f| item_failures.push(f)),
-                    Err(e) => item_failures.push(format!("typed failed: {e}")),
-                }
-                record(what, item_failures, &mut failures);
+            let lua_item = get(&entry, "item");
+            compared += 1;
+            let mut item_failures = Vec::new();
+            match Item::new(&ctx, &raw_text, Some(&rarity), true) {
+                Ok(item) => compare(&item, &lua_item, &mut |f| item_failures.push(f)),
+                Err(e) => item_failures.push(format!("typed failed: {e}")),
             }
+            record(what, item_failures, &mut failures);
         }
     }
 
@@ -701,11 +668,14 @@ fn items_match_upstream() {
             continue;
         }
         let xml = std::fs::read_to_string(&path).unwrap();
-        host.load_build_xml(xml.as_bytes(), &id)
-            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
-        let build = host.build().unwrap();
-        let items = get(&get(&build, "itemsTab"), "items");
-        let radius = jewel_radius(&host);
+        let loaded = oracle_value(
+            &oracle,
+            "buildItems",
+            serde_json::json!({"id": id, "xml": xml}),
+        )
+        .unwrap_or_else(|e| panic!("{id}: {e}"));
+        let items = get(&loaded, "items");
+        let radius = jewel_radius(&loaded);
         let ctx = ItemContext {
             data: &data,
             parser: &parser,

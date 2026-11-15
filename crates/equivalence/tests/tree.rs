@@ -1,18 +1,20 @@
-//! The typed passive tree (`engine::tree`) equals the translated program's
-//! `PassiveTree` for every tree version the corpus uses: every node's
-//! fields, position, links, stat parses and mods, the radius lists of jewel
-//! sockets and keystones, and the tree's lookup tables.
+//! The typed passive tree (`engine::tree`) equals upstream's `PassiveTree`
+//! on the oracle (`oracle/values.lua`'s `tree`) for every tree version the
+//! corpus uses: every node's fields, position, links, stat parses and mods,
+//! the radius lists of jewel sockets and keystones, and the tree's lookup
+//! tables. Upstream builds the node list and the connectors in `pairs`
+//! order over `tree.nodes`, whose string key `root` makes it follow
+//! LuaJIT's per-process string hash, so both compare in id order,
+//! connectors undirected and the class notables sorted.
 
 use engine::mods::Mod;
 use engine::mods::convert::Converter;
 use engine::tree::{self, PassiveTree};
-use equivalence::{load_data, mod_parser_preloaded, typed_json, upstream_src};
-use lua::rt::{self, first};
-use lua::{Key, LuaError, LuaStr, Value};
+use equivalence::{load_data, lua_json, mod_parser_preloaded, typed_json, upstream_src};
+use lua::rt;
+use lua::{Key, Value};
+use session::Session;
 use std::collections::BTreeMap;
-use std::rc::Rc;
-use upstream::host::Host;
-use upstream::imported::Imported;
 
 const VERSIONS: &[&str] = &["3_29", "3_13", "3_12", "3_6"];
 
@@ -22,14 +24,6 @@ fn s(x: &str) -> Value {
 
 fn get(v: &Value, k: &str) -> Value {
     rt::index(v, &s(k)).unwrap_or_default()
-}
-
-fn describe(e: &LuaError) -> String {
-    format!(
-        "{}\n  {}",
-        lua::to_string(e.value()),
-        e.traceback().join("\n  ")
-    )
 }
 
 fn text(v: &Value) -> Option<String> {
@@ -64,23 +58,19 @@ fn lua_mods(v: &Value) -> Result<Vec<Mod>, String> {
 
 #[test]
 fn trees_match_upstream() {
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
+    let oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
     let parser = mod_parser_preloaded();
     let mut im = importer::Importer::new(&upstream_src());
     let (data, _) = load_data();
-    let latest = lua::to_string(&host.global("latestTreeVersion")).to_string();
     let mut failures = Vec::new();
     for version in VERSIONS {
-        let lua_tree = first(
-            rt::method(
-                &host.main().unwrap(),
-                &LuaStr::from("LoadTree"),
-                &[s(version)],
-            )
-            .unwrap_or_else(|e| panic!("LoadTree {version}: {}", describe(&e))),
-        );
+        let req =
+            serde_json::json!({"cmd": "oracleValue", "fn": "tree", "params": {"version": version}});
+        let lua_tree = oracle
+            .request(&req.to_string())
+            .and_then(|r| lua_json::answer(&r))
+            .unwrap_or_else(|e| panic!("LoadTree {version}: {e}"));
+        let latest = lua::to_string(&get(&lua_tree, "latestTreeVersion")).to_string();
         let tree_data = im
             .load1(&format!("TreeData/{version}/tree"), vec![])
             .unwrap_or_else(|e| panic!("{version}: {e}"));
@@ -93,11 +83,13 @@ fn trees_match_upstream() {
             }
         };
         let lua_nodes = get(&lua_tree, "nodes");
-        let lua_ids = ids(&lua_nodes);
-        let typed_ids: Vec<u32> = typed.nodes.iter().map(|n| n.id).collect();
+        let mut lua_ids = ids(&lua_nodes);
+        let mut typed_ids: Vec<u32> = typed.nodes.iter().map(|n| n.id).collect();
+        lua_ids.sort();
+        typed_ids.sort();
         if lua_ids != typed_ids {
             fail(format!(
-                "nodes: {} translated, {} typed, or in another order",
+                "nodes: {} upstream, {} typed",
                 lua_ids.len(),
                 typed_ids.len()
             ));
@@ -186,13 +178,6 @@ fn trees_match_upstream() {
             for (i, (lm, tm)) in lmods.iter().zip(&node.mods).enumerate() {
                 let list = get(lm, "list");
                 let lextra = text(&get(lm, "extra"));
-                // A line the parser does not know: upstream returns the
-                // unparsed text as `extra` (the oracle records it), but the
-                // translation's runtime loses it in `unpack(copyTable({ nil,
-                // extra }))`, whose length it takes as 0 where LuaJIT's is 2
-                if tm.list.is_none() && list.is_nil() && lextra.is_none() {
-                    continue;
-                }
                 let ok = match (&tm.list, list.is_nil()) {
                     (None, true) => true,
                     (Some(t), false) => lua_mods(&list)
@@ -204,7 +189,7 @@ fn trees_match_upstream() {
                     &format!("mods[{}]", i + 1),
                     ok && lextra.as_deref() == tm.extra.as_deref(),
                     format!(
-                        "typed {:?} list {:?}, translated {lextra:?} list {}",
+                        "typed {:?} list {:?}, upstream {lextra:?} list {}",
                         tm.extra,
                         tm.list.as_ref().map(|l| mods_json(l)),
                         if list.is_nil() {
@@ -222,7 +207,7 @@ fn trees_match_upstream() {
                     "modList",
                     false,
                     format!(
-                        "\n    typed      {}\n    translated {}",
+                        "\n    typed      {}\n    upstream {}",
                         mods_json(&node.mod_list),
                         mods_json(&l)
                     ),
@@ -266,7 +251,7 @@ fn trees_match_upstream() {
             check(
                 "nodesInRadius",
                 lr == tr,
-                format!("typed {:?} translated {:?}", sizes(&tr), sizes(&lr)),
+                format!("typed {:?} upstream {:?}", sizes(&tr), sizes(&lr)),
             );
         }
         // Lookup tables
@@ -308,7 +293,7 @@ fn trees_match_upstream() {
                     .take(5)
                     .collect();
                 fail(format!(
-                    "{name}: translated only {missing:?}, typed only {extra:?}"
+                    "{name}: upstream only {missing:?}, typed only {extra:?}"
                 ));
             }
         }
@@ -325,9 +310,14 @@ fn trees_match_upstream() {
                 lconn.push(pair);
             }
         }
-        if lconn != typed.connectors {
+        let undirected = |c: &[(u32, u32)]| {
+            let mut c: Vec<(u32, u32)> = c.iter().map(|&(a, b)| (a.min(b), a.max(b))).collect();
+            c.sort();
+            c
+        };
+        if undirected(&lconn) != undirected(&typed.connectors) {
             fail(format!(
-                "connectors: {} typed, {} translated, or in another order",
+                "connectors: {} typed, {} upstream",
                 typed.connectors.len(),
                 lconn.len()
             ));
@@ -365,16 +355,19 @@ fn trees_match_upstream() {
                 ));
             }
         }
+        // Gathered in `pairs` order over `tree.nodes`, so compared sorted
         let lnot = get(&lua_tree, "classNotables");
         for (class, list) in &typed.class_notables {
-            let l: Vec<String> = get(&lnot, class)
+            let mut l: Vec<String> = get(&lnot, class)
                 .as_table()
                 .map(|t| t.array())
                 .unwrap_or_default()
                 .iter()
                 .filter_map(text)
                 .collect();
-            let t: Vec<String> = list.iter().map(|s| s.to_string()).collect();
+            let mut t: Vec<String> = list.iter().map(|s| s.to_string()).collect();
+            l.sort();
+            t.sort();
             if l != t {
                 fail(format!("classNotables {class}: {t:?} != {l:?}"));
             }
