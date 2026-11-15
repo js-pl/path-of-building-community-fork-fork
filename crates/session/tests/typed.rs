@@ -360,6 +360,9 @@ struct Alternates {
     variants: std::collections::HashMap<String, String>,
     /// The skills of curse gems (marks too)
     curse_skills: std::collections::HashSet<String>,
+    /// The item bases, and those that are weapons
+    bases: std::collections::HashSet<String>,
+    weapon_bases: std::collections::HashSet<String>,
     /// A unique's flavour texts but the first, to its first
     /// (`flavourLookup` is read in `pairs` order)
     flavours: Vec<(Vec<String>, Vec<String>)>,
@@ -413,10 +416,27 @@ impl Alternates {
             .filter(|g| g.tags.contains("curse"))
             .map(|g| g.granted_effect.id.clone())
             .collect();
+        let weapon_bases = data
+            .game
+            .items
+            .bases()
+            .iter()
+            .filter(|b| b.weapon.is_some())
+            .map(|b| b.name.clone())
+            .collect();
+        let bases = data
+            .game
+            .items
+            .bases()
+            .iter()
+            .map(|b| b.name.clone())
+            .collect();
         Alternates {
             gems,
             variants,
             curse_skills,
+            bases,
+            weapon_bases,
             flavours,
         }
     }
@@ -1784,6 +1804,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         if let Some(a) = items["ok"]["items"].as_array() {
             pool.extend(a.iter().map(|i| i["raw"].clone()));
         }
+        let mut ambiguous = false;
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -2497,6 +2518,13 @@ fn items_edits_match(d: &mut Dispatcher) {
             let t = Instant::now();
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
+            if oracle() && weapon_slot_ambiguous(d, &req) {
+                skipped.push(format!(
+                    "{id}: {label} {r}: a non-weapon in Weapon 1, which upstream fails on when `pairs(self.slots)` reaches Weapon 2 first"
+                ));
+                ambiguous = true;
+                break;
+            }
             for f in ["state", "outputs", "skills", "treeSpecs"] {
                 compare(d, &json!({"cmd": f}), &format!("{label} {r}"), &mut out);
             }
@@ -2519,7 +2547,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             );
             steps += 1;
         }
-        if out.is_empty() && d.typed_active() {
+        if out.is_empty() && d.typed_active() && !ambiguous {
             compare_saves(d, "after the edits", &mut out);
         }
         if !out.is_empty() {
@@ -2540,6 +2568,34 @@ fn items_edits_match(d: &mut Dispatcher) {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// Whether the reference failed after an item edit that put a non-weapon
+/// (`req`'s item text) in or into Weapon 1's place: upstream equips it,
+/// then `ItemsTab:PopulateSlots` goes through `pairs(self.slots)`, and
+/// when it reaches Weapon 2 before Weapon 1 has dropped the item,
+/// `IsItemValidForSlot` indexes `weaponTypeInfo` with its type and fails
+/// (leaving the build broken), so LuaJIT's string hash decides
+fn weapon_slot_ambiguous(d: &mut Dispatcher, req: &J) -> bool {
+    let Some(text) = req["text"].as_str() else {
+        return false;
+    };
+    if !matches!(req["cmd"].as_str(), Some("addItem" | "editItem")) {
+        return false;
+    }
+    let Some(alt) = ALTERNATES.get() else {
+        return false;
+    };
+    let non_weapon = text
+        .lines()
+        .skip(1)
+        .take(2)
+        .find(|l| alt.bases.contains(*l))
+        .is_some_and(|b| !alt.weapon_bases.contains(b));
+    non_weapon
+        && answer(d.translated_request(r#"{"cmd":"state"}"#), "state")
+            .get("error")
+            .is_some()
 }
 
 /// `displayItem` of both. The tooltip's stat comparison of the
