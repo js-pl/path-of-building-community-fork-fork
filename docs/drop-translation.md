@@ -44,7 +44,7 @@ makes cyclic environments).
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
 | `equivalence/tests/{calc_setup,perform,breakdown,calculator,power,mods,item,items_tab,spec,tree,skills,config,game_data}.rs` | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | the translation, live: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
