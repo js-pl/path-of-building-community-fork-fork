@@ -76,8 +76,27 @@ fn oracle() -> bool {
 /// enemy modifiers and exported mods (`<value>|Skill:..` runs). Build codes are compared decoded (zlib and miniz
 /// compress differently).
 fn unordered(v: &mut J) {
+    // A comma list in curse slot order, which follows `pairs` over the
+    // party's curse names
+    let sort_list = |s: &mut String| {
+        let mut parts: Vec<&str> = s.split(", ").collect();
+        parts.sort_unstable();
+        *s = parts.join(", ");
+    };
     match v {
         J::Object(m) => {
+            if let Some(J::String(s)) = m.get_mut("CurseList") {
+                sort_list(s);
+            }
+            if m.get("label").and_then(J::as_str) == Some("Curses and Debuffs")
+                && let Some(J::Array(cells)) = m.get_mut("cells")
+            {
+                for c in cells {
+                    if let Some(J::String(s)) = c.get_mut("text") {
+                        sort_list(s);
+                    }
+                }
+            }
             // Timeless jewel seeds whose totals differ only by the order
             // their weights were added in (the radius' `pairs` order)
             if m.get("class").and_then(J::as_str) == Some("TimelessJewelListControl")
@@ -137,6 +156,20 @@ fn unordered(v: &mut J) {
             }
         }
         J::Array(a) => a.iter_mut().for_each(unordered),
+        // `data.gemForSkill` names whichever alternate Vaal Righteous Fire
+        // `pairs(data.gems)` sets up last
+        J::String(s)
+            if s.contains("Vaal Righteous Fire of Arcane Devotion")
+                || s.contains("VaalRighteousFireAltX") =>
+        {
+            *s = s
+                .replace(
+                    "Vaal Righteous Fire of Arcane Devotion",
+                    "Vaal Righteous Fire",
+                )
+                .replace("VaalRighteousFireAltX", "VaalRighteousFire");
+            unordered(v);
+        }
         J::String(s) if s.contains('\n') => {
             let mut lines: Vec<&str> = s.split('\n').collect();
             let enemy_mods = s.starts_with("^7-----");
@@ -3203,6 +3236,12 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             skipped.push(format!("{id}: {e}"));
             return None;
         }
+        if oracle() && party_curses_ambiguous(d) {
+            skipped.push(format!(
+                "{id}: more party curses than the limit, which upstream picks in `pairs` order"
+            ));
+            return None;
+        }
         let mut out = Vec::new();
         let typed: Vec<J> = ["state", "outputs"]
             .iter()
@@ -3302,6 +3341,32 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
 /// The Party tab's views after a change
 const PARTY_VIEWS: [&str; 3] = ["party", "state", "outputs"];
 
+/// Whether the party's curses are more than its curse limit. Upstream
+/// slots them in `pairs` order over a table keyed by curse name, all of
+/// priority 0, so which ones take the slots follows LuaJIT's string hash,
+/// which it seeds per process: upstream itself differs from run to run.
+/// The translation (and the typed engine) take them in import order.
+fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
+    let save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+    let xml = save["ok"]["xml"].as_str().unwrap_or("");
+    let Some(start) = xml.find("<ImportedBuffs name=\"Curse\">") else {
+        return false;
+    };
+    let body = &xml[start..];
+    let body = &body
+        [body.find('>').map_or(0, |i| i + 1)..body.find("</ImportedBuffs>").unwrap_or(body.len())];
+    let lines: Vec<&str> = body.lines().collect();
+    let limit = lines
+        .iter()
+        .position(|l| l.trim() == "--- Curse Limit ---")
+        .and_then(|i| lines.get(i + 1))
+        .and_then(|l| l.trim().parse::<usize>().ok())
+        .unwrap_or(1);
+    // A curse is its name line after a "---" separator (or the limit)
+    let curses = lines.iter().filter(|l| l.trim() == "---").count();
+    curses > limit
+}
+
 /// The Party tab's controls (`party.*`) changed at random on corpus builds
 /// with a party: import codes (other builds' exports, invalid text, a
 /// link) to each destination, appended or replacing, Clear, Disable Party
@@ -3343,6 +3408,7 @@ fn party_controls_match(
         }
         let mut rng = Lcg(seed(&id));
         let mut out = Vec::new();
+        let mut ambiguous = false;
         let edits = [
             ("editPartyMemberStats", "PartyMemberStats"),
             ("editAuras", "Aura"),
@@ -3414,6 +3480,13 @@ fn party_controls_match(
                 diff(&typed, &tr, &label, &mut out);
             }
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            if oracle() && party_curses_ambiguous(d) {
+                skipped.push(format!(
+                    "{id}: {label}: more party curses than the limit, which upstream picks in `pairs` order"
+                ));
+                ambiguous = true;
+                break;
+            }
             compare_views(d, &PARTY_VIEWS, &label, &mut out);
             // A control's hover tooltip
             let names = [
@@ -3430,7 +3503,7 @@ fn party_controls_match(
             diff(&t, &tr, &format!("{label} {q}"), &mut out);
             steps += 1;
         }
-        if out.is_empty() {
+        if out.is_empty() && !ambiguous {
             compare_saves(d, &format!("{id} after the party edits"), &mut out);
         }
         if !out.is_empty() {

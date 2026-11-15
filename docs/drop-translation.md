@@ -213,12 +213,21 @@ of them, so each difference is one between the translation and LuaJIT):
 - **Left to explain** (each a real difference, or upstream choosing between
   equals in `pairs` order):
   - with imported party members, a few builds' sidebar and `Ignite*`
-    outputs (a party curse's `SelfIgniteChance` is applied on one side);
+    outputs (a party curse's `SelfIgniteChance` is applied on one side):
+    explained, upstream's `pairs` order. `CalcPerform` slots the party's
+    curses in `pairs` order over a table keyed by curse name, all of
+    priority 0, so with more curses than the limit which ones apply
+    follows LuaJIT's string hash (gen-0025 with gen-0029's Despair and
+    Flammability under a limit of 1). Against the oracle such party builds
+    are skipped (`party_curses_ambiguous`), and the curse list
+    (`CurseList`, the Calcs tab's Curses and Debuffs row) is compared
+    unordered;
   - transfigured gem names, `Vaal Righteous Fire` against `... of Arcane
     Devotion` as a breakdown row's source and in a saved gem: explained,
     upstream's `pairs` order. `Data.lua` makes the alternate Vaal gems with
     the base gem's `grantedEffect`, so `data.gemForSkill[grantedEffect]`
-    names whichever of them `pairs(data.gems)` sets up last;
+    names whichever of them `pairs(data.gems)` sets up last; compared with
+    the base name against the oracle;
   - unique flavour text, two uniques (`Duskblight`, a flask) with other
     lore lines: explained, upstream's `pairs` order. A unique with several
     flavour texts shows the first `pairs(flavourTable)` gives
@@ -226,4 +235,4 @@ of them, so each difference is one between the translation and LuaJIT):
   - a connector of the 3.21 tree's Necromancer ascendancy, drawn as an arc
     on one side and a line on the other;
   - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
-    another order.
+    another order: explained with the party's curses above.
