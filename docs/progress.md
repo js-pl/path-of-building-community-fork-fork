@@ -1350,19 +1350,18 @@ the tests align these:
     two base names match equally long (`pairs(data.itemBases)`), a mod
     line matching two patterns of one length (`ModParser`'s `scan`,
     `pairs(jewelFuncList)`), a notable or cluster node name two grouped
-    nodes share (`notableMap`, `clusterNodeMap`), a duplicate unique name
-    or title across item types (`pairs(data.uniques)`), and
-    `string:matchOrPattern` with one alternative that matches and one
-    malformed (`life|[`: found or a failed search, by run)
+    nodes share (`notableMap`, `clusterNodeMap`), and a duplicate unique
+    name or title across item types (`pairs(data.uniques)`)
+  - `string:matchOrPattern` with one alternative that matches and one
+    malformed (`life|[`) finds the line or fails the search, by run; the
+    typed engine answers true whenever a well-formed alternative matches
 
   Number keys hash the same in every LuaJIT process (`LjMap`, verified
-  against LuaJIT by `tests/oracle/tables.jsonl`); one typed table that
-  upstream visits with `pairs` over number keys still keeps insertion
-  order: `legacyClusterNodeMap` and the oidx maps of the legacy cluster
-  conversion (`BuildLegacyClusterOrbitMappings`,
-  `ApplyLegacyClusterNodeRemap`), which the 3.13 corpus builds with
-  cluster jewels (saved before `clusterHashFormatVersion`) go through;
-  they agree with the oracle, no two nodes sharing an orbit index there.
+  against LuaJIT by `tests/oracle/tables.jsonl`), so those tables follow
+  LuaJIT's order, including the legacy cluster conversion's
+  (`legacyClusterNodeMap` and the orbit index maps of
+  `BuildLegacyClusterOrbitMappings`, which the 3.13 corpus builds with
+  cluster jewels go through).
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
