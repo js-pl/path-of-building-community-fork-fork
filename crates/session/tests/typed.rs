@@ -5412,19 +5412,8 @@ fn mod_browser_match() {
             "load",
         );
         assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
-        let paths: Vec<String> = (1000..1200).map(|n| format!("configTab.{n}")).collect();
-        let tr = answer(
-            d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
-            "translated controls",
-        );
-        let group = tr["ok"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .find(|(_, c)| c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl")
-            .map(|(p, _)| p.clone())
-            .expect("a custom modifier group");
-        let open = json!({"cmd": "control", "path": format!("{group}.addModBtn"), "click": true});
+        // The shown group's controls get new indices with each Add
+        let open = json!({"open": true});
         let c = |path: &str, v: J| {
             let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
             for (k, x) in v.as_object().unwrap() {
@@ -5443,7 +5432,10 @@ fn mod_browser_match() {
             open.clone(),
             c("search", json!({"text": "inc fire dam"})),
             c("search", json!({"text": "firedam"})),
-            c("listControl", json!({"sel": 4, "click": true, "doubleClick": true})),
+            c(
+                "listControl",
+                json!({"sel": 4, "click": true, "doubleClick": true}),
+            ),
             open.clone(),
             c("search", json!({"text": "zzzzqqqq"})),
             button("save"),
@@ -5452,7 +5444,24 @@ fn mod_browser_match() {
             c("listControl", json!({"sel": 99999})),
             button("close"),
         ];
-        for r in steps {
+        for mut r in steps {
+            if r["open"] == true {
+                let paths: Vec<String> = (1000..1300).map(|n| format!("configTab.{n}")).collect();
+                let tr = answer(
+                    d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+                    "translated controls",
+                );
+                let group = tr["ok"]
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                    .find(|(_, c)| {
+                        c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl"
+                    })
+                    .map(|(p, _)| p.clone())
+                    .expect("a custom modifier group");
+                r = json!({"cmd": "control", "path": format!("{group}.addModBtn"), "click": true});
+            }
             answer(d.request(&r.to_string()), "typed");
             assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
             let label = format!("{id} {r}");
@@ -5463,11 +5472,20 @@ fn mod_browser_match() {
                     let q = json!({"cmd": "controlTooltip", "path": "popup.listControl", "index": index})
                         .to_string();
                     d.typed_error = None;
-                    let (t, tr) = (
+                    let (mut t, mut tr) = (
                         answer(d.request(&q), "typed"),
                         answer(d.translated_request(&q), "translated"),
                     );
                     assert!(d.typed_error.is_none(), "{label} {q}: {:?}", d.typed_error);
+                    // A row's sources, in the `pairs` order of string keys
+                    // (which LuaJIT seeds per process)
+                    if oracle() {
+                        for v in [&mut t, &mut tr] {
+                            if let Some(a) = v["ok"]["lines"].as_array_mut() {
+                                a.sort_by_key(|l| l.to_string());
+                            }
+                        }
+                    }
                     diff(&t, &tr, &format!("{label} {q}"), &mut out);
                 }
             }
