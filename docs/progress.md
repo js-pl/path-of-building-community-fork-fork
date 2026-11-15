@@ -462,7 +462,10 @@ What remains for the full migration, in order:
    tree holding tattoos it stays on the translation; `overlays_match`
    removes them on every tattoo variant), the version drop-down's
    Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
-   active one's undo state on the other version, inserted after it, the
+   active one's undo state on the other version, with its tattoos (the
+   state's `hashOverrides`: those on nodes the version has replace them,
+   the others are kept and saved; `overlays_match` converts the tattoo
+   variants to 3_25), inserted after it, the
    old one removed or kept, `SetActiveSpec` once with its loadout sync and
    version drop-down), Convert to the latest version and Convert all
    (each spec on another version in turn, then the active one again), the

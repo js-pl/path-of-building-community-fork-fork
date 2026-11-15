@@ -341,8 +341,9 @@ impl TypedSession<'_> {
         }
         // `RestoreUndoState(CreateUndoState(), version)`: no bloodline
         let src = &self.build.spec;
+        // `PassiveSpec::new` selects class 0, as upstream's constructor
         let (Some(class), Some(ascend)) = (src.cur_class_id, src.cur_ascend_class_id) else {
-            return Err(format!("{NOT_PORTED}: converting a tree without a class"));
+            return Err("invariant: a spec without a class".into());
         };
         let hash_list: Vec<u32> = src.alloc_nodes.iter().map(|(k, _)| k).collect();
         let masteries: Vec<(u32, f64)> = src
@@ -355,15 +356,13 @@ impl TypedSession<'_> {
             src.jewels.clone(),
             src.hash_overrides.clone(),
         );
-        if !overrides.is_empty() {
-            return Err(format!(
-                "{NOT_PORTED}: converting a tree with overridden nodes"
-            ));
-        }
         let tree = self.data.tree(&version)?;
         let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
         spec.title = title;
         spec.jewels = jewels;
+        // The undo state's `hashOverrides`, the same tattoos: those on nodes
+        // the other version has replace them, the others are kept and saved
+        spec.hash_overrides = overrides;
         spec.import_from_node_list(class, ascend, None, &hash_list, &masteries)?;
         spec.build_cluster_jewel_graphs(&self.build.items, &self.data.game.items)?;
         let active = self.specs.0;
