@@ -16,60 +16,30 @@ use crate::items_tab::ItemsTab;
 use crate::mods::{Mod, ModType, ModValue};
 use crate::spec::{PassiveSpec, SpecNode};
 use crate::tree::{ExpansionJewel, Node, NodeType};
+use lua::ljtab::LjMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-/// A Lua table with integer keys as the translated runtime orders it: the
-/// array part `1..n` first, then the other keys in insertion order
+/// A Lua table with non-negative integer keys (`indicies` and the orbit
+/// index maps of `BuildSubgraph`), visited in LuaJIT's `pairs` order, which
+/// decides which node a shared orbit index keeps
 #[derive(Default)]
-struct IntTable<T> {
-    array: Vec<T>,
-    hash: Vec<(i64, T)>,
-}
+struct IntTable<T>(LjMap<T>);
 
 impl<T: Clone> IntTable<T> {
     fn get(&self, k: i64) -> Option<&T> {
-        if k >= 1 && (k as usize) <= self.array.len() {
-            return self.array.get(k as usize - 1);
-        }
-        self.hash.iter().find(|(x, _)| *x == k).map(|(_, v)| v)
+        u32::try_from(k).ok().and_then(|k| self.0.get(k))
     }
 
     fn set(&mut self, k: i64, v: T) {
-        if k >= 1 && (k as usize) <= self.array.len() {
-            self.array[k as usize - 1] = v;
-            return;
-        }
-        if k >= 1 && k as usize == self.array.len() + 1 {
-            self.hash.retain(|(x, _)| *x != k);
-            self.array.push(v);
-            loop {
-                let next = self.array.len() as i64 + 1;
-                match self.hash.iter().position(|(x, _)| *x == next) {
-                    Some(p) => {
-                        let (_, v) = self.hash.remove(p);
-                        self.array.push(v);
-                    }
-                    None => break,
-                }
-            }
-            return;
-        }
-        match self.hash.iter_mut().find(|(x, _)| *x == k) {
-            Some(e) => e.1 = v,
-            None => self.hash.push((k, v)),
-        }
+        self.0
+            .insert(u32::try_from(k).expect("a non-negative index"), v);
     }
 
     fn pairs(&self) -> Vec<(i64, T)> {
-        self.array
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (i as i64 + 1, v.clone()))
-            .chain(self.hash.iter().cloned())
-            .collect()
+        self.0.iter().map(|(k, v)| (k as i64, v.clone())).collect()
     }
 }
 
@@ -172,10 +142,7 @@ impl<'t> PassiveSpec<'t> {
         let Some(map) = &mut self.legacy_map else {
             return;
         };
-        match map.iter_mut().find(|(k, _)| *k == legacy) {
-            Some(e) => e.1 = current,
-            None => map.push((legacy, current)),
-        }
+        map.insert(legacy, current);
         if let Some(rev) = &mut self.legacy_reverse {
             rev.insert(current, legacy);
         }
@@ -229,7 +196,7 @@ impl<'t> PassiveSpec<'t> {
     pub fn build_cluster_jewel_graphs(&mut self, tab: &ItemsTab, data: &ItemData) -> Result<()> {
         self.set_tree_jewels(tab);
         let legacy = self.cluster_hash_format_version < 2.0;
-        self.legacy_map = legacy.then(Vec::new);
+        self.legacy_map = legacy.then(LjMap::default);
         self.legacy_reverse = legacy.then(HashMap::new);
         let mut b = Builder::default();
         for &socket in &self.tree.sockets {
@@ -319,8 +286,8 @@ impl<'t> PassiveSpec<'t> {
             return;
         };
         let mapped = |s: &Self, id: u32| -> u32 {
-            match map.iter().find(|(k, _)| *k == id) {
-                Some((_, c)) if s.index.contains_key(c) => *c,
+            match map.get(id) {
+                Some(c) if s.index.contains_key(c) => *c,
                 _ => id,
             }
         };
@@ -332,7 +299,9 @@ impl<'t> PassiveSpec<'t> {
             }
         }
         self.alloc_subgraph_nodes = converted;
-        for (legacy, current) in &map {
+        // `pairs` over the legacy ids: LuaJIT's order
+        for (legacy, current) in map.iter() {
+            let legacy = &legacy;
             if legacy != current
                 && self.alloc_nodes.contains(*legacy)
                 && self.index.contains_key(current)
