@@ -77,6 +77,17 @@ fn oracle() -> bool {
 /// base-type lines of an item's text (`{variant:..}` runs), the party's
 /// enemy modifiers and exported mods (`<value>|Skill:..` runs). Build codes are compared decoded (zlib and miniz
 /// compress differently).
+/// The key upstream sorts a control's list of mods by (the first line with
+/// numbers and ranges as `$`, `ItemsTab`'s corruption and crafting popups);
+/// entries with equal keys come in `pairs` order
+fn mod_list_key(l: &J) -> String {
+    let s = l.as_str().unwrap_or("").to_lowercase();
+    let s = s.split('/').next().unwrap_or("").to_string();
+    let s = engine::pat::gsub(&s, "%(.-%)", "$");
+    let s = engine::pat::gsub(&s, "[%+%-%%]", "");
+    engine::pat::gsub(&s, "%d+", "$")
+}
+
 fn unordered(v: &mut J) {
     // A comma list in curse slot order, which follows `pairs` over the
     // party's curse names
@@ -225,13 +236,7 @@ fn unordered(v: &mut J) {
                     && a.len() > 1
                     && a.iter().all(J::is_string)
                 {
-                    let norm = |l: &J| {
-                        let s = l.as_str().unwrap_or("").to_lowercase();
-                        let s = s.split('/').next().unwrap_or("").to_string();
-                        let s = engine::pat::gsub(&s, "%(.-%)", "$");
-                        let s = engine::pat::gsub(&s, "[%+%-%%]", "");
-                        engine::pat::gsub(&s, "%d+", "$")
-                    };
+                    let norm = mod_list_key;
                     let mut i = 0;
                     while i < a.len() {
                         let mut j = i + 1;
@@ -2097,10 +2102,26 @@ fn items_edits_match(d: &mut Dispatcher) {
                             if let Some(c) = pick(&mut rng, &inputs).filter(|c| {
                                 c["path"] != "popup.sort" && c["path"] != "popup.notableDB.sort"
                             }) {
-                                let n = c["list"].as_array().map_or(1, Vec::len);
-                                let req = json!({"cmd": "controlTooltip", "path": c["path"], "index": rng.below(n) + 1});
-                                compare(d, &req, &format!("step {step}"), &mut out);
-                                *popup_inputs.entry("tooltip".into()).or_default() += 1;
+                                let list = c["list"].as_array().cloned().unwrap_or_default();
+                                let n = list.len().max(1);
+                                let index = rng.below(n);
+                                // An entry tied with a neighbour on the sort
+                                // key sits where `pairs` put it, so against
+                                // the oracle the same index can be another mod
+                                let tied = |j: usize| {
+                                    j < list.len()
+                                        && list[j].is_string()
+                                        && [j.wrapping_sub(1), j + 1].iter().any(|&k| {
+                                            list.get(k).is_some_and(|o| {
+                                                mod_list_key(o) == mod_list_key(&list[j])
+                                            })
+                                        })
+                                };
+                                if !(oracle() && tied(index)) {
+                                    let req = json!({"cmd": "controlTooltip", "path": c["path"], "index": index + 1});
+                                    compare(d, &req, &format!("step {step}"), &mut out);
+                                    *popup_inputs.entry("tooltip".into()).or_default() += 1;
+                                }
                             }
                             if rng.below(2) == 0 {
                                 let req = json!({"cmd": "controlTooltip", "path": "popup.save"});

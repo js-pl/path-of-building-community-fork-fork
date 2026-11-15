@@ -255,6 +255,12 @@ of them, so each difference is one between the translation and LuaJIT):
     disable each other, and `calcs.initEnv` breaks the cycle from the slot
     `pairs(itemDisablers)` gives first; against the oracle the weapon
     slots' comparisons of such tooltips are left out;
+  - an item popup's mod list hovered on an entry tied with its neighbour
+    on the sort key (gen-0055, Global Accuracy Rating (15-17)% against
+    (18-20)% in the nightly): explained, upstream's `pairs` order. Tied
+    entries keep the order they were gathered in, so one index names
+    either mod; against the oracle such entries are not hovered (the lists
+    themselves compare with ties sorted);
   - a shared item set dragged back into the build: explained, upstream's
     `pairs` order. `ItemSetListControl:ReceiveDrag` adds the set's items in
     `pairs` order of their slot names, so their ids, and with them every
