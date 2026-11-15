@@ -111,7 +111,9 @@ impl Source {
     }
 
     /// The stat descriptions of the gems' quality stats, in the scopes of
-    /// their skills (`Data/StatDescriptions`)
+    /// their skills, and of the timeless jewels' passives' stats in
+    /// `stat_descriptions`, which Find Timeless Jewel's Generate describes
+    /// (`Data/StatDescriptions`)
     pub fn stat_descriptions(
         &self,
         skills: &SkillData,
@@ -125,6 +127,25 @@ impl Source {
             stats.extend(e.quality_stats.iter().map(|(s, _)| s.clone()));
         }
         let mut im = self.importer();
+        let legion = im
+            .load1("Data/TimelessJewelData/LegionPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        for list in ["nodes", "additions"] {
+            let Some(t) = legion.as_table().map(|t| t.get_str(list)) else {
+                continue;
+            };
+            for (_, n) in t.as_table().map(|t| t.entries()).unwrap_or_default() {
+                let Some(st) = n.as_table().map(|n| n.get_str("stats")) else {
+                    continue;
+                };
+                for (k, _) in st.as_table().map(|t| t.entries()).unwrap_or_default() {
+                    if let Some(k) = k.to_value().as_str() {
+                        stats.insert(k.to_str_lossy().into_owned());
+                    }
+                }
+            }
+        }
+        scopes.insert("stat_descriptions".to_string());
         let names: Vec<String> = scopes.into_iter().collect();
         engine::stat_describer::StatDescriptions::from_lua(
             &names,

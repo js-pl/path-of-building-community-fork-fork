@@ -200,6 +200,8 @@ struct ModEntry {
 #[derive(Clone, Debug)]
 struct ProtectBox {
     label: String,
+    /// The tree's node (`nodeInfo.node`)
+    id: u32,
     state: bool,
 }
 
@@ -571,7 +573,7 @@ impl<'d> TypedSession<'d> {
         let Some(tree_socket) = spec.tree.node(socket as u32) else {
             return Ok(());
         };
-        let mut options: Vec<String> = Vec::new();
+        let mut options: Vec<(String, u32)> = Vec::new();
         if p.jewel() == 11 {
             let class = spec.ascend_class_name();
             for (id, _) in spec.alloc_nodes.iter() {
@@ -579,7 +581,7 @@ impl<'d> TypedSession<'d> {
                     && n.ascendancy_name.as_ref().map(|s| s.as_str()) == class.as_deref()
                     && n.kind == NodeType::Notable
                 {
-                    options.push(n.dn.to_string());
+                    options.push((n.dn.to_string(), id));
                 }
             }
         } else {
@@ -595,16 +597,17 @@ impl<'d> TypedSession<'d> {
                     && let Some(n) = spec.tree.node(id)
                     && n.kind == NodeType::Notable
                 {
-                    options.push(n.dn.to_string());
+                    options.push((n.dn.to_string(), id));
                 }
             }
         }
-        engine::calcs::lua_sort(&mut options, |a, b| a < b);
+        engine::calcs::lua_sort(&mut options, |a, b| a.0 < b.0);
         self.tree_tab_mut_allocated(options.len());
         p.protect = options
             .into_iter()
-            .map(|label| ProtectBox {
+            .map(|(label, id)| ProtectBox {
                 label,
+                id,
                 state: false,
             })
             .collect();
@@ -1369,10 +1372,40 @@ impl<'d> TypedSession<'d> {
                 let Some(label) = idx.and_then(|i| CONQUERORS[p.jewel() - 1].get(i - 1)) else {
                     return nil();
                 };
-                if is_match(label, "%((.+)%)$") {
-                    return Err(format!(
-                        "{NOT_PORTED}: the tooltip of a conqueror's keystone"
-                    ));
+                // `spec.tree.keystoneMap`: the tree's keystone, else the
+                // legion keystone of that name
+                let tree = self.build.spec.tree;
+                let name = engine::pat::capture(label, "%((.+)%)$");
+                if let Some(name) = name {
+                    if let Some(n) = tree
+                        .keystone_map
+                        .get(name.as_str())
+                        .and_then(|&id| tree.node(id))
+                    {
+                        self.base_node_tooltip(
+                            &mut tip,
+                            &n.dn,
+                            &n.sd,
+                            &n.mods,
+                            n.reminder_text.as_deref(),
+                            n.flavour_text.as_deref(),
+                        );
+                    } else if let Some(t) = self.data.timeless()
+                        && let Some(l) = t
+                            .nodes
+                            .iter()
+                            .find(|l| l.node.kind == NodeType::Keystone && *l.node.dn == *name)
+                    {
+                        let n = &l.node;
+                        self.base_node_tooltip(
+                            &mut tip,
+                            &n.dn,
+                            &n.sd,
+                            &n.mods,
+                            n.reminder_text.as_deref(),
+                            None,
+                        );
+                    }
                 }
             }
             "socketFilter" => lines(&[
@@ -1441,14 +1474,47 @@ impl<'d> TypedSession<'d> {
                 None => return nil(),
                 Some(i) if i > p.abyss.len() + 1 => return nil(),
                 Some(1) => {}
-                Some(_) => {
-                    return Err(format!(
-                        "{NOT_PORTED}: the tooltip of an Abyss ascendancy notable"
-                    ));
+                Some(i) => {
+                    // The legion node (`value.node`)
+                    let (_, id) = &self.timeless_abyss_options()?[i - 2];
+                    let t = self.data.timeless().ok_or_else(|| {
+                        format!("{NOT_PORTED}: timeless jewels without their data")
+                    })?;
+                    let l = t
+                        .nodes
+                        .iter()
+                        .find(|l| &*l.node.id == id.as_str())
+                        .ok_or("no legion node")?;
+                    let n = &l.node;
+                    self.base_node_tooltip(
+                        &mut tip,
+                        &n.dn,
+                        &n.sd,
+                        &n.mods,
+                        n.reminder_text.as_deref(),
+                        None,
+                    );
                 }
             },
             n if n.starts_with("protectAllocatedBox") => {
-                return Err(format!("{NOT_PORTED}: the tooltip of a protected notable"));
+                // The tree's node (`nodeInfo.node`)
+                let Some(b) = n["protectAllocatedBox".len()..]
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|i| p.protect.get(i.wrapping_sub(1)))
+                else {
+                    return Err(format!("{NOT_PORTED}: the tooltip of popup.{name}"));
+                };
+                let tree = self.build.spec.tree;
+                let n = tree.node(b.id).ok_or("no protected node")?;
+                self.base_node_tooltip(
+                    &mut tip,
+                    &n.dn,
+                    &n.sd,
+                    &n.mods,
+                    n.reminder_text.as_deref(),
+                    n.flavour_text.as_deref(),
+                );
             }
             "searchResults" => {
                 let rows = self.tree_tab.timeless.results.len();
