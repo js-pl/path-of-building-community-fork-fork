@@ -236,11 +236,6 @@ impl<'d> TypedSession<'d> {
     /// edit), deleted, or dragged onto the item list
     pub fn shared_list_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: the shared items with a class change popup open"
-            ));
-        }
         let len = self.shared()?.items.len();
         if path == "items.sharedItemList.delete" {
             if req["click"].as_bool() != Some(true) {
@@ -356,11 +351,6 @@ impl<'d> TypedSession<'d> {
         let dst = req["dragTo"].as_str().unwrap_or("");
         if !drag_target_ok(src, dst) {
             return Err(format!("no drag target {dst}"));
-        }
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: dragging with a class change popup open"
-            ));
         }
         let sel = req["sel"]
             .as_f64()

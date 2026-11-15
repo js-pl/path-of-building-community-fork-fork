@@ -264,6 +264,15 @@ impl<'d> Dispatcher<'d> {
         let data = self.data?;
         let req: J = serde_json::from_str(json).ok()?;
         let name = req["name"].as_str();
+        // main:OnFrame gives input to the front popup alone
+        if req["cmd"] == "control"
+            && let Some(path) = req["path"].as_str()
+            && !path.starts_with("popup.")
+            && self.typed.as_ref()?.popup_open()
+        {
+            let e = format!("control {path} is behind a popup");
+            return Some(json!({ "error": e }).to_string());
+        }
         match req["cmd"].as_str()? {
             "loadXml" => {
                 let xml = req["xml"].as_str()?;
