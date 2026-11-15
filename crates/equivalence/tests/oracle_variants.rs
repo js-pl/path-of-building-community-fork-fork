@@ -66,7 +66,7 @@ fn run_shard(name: &str, k: usize, n: usize) {
         .map(|(_, b)| b)
         .collect();
     let oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
-    let (mut equal, mut failures) = (0, Vec::new());
+    let (mut equal, mut failures, mut aligned) = (0, Vec::new(), Vec::new());
     let mut skips: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for (id, xml) in &builds {
         let want = match oracle_outputs(&oracle, id, xml) {
@@ -80,7 +80,21 @@ fn run_shard(name: &str, k: usize, n: usize) {
                 continue;
             }
         };
-        let outcomes = oracle::check(&mut data, id, xml, || want);
+        let mut outcomes = oracle::check(&mut data, id, xml, || want);
+        if outcomes.iter().any(|o| matches!(o, Outcome::Failed(_))) {
+            // Upstream keeps state from the builds loaded before in the
+            // process (a Tempest Shield variant left Bonespire's
+            // Intimidating Cry without cost): the reference is the build
+            // on a fresh oracle
+            let fresh = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+            if let Ok(w) = oracle_outputs(&fresh, id, xml) {
+                let again = oracle::check(&mut data, id, xml, || w);
+                if again.iter().all(|o| !matches!(o, Outcome::Failed(_))) {
+                    aligned.push(id.clone());
+                }
+                outcomes = again;
+            }
+        }
         for (mode, outcome) in ["MAIN", "CALCS"].into_iter().zip(outcomes) {
             match outcome {
                 Outcome::Equal => equal += 1,
@@ -90,9 +104,10 @@ fn run_shard(name: &str, k: usize, n: usize) {
         }
     }
     eprintln!(
-        "{} builds, {equal} calculations equal to the oracle, skipped {}: {skips:?}",
+        "{} builds, {equal} calculations equal to the oracle, skipped {}: {skips:?}; aligned with a fresh oracle {}: {aligned:?}",
         builds.len(),
-        skips.values().map(Vec::len).sum::<usize>()
+        skips.values().map(Vec::len).sum::<usize>(),
+        aligned.len()
     );
     assert!(
         failures.is_empty(),

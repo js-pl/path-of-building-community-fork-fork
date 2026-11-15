@@ -266,6 +266,11 @@ of them, so each difference is one between the translation and LuaJIT):
     `GlobalCache` entries keyed by socket slot that the candidates
     calculated before left; against the oracle the candidates of builds
     with a mirage are compared without their DPS;
+  - Bonespire's Intimidating Cry without cost, after a Tempest Shield
+    trigger variant in the same oracle process: upstream keeps state from
+    the builds loaded before (like the shared-state alignments of the
+    session test); `oracle_variants.rs` asks a fresh oracle for a build
+    that differs and lists it as aligned when that one agrees;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
