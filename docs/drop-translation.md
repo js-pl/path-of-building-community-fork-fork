@@ -289,6 +289,16 @@ of them, so each difference is one between the translation and LuaJIT):
     `Classes/ItemsTab.lua`, "attempt to index a nil value") and at most
     three builds per items shard (`WEAPON_SLOT_SKIPS`), so that a broader
     regression cannot pass for it;
+  - node power of gen-0029 under Full DPS, 14.06 against -15.81 for
+    many nodes (two of five oracle runs): explained, upstream's `pairs`
+    order. `CalcsTab:PowerBuilder` goes through `pairs(spec.nodes)` and
+    shares one calculation between the nodes of a `modKey`, the first
+    one's, though such nodes can give different results (one in a
+    jewel's radius); `spec.nodes` is filled in `pairs` order of the tree's
+    nodes, which have the string key `root` too, so the first one follows
+    LuaJIT's string hash. The session's `nodePower` runs `PowerBuilder` on
+    `spec.nodes` filled in ascending order of the ids, and the typed
+    engine (`engine::power`) takes that order too;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
