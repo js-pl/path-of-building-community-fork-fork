@@ -5,6 +5,64 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 
 ## Handoff
 
+The typed engine answers the whole engine API the web app and the tests use,
+and upstream itself is the reference: the translation is being deleted in
+the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
+(1 to 4 done; 5 `session::Paired` and 6 the web test on the native typed
+`pob serve` under way; 7 the CLI, bench and wasm cleanup next; 8 the
+deletion itself after the owner's confirmation). To pick the work up:
+
+1. `git submodule update --init --depth 50` (the upstream submodule) and
+   `oracle/setup.sh` (LuaJIT and its rocks into `.oracle/`, for every test
+   against the live oracle).
+2. `cargo test --release -p equivalence` runs the typed engine against the
+   oracle: the corpus's whole builds (`build_output`, against
+   `tests/oracle`), the variant families (`oracle_variants`), calculator
+   overrides (`calculator`), items, trees and the game data (`item`,
+   `tree`, `game_data`), the mod parser and the data tables.
+3. `SESSION_REFERENCE=oracle cargo test --release -p session --test typed`
+   runs the session test against upstream's own session
+   (`oracle/session.lua`), as CI does; `SESSION_PHASES=calcs,tree` limits
+   it to some of its 16 phases. Without `SESSION_REFERENCE` it compares
+   with the translation, *until sub-step 8*.
+4. Upstream to sync with: the `sync` skill (`.claude/skills/sync/SKILL.md`).
+
+## State
+
+- **Typed.** Everything the engine API serves: loading and saving builds
+  (XML and codes, byte for byte), the passive tree with jewels that change
+  it (timeless, Intuitive Leap and the like, Impossible Escape, Split
+  Personality), tattoos and cluster jewel subgraphs, items with crafting
+  (the item editor and its popups), skills and gems, the configuration,
+  `initEnv`, `perform` with breakdowns, triggers and mirages, Full DPS, the
+  sidebar and the Calcs tab, tooltips, node, item, gem and anoint power,
+  party, notes, and the item, skill, tree and config sets. The shipped
+  wasm module (2 MB gzipped) holds no translation and no Lua interpreter.
+- **Reference.** The oracle only: `tests/oracle` (whole builds, mod parser,
+  data) and the live `oracle/session.lua` (sessions of edits, variant
+  builds, calculator overrides, upstream's tables), see
+  `oracle/README.md`. No equivalence test uses the translation any more;
+  the session test's local default does until sub-step 8. Retired tests
+  and the argument for each are in
+  [drop-translation.md](drop-translation.md#retired-tests).
+- **Known upstream quirks** the tests compare around: answers in `pairs`
+  order over string keys (LuaJIT seeds its string hash per process), each
+  case canonicalised narrowly and listed with its reason in
+  [drop-translation.md](drop-translation.md#the-oracle-session-step-2) ("Left to explain"); state
+  upstream keeps from builds loaded earlier in a process (a differing
+  build is asked of a fresh oracle); and the shared-state quirks in
+  [Upstream quirks met so far](#upstream-quirks-met-so-far).
+- **Not ported**: see [Not ported yet](#not-ported-yet). Each case is a
+  `not ported: ...` error, which the tests count as a skip or, in the
+  session test, fail on unless listed in `KNOWN_FALLBACKS` (today only
+  cases where upstream itself fails, and one alignment of the
+  translation's shared state).
+
+## History
+
+The handoffs while the typed engine was built against the translation, kept
+for the reasoning behind the code. Test names here may be retired since.
+
 Last session's branch: `claude/typed-power-calcs` (calculation overrides
 and the calculators, then node power). To pick the work up:
 
@@ -1106,7 +1164,35 @@ parser (before: about 2600; the scan over every pattern dominates) and
 at 2 to 3 million lines/s from its cache (before: 0.6 to 0.75 million,
 copying Lua tables).
 
-## Not ported yet in `initEnv`
+## Not ported yet
+
+What the engine and the session answer `not ported: ...` for, by area
+(the error texts in `crates/engine` and `crates/session/src/typed`):
+
+- **Calculations:** a gap in the curse slots; mirages and other skills'
+  calculations without a recalculator; party buffs without their effect
+  type and exported buffs under another name; triggers outside the ported
+  set (`the trigger ...`); formatting a table, a function, a mod or a tag
+  list as a cell value.
+- **Tree and jewels:** timeless jewels without their data (an unknown
+  type, conqueror or devotion variant, a socket not listed or without
+  nodes in radius); a tattoo on a node the tree lacks; a crucible mod off
+  the tree; tree links of versions without a link.
+- **Items:** an enchantment or anoint slot past the item's enchantments,
+  anointing without an item, an item dragged without a base, a deleted
+  item in the list, crafting with the class change popup open.
+- **Skills:** gems without a level or quality in some tooltips and
+  copies, a main skill copied from a mirage, imbued supports in some
+  states.
+- **Session controls:** controls and popup inputs not ported
+  (`control <path>`, `control popup.<name> of <popup>`), drops outside a
+  list, a few edits on groups or trees no longer in their lists, party
+  imports that are not plain PathOfBuilding builds, loadouts whose sets
+  are not numbered 1 to n.
+- **Where upstream fails too** (`(upstream fails)`): rebuilding cluster
+  subgraphs that shared an id; an enemy level without a monster accuracy.
+
+### In `initEnv`
 
 - `initial_node_mods_match_upstream` skips the builds with cluster jewel
   subgraphs, as it loads no items
@@ -1119,7 +1205,7 @@ copying Lua tables).
   the next `BuildAllDependsAndPaths`)
 - Passives granted only by the latest tree
 
-## Not ported yet in `perform`
+### In `perform`
 
 Each returns an error starting with `not ported`, which the tests count as
 a skip:
@@ -1137,7 +1223,7 @@ a skip:
 CalcActiveSkill 52, CalcSections 25, CalcTools 17, CalcBreakdown 15,
 CalcFormat 3; `target/oracle-coverage/uncovered.txt` lists them. The
 variant tests reach far more of CalcTriggers and CalcMirages than the
-corpus but run on the translation, not under luacov. Of `configTable`'s
+corpus but run on the live oracle, not under luacov. Of `configTable`'s
 82 keys the trigger variants reach 63; not reached: `call to arms`,
 `cospri's malice`, `fissure`, `focus`, `foulborn kitava's thirst`,
 `ghostly artillery`, `hex on trap`, `hextouch`, `maloney's mechanism`,
@@ -1149,13 +1235,10 @@ trigger, or a source skill the templates lack).
 
 ## Next
 
-See the handoff above, and [drop-translation.md](drop-translation.md) for
-how the translation can go and what the tests use as reference instead
-(option C: step 1, typed-only by default, is done; step 2, the oracle
-session `oracle/session.lua` with `SESSION_REFERENCE=oracle`, is done, every
-difference from the translation explained there; step 3 has begun: CI's
-session test runs against the oracle; next the small recorded set for
-runs without LuaJIT, then retiring intermediate-state tests).
+The rest of [the deletion](drop-translation.md#step-4-in-sub-steps)
+(sub-steps 5 to 8), then the sync to upstream's 3.30 (the `sync` skill:
+upstream `dev` is ahead with the 3.30 trees and flask mods), and the open
+work of phase 5 in `docs/design.md` (compare, character import, trade).
 
 ## Shipping the typed engine to the browser
 
