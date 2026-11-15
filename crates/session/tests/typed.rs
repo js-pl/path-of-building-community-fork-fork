@@ -453,7 +453,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 13] = [
+const PHASES: [(&str, usize); 14] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -467,6 +467,7 @@ const PHASES: [(&str, usize); 13] = [
     ("new", 1),
     ("overlays", 2),
     ("power", 2),
+    ("variants", 2),
 ];
 
 /// The typed engine's commands against the translated session's: the
@@ -523,7 +524,8 @@ fn typed_session_matches_translated() {
     match phase {
         "commands" => commands_match(data, &mut d),
         "geometry" => geometry_matches(&mut d),
-        "calcs" => calcs_match(data, &mut d),
+        "calcs" => calcs_match(data, &mut d, corpus_xml()),
+        "variants" => calcs_match(data, &mut d, breakdown_variants()),
         "tree" => {
             tree_edits_match(&mut d);
             tree_controls_match(&mut d);
@@ -4183,6 +4185,9 @@ fn compare_calcs(
     let mut reqs = vec![json!({"cmd": "calcs"})];
     let mut paths = vec![json!("build.mainSkill"), json!("build.mainSocketGroup")];
     let typed = answer(d.request(r#"{"cmd":"calcs"}"#), "typed calcs");
+    if let Some(e) = d.typed_error.take() {
+        return (0, vec![format!("calcs fell back: {e}")], 0);
+    }
     for s in typed["ok"]["sections"].as_array().into_iter().flatten() {
         for u in s["subs"].as_array().into_iter().flatten() {
             for r in u["rows"].as_array().into_iter().flatten() {
@@ -4249,12 +4254,35 @@ fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTre
 }
 
 /// The Calcs tab gives the translation's JSON, for every corpus build
-fn calcs_match(data: &'static TypedData, d: &mut Dispatcher) {
+/// The corpus builds' text
+fn corpus_xml() -> Vec<(String, String)> {
+    corpus()
+        .into_iter()
+        .map(|(id, path)| (id, std::fs::read_to_string(&path).unwrap()))
+        .collect()
+}
+
+/// The variant builds about breakdowns (`equivalence::variants`): the
+/// skills whose functions write breakdowns in each of their parts, mirages
+/// of minion skills, and the Calcs tab's inputs the corpus leaves at their
+/// defaults
+fn breakdown_variants() -> Vec<(String, String)> {
+    use equivalence::variants;
+    let mut data = equivalence::typed_build::TypedData::load();
+    let filter = std::env::var("SESSION_FILTER").unwrap_or_default();
+    let mut out = variants::breakdown_skill_variants(&mut data);
+    out.extend(variants::mirage_variants(&mut data));
+    out.extend(variants::calcs_input_variants(&mut data));
+    out.retain(|(id, _)| id.contains(&filter));
+    out
+}
+
+/// The Calcs tab's breakdowns of `builds`
+fn calcs_match(data: &'static TypedData, d: &mut Dispatcher, builds: Vec<(String, String)>) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
     let mut times = [Duration::ZERO; 2];
-    for (id, path) in mine(corpus()) {
+    for (id, xml) in mine(builds) {
         at_build(d, &id);
-        let xml = std::fs::read_to_string(&path).unwrap();
         let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
         answer(d.request(&load), "load");
         if !d.typed_active() {
@@ -6966,5 +6994,64 @@ fn vaal_global_effect_matches_after_the_first_calculation() {
         "load again",
         &mut out,
     );
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// Upstream's input goes to the front popup alone (`main:OnFrame`): a tab
+/// control behind a popup, the class change popup or the item sets', is the
+/// same error in both sessions and changes nothing
+#[test]
+fn tab_controls_behind_a_popup_fail() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut class_popups = 0;
+    for (id, path) in corpus().into_iter().take(4) {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let popups = |d: &mut Dispatcher| {
+            answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+                .as_array()
+                .map_or(0, Vec::len)
+        };
+        let mut openers = vec![json!({"cmd": "control", "path": "items.setManage", "click": true})];
+        for sel in 1..=7 {
+            openers.push(json!({"cmd": "control", "path": "build.classDrop", "sel": sel}));
+        }
+        for opener in openers {
+            answer(d.request(&opener.to_string()), "open");
+            assert!(d.typed_active(), "{id} {opener}: {:?}", d.typed_error);
+            if popups(&mut d) == 0 {
+                continue;
+            }
+            if opener["path"] == "build.classDrop" {
+                class_popups += 1;
+            }
+            compare_views(&mut d, &["state"], &format!("{id} {opener}"), &mut out);
+            for r in [
+                json!({"cmd": "control", "path": "items.setManage", "click": true}),
+                json!({"cmd": "control", "path": "build.classDrop", "sel": 1}),
+                json!({"cmd": "control", "path": "tree.specConvert", "click": true}),
+                json!({"cmd": "control", "path": "configTab.setManage", "click": true}),
+                json!({"cmd": "control", "path": "items.itemList", "sel": 1, "dragTo": "items.sharedItemList"}),
+            ] {
+                let label = format!("{id} {opener} then {r}");
+                let t = answer(d.request(&r.to_string()), "typed");
+                assert!(d.typed_active(), "{label}: {:?}", d.typed_error);
+                let e = format!("control {} is behind a popup", r["path"].as_str().unwrap());
+                assert_eq!(t, json!({ "error": e }), "{label}");
+                let tr = answer(d.translated_request(&r.to_string()), "translated");
+                diff(&t, &tr, &label, &mut out);
+                compare_views(&mut d, &["state", "items"], &label, &mut out);
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
+            assert_eq!(popups(&mut d), 0, "{id} {opener}");
+        }
+    }
+    assert!(class_popups > 0, "no class change popup opened");
     assert!(out.is_empty(), "{}", out.join("\n"));
 }

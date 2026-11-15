@@ -582,7 +582,11 @@ What remains for the full migration, in order:
    opened keeps it, as upstream's popups belong to `main` (the
    dispatcher carries the typed popups over; a popup the translation
    opened while the build was on it is not carried). Saviour's mirage as
-   the main skill falls back.
+   the main skill falls back. As upstream's `main:OnFrame` gives input
+   to the front popup alone, both sessions answer a `control` of another
+   host while a popup is open with `control <path> is behind a popup`
+   and change nothing (`tab_controls_behind_a_popup_fail`); the web UI's
+   popups cover the tabs and always offer Cancel (`closePopup`).
 
    A typed error starting with `UPSTREAM_ERROR` is one the translation
    answers the same request with (`no node <id>` of `clickNode`,

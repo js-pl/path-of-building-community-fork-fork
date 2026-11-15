@@ -51,4 +51,28 @@ function headless.loadBuild(id, path)
 	assert(build.calcsTab.mainEnv, "build did not calculate: " .. path)
 end
 
+-- The loaded build's outputs as `dump.lua` writes them: the sidebar's
+-- calculation (`MAIN`) and the Calcs tab's (`CALCS`). player.output holds a
+-- reference to the minion's output table as Minion; it is dumped separately
+-- as minion.output, so the alias is left out.
+function headless.outputs()
+	local function actorOutputs(env)
+		local player = { }
+		for k, v in pairs(env.player.output) do
+			if not (k == "Minion" and env.minion and v == env.minion.output) then
+				player[k] = v
+			end
+		end
+		return {
+			player = player,
+			minion = env.minion and env.minion.output or nil,
+		}
+	end
+	local calcsTab = build.calcsTab
+	return {
+		MAIN = actorOutputs(calcsTab.mainEnv),
+		CALCS = actorOutputs(calcsTab.calcsEnv),
+	}
+end
+
 return headless

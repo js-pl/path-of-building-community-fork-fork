@@ -1,5 +1,6 @@
 name: Full variants
-# The variants CI samples, in full: every trigger variant (TRIGGERS_FULL),
+# The variants CI samples, in full: every trigger variant (TRIGGERS_FULL,
+# against the translation and the live oracle),
 # every node and cluster notable's power (POWER_FULL) and longer edit
 # sequences in the session test (SESSION_STEPS). Nightly, by hand, and on
 # pull requests that change this workflow.
@@ -51,12 +52,16 @@ jobs:
           - { name: triggers 2/4, filter: 'test(=triggers_match_upstream)', shards: 2/4 }
           - { name: triggers 3/4, filter: 'test(=triggers_match_upstream)', shards: 3/4 }
           - { name: triggers 4/4, filter: 'test(=triggers_match_upstream)', shards: 4/4 }
+          - { name: triggers oracle 1/4, filter: 'test(=triggers_match_oracle)', shards: 1/4, oracle: true }
+          - { name: triggers oracle 2/4, filter: 'test(=triggers_match_oracle)', shards: 2/4, oracle: true }
+          - { name: triggers oracle 3/4, filter: 'test(=triggers_match_oracle)', shards: 3/4, oracle: true }
+          - { name: triggers oracle 4/4, filter: 'test(=triggers_match_oracle)', shards: 4/4, oracle: true }
           - { name: power, filter: 'test(=node_power_matches_upstream)' }
-          - { name: session 1/5, filter: 'test(=typed_session_matches_translated)', shards: 1/5 }
-          - { name: session 2/5, filter: 'test(=typed_session_matches_translated)', shards: 2/5 }
-          - { name: session 3/5, filter: 'test(=typed_session_matches_translated)', shards: 3/5 }
-          - { name: session 4/5, filter: 'test(=typed_session_matches_translated)', shards: 4/5 }
-          - { name: session 5/5, filter: 'test(=typed_session_matches_translated)', shards: 5/5 }
+          - { name: session 1/5, filter: 'test(=typed_session_matches_translated)', shards: 1/5, oracle: true }
+          - { name: session 2/5, filter: 'test(=typed_session_matches_translated)', shards: 2/5, oracle: true }
+          - { name: session 3/5, filter: 'test(=typed_session_matches_translated)', shards: 3/5, oracle: true }
+          - { name: session 4/5, filter: 'test(=typed_session_matches_translated)', shards: 4/5, oracle: true }
+          - { name: session 5/5, filter: 'test(=typed_session_matches_translated)', shards: 5/5, oracle: true }
     name: full (${{ matrix.name }})
     env:
       TRIGGERS_FULL: "1"
@@ -65,10 +70,14 @@ jobs:
       # Smaller shards: the edit phases take 2.5 times as long
       SESSION_SHARDS: "6"
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
+      # Upstream itself on LuaJIT as the reference
+      SESSION_REFERENCE: ${{ matrix.oracle && 'oracle' || '' }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
+      - if: matrix.oracle
+        uses: ./.github/actions/setup-oracle
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest

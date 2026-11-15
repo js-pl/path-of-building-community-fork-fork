@@ -129,11 +129,6 @@ impl TypedSession<'_> {
                 self.open_tree_popup(ItemPopup::ResetTree)?;
             }
             ("specConvert", None, None, None) if req["click"].as_bool() == Some(true) => {
-                if self.class_popups_open() > 0 {
-                    return Err(format!(
-                        "{NOT_PORTED}: converting a tree with a class change popup open"
-                    ));
-                }
                 let latest = self.latest_for_spec();
                 self.convert_to_version(&latest, false, true, false)?;
             }
@@ -203,11 +198,6 @@ impl TypedSession<'_> {
 
     /// `main:OpenPopup` of one of the tab's popups, in front
     pub(super) fn open_tree_popup(&mut self, popup: ItemPopup) -> Result<()> {
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: a tree popup with a class change popup open"
-            ));
-        }
         self.editor.popups.insert(0, popup);
         self.refresh_item_popups();
         Ok(())

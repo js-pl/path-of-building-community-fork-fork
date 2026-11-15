@@ -3,7 +3,13 @@ import type { TabProps } from "../app";
 import { ColorText } from "./ColorText";
 import { ControlView } from "./Control";
 
-export function PopupView({ popup, act }: { popup: Popup; act: TabProps["act"] }) {
+export function PopupView({
+  popup,
+  act,
+}: {
+  popup: Popup;
+  act: TabProps["act"];
+}) {
   return (
     <div class="modal-back">
       <div class="modal">
@@ -16,15 +22,30 @@ export function PopupView({ popup, act }: { popup: Popup; act: TabProps["act"] }
           </p>
         ))}
         {popup.controls.map((c) => (
-          <ControlView key={c.path} path={c.path!} c={c} set={(path, change) => act("control", { path, ...change })} />
+          <ControlView
+            key={c.path}
+            path={c.path!}
+            c={c}
+            set={(path, change) => act("control", { path, ...change })}
+          />
         ))}
         <div class="buttons">
           {popup.buttons.map((b) => (
-            <button key={b.name} disabled={!b.enabled} onClick={() => act("popupButton", { name: b.name })}>
+            <button
+              key={b.name}
+              disabled={!b.enabled}
+              onClick={() => act("popupButton", { name: b.name })}
+            >
               <ColorText text={b.label} />
             </button>
           ))}
-          {popup.buttons.length === 0 ? <button onClick={() => act("closePopup")}>Close</button> : null}
+          {/* Upstream's unnamed buttons (Cancel) and Escape close the popup;
+              while it is open the engine takes no other tab's input */}
+          {popup.buttons.some((b) => b.name === "close") ? null : (
+            <button onClick={() => act("closePopup")}>
+              {popup.buttons.length === 0 ? "Close" : "Cancel"}
+            </button>
+          )}
         </div>
       </div>
     </div>

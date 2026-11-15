@@ -194,51 +194,6 @@ fn specs_match_upstream() {
     );
 }
 
-/// A build with a jewel socketed in an allocated socket of its active spec
-/// and `extra` nodes allocated
-fn with_jewel(
-    xml: &str,
-    text: &str,
-    variant: Option<u32>,
-    socket: u32,
-    extra: &[u32],
-) -> Option<String> {
-    let id = engine::pat::gmatch(xml, "<Item id=\"(%d+)\"")
-        .iter()
-        .filter_map(|c| c[0].parse::<u32>().ok())
-        .max()
-        .unwrap_or(0)
-        + 1;
-    let at = xml.find("<ItemSet ")?;
-    let v = variant.map_or(String::new(), |v| format!(" variant=\"{v}\""));
-    let mut x = format!(
-        "{}<Item id=\"{id}\"{v}>\nRarity: UNIQUE\n{text}\n</Item>\n{}",
-        &xml[..at],
-        &xml[at..]
-    );
-    let spec = x.find("<Spec ")?;
-    let nodes = spec + x[spec..].find("nodes=\"")? + 7;
-    let extra: String = extra.iter().map(|n| format!("{n},")).collect();
-    x.insert_str(nodes, &extra);
-    let spec_end = spec + x[spec..].find("</Spec>")?;
-    let socket_tag = format!("nodeId=\"{socket}\"/>");
-    match x[spec..spec_end].find(&socket_tag) {
-        Some(k) => {
-            let k = spec + k;
-            let start = x[..k].rfind("<Socket ")?;
-            x.replace_range(
-                start..k + socket_tag.len(),
-                &format!("<Socket itemId=\"{id}\" {socket_tag}"),
-            );
-        }
-        None => {
-            let s_at = spec + x[spec..spec_end].find("<Sockets>")? + 9;
-            x.insert_str(s_at, &format!("\n<Socket itemId=\"{id}\" {socket_tag}"));
-        }
-    }
-    Some(x)
-}
-
 /// Specs with jewels that let nodes be allocated without a connection
 /// (Intuitive Leap, Thread of Hope, Impossible Escape), socketed in an
 /// allocated socket of generated corpus builds with unconnected nodes in
@@ -250,101 +205,31 @@ fn jewel_specs_match_upstream() {
     host.start()
         .unwrap_or_else(|e| panic!("upstream failed to start: {}", describe(&e)));
     let mut data = equivalence::typed_build::TypedData::load();
-    let jewels: [(&str, &str, Option<u32>); 4] = [
-        (
-            "il",
-            "Intuitive Leap\nViridian Jewel\nRadius: Small\nPassive Skills in Radius can be Allocated without being connected to your tree",
-            None,
-        ),
-        (
-            "toh",
-            "Thread of Hope\nCrimson Jewel\nVariant: Small Ring\nVariant: Medium Ring\nVariant: Large Ring\nVariant: Very Large Ring\nVariant: Massive Ring (Uber)\nRadius: Variable\nImplicits: 0\n{variant:1}Only affects Passives in Small Ring\n{variant:2}Only affects Passives in Medium Ring\n{variant:3}Only affects Passives in Large Ring\n{variant:4}Only affects Passives in Very Large Ring\n{variant:5}Only affects Passives in Massive Ring\nPassive Skills in Radius can be Allocated without being connected to your tree",
-            Some(3),
-        ),
-        (
-            "ie",
-            "Impossible Escape\nViridian Jewel\nLimited to: 1\nRadius: Small\nPassives in Radius of Iron Reflexes can be Allocated without being connected to your tree",
-            None,
-        ),
-        (
-            "kl",
-            "Unnatural Instinct\nViridian Jewel\nRadius: Small\nAllocated Small Passive Skills in Radius grant nothing\nGrants all bonuses of Unallocated Small Passive Skills in Radius",
-            None,
-        ),
-    ];
     let mut failures = Vec::new();
     let mut compared = 0;
-    for (n, (bid, xml)) in equivalence::corpus_builds().into_iter().enumerate() {
-        if !bid.starts_with("gen-") || n % 4 != 0 {
+    for (id, v) in equivalence::variants::jewel_variants(&mut data) {
+        if !id.contains(&filter) {
             continue;
         }
-        let root = engine::xml::parse(&xml).unwrap();
+        host.load_build_xml(v.as_bytes(), &id)
+            .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
+        let lua_build = host.build().unwrap();
+        let lua_spec = get(&lua_build, "spec");
+        let root = engine::xml::parse(&v).unwrap();
         data.load_tree(&root);
-        let Ok(build) = data.load_build(&root) else {
-            continue;
-        };
-        let spec = &build.spec;
-        let tree = spec.tree;
-        // An allocated, non-cluster socket
-        let Some(socket) = tree.sockets.iter().copied().find(|&s| {
-            spec.alloc_nodes.contains(s)
-                && tree.node(s).is_some_and(|t| t.expansion_jewel.is_none())
-        }) else {
-            continue;
-        };
-        for (k, (name, text, variant)) in jewels.iter().enumerate() {
-            let id = format!("{bid}-{name}");
-            if !id.contains(&filter) {
+        let typed = match data.load_build(&root) {
+            Ok(b) => b,
+            Err(e) => {
+                failures.push(format!("{id}: {e}"));
                 continue;
             }
-            // Unallocated nodes in the radius: the socket's, or the keystone's
-            let centre = if *name == "ie" {
-                tree.keystone_map.get("Iron Reflexes").copied().unwrap()
-            } else {
-                socket
-            };
-            let ring = if *name == "toh" { 7 } else { 0 };
-            let extra: Vec<u32> = tree
-                .node(centre)
-                .and_then(|c| c.nodes_in_radius.as_ref())
-                .map(|r| r[ring].clone())
-                .unwrap_or_default()
-                .into_iter()
-                .filter(|&i| {
-                    !spec.alloc_nodes.contains(i)
-                        && tree.node(i).is_some_and(|t| {
-                            matches!(
-                                t.kind,
-                                engine::tree::NodeType::Normal | engine::tree::NodeType::Notable
-                            ) && t.ascendancy_name.is_none()
-                        })
-                })
-                .skip(k)
-                .step_by(3)
-                .take(4)
-                .collect();
-            let Some(v) = with_jewel(&xml, text, *variant, socket, &extra) else {
-                continue;
-            };
-            host.load_build_xml(v.as_bytes(), &id)
-                .unwrap_or_else(|e| panic!("{id}: {}", describe(&e)));
-            let lua_build = host.build().unwrap();
-            let lua_spec = get(&lua_build, "spec");
-            let root = engine::xml::parse(&v).unwrap();
-            let typed = match data.load_build(&root) {
-                Ok(b) => b,
-                Err(e) => {
-                    failures.push(format!("{id}: {e}"));
-                    continue;
-                }
-            };
-            compared += 1;
-            compare_spec(&typed.spec, &lua_spec, &mut |what| {
-                if failures.len() < 60 {
-                    failures.push(format!("{id}: {what}"));
-                }
-            });
-        }
+        };
+        compared += 1;
+        compare_spec(&typed.spec, &lua_spec, &mut |what| {
+            if failures.len() < 60 {
+                failures.push(format!("{id}: {what}"));
+            }
+        });
     }
     eprintln!("{compared} specs compared");
     assert!(compared > 0, "no spec compared");

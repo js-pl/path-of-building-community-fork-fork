@@ -82,11 +82,6 @@ impl<'d> TypedSession<'d> {
         if req["click"].as_bool() != Some(true) {
             return Err(format!("{NOT_PORTED}: control items.specButton"));
         }
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: managing trees with a class change popup open"
-            ));
-        }
         self.editor
             .popups
             .insert(0, ItemPopup::ManageSpecs(Box::default()));

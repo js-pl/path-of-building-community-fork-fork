@@ -226,12 +226,6 @@ impl TypedSession<'_> {
             return Ok(json!([]));
         }
         if let (None, Some(s)) = (input, sel) {
-            if self.class_popups_open() > 0 {
-                return Err(format!(
-                    "{}: the item database with a class change popup open",
-                    super::NOT_PORTED
-                ));
-            }
             self.item_db_select(rare, s, req)?;
             return Ok(json!([]));
         }
