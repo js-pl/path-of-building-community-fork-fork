@@ -399,7 +399,8 @@ each optimisation's numbers are in `docs/progress.md`.
    The typed engine starts with the mod core (`crates/engine/src/mods`):
    interned names, typed mods, tags and values, ModDB and ModList stores in
    one arena, and their queries, in plain Rust. `crates/equivalence/tests/mods.rs`
-   converts the stores of every corpus build's calculation and runs every
+   (since retired, see docs/drop-translation.md) converted the stores of
+   every corpus build's calculation and ran every
    query for every mod name and type present, with no cfg and with each
    active skill's, against the translated stores (565k queries, all equal).
    What the queries need from the rest of the engine (actors, outputs,

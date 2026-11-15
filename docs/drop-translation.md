@@ -43,8 +43,8 @@ makes cyclic environments).
 | Tests | Reference today |
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
-| `equivalence/tests/{calc_setup,perform,breakdown,calculator,power,mods,item,items_tab,spec,tree,skills,config,game_data}.rs` | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | the translation, live: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `equivalence/tests/{perform,breakdown,calculator,power,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -218,8 +218,12 @@ of them, so each difference is one between the translation and LuaJIT):
     curses in `pairs` order over a table keyed by curse name, all of
     priority 0, so with more curses than the limit which ones apply
     follows LuaJIT's string hash (gen-0025 with gen-0029's Despair and
-    Flammability under a limit of 1). Against the oracle such party builds
-    are skipped (`party_curses_ambiguous`), and the curse list
+    Flammability under a limit of 1). The party's curses also take only
+    the slots the build's own curses leave free (gen-0001 with Assassin's
+    Mark and Frostbite under a limit of 2 beside its own curse). Against
+    the oracle such party builds are skipped (`party_curses_ambiguous`:
+    more party curses than their limit, or several beside a curse gem of
+    the build's), and the curse list
     (`CurseList`, the Calcs tab's Curses and Debuffs row) is compared
     unordered;
   - gem names sharing a granted effect, `Vaal Righteous Fire` against
@@ -254,6 +258,31 @@ of them, so each difference is one between the translation and LuaJIT):
     `pairs` order of their slot names, so their ids, and with them every
     later item step, follow the string hash; that drag is left out
     against the oracle;
+  - the gem dropdown's DPS of an attack candidate with The Saviour
+    (3.13-dual-savior's Smite, in two of four oracle runs): explained,
+    upstream's `pairs` order. `GemSelectControl` calculates the candidates
+    in `pairs` order of their ids, and a mirage picks its skill from
+    `GlobalCache` entries keyed by socket slot that the candidates
+    calculated before left (also when the candidate is the mirage:
+    gen-0020's General's Cry, 0 on one oracle run); against the oracle the
+    candidates of builds with a mirage are compared without their DPS, and
+    mirage candidates (General's Cry, Mirage Archer) are left out;
+  - tied mods in the item editor's corruption and crafting lists
+    (`(4-6)% increased Strength/... Dexterity` against `... Intelligence`):
+    explained, upstream's `pairs` order. `ItemsTab` gathers them in
+    `pairs` order and `table.sort`s by the first line with numbers as `$`;
+    against the oracle such runs of ties are compared sorted;
+  - an item edit that puts a non-weapon into Weapon 1 (the items
+    phase's random `addItem`/`editItem`): upstream equips it, then
+    `ItemsTab:PopulateSlots` goes through `pairs(self.slots)`; reaching
+    Weapon 2 before Weapon 1 has dropped the item, `IsItemValidForSlot`
+    indexes `weaponTypeInfo` with its type and fails, leaving the build
+    broken (about half of the oracle runs). Against the oracle the rest
+    of such a build is skipped, only for that failure (the oracle's
+    `oracleLastError` request gives it with its source position:
+    `Classes/ItemsTab.lua`, "attempt to index a nil value") and at most
+    three builds per items shard (`WEAPON_SLOT_SKIPS`), so that a broader
+    regression cannot pass for it;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
@@ -262,3 +291,26 @@ of them, so each difference is one between the translation and LuaJIT):
     LuaJIT, a NaN or a -0 on either side giving the right operand;
   - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
     another order: explained with the party's curses above.
+
+## Retired tests
+
+Intermediate-state tests against the translation go once the oracle
+covers what they checked; the diagnostic value (where a difference starts)
+goes with them.
+
+- `mods.rs` (`mod_queries`, corpus): the typed mod queries on every corpus
+  build's stores. Every output, breakdown and Calcs cell runs on them:
+  `build_output.rs` (every corpus build, `MAIN` and `CALCS`, bitwise),
+  `oracle_variants.rs` (the variant builds) and the session test's calcs
+  phase (every cell's breakdown), all against the oracle.
+- `calc_setup.rs` (`base_dbs`, `initial_node_mods`, `items_setup`,
+  corpus): the setup slices of `initEnv`, which every output stands on;
+  the same coverage, plus the session's item and config edits
+  recalculating after each change.
+- `items_tab.rs`, `skills.rs` (corpus): the Items and Skills tabs after
+  loading; the session test's items and skills views and saves, after the
+  load and after random edits, on every corpus build.
+- `config.rs` `config_matches_upstream` (corpus): the session test's config
+  phase (views and outputs after option edits) and `build_output.rs`.
+  `every_option_matches_upstream` (every option and value) stays until it
+  runs against the oracle.

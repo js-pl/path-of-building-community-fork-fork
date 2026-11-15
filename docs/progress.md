@@ -458,9 +458,10 @@ What remains for the full migration, in order:
    file. Its popups are typed too: Reset Tree/Tattoos (Remove All
    Tattoos: `RemoveTattooFromNode` of each tattooed node, its override
    dropped, `allMasteryOptions` false, and the tree node's reminder text,
-   which a tattoo without one emptied at load, left empty; with another
-   tree holding tattoos it stays on the translation; `overlays_match`
-   removes them on every tattoo variant), the version drop-down's
+   which a tattoo without one emptied at load, left empty; the tattoo's
+   shared reminder text is emptied only where the other trees' loads
+   already did; `overlays_match` removes them on every tattoo variant,
+   and on a tattooed copy with the first tree's tattoos left), the version drop-down's
    Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
    active one's undo state on the other version, inserted after it, the
    old one removed or kept, `SetActiveSpec` once with its loadout sync and
@@ -937,7 +938,9 @@ The whole of `calcs.initEnv` runs typed from a build file:
 chains the slices in upstream's order. Each slice is compared with the
 translated `initEnv` for every corpus build in
 `crates/equivalence/tests/calc_setup.rs` (`items_setup_matches_upstream`
-covers everything from the items on; 61 builds compared).
+covered everything from the items on; 61 builds compared), since retired
+for the oracle's whole-build coverage (docs/drop-translation.md, "Retired
+tests").
 
 | Upstream | Typed |
 |---|---|
@@ -1142,8 +1145,10 @@ trigger, or a source skill the templates lack).
 See the handoff above, and [drop-translation.md](drop-translation.md) for
 how the translation can go and what the tests use as reference instead
 (option C: step 1, typed-only by default, is done; step 2, the oracle
-session `oracle/session.lua` with `SESSION_REFERENCE=oracle`, is under way
-and its differences from the translation are listed there).
+session `oracle/session.lua` with `SESSION_REFERENCE=oracle`, is done, every
+difference from the translation explained there; step 3 has begun: CI's
+session test runs against the oracle; next the small recorded set for
+runs without LuaJIT, then retiring intermediate-state tests).
 
 ## Shipping the typed engine to the browser
 

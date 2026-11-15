@@ -69,10 +69,21 @@ local api = dofile(oracleDir .. "/../crates/session/lua/session.lua")
 local first = api.handle('{"cmd":"newBuild"}')
 assert(first:match('^{"ok"'), "newBuild failed: " .. first)
 
+-- Not the engine API: `{"cmd":"oracleLastError"}` answers the last error
+-- with its source position, which the answers leave out (the session test
+-- checks which upstream failure it is)
+local lastError
 for line in io.lines() do
-	if line:match("%S") then
+	if line == '{"cmd":"oracleLastError"}' then
+		out:write(require("dkjson").encode({ ok = lastError }), "\n")
+		out:flush()
+	elseif line:match("%S") then
+		local raw = api.handle(line)
+		if raw:match('^{"error"') then
+			lastError = require("dkjson").decode(raw).error
+		end
 		-- The translation's errors carry no source positions
-		local res = api.handle(line):gsub('^{"error":"[^"]-%.lua:%d+: ', '{"error":"')
+		local res = raw:gsub('^{"error":"[^"]-%.lua:%d+: ', '{"error":"')
 		out:write(res, "\n")
 		out:flush()
 	end

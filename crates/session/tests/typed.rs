@@ -216,6 +216,32 @@ fn unordered(v: &mut J) {
                 {
                     *n = short.clone();
                 }
+                // A control's list of mods, which upstream gathers in
+                // `pairs` order and sorts by the first line with numbers
+                // and ranges as `$` (`ItemsTab`'s corruption and crafting
+                // popups): ties in either order
+                if k == "list"
+                    && let J::Array(a) = x
+                    && a.len() > 1
+                    && a.iter().all(J::is_string)
+                {
+                    let norm = |l: &J| {
+                        let s = l.as_str().unwrap_or("").to_lowercase();
+                        let s = s.split('/').next().unwrap_or("").to_string();
+                        let s = engine::pat::gsub(&s, "%(.-%)", "$");
+                        let s = engine::pat::gsub(&s, "[%+%-%%]", "");
+                        engine::pat::gsub(&s, "%d+", "$")
+                    };
+                    let mut i = 0;
+                    while i < a.len() {
+                        let mut j = i + 1;
+                        while j < a.len() && norm(&a[j]) == norm(&a[i]) {
+                            j += 1;
+                        }
+                        a[i..j].sort_by_key(|l| l.to_string());
+                        i = j;
+                    }
+                }
                 // Connectors between two nodes that both link to the other
                 // keep the direction of the node `pairs(tree.nodes)`
                 // visits first; the nodes' table has a string key too
@@ -332,6 +358,11 @@ struct Alternates {
     /// skill whose `Skill:` source `processMod` set last on mods their
     /// skills share, in `pairs(data.skills)` order
     variants: std::collections::HashMap<String, String>,
+    /// The skills of curse gems (marks too)
+    curse_skills: std::collections::HashSet<String>,
+    /// The item bases, and those that are weapons
+    bases: std::collections::HashSet<String>,
+    weapon_bases: std::collections::HashSet<String>,
     /// A unique's flavour texts but the first, to its first
     /// (`flavourLookup` is read in `pairs` order)
     flavours: Vec<(Vec<String>, Vec<String>)>,
@@ -377,9 +408,35 @@ impl Alternates {
                 flavours.push((t.clone(), list[0].1.clone()));
             }
         }
+        let curse_skills = data
+            .game
+            .skills
+            .gems()
+            .iter()
+            .filter(|g| g.tags.contains("curse"))
+            .map(|g| g.granted_effect.id.clone())
+            .collect();
+        let weapon_bases = data
+            .game
+            .items
+            .bases()
+            .iter()
+            .filter(|b| b.weapon.is_some())
+            .map(|b| b.name.clone())
+            .collect();
+        let bases = data
+            .game
+            .items
+            .bases()
+            .iter()
+            .map(|b| b.name.clone())
+            .collect();
         Alternates {
             gems,
             variants,
+            curse_skills,
+            bases,
+            weapon_bases,
             flavours,
         }
     }
@@ -526,6 +583,43 @@ fn power_sorts_match(d: &mut Dispatcher) {
         if let Ok(dir) = std::env::var("SESSION_DUMP") {
             for (k, v) in [("typed", &typed), ("translated", &tr)] {
                 std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
+            }
+        }
+        let (mut typed, mut tr) = (typed, tr);
+        // `GemSelectControl` calculates the candidates in `pairs` order of
+        // their ids, and a mirage (`CalcMirages`) picks its skill from the
+        // global cache by socket slot, where the candidates calculated
+        // before left theirs: on the oracle, which LuaJIT's string hash
+        // decides, so the candidates of builds with one are compared
+        // without their DPS (and their order, which follows it)
+        let mirage = [
+            "The Saviour",
+            "Tawhoa's Felling",
+            "SupportMirageArcher",
+            "GeneralsCry",
+        ]
+        .iter()
+        .any(|m| xml.contains(m));
+        // A mirage among the candidates (General's Cry, Mirage Archer)
+        // picks from the same cache: on any build, so these candidates
+        // are left out
+        let mirage_gem = |g: &J| {
+            let id = g["id"].as_str().unwrap_or("");
+            id.contains("GeneralsCry") || id.contains("MirageArcher")
+        };
+        if oracle() {
+            for v in [&mut typed, &mut tr] {
+                if let Some(a) = v["ok"]["gems"].as_array_mut() {
+                    a.retain(|g| !mirage_gem(g));
+                    if mirage {
+                        for g in a.iter_mut() {
+                            if let Some(o) = g.as_object_mut() {
+                                o.remove("dps");
+                            }
+                        }
+                        a.sort_by_key(|g| g["id"].to_string());
+                    }
+                }
             }
         }
         let mut out = Vec::new();
@@ -757,6 +851,37 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+            // The copy's tattoos removed while the first tree keeps its own,
+            // then the first tree's tattooed nodes: `ReplaceNode` empties
+            // the tattoo's shared reminder text only where the load's
+            // `BuildAllDependsAndPaths` already did
+            for r in [
+                json!({"cmd": "control", "path": "tree.reset", "click": true}),
+                json!({"cmd": "popupButton", "name": "removeTattoo"}),
+            ] {
+                answer(d.request(&r.to_string()), "remove the copy's tattoos");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            let label = format!("{id} the copy's tattoos removed");
+            compare_views(d, &["treeState", "state", "outputs"], &label, &mut out);
+            let r = json!({"cmd": "selectTreeSpec", "index": active}).to_string();
+            answer(d.request(&r), "selectTreeSpec");
+            compare_views(
+                d,
+                &["treeSpecs", "treeState", "state", "outputs"],
+                &label,
+                &mut out,
+            );
+            for o in xml.split("<Override ").skip(1) {
+                let Some(n) = attr(o, "nodeId") else { continue };
+                let req =
+                    json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{label} first tree {req}"), &mut out);
+                compared += 1;
+            }
+            compare_saves(d, &label, &mut out);
             // The build again, its tattoos removed (Reset Tree/Tattoos'
             // Remove All Tattoos)
             let steps = [
@@ -1598,6 +1723,7 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
+    let mut weapon_skips = 0;
     let mut popups = 0;
     let mut popup_inputs: std::collections::BTreeMap<String, usize> = Default::default();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
@@ -1679,6 +1805,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         if let Some(a) = items["ok"]["items"].as_array() {
             pool.extend(a.iter().map(|i| i["raw"].clone()));
         }
+        let mut ambiguous = false;
         for step in 0..steps_per_build {
             if !out.is_empty() {
                 break;
@@ -2392,6 +2519,7 @@ fn items_edits_match(d: &mut Dispatcher) {
             let t = Instant::now();
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
+            let before = out.len();
             for f in ["state", "outputs", "skills", "treeSpecs"] {
                 compare(d, &json!({"cmd": f}), &format!("{label} {r}"), &mut out);
             }
@@ -2412,9 +2540,18 @@ fn items_edits_match(d: &mut Dispatcher) {
                 &format!("{label} {r}"),
                 &mut out,
             );
+            if oracle() && out.len() > before && weapon_slot_ambiguous(d, &req) {
+                out.truncate(before);
+                weapon_skips += 1;
+                skipped.push(format!(
+                    "{id}: {label} {r}: a non-weapon in Weapon 1, which upstream fails on when `pairs(self.slots)` reaches Weapon 2 first"
+                ));
+                ambiguous = true;
+                break;
+            }
             steps += 1;
         }
-        if out.is_empty() && d.typed_active() {
+        if out.is_empty() && d.typed_active() && !ambiguous {
             compare_saves(d, "after the edits", &mut out);
         }
         if !out.is_empty() {
@@ -2424,9 +2561,14 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits ({popups} item editor popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} item and set edits ({popups} item editor popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays), {weapon_skips} builds ended by a non-weapon in Weapon 1\nskipped:\n{}",
         times[0],
         times[1],
+        skipped.join("\n")
+    );
+    assert!(
+        weapon_skips <= WEAPON_SLOT_SKIPS,
+        "{weapon_skips} builds ended by a non-weapon in Weapon 1, more than {WEAPON_SLOT_SKIPS}:\n{}",
         skipped.join("\n")
     );
     assert!(
@@ -2436,6 +2578,51 @@ fn items_edits_match(d: &mut Dispatcher) {
         failures.join("\n")
     );
 }
+
+/// Whether the reference failed on an item edit that put a non-weapon
+/// (`req`'s item text) into Weapon 1, and failed so: upstream equips it,
+/// then `ItemsTab:PopulateSlots` goes through `pairs(self.slots)`, and
+/// when it reaches Weapon 2 before Weapon 1 has dropped the item,
+/// `IsItemValidForSlot` indexes `weaponTypeInfo` with its type and fails
+/// (leaving the build broken), so LuaJIT's string hash decides
+fn weapon_slot_ambiguous(d: &mut Dispatcher, req: &J) -> bool {
+    let Some(text) = req["text"].as_str() else {
+        return false;
+    };
+    if !matches!(req["cmd"].as_str(), Some("addItem" | "editItem")) {
+        return false;
+    }
+    let Some(alt) = ALTERNATES.get() else {
+        return false;
+    };
+    // The base: a line of its own, or in a magic item's name
+    let base = text.lines().skip(1).take(2).find_map(|l| {
+        alt.bases
+            .iter()
+            .filter(|b| l.contains(b.as_str()))
+            .max_by_key(|b| b.len())
+    });
+    let non_weapon = base.is_some_and(|b| !alt.weapon_bases.contains(b));
+    if !non_weapon {
+        return false;
+    }
+    // That failure, and no other: asked of the reference itself, not after
+    // replaying the edits it failed on
+    let last = answer(
+        d.translated().request(r#"{"cmd":"oracleLastError"}"#),
+        "oracleLastError",
+    );
+    last["ok"].as_str().is_some_and(|e| {
+        engine::pat::is_match(
+            e,
+            "^Classes/ItemsTab%.lua:%d+: attempt to index a nil value",
+        )
+    })
+}
+
+/// Builds an items shard may end early for [`weapon_slot_ambiguous`]: more
+/// would be a regression hiding behind upstream's nondeterminism
+const WEAPON_SLOT_SKIPS: usize = 3;
 
 /// `displayItem` of both. The tooltip's stat comparison of the
 /// translation can carry another build's mutation of upstream's shared
@@ -3541,7 +3728,17 @@ fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
         .unwrap_or(1);
     // A curse is its name line after a "---" separator (or the limit)
     let curses = lines.iter().filter(|l| l.trim() == "---").count();
-    curses > limit
+    // The party's curses take the slots the build's own leave free, so
+    // with one of those, too, fewer of them may fit (marks and curses
+    // also share the one mark slot)
+    let own = engine::pat::gmatch(xml, "<Gem [^>]-enabled=\"true\"[^>]-skillId=\"([^\"]+)\"")
+        .iter()
+        .any(|c| {
+            ALTERNATES
+                .get()
+                .is_some_and(|a| a.curse_skills.contains(&c[0]))
+        });
+    curses > limit || (curses > 1 && own)
 }
 
 /// The Party tab's controls (`party.*`) changed at random on corpus builds
