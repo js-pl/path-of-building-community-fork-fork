@@ -522,6 +522,33 @@ fn power_sorts_match(d: &mut Dispatcher) {
                 std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
             }
         }
+        let (mut typed, mut tr) = (typed, tr);
+        // `GemSelectControl` calculates the candidates in `pairs` order of
+        // their ids, and a mirage (`CalcMirages`) picks its skill from the
+        // global cache by socket slot, where the candidates calculated
+        // before left theirs: on the oracle, which LuaJIT's string hash
+        // decides, so the candidates of builds with one are compared
+        // without their DPS (and so their order)
+        let mirage = [
+            "The Saviour",
+            "Tawhoa's Felling",
+            "SupportMirageArcher",
+            "GeneralsCry",
+        ]
+        .iter()
+        .any(|m| xml.contains(m));
+        if oracle() && mirage {
+            for v in [&mut typed, &mut tr] {
+                if let Some(a) = v["ok"]["gems"].as_array_mut() {
+                    for g in a.iter_mut() {
+                        if let Some(o) = g.as_object_mut() {
+                            o.remove("dps");
+                        }
+                    }
+                    a.sort_by_key(|g| g["id"].to_string());
+                }
+            }
+        }
         let mut out = Vec::new();
         diff(&typed, &tr, &format!("gemList {group}/{slot}"), &mut out);
         if !out.is_empty() {
