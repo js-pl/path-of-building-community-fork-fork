@@ -717,9 +717,14 @@ impl<'d> Dispatcher<'d> {
             "closePopup" => self.edit(json, |s| Ok(s.close_popup())),
             "nodePower" => {
                 let index = req["index"].as_f64().unwrap_or(1.0);
+                let cluster: Option<Vec<u32>> = req["cluster"].as_array().map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u32))
+                        .collect()
+                });
                 view(
                     &mut self.typed_error,
-                    self.typed.as_ref()?.node_power(index),
+                    self.typed.as_ref()?.node_power(index, cluster),
                 )
             }
             // Notes, party and tooltips

@@ -47,8 +47,8 @@ makes cyclic environments).
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
-| `equivalence/tests/{power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `equivalence/tests/spec.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown`, `power`, `config` and `compare` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `session/tests/typed.rs` (16 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), `nodepower` (node power on every tenth corpus build, four power stats, with cluster notables), `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -257,6 +257,14 @@ of them, so each difference is one between the translation and LuaJIT):
     disable each other, and `calcs.initEnv` breaks the cycle from the slot
     `pairs(itemDisablers)` gives first; against the oracle the weapon
     slots' comparisons of such tooltips are left out;
+  - Destructive Aspiration's "Minion Attack and Cast Speed" nodes
+    (timeless-DestructiveAspiration-1-gen-0001 and others, 2% or 3% on
+    both lines): explained, upstream's `pairs` order. Both stat lines of
+    that legion passive carry the range `(2-3)`, and
+    `BuildAllDependsAndPaths` fills each line with the roll of whichever
+    stat `pairs(changedNode.stats)` visits first, so both lines get the
+    attack or the cast speed roll depending on the string hash; against
+    the oracle the value of such a node's two equal lines is left out;
   - an item popup's mod list hovered on an entry tied with its neighbour
     on the sort key (gen-0055, Global Accuracy Rating (15-17)% against
     (18-20)% in the nightly): explained, upstream's `pairs` order. Tied
@@ -298,6 +306,16 @@ of them, so each difference is one between the translation and LuaJIT):
     `Classes/ItemsTab.lua`, "attempt to index a nil value") and at most
     three builds per items shard (`WEAPON_SLOT_SKIPS`), so that a broader
     regression cannot pass for it;
+  - node power of gen-0029 under Full DPS, 14.06 against -15.81 for
+    many nodes (two of five oracle runs): explained, upstream's `pairs`
+    order. `CalcsTab:PowerBuilder` goes through `pairs(spec.nodes)` and
+    shares one calculation between the nodes of a `modKey`, the first
+    one's, though such nodes can give different results (one in a
+    jewel's radius); `spec.nodes` is filled in `pairs` order of the tree's
+    nodes, which have the string key `root` too, so the first one follows
+    LuaJIT's string hash. The session's `nodePower` runs `PowerBuilder` on
+    `spec.nodes` filled in ascending order of the ids, and the typed
+    engine (`engine::power`) takes that order too;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
@@ -342,6 +360,22 @@ goes with them.
   session test's calcs phase (every cell's `breakdown` command); the
   breakdown-writing skill functions, the mirages and the Calcs inputs in
   its `variants` phase, against the oracle.
+- `compare.rs` (item, gem and anoint power): each candidate's power under
+  a power stat, the calculator over the candidates. The session test's
+  power phase asks the oracle for the same sorts: the gem dropdown's
+  candidates with their DPS, the unique and rare databases sorted by
+  power stats, and (added for this) the equipped amulet's anoint popup
+  sorted by four power stats per build, its first rows hovered (the
+  stats each anoint gives). Its check that threaded runs equal the
+  sequential one is kept in practice: the typed session calculates the
+  candidates on `Threads::available()` and compares bitwise with the
+  oracle's sequential calculation.
+- `power.rs` (`node_power_matches_upstream`): node power on every tenth
+  corpus build with four power stats in turn, a depth of one point, the
+  first three cluster notables (all of them and the full depth with
+  `POWER_FULL`). The session test's `nodepower` phase asks the same of the
+  oracle: `nodePower` now takes the cluster notables to calculate
+  (`cluster`, by id) and answers their powers.
 - `calcs.rs` (corpus): the translated program, with the engine's
   `mod_store` installed, against the oracle's whole-build outputs. It
   tested the translation; `build_output.rs` compares the typed engine on
