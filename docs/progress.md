@@ -934,7 +934,9 @@ The whole of `calcs.initEnv` runs typed from a build file:
 chains the slices in upstream's order. Each slice is compared with the
 translated `initEnv` for every corpus build in
 `crates/equivalence/tests/calc_setup.rs` (`items_setup_matches_upstream`
-covers everything from the items on; 61 builds compared).
+covered everything from the items on; 61 builds compared), since retired
+for the oracle's whole-build coverage (docs/drop-translation.md, "Retired
+tests").
 
 | Upstream | Typed |
 |---|---|
