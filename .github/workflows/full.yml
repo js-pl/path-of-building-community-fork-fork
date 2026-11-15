@@ -1,7 +1,8 @@
 name: Full variants
 # The variants CI samples, in full: every trigger variant (TRIGGERS_FULL,
 # against the translation and the live oracle),
-# every node and cluster notable's power (POWER_FULL) and longer edit
+# every node and cluster notable's power (POWER_FULL, the session test's
+# nodepower phase) and longer edit
 # sequences in the session test (SESSION_STEPS). Nightly, by hand, and on
 # pull requests that change this workflow.
 on:
@@ -39,7 +40,7 @@ jobs:
           compression-level: 0
 
   # Each test's shards (`testkit::run_shards`) split over runners with
-  # TEST_SHARD_PARTITION; node power runs in one process
+  # TEST_SHARD_PARTITION
   test:
     needs: build
     runs-on: ubuntu-latest
@@ -56,7 +57,6 @@ jobs:
           - { name: triggers oracle 2/4, filter: 'test(=triggers_match_oracle)', shards: 2/4, oracle: true }
           - { name: triggers oracle 3/4, filter: 'test(=triggers_match_oracle)', shards: 3/4, oracle: true }
           - { name: triggers oracle 4/4, filter: 'test(=triggers_match_oracle)', shards: 4/4, oracle: true }
-          - { name: power, filter: 'test(=node_power_matches_upstream)' }
           - { name: session 1/5, filter: 'test(=typed_session_matches_translated)', shards: 1/5, oracle: true }
           - { name: session 2/5, filter: 'test(=typed_session_matches_translated)', shards: 2/5, oracle: true }
           - { name: session 3/5, filter: 'test(=typed_session_matches_translated)', shards: 3/5, oracle: true }

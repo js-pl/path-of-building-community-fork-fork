@@ -44,8 +44,8 @@ makes cyclic environments).
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
-| `equivalence/tests/{perform,breakdown,calculator,power,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `equivalence/tests/{perform,breakdown,calculator,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `power` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `session/tests/typed.rs` (15 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, `nodepower` (node power on every tenth corpus build, four power stats, with cluster notables), and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -320,3 +320,9 @@ goes with them.
   phase (views and outputs after option edits) and `build_output.rs`.
   `every_option_matches_upstream` (every option and value) stays until it
   runs against the oracle.
+- `power.rs` (`node_power_matches_upstream`): node power on every tenth
+  corpus build with four power stats in turn, a depth of one point, the
+  first three cluster notables (all of them and the full depth with
+  `POWER_FULL`). The session test's `nodepower` phase asks the same of the
+  oracle: `nodePower` now takes the cluster notables to calculate
+  (`cluster`, by id) and answers their powers.

@@ -579,7 +579,10 @@ impl<'d> TypedSession<'d> {
 
     /// `nodePower`: `CalcsTab:PowerBuilder` with the tree tab's power stat
     /// of this index (1-based), as the heat map shows it
-    pub fn node_power(&self, index: f64) -> Result<J> {
+    /// `nodePower`: the powers `CalcsTab:PowerBuilder()` leaves on the
+    /// spec's nodes and in `powerMax`, and on the cluster notables
+    /// `cluster` names (by id) when given
+    pub fn node_power(&self, index: f64, cluster: Option<Vec<u32>>) -> Result<J> {
         use engine::power::{PowerOptions, node_power, power_stats};
         let stat = power_stats()
             .into_iter()
@@ -591,7 +594,7 @@ impl<'d> TypedSession<'d> {
         let opts = PowerOptions {
             stat,
             max_depth: self.tree_tab.max_depth,
-            cluster_nodes: Vec::new(),
+            cluster_nodes: cluster.clone().unwrap_or_default(),
         };
         let p = node_power(&calc, &opts)?;
         let opt = |v: Option<f64>| v.map_or(J::Null, num);
@@ -626,7 +629,18 @@ impl<'d> TypedSession<'d> {
             .iter()
             .map(|(k, v)| (k.to_string(), opt(Some(*v))))
             .collect();
-        Ok(json!({ "combined": combined, "max": object(max), "nodes": object(nodes) }))
+        let mut out = json!({ "combined": combined, "max": object(max), "nodes": object(nodes) });
+        if cluster.is_some() {
+            let c: Map<String, J> = p
+                .cluster
+                .iter()
+                .filter_map(|(id, w)| {
+                    Some((id.to_string(), json!({ "single": num(w.single_stat?) })))
+                })
+                .collect();
+            out["cluster"] = object(c);
+        }
+        Ok(out)
     }
 }
 
