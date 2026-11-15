@@ -1315,6 +1315,52 @@ the tests align these:
 - the build's `EstimatePlayerProgress` sets the level of the auto mode
   after a calculation and rebuilds the configuration's mods without
   calculating again: the shown outputs are the previous level's
+- `pairs` over string keys (and over `tree.nodes`, whose string key `root`
+  mixes in) follows LuaJIT's string hash, seeded per process: upstream
+  itself gives these in another order from run to run. The typed engine
+  keeps the data's or the first insertion's order (the translation's);
+  the oracle tests compare them order-free where they reach them
+  (`unordered` and the skips in `tests/typed.rs`, `tree.rs`,
+  `game_data.rs`, see `docs/drop-translation.md`). Where the order
+  changes what a user sees:
+  - which party curses apply over the curse limit, the party label's
+    `otherEffects` lines (`PartyTab`, `CalcPerform`)
+  - buffs merged into the mod database (`pairs(buffs)`): breakdown
+    source rows, float sum order
+  - max hit and damage taken breakdown rows by damage type
+  - a unique's `{variant:..}` base-type lines in its text, saved items
+    and builds (`BuildRaw`, `pairs(baseLines)`)
+  - a unique's flavour text when it has several (`ItemsTab`)
+  - a shared item set's slots (`Main.lua`'s settings, `sharedLists`) and
+    the item ids of a set dragged back into a build
+  - the order of tied mods in the crafting, corruption and Add Modifier
+    lists (`pairs` then an unstable `table.sort`)
+  - the Find Timeless Jewel search: the abyss path's ascendancies
+    (`pairs(ascendancyOffsets)`) and `nodesInRadius` (filled in
+    `pairs(tree.nodes)` order) decide the order of a seed's weight sum
+    (ties) and of its node names
+  - the gem named for a granted effect several gems share
+    (`gemForSkill`, last of `pairs(data.gems)`), and the `Skill:` source
+    of a mod table a gem shares with its transfigured variants
+    (`processMod`, last of `pairs(data.skills)`)
+  - first match wins, so the order picks among ties (none in the corpus
+    and data the oracle tests run, or those tests would not be stable):
+    which affix id a mod line maps to when several share it
+    (`Item:ParseRaw`, `pairs(self.affixes)`), the base of a magic item
+    two base names match equally long (`pairs(data.itemBases)`), a mod
+    line matching two patterns of one length (`ModParser`'s `scan`,
+    `pairs(jewelFuncList)`), a notable or cluster node name two grouped
+    nodes share (`notableMap`, `clusterNodeMap`), a duplicate unique name
+    or title across item types (`pairs(data.uniques)`), and
+    `string:matchOrPattern` with one alternative that matches and one
+    malformed (`life|[`: found or a failed search, by run)
+
+  Number keys hash the same in every LuaJIT process (`LjMap`, verified
+  against LuaJIT by `tests/oracle/tables.jsonl`); one typed table that
+  upstream visits with `pairs` over number keys still keeps insertion
+  order: `legacyClusterNodeMap` and the oidx maps of the legacy cluster
+  conversion (`PassiveSpec:ConvertLegacyClusterNodes`), which no corpus
+  build reaches.
 - `Flag(...) and x` outputs are nil, not false, without the flag
   (`SustainableTrauma`); `output.x = output.x * a * b` must keep Lua's
   association to stay bit-exact
