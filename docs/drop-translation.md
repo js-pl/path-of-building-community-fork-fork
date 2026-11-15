@@ -43,7 +43,7 @@ makes cyclic environments).
 
 | Tests | Reference today |
 | --- | --- |
-| `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
+| `equivalence/tests/build_output.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
@@ -342,6 +342,11 @@ goes with them.
   session test's calcs phase (every cell's `breakdown` command); the
   breakdown-writing skill functions, the mirages and the Calcs inputs in
   its `variants` phase, against the oracle.
+- `calcs.rs` (corpus): the translated program, with the engine's
+  `mod_store` installed, against the oracle's whole-build outputs. It
+  tested the translation; `build_output.rs` compares the typed engine on
+  the same builds and outputs. `equivalence::bridge` (the translated
+  stores read as typed ones) went with the last test that used it.
 
 ## Moved to the oracle
 
