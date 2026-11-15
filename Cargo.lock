@@ -22,11 +22,9 @@ dependencies = [
 name = "cli"
 version = "0.0.0"
 dependencies = [
- "lua",
  "mimalloc",
  "serde_json",
  "session",
- "upstream",
 ]
 
 [[package]]

@@ -1,32 +1,24 @@
 //! Native runner of the engine API.
 //!
-//!   pob serve [--typed | --translated]
-//!                             JSON requests on stdin, one per line; responses on stdout:
+//!   pob serve                 JSON requests on stdin, one per line; responses on stdout:
 //!                             the typed engine, as the browser ships it, where commands
-//!                             it does not have are "not ported" errors; with --typed,
-//!                             those fall back to upstream's translated program; with
-//!                             --translated, the translation answers everything
-//!   pob bundle <out> [--lua [xml..]]
-//!                             writes the typed engine's data in its binary form (game
+//!                             it does not have are "not ported" errors
+//!   pob bundle <out>          writes the typed engine's data in its binary form (game
 //!                             data, mod parser, the latest tree) as `<out>/core.bin`, and
 //!                             every tree version under `<out>/files/`, which the browser
-//!                             fetches when a build needs it. With --lua, also the Lua data
-//!                             files the translation reads (starting up and loading the
-//!                             given builds) and every tree version's Lua data, for an
-//!                             engine built with the translation
-//!   pob bench <xml>           times loading, editing and node power for a build
+//!                             fetches when a build needs it
+//!   pob bench <xml>           times making the data, loading, editing and node power for
+//!                             a build on the typed engine
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+use session::Dispatcher;
 use session::typed::TypedData;
-use session::{Dispatcher, Prefer, Recording, Session};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::time::Instant;
-use upstream::imported::Imported;
 
 fn src_dir() -> PathBuf {
     std::env::var_os("POB_UPSTREAM_SRC")
@@ -41,7 +33,7 @@ fn die(msg: impl std::fmt::Display) -> ! {
     std::process::exit(1)
 }
 
-fn ok(s: &Session, req: serde_json::Value) -> serde_json::Value {
+fn ok(s: &mut Dispatcher, req: serde_json::Value) -> serde_json::Value {
     let text = s.request(&req.to_string()).unwrap_or_else(|e| die(e));
     let v: serde_json::Value = serde_json::from_str(&text).unwrap_or_else(|e| die(e));
     if let Some(e) = v.get("error") {
@@ -50,26 +42,15 @@ fn ok(s: &Session, req: serde_json::Value) -> serde_json::Value {
     v["ok"].clone()
 }
 
-fn serve(mode: Option<&str>) {
-    let typed = matches!(mode, None | Some("--typed"));
-    let data = typed.then(|| {
-        &*Box::leak(Box::new(
-            TypedData::from_source(&src_dir()).unwrap_or_else(|e| die(e)),
-        ))
-    });
-    let mut s = match (mode, data) {
-        (None, Some(data)) => Dispatcher::typed(data),
-        (Some("--typed" | "--translated"), _) => {
-            let s = Session::new(Rc::new(Imported::new(src_dir()))).unwrap_or_else(|e| die(e));
-            let prefer = if typed {
-                Prefer::Typed
-            } else {
-                Prefer::Translated
-            };
-            Dispatcher::new(s, data, prefer)
-        }
-        _ => usage(),
-    };
+/// The typed engine's data made from upstream's source
+fn data() -> &'static TypedData {
+    Box::leak(Box::new(
+        TypedData::from_source(&src_dir()).unwrap_or_else(|e| die(e)),
+    ))
+}
+
+fn serve() {
+    let mut s = Dispatcher::typed(data());
     let stdout = std::io::stdout();
     for line in std::io::stdin().lock().lines() {
         let line = line.unwrap_or_else(|e| die(e));
@@ -112,62 +93,8 @@ fn typed_files() -> (Files, Files) {
     (core, lazy)
 }
 
-/// The Lua data files the translation reads starting up and loading the
-/// given builds, and every tree version's, by path relative to `src/`
-fn lua_files(builds: &[String]) -> (Files, Files) {
-    let src = src_dir();
-    let rec = Rc::new(Recording {
-        inner: Imported::new(&src),
-        read: Default::default(),
-    });
-    let s = Session::new(rec.clone()).unwrap_or_else(|e| die(e));
-    for path in builds {
-        let xml = std::fs::read_to_string(path).unwrap_or_else(|e| die(format!("{path}: {e}")));
-        ok(&s, serde_json::json!({"cmd": "loadXml", "xml": xml}));
-    }
-    let read = |p: &String| {
-        let data = std::fs::read(src.join(p)).unwrap_or_else(|e| die(format!("{p}: {e}")));
-        (p.clone(), data)
-    };
-    let core = rec.read.borrow().iter().map(read).collect();
-    let mut lazy = Vec::new();
-    for entry in std::fs::read_dir(src.join("TreeData")).unwrap() {
-        let p = entry.unwrap().path();
-        if p.is_dir() {
-            let name = p.file_name().unwrap().to_string_lossy().to_string();
-            list_tree(&p, &format!("TreeData/{name}"), &mut lazy);
-        }
-    }
-    lazy.sort();
-    (core, lazy.iter().map(read).collect())
-}
-
-fn list_tree(from: &Path, rel: &str, out: &mut Vec<String>) {
-    let mut entries: Vec<_> = std::fs::read_dir(from)
-        .unwrap_or_else(|e| die(format!("{}: {e}", from.display())))
-        .map(|e| e.unwrap().path())
-        .collect();
-    entries.sort();
-    for p in entries {
-        let name = p.file_name().unwrap().to_string_lossy().to_string();
-        let rel = format!("{rel}/{name}");
-        if p.is_dir() {
-            list_tree(&p, &rel, out);
-        } else if name.ends_with(".lua") || name.ends_with(".json") {
-            out.push(rel);
-        }
-    }
-}
-
-fn bundle(out: &Path, args: &[String]) {
-    let (mut core, mut lazy) = typed_files();
-    if args.first().is_some_and(|a| a == "--lua") {
-        let (c, l) = lua_files(&args[1..]);
-        core.extend(c);
-        lazy.extend(l);
-    } else if !args.is_empty() {
-        die("builds to bundle the Lua data files for go after --lua");
-    }
+fn bundle(out: &Path) {
+    let (core, lazy) = typed_files();
     let packed = session::bundle::pack(core.iter().map(|(p, d)| (p.as_str(), d.as_slice())));
     std::fs::create_dir_all(out).unwrap_or_else(|e| die(e));
     std::fs::write(out.join("core.bin"), &packed).unwrap_or_else(|e| die(e));
@@ -199,41 +126,39 @@ fn bundle(out: &Path, args: &[String]) {
     );
 }
 
-/// Resident memory (from /proc on Linux) and the cycle collector's work
+/// Resident memory (from /proc on Linux)
 fn rss() -> String {
-    let rss = std::fs::read_to_string("/proc/self/status")
+    std::fs::read_to_string("/proc/self/status")
         .ok()
         .and_then(|s| {
             s.lines()
                 .find(|l| l.starts_with("VmRSS:"))
                 .map(|l| l[6..].trim().to_string())
         })
-        .unwrap_or_default();
-    let (runs, cleared) = lua::gc::totals();
-    format!("{rss}, {runs} collections freed {cleared} objects")
+        .unwrap_or_default()
 }
 
 fn bench(path: &str) {
     let t = Instant::now();
-    let s = Session::new(Rc::new(Imported::new(src_dir()))).unwrap_or_else(|e| die(e));
+    let mut s = Dispatcher::typed(data());
     eprintln!(
-        "start:      {:>8.0} ms  {}",
+        "data:       {:>8.0} ms  {}",
         t.elapsed().as_secs_f64() * 1000.0,
         rss()
     );
     let xml = std::fs::read_to_string(path).unwrap_or_else(|e| die(format!("{path}: {e}")));
     let t = Instant::now();
-    ok(&s, serde_json::json!({"cmd": "loadXml", "xml": xml}));
+    ok(&mut s, serde_json::json!({"cmd": "loadXml", "xml": xml}));
     eprintln!(
         "load:       {:>8.0} ms  {}",
         t.elapsed().as_secs_f64() * 1000.0,
         rss()
     );
-    let alloc = ok(&s, serde_json::json!({"cmd": "treeState"}))["alloc"].clone();
+    let alloc = ok(&mut s, serde_json::json!({"cmd": "treeState"}))["alloc"].clone();
     if let Some(id) = alloc.as_array().and_then(|a| a.last()).cloned() {
         let t = Instant::now();
-        ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
-        ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
+        ok(&mut s, serde_json::json!({"cmd": "clickNode", "id": id}));
+        ok(&mut s, serde_json::json!({"cmd": "clickNode", "id": id}));
         eprintln!(
             "2 edits:    {:>8.0} ms  {}",
             t.elapsed().as_secs_f64() * 1000.0,
@@ -241,7 +166,7 @@ fn bench(path: &str) {
         );
     }
     let t = Instant::now();
-    ok(&s, serde_json::json!({"cmd": "tree"}));
+    ok(&mut s, serde_json::json!({"cmd": "tree"}));
     eprintln!(
         "tree:       {:>8.0} ms  {}",
         t.elapsed().as_secs_f64() * 1000.0,
@@ -250,8 +175,8 @@ fn bench(path: &str) {
     if let Some(id) = alloc.as_array().and_then(|a| a.last()).cloned() {
         let t = Instant::now();
         for _ in 0..10 {
-            ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
-            ok(&s, serde_json::json!({"cmd": "clickNode", "id": id}));
+            ok(&mut s, serde_json::json!({"cmd": "clickNode", "id": id}));
+            ok(&mut s, serde_json::json!({"cmd": "clickNode", "id": id}));
         }
         eprintln!(
             "20 edits:   {:>8.0} ms  {}",
@@ -260,7 +185,7 @@ fn bench(path: &str) {
         );
     }
     let t = Instant::now();
-    ok(&s, serde_json::json!({"cmd": "nodePower", "index": 1}));
+    ok(&mut s, serde_json::json!({"cmd": "nodePower", "index": 1}));
     eprintln!(
         "node power: {:>8.0} ms  {}",
         t.elapsed().as_secs_f64() * 1000.0,
@@ -268,7 +193,7 @@ fn bench(path: &str) {
     );
     if std::env::var_os("BENCH_TWICE").is_some() {
         let t = Instant::now();
-        ok(&s, serde_json::json!({"cmd": "nodePower", "index": 1}));
+        ok(&mut s, serde_json::json!({"cmd": "nodePower", "index": 1}));
         eprintln!(
             "node power: {:>8.0} ms  {}",
             t.elapsed().as_secs_f64() * 1000.0,
@@ -280,15 +205,13 @@ fn bench(path: &str) {
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
-        Some("serve") if args.len() <= 2 => serve(args.get(1).map(String::as_str)),
-        Some("bundle") if args.len() >= 2 => bundle(Path::new(&args[1]), &args[2..]),
+        Some("serve") if args.len() == 1 => serve(),
+        Some("bundle") if args.len() == 2 => bundle(Path::new(&args[1])),
         Some("bench") if args.len() == 2 => bench(&args[1]),
         _ => usage(),
     }
 }
 
 fn usage() -> ! {
-    die(
-        "usage: pob serve [--typed | --translated] | pob bundle <out dir> [--lua [build.xml ...]] | pob bench <build.xml>",
-    )
+    die("usage: pob serve | pob bundle <out dir> | pob bench <build.xml>")
 }

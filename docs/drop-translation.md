@@ -16,10 +16,10 @@ reference without them.
 | Code | Uses | Shipped? |
 | --- | --- | --- |
 | `crates/upstream` | upstream's whole program translated by `luagen` in its build script, plus the headless host | only through the features below |
-| `crates/session`, feature `translation` (default; `wasm` turns it off) | `translated.rs`, `lua/session.lua` (translated too; on the oracle it runs untranslated), the dispatcher's fallback and replay (`Dispatcher::fallbacks`, `pending`; the replay moves to `session::Paired` in sub-step 5). `Session::oracle` (`reference.rs`) no longer needs the feature (sub-step 1) | native CLI (`pob serve --typed`, `--translated`) and the wasm build with `--translation` |
-| `crates/wasm`, feature `translation` (not default) | `session/translation` | `web/scripts/build-wasm.mjs --translation` (80 MB, 15 MB gzipped, against 8.2 MB, 2 MB typed) |
-| `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve --typed`, `--translated`, `bundle --lua`, `bench`) |
-| `crates/equivalence` | `upstream` for the translated bench (`equivalence::bench`, `install_inflate`) only; `bridge.rs` is deleted (sub-step 2) and every test takes its reference from the oracle | tests and the bench; the bench goes typed-only in sub-step 7 |
+| `crates/session`, feature `translation` (default; `wasm` and the CLI turn it off) | `translated.rs`, `lua/session.lua` (translated too; on the oracle it runs untranslated), the dispatcher's own fallback and replay (`Dispatcher::new`, `pending`); the tests keep their reference in step with `session::Paired` (sub-step 5), and `Session::oracle` (`reference.rs`) no longer needs the feature (sub-step 1) | tests only (the session tests' local reference) |
+| `crates/wasm` | typed only: the `translation` feature and `has_translation` are gone (sub-step 7) | the browser |
+| `crates/cli` | typed only: `pob serve`, `bundle` and `bench` on the typed engine; `--typed`, `--translated` and `bundle --lua` are gone (sub-step 7) | the native CLI |
+| `crates/equivalence` | `upstream` for `install_inflate` only; `bridge.rs` is deleted (sub-step 2), every test takes its reference from the oracle and the bench is typed-only (sub-step 7) | tests and the bench |
 | `crates/importer::luagen` | the translator (1.9k lines), run by `crates/upstream/build.rs` | build only |
 | `crates/lua` | the library pieces: values and tables (`value`, with the `gc` cycle collector), table operations (`rt`), Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | in the typed engine and shipped |
 | `crates/luai` | the interpreter's parts: lexer, parser, syntax tree, standard library environment (`env`) | not in the shipped engine (CI checks `wasm`'s dependencies); the engine's `translation` feature (`install`, `mod_store`) and the importer use it |

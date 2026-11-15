@@ -12,9 +12,7 @@ name = "pob"
 path = "src/main.rs"
 
 [dependencies]
-session = { path = "../session" }
-lua.workspace = true
-upstream.workspace = true
+session = { path = "../session", default-features = false, features = ["source"] }
 serde_json.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
