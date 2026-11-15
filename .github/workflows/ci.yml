@@ -54,8 +54,7 @@ jobs:
           compression-level: 0
 
   # The tests on runners of their own. The session test's shards split over
-  # three runners and the perform tests' over two (TEST_SHARD_PARTITION), the
-  # other tests three, by binary, about 4 minutes of a single test at a time
+  # three runners (TEST_SHARD_PARTITION), the other tests four, by binary, about 4 minutes of a single test at a time
   # each (equivalence tests side by side on one runner are about three times
   # slower each: the runner's CPU is the limit). Every test runs on one of
   # them: `rest` takes what the others leave.
@@ -81,18 +80,12 @@ jobs:
           - name: oracle variants
             filter: 'binary(=oracle_variants)'
             oracle: true
-          - name: perform 1/2
-            filter: 'binary(=perform)'
-            shards: 1/2
-          - name: perform 2/2
-            filter: 'binary(=perform)'
-            shards: 2/2
-          - name: setup and breakdowns
-            filter: 'binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
+          - name: calculator and outputs
+            filter: 'binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data)'
           - name: items, config and skills
             filter: 'binary(=item) | binary(=config) | binary(=calcs) | binary(=tree)'
           - name: rest
-            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=perform) | binary(=calculator) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=config) | binary(=calcs) | binary(=tree))'
+            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=config) | binary(=calcs) | binary(=tree))'
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
