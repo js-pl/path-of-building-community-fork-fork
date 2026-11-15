@@ -66,6 +66,13 @@ pub enum ItemPopup {
     ImportTree(Box<super::tree_import::ImportTree>),
     NewLoadout(Box<super::build_controls::NewLoadout>),
     SpectreLibrary(Box<super::spectre_library::SpectreLibrary>),
+    /// Back with unsaved changes: `OpenSavePopup("LIST")`
+    SaveChanges,
+    /// Help >>: the help file's section
+    Help {
+        title: String,
+        lines: Vec<String>,
+    },
     ExportTree(Box<super::tree_import::ExportTree>),
     /// The Tree tab's Reset Tree/Tattoos
     ResetTree,
@@ -201,6 +208,7 @@ impl<'d> TypedSession<'d> {
             Some(ItemPopup::SpectreLibrary(_)) => {
                 name.starts_with("list") || name.starts_with("source")
             }
+            Some(ItemPopup::FindTimeless(_)) => name == "searchResults",
             _ => false,
         };
         if req["click"].as_bool() == Some(true) && !list_click {
@@ -512,6 +520,23 @@ impl<'d> TypedSession<'d> {
                 self.export_tree_shrink(&mut p);
                 self.editor.popups[0] = ItemPopup::ExportTree(p);
             }
+            (ItemPopup::SaveChanges | ItemPopup::Help { .. }, "close") => {
+                self.close_item_popup();
+            }
+            (ItemPopup::SaveChanges, "save") => {
+                // `SaveDBFile()` with `actionOnSave = "LIST"`: the build saved
+                // (the session's file is its XML), then closed
+                self.close_item_popup();
+                let xml = self.save_db_file()?;
+                self.refresh_item_popups();
+                return Ok(json!({ "xml": xml, "closed": true }));
+            }
+            (ItemPopup::SaveChanges, "noSave") => {
+                // `CloseBuild()`
+                self.close_item_popup();
+                self.refresh_item_popups();
+                return Ok(json!({ "closed": true }));
+            }
             (ItemPopup::SpectreLibrary(p), "save") => {
                 // `self.spectreList = destList`, then `main:ClosePopup()`
                 self.spectre_library_save(&p)?;
@@ -690,6 +715,23 @@ impl<'d> TypedSession<'d> {
             ItemPopup::ImportTree(p) => self.describe_import_tree(p),
             ItemPopup::NewLoadout(p) => self.describe_new_loadout(p),
             ItemPopup::SpectreLibrary(p) => self.describe_spectre_library(p),
+            ItemPopup::SaveChanges => json!({
+                "title": "Save Changes",
+                // Its message is a named label, which `lines` leaves out
+                "lines": [],
+                "buttons": [
+                    { "name": "close", "label": "Cancel", "enabled": true },
+                    { "name": "noSave", "label": "Don't Save", "enabled": true },
+                    { "name": "save", "label": "Save", "enabled": true },
+                ],
+                "controls": [],
+            }),
+            ItemPopup::Help { title, lines } => json!({
+                "title": title,
+                "lines": lines,
+                "buttons": [{ "name": "close", "label": "Close", "enabled": true }],
+                "controls": [],
+            }),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
             ItemPopup::FindTimeless(p) => self.describe_find_timeless(p),
             ItemPopup::ResetTree => json!({

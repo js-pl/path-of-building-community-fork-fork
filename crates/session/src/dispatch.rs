@@ -599,6 +599,30 @@ impl<'d> Dispatcher<'d> {
             {
                 Some(ok(self.typed.as_ref()?.gem_slot_count_tooltip()))
             }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_enable_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_slot_enable_tooltip(&path),
+                )
+            }
+            "controlTooltip"
+                if req["path"].as_str().is_some_and(|p| {
+                    crate::typed::gem_slots_quality_path(p)
+                        && self.typed.as_ref().is_some_and(|t| t.gem_slot_exists(p))
+                }) =>
+            {
+                let path = req["path"].as_str()?.to_string();
+                view(
+                    &mut self.typed_error,
+                    self.typed.as_ref()?.gem_slot_quality_tooltip(&path),
+                )
+            }
             "controlTooltip" if req["path"].as_str() == Some("skills.groupSlot") => {
                 let index = req["index"].as_f64();
                 view(
@@ -745,15 +769,22 @@ impl<'d> Dispatcher<'d> {
         json: &str,
         f: impl FnOnce(&mut TypedSession<'d>) -> crate::typed::Result<J>,
     ) -> Option<String> {
+        // What the translation replays, as the build was before
+        let replay = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|req| self.typed.as_ref()?.translation_replay(&req));
         let r = f(self.typed.as_mut()?);
         match r {
             // The translation fails the same way, before changing the build
             Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
                 #[cfg(feature = "translation")]
-                if self.translated.is_some() {
-                    self.pending.push(json.to_string());
+                if self.translated.is_some()
+                    && let Some(r) = &replay
+                {
+                    self.pending.push(r.to_string());
                 }
+                let _ = &replay;
                 let _ = json;
                 Some(ok(v))
             }

@@ -268,6 +268,36 @@ function api.control(req)
 				control.selValue = nil
 			end
 		end
+	elseif req.hoverKey and control.OnHoverKeyUp then
+		-- A key released over row `hover` of a list (`OnHoverKeyUp`), with
+		-- the keys held: the list's hover methods answer that row
+		buildList(control)
+		local function hoverIndex()
+			return control.list[req.hover] ~= nil and req.hover or nil
+		end
+		local function hoverValue()
+			return control.list[req.hover]
+		end
+		local saved = { }
+		local tables = { control, common.classes[control._className], common.classes.ListControl }
+		for _, t in ipairs(tables) do
+			saved[t] = { rawget(t, "GetHoverIndex"), rawget(t, "GetHoverValue") }
+			rawset(t, "GetHoverIndex", hoverIndex)
+			rawset(t, "GetHoverValue", hoverValue)
+		end
+		local isKeyDown = IsKeyDown
+		IsKeyDown = function(key)
+			return (key == "CTRL" and req.ctrl) or (key == "SHIFT" and req.shift) or false
+		end
+		local ok, err = pcall(control.OnHoverKeyUp, control, req.hoverKey)
+		IsKeyDown = isKeyDown
+		for _, t in ipairs(tables) do
+			rawset(t, "GetHoverIndex", saved[t][1])
+			rawset(t, "GetHoverValue", saved[t][2])
+		end
+		if not ok then
+			error(err, 0)
+		end
 	elseif req.sel and control.SelectIndex and not control.SetSel then
 		-- A row of a list, clicked with the keys held as ListControl's
 		-- left button does

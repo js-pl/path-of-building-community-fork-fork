@@ -110,6 +110,32 @@ impl Source {
             .collect()
     }
 
+    /// The stat descriptions of the gems' quality stats, in the scopes of
+    /// their skills (`Data/StatDescriptions`)
+    pub fn stat_descriptions(
+        &self,
+        skills: &SkillData,
+    ) -> Result<engine::stat_describer::StatDescriptions> {
+        let mut scopes = std::collections::BTreeSet::new();
+        let mut stats = std::collections::HashSet::new();
+        for e in skills.skills.values() {
+            if let Some(s) = &e.stat_description_scope {
+                scopes.insert(s.clone());
+            }
+            stats.extend(e.quality_stats.iter().map(|(s, _)| s.clone()));
+        }
+        let mut im = self.importer();
+        let names: Vec<String> = scopes.into_iter().collect();
+        engine::stat_describer::StatDescriptions::from_lua(
+            &names,
+            &mut |name| {
+                im.load1(&format!("Data/StatDescriptions/{name}"), vec![])
+                    .map_err(|e| e.to_string())
+            },
+            &stats,
+        )
+    }
+
     /// `data.monsterExperienceLevelMap`
     pub fn monster_experience_levels(&self) -> Result<Vec<f64>> {
         let map = self.data.get_str("monsterExperienceLevelMap");
@@ -293,9 +319,11 @@ impl Source {
 
     pub fn game_data(&self) -> Result<GameData> {
         let versions = self.tree_versions()?;
+        let skills = self.skills()?;
         Ok(GameData {
             items: self.items()?,
-            skills: self.skills()?,
+            stat_descriptions: self.stat_descriptions(&skills)?,
+            skills,
             setup: self.setup()?,
             config: self.config()?,
             option_defaults: self.option_defaults()?,

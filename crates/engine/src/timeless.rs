@@ -90,6 +90,8 @@ pub struct Timeless {
     loader: Box<Loader>,
     luts: Mutex<HashMap<usize, Arc<Vec<u8>>>>,
     abyss: Mutex<HashMap<usize, Arc<AbyssLut>>>,
+    /// Glorious Vanity: where each node's data starts, by seed offset
+    vaal_starts: Mutex<HashMap<usize, Arc<Vec<usize>>>>,
 }
 
 crate::codec_struct!(StatRange {
@@ -234,6 +236,7 @@ impl Timeless {
             loader,
             luts: Mutex::new(HashMap::new()),
             abyss: Mutex::new(HashMap::new()),
+            vaal_starts: Mutex::new(HashMap::new()),
         })
     }
 
@@ -263,6 +266,7 @@ impl Timeless {
             loader,
             luts: Mutex::new(HashMap::new()),
             abyss: Mutex::new(HashMap::new()),
+            vaal_starts: Mutex::new(HashMap::new()),
         })
     }
 
@@ -287,6 +291,34 @@ impl Timeless {
             .unwrap_or(local)
     }
 
+    /// Glorious Vanity's table holds each node's lengths by seed, then
+    /// each node's data by seed: where the node's data starts for each
+    /// seed offset
+    fn vaal_starts(&self, lut: &[u8], index: usize, seed_size: usize) -> Result<Arc<Vec<usize>>> {
+        let mut cache = self.vaal_starts.lock().map_err(|e| e.to_string())?;
+        if let Some(s) = cache.get(&index) {
+            return Ok(s.clone());
+        }
+        let byte = |i: usize| lut.get(i).copied().map_or(0, usize::from);
+        let mut start = self.size * seed_size;
+        let mut by_index: Vec<(usize, usize)> = self.node_ids.values().copied().collect();
+        by_index.sort_unstable();
+        for &(i, size) in &by_index {
+            if i == index {
+                break;
+            }
+            start += size;
+        }
+        let mut starts = Vec::with_capacity(seed_size);
+        for k in 0..seed_size {
+            starts.push(start);
+            start += byte(index * seed_size + k);
+        }
+        let starts = Arc::new(starts);
+        cache.insert(index, starts.clone());
+        Ok(starts)
+    }
+
     /// `data.readLUT(seed, nodeID, jewelType)`
     pub fn read_lut(&self, seed: f64, node_id: u32, ty: usize) -> Result<Vec<u32>> {
         let lut = self.lut(ty)?;
@@ -298,20 +330,9 @@ impl Timeless {
         };
         let byte = |i: usize| lut.get(i).copied().map(u32::from);
         if ty == 1 {
-            // Each node's lengths by seed, then each node's data by seed
-            let sizes = self.size * seed_size;
-            let mut start = sizes;
-            let mut by_index: Vec<(usize, usize)> = self.node_ids.values().copied().collect();
-            by_index.sort_unstable();
-            for &(i, size) in &by_index {
-                if i == index {
-                    break;
-                }
-                start += size;
-            }
-            for k in 0..seed_offset {
-                start += byte(index * seed_size + k).unwrap_or(0) as usize;
-            }
+            let Some(&start) = self.vaal_starts(&lut, index, seed_size)?.get(seed_offset) else {
+                return Ok(Vec::new());
+            };
             let len = byte(index * seed_size + seed_offset).unwrap_or(0) as usize;
             let mut out: Vec<u32> = (0..len).filter_map(|i| byte(start + i)).collect();
             let n = if len == 2 || len == 3 {
@@ -572,6 +593,21 @@ impl Timeless {
         ty: usize,
         path: Option<&[u32]>,
     ) -> Result<Vec<(u32, Arc<Vec<AbyssComponent>>)>> {
+        self.read_abyss_in(seed, socket, ty, path, None)
+    }
+
+    /// `data.readAbyssJewelLUT(seed, socketId, jewelType, path,
+    /// ascendancyName)`: the affected nodes in the order upstream's table
+    /// gets them, Zorath's path visited in `pairs` order and its
+    /// ascendancy selections limited to the named ascendancy
+    pub fn read_abyss_in(
+        &self,
+        seed: f64,
+        socket: u32,
+        ty: usize,
+        path: Option<&[u32]>,
+        ascendancy: Option<&str>,
+    ) -> Result<Vec<(u32, Arc<Vec<AbyssComponent>>)>> {
         let mut out = Vec::new();
         if (7..=10).contains(&ty) {
             let lut = self.abyss_lut(ty)?;
@@ -597,7 +633,12 @@ impl Timeless {
             return Ok(out);
         };
         let lut = self.abyss_lut(ty)?;
+        // `{ [root.id] = true, [other.id] = true }`, then the path's nodes
+        let mut keys: lua::ljtab::LjMap<()> = lua::ljtab::LjMap::with_hash(1);
         for &node in path {
+            keys.insert(node, ());
+        }
+        for (node, _) in keys.iter() {
             let m = self.read_abyss_node(&lut, seed, node, ty)?;
             if !m.is_empty() {
                 out.push((node, Arc::new(m)));
@@ -605,7 +646,10 @@ impl Timeless {
         }
         if let (Some(s), true) = (lut.seed_index(seed), lut.by_node) {
             let d = &lut.data[..];
-            for (_, block) in &lut.ascendancies {
+            for (name, block) in &lut.ascendancies {
+                if ascendancy.is_some_and(|a| a != name) {
+                    continue;
+                }
                 let mut o = lut.record(*block, s, skip_ascendancy_record)?;
                 let n = byte(d, o)?;
                 o += 1;

@@ -47,6 +47,7 @@ mod slot_drops;
 mod spec_sets;
 mod spectre_library;
 mod timeless_search;
+mod timeless_seeds;
 pub mod tooltip;
 mod tree;
 mod tree_import;
@@ -631,4 +632,14 @@ impl<'d> TypedSession<'d> {
 /// Whether a path is a gem slot's count (`skills.gemSlot<i>Count`)
 pub fn gem_slots_count_path(path: &str) -> bool {
     gem_slots::parse(path).is_some_and(|(_, part)| part == "Count")
+}
+
+/// Whether a path is a gem slot's enabled box (`skills.gemSlot<i>Enable`)
+pub fn gem_slots_enable_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Enable")
+}
+
+/// Whether a path is a gem slot's quality box (`skills.gemSlot<i>Quality`)
+pub fn gem_slots_quality_path(path: &str) -> bool {
+    gem_slots::parse(path).is_some_and(|(_, part)| part == "Quality")
 }

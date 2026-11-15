@@ -1124,7 +1124,7 @@ impl<'t> PassiveSpec<'t> {
 
     /// The ids of the nodes in a radius of a tree node, in upstream's
     /// `pairs` order over `nodesInRadius[radiusIndex]`
-    fn radius_ids(&self, id: u32, radius: Option<usize>) -> LjMap<()> {
+    pub fn radius_ids(&self, id: u32, radius: Option<usize>) -> LjMap<()> {
         let mut out = LjMap::default();
         let list = radius
             .and_then(|r| r.checked_sub(1))
@@ -1598,7 +1598,8 @@ impl<'t> PassiveSpec<'t> {
     }
 
     /// `GetShortestPathToClassStart(rootId)`: the ids of the nodes on the
-    /// shortest allocated path from the node to the class start
+    /// shortest allocated path from the node to the class start, in the
+    /// order upstream's table gets them
     pub fn shortest_path_to_class_start(&self, root: usize) -> Option<Vec<u32>> {
         if !self.nodes[root].alloc {
             return None;
@@ -1618,8 +1619,8 @@ impl<'t> PassiveSpec<'t> {
                         path.push(self.nodes[c].id);
                         cur = parent.get(&c).copied();
                     }
-                    path.sort_unstable();
-                    path.dedup();
+                    let mut seen = std::collections::HashSet::new();
+                    path.retain(|id| seen.insert(*id));
                     return Some(path);
                 }
                 if self.nodes[other].alloc
