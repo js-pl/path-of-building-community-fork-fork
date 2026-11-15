@@ -29,8 +29,8 @@ the notes marked *until sub-step 8* below go with it.
   - `ported` or `partial`: port the behaviour where the entry's `port`
     says (the typed engine is laid out freely, not by upstream's files);
   - `todo`: not ported yet; note it in the PR, nothing to do;
-  - `skip`: deliberately not ported (UI-only or desktop-only); check the
-    reason still holds;
+  - `skip`: deliberately not ported, with the `reason` in the entry
+    (export scripts, desktop-only parts); check it still holds;
   - not in the manifest: a new file, see step 4.
 - Commits to the UI classes (`*Tab.lua`, `*Control.lua`) that the web UI
   ports (`partial` with a `web/` port) have no test against upstream: check
