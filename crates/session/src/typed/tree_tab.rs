@@ -11,7 +11,6 @@
 
 use super::item_popups::ItemPopup;
 use super::{NOT_PORTED, Result, TypedSession};
-use engine::spec::PassiveSpec;
 use serde_json::{Value as J, json};
 use std::sync::Arc;
 
@@ -338,7 +337,7 @@ impl TypedSession<'_> {
             src.hash_overrides.clone(),
         );
         let tree = self.data.tree(&version)?;
-        let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
+        let mut spec = self.new_spec(tree)?;
         spec.title = title;
         spec.jewels = jewels;
         // The undo state's `hashOverrides`, the same tattoos: those on nodes
