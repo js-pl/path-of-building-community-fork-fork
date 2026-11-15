@@ -178,9 +178,12 @@ pub fn format_num_sep(s: &str) -> String {
 
 /// `string:matchOrPattern(pattern)` (`Modules/Common.lua`): whether `s`
 /// matches one of the patterns that `(a|b)` groups and `|` make of
-/// `pattern`. Upstream tries them in `pairs` order and stops at the first
-/// match or at a malformed one (its search's `PCall` then fails); here
-/// they are tried in the order they are made.
+/// `pattern`. Upstream tries them in `pairs` order over the patterns,
+/// which follows LuaJIT's per-process string hash, and stops at the first
+/// match or at a malformed one (its search's `PCall` then fails), so with
+/// one alternative that matches and one malformed it answers either way
+/// from run to run. Here the answer is the same every time: true if any
+/// well-formed alternative matches, else the error of a malformed one.
 pub fn match_or_pattern(s: &str, pattern: &str) -> Result<bool, String> {
     fn generate(p: &str) -> Vec<String> {
         let mut groups: Vec<(usize, usize, Vec<String>)> = Vec::new();
@@ -223,10 +226,29 @@ pub fn match_or_pattern(s: &str, pattern: &str) -> Result<bool, String> {
         }
         out
     }
+    let mut error = None;
     for p in generate(pattern) {
-        if try_find(s, &p)?.is_some() {
-            return Ok(true);
+        match try_find(s, &p) {
+            Ok(Some(_)) => return Ok(true),
+            Ok(None) => {}
+            Err(e) => {
+                error.get_or_insert(e);
+            }
         }
     }
-    Ok(false)
+    error.map_or(Ok(false), Err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::match_or_pattern;
+
+    #[test]
+    fn match_or_pattern_ignores_the_order_of_alternatives() {
+        assert_eq!(match_or_pattern("life", "life|["), Ok(true));
+        assert_eq!(match_or_pattern("life", "[|life"), Ok(true));
+        assert_eq!(match_or_pattern("mana", "life|mana"), Ok(true));
+        assert_eq!(match_or_pattern("mana", "life"), Ok(false));
+        assert!(match_or_pattern("mana", "life|[").is_err());
+    }
 }
