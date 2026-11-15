@@ -252,9 +252,10 @@ impl<'d> TypedSession<'d> {
                 // `CreateUndoState` reads no bloodline, so the copy has none
                 let i = p.sel.ok_or_else(missing)?;
                 let src = self.spec_list()[i - 1];
+                // `PassiveSpec::new` selects class 0, as upstream's constructor
                 let (Some(class), Some(ascend)) = (src.cur_class_id, src.cur_ascend_class_id)
                 else {
-                    return Err(format!("{NOT_PORTED}: copying a tree without a class"));
+                    return Err("invariant: a spec without a class".into());
                 };
                 let hash_list: Vec<u32> = src.alloc_nodes.iter().map(|(k, _)| k).collect();
                 let masteries: Vec<(u32, f64)> = src

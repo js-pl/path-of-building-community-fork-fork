@@ -939,6 +939,39 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 }
             }
         }
+        // The tattooed tree copied and converted to an older version with
+        // tattoos (the version drop-down's Copy + Convert): the copy keeps
+        // the tattoos (`RestoreUndoState`'s `hashOverrides`)
+        if xml.contains("<Override ") {
+            let versions = &data.game.tree_versions;
+            let sel = versions.iter().position(|v| v.as_str() == "3_25").unwrap() + 1;
+            let label = format!("{id} converted to 3_25");
+            for r in [
+                json!({"cmd": "loadXml", "xml": xml}),
+                json!({"cmd": "control", "path": "tree.versionSelect", "sel": sel}),
+                json!({"cmd": "popupButton", "name": "convertCopy"}),
+                json!({"cmd": "closePopup"}),
+            ] {
+                answer(d.request(&r.to_string()), "convert");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            compare_views(
+                d,
+                &["treeSpecs", "treeState", "state", "outputs", "tree"],
+                &label,
+                &mut out,
+            );
+            for o in xml.split("<Override ").skip(1) {
+                let Some(n) = attr(o, "nodeId") else { continue };
+                let req =
+                    json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{label} {req}"), &mut out);
+                compared += 1;
+            }
+            compare_saves(d, &label, &mut out);
+        }
         if !out.is_empty() {
             let n = out.len();
             out.truncate(4);
