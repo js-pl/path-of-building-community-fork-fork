@@ -43,9 +43,9 @@ makes cyclic environments).
 | Tests | Reference today |
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
-| `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
+| `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
-| `equivalence/tests/{calculator,power,spec,config}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `equivalence/tests/{calculator,power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
 | `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
@@ -319,8 +319,11 @@ goes with them.
   load and after random edits, on every corpus build.
 - `config.rs` `config_matches_upstream` (corpus): the session test's config
   phase (views and outputs after option edits) and `build_output.rs`.
-  `every_option_matches_upstream` (every option and value) stays until it
-  runs against the oracle.
+- `config.rs` `every_option_matches_upstream`: the mods each
+  Configuration option builds for a few values each, against the
+  translation's. `oracle_variants.rs` sets every option to the same values
+  (checks on, each list entry, 3, 12 and -2) in a corpus build and
+  compares the whole build with the oracle (1231 builds).
 - `perform.rs` (7 tests): `calcs.perform`'s state at the defences (the
   player's output, every database's mods, conditions and multipliers), on
   the corpus and the variant families. The corpus as whole builds in
