@@ -329,7 +329,7 @@ impl TypedSession<'_> {
 
     /// `UpdateCustomModsControls`: a new control per group of the active
     /// set, after the ones made before
-    fn update_custom_mods_controls(&mut self) {
+    pub(super) fn update_custom_mods_controls(&mut self) {
         let n = self.build.config.active().custom_mods.len().max(1);
         let next = self.config_ui.blocks.1;
         self.config_ui.blocks = (next, next + n);
@@ -352,7 +352,7 @@ impl TypedSession<'_> {
 
     /// A custom modifier group changed: `AddUndoState`, `BuildModList`,
     /// `buildFlag`
-    fn custom_mods_changed(&mut self) -> Result<()> {
+    pub(super) fn custom_mods_changed(&mut self) -> Result<()> {
         self.build
             .build_config_mods(&self.data.game.config, &self.data.parser)?;
         self.config_mods_built();
@@ -520,6 +520,10 @@ impl TypedSession<'_> {
                 ("titleEdit", Some(t), None) => list[b].title = Some(t.to_string()),
                 ("textEdit", Some(t), None) => list[b].text = t.to_string(),
                 ("enableCheck", None, Some(s)) => list[b].enabled = s,
+                ("addModBtn", None, None) if click => {
+                    self.open_mod_browser(b)?;
+                    return Ok(json!([]));
+                }
                 _ => return Err(format!("{}: control configTab.{name}", super::NOT_PORTED)),
             }
             self.custom_mods_changed()?;

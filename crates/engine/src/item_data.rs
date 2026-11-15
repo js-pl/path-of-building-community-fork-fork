@@ -86,6 +86,9 @@ pub struct Affix {
     pub group: Option<String>,
     /// `tags`: what the affix adds to an item's tags while crafting
     pub tags: Vec<String>,
+    /// `tradeHashes`: each stat description's lines (crafted mods have
+    /// none)
+    pub trade_hashes: Option<Vec<Vec<String>>>,
 }
 
 /// A table of affixes, in data order
@@ -120,6 +123,15 @@ impl Affix {
             level: opt_number(&get(m, "level"))?,
             group: opt_string(&get(m, "group"))?,
             tags: strings("tags")?,
+            trade_hashes: match get(m, "tradeHashes") {
+                Value::Table(_) => Some(
+                    pairs(&get(m, "tradeHashes"))
+                        .into_iter()
+                        .map(|(_, d)| array(&d).iter().map(string).collect())
+                        .collect::<Result<_>>()?,
+                ),
+                _ => None,
+            },
         })
     }
 }
@@ -793,6 +805,7 @@ crate::codec_struct!(Affix {
     level,
     group,
     tags,
+    trade_hashes,
 });
 crate::codec_struct!(ClusterSkill {
     name,
