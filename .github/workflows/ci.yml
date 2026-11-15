@@ -78,6 +78,9 @@ jobs:
             filter: 'test(=typed_session_matches_translated)'
             shards: 3/3
             oracle: true
+          - name: oracle variants
+            filter: 'binary(=oracle_variants)'
+            oracle: true
           - name: perform 1/2
             filter: 'binary(=perform)'
             shards: 1/2
@@ -89,11 +92,12 @@ jobs:
           - name: items, config and skills
             filter: 'binary(=item) | binary(=items_tab) | binary(=config) | binary(=calcs) | binary(=skills) | binary(=tree)'
           - name: rest
-            filter: 'not (test(=typed_session_matches_translated) | binary(=perform) | binary(=calculator) | binary(=calc_setup) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=items_tab) | binary(=config) | binary(=calcs) | binary(=skills) | binary(=tree))'
+            filter: 'not (test(=typed_session_matches_translated) | binary(=oracle_variants) | binary(=perform) | binary(=calculator) | binary(=calc_setup) | binary(=breakdown) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=items_tab) | binary(=config) | binary(=calcs) | binary(=skills) | binary(=tree))'
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
-      # The session test's reference: upstream itself on LuaJIT
+      # The reference of the session test and the variants: upstream
+      # itself on LuaJIT
       SESSION_REFERENCE: ${{ matrix.oracle && 'oracle' || '' }}
     steps:
       - uses: actions/checkout@v4

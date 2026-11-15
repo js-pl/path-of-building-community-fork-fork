@@ -69,8 +69,29 @@ local api = dofile(oracleDir .. "/../crates/session/lua/session.lua")
 local first = api.handle('{"cmd":"newBuild"}')
 assert(first:match('^{"ok"'), "newBuild failed: " .. first)
 
+-- Not the engine API: `{"cmd":"oracleOutputs","xml":..,"id":..}` loads a
+-- build as `dump.lua` does and answers its outputs in `dump.lua`'s JSON,
+-- `{"ok":<outputs>}` (the variant tests' reference, see
+-- crates/equivalence/src/oracle.rs)
+local toJSON = dofile(oracleDir .. "/json.lua")
+local dkjson = require("dkjson")
+local function oracleOutputs(req)
+	local ok, res = pcall(function()
+		loadBuildFromXML(req.xml, req.id or "variant")
+		assert(build.calcsTab.mainEnv, "build did not calculate")
+		return headless.outputs()
+	end)
+	if not ok then
+		return dkjson.encode({ error = tostring(res) })
+	end
+	return '{"ok":' .. toJSON(res) .. '}'
+end
+
 for line in io.lines() do
-	if line:match("%S") then
+	if line:match('^{"cmd":"oracleOutputs"') then
+		out:write(oracleOutputs(dkjson.decode(line)), "\n")
+		out:flush()
+	elseif line:match("%S") then
 		-- The translation's errors carry no source positions
 		local res = api.handle(line):gsub('^{"error":"[^"]-%.lua:%d+: ', '{"error":"')
 		out:write(res, "\n")

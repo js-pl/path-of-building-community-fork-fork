@@ -11,10 +11,9 @@ use engine::breakdown::{Breakdown, Breakdowns, Cell, Row};
 use engine::items_tab::ItemsTab;
 use engine::mods::convert::Converter;
 use engine::mods::tag::TagKind;
-use engine::skill_data::Gem;
 use equivalence::outputs::{compare, entries, key_str, list, lua_outputs, number, typed_outputs};
 use equivalence::typed_build::TypedData;
-use equivalence::{corpus_builds, gem_variants, skill_variants, typed_json, upstream_src};
+use equivalence::{corpus_builds, skill_variants, typed_json, upstream_src};
 use lua::rt;
 use lua::{Key, LuaError, Value};
 use serde_json::{Map, Value as J, json};
@@ -276,57 +275,7 @@ fn skill_function_breakdowns_match_upstream() {
 /// skill part and active skill
 #[test]
 fn calcs_inputs_match_upstream() {
-    run(&|data| {
-        let mut out = Vec::new();
-        for (id, xml) in corpus_builds()
-            .into_iter()
-            .filter(|(id, _)| id.starts_with("gen-"))
-            .take(8)
-        {
-            let effective = "<Input name=\"misc_buffMode\" string=\"EFFECTIVE\"/>";
-            for mode in ["COMBAT", "BUFFED", "UNBUFFED"] {
-                let v = xml.replace(
-                    effective,
-                    &format!("<Input name=\"misc_buffMode\" string=\"{mode}\"/>"),
-                );
-                out.push((format!("{id}-{mode}"), v));
-            }
-            if xml.matches("<Skill ").count() >= 2 {
-                let v = xml.replace(
-                    "<Input name=\"skill_number\" number=\"1\"/>",
-                    "<Input name=\"skill_number\" number=\"2\"/>",
-                );
-                out.push((format!("{id}-skill2"), v));
-            }
-        }
-        let parts = |g: &Gem| g.granted_effect.parts.as_ref().map_or(0, Vec::len);
-        let main = "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string();
-        let part = gem_variants(
-            &data.skills,
-            |g| parts(g) >= 2,
-            |g| {
-                vec![(
-                    format!("part-{}", g.id),
-                    main.clone(),
-                    format!("skillPart=\"1\" skillPartCalcs=\"{}\"", parts(g)),
-                )]
-            },
-        );
-        out.extend(part.into_iter().take(8));
-        let active = gem_variants(
-            &data.skills,
-            |g| g.secondary_granted_effect.is_some(),
-            |g| {
-                vec![(
-                    format!("active2-{}", g.id),
-                    "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"2\"".to_string(),
-                    String::new(),
-                )]
-            },
-        );
-        out.extend(active.into_iter().take(6));
-        out
-    });
+    run(&equivalence::variants::calcs_input_variants);
 }
 
 /// Mirages of skills with minions as the main skill

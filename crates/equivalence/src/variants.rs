@@ -3,7 +3,7 @@
 //! (`configTable`), by the gems and uniques its keys name.
 
 use crate::typed_build::TypedData;
-use crate::{corpus_builds, upstream_src, with_group};
+use crate::{corpus_builds, gem_variants, upstream_src, with_group};
 use engine::skill_data::{Gem, GrantedEffect};
 use std::sync::Arc;
 
@@ -658,4 +658,187 @@ fn with_socketed(xml: &str, text: &str, variant: usize, socket: u32) -> Option<S
         }
     }
     Some(x)
+}
+
+/// Jewels that let nodes be allocated without a connection (Intuitive
+/// Leap, Thread of Hope, Impossible Escape) and Unnatural Instinct, each
+/// socketed in an allocated socket of every fourth generated corpus build
+/// with unconnected nodes in its radius allocated; ids `<build>-<jewel>`
+pub fn jewel_variants(data: &mut TypedData) -> Vec<(String, String)> {
+    let jewels: [(&str, &str, Option<u32>); 4] = [
+        (
+            "il",
+            "Intuitive Leap\nViridian Jewel\nRadius: Small\nPassive Skills in Radius can be Allocated without being connected to your tree",
+            None,
+        ),
+        (
+            "toh",
+            "Thread of Hope\nCrimson Jewel\nVariant: Small Ring\nVariant: Medium Ring\nVariant: Large Ring\nVariant: Very Large Ring\nVariant: Massive Ring (Uber)\nRadius: Variable\nImplicits: 0\n{variant:1}Only affects Passives in Small Ring\n{variant:2}Only affects Passives in Medium Ring\n{variant:3}Only affects Passives in Large Ring\n{variant:4}Only affects Passives in Very Large Ring\n{variant:5}Only affects Passives in Massive Ring\nPassive Skills in Radius can be Allocated without being connected to your tree",
+            Some(3),
+        ),
+        (
+            "ie",
+            "Impossible Escape\nViridian Jewel\nLimited to: 1\nRadius: Small\nPassives in Radius of Iron Reflexes can be Allocated without being connected to your tree",
+            None,
+        ),
+        (
+            "kl",
+            "Unnatural Instinct\nViridian Jewel\nRadius: Small\nAllocated Small Passive Skills in Radius grant nothing\nGrants all bonuses of Unallocated Small Passive Skills in Radius",
+            None,
+        ),
+    ];
+    let mut out = Vec::new();
+    for (n, (bid, xml)) in corpus_builds().into_iter().enumerate() {
+        if !bid.starts_with("gen-") || n % 4 != 0 {
+            continue;
+        }
+        let root = engine::xml::parse(&xml).unwrap();
+        data.load_tree(&root);
+        let Ok(build) = data.load_build(&root) else {
+            continue;
+        };
+        let spec = &build.spec;
+        let tree = spec.tree;
+        // An allocated, non-cluster socket
+        let Some(socket) = tree.sockets.iter().copied().find(|&s| {
+            spec.alloc_nodes.contains(s)
+                && tree.node(s).is_some_and(|t| t.expansion_jewel.is_none())
+        }) else {
+            continue;
+        };
+        for (k, (name, text, variant)) in jewels.iter().enumerate() {
+            let id = format!("{bid}-{name}");
+            // Unallocated nodes in the radius: the socket's, or the keystone's
+            let centre = if *name == "ie" {
+                tree.keystone_map.get("Iron Reflexes").copied().unwrap()
+            } else {
+                socket
+            };
+            let ring = if *name == "toh" { 7 } else { 0 };
+            let extra: Vec<u32> = tree
+                .node(centre)
+                .and_then(|c| c.nodes_in_radius.as_ref())
+                .map(|r| r[ring].clone())
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|&i| {
+                    !spec.alloc_nodes.contains(i)
+                        && tree.node(i).is_some_and(|t| {
+                            matches!(
+                                t.kind,
+                                engine::tree::NodeType::Normal | engine::tree::NodeType::Notable
+                            ) && t.ascendancy_name.is_none()
+                        })
+                })
+                .skip(k)
+                .step_by(3)
+                .take(4)
+                .collect();
+            let Some(v) = with_jewel(&xml, text, *variant, socket, &extra) else {
+                continue;
+            };
+            out.push((id, v));
+        }
+    }
+    out
+}
+
+/// A build with a jewel socketed in an allocated socket of its active spec
+/// and `extra` nodes allocated
+pub fn with_jewel(
+    xml: &str,
+    text: &str,
+    variant: Option<u32>,
+    socket: u32,
+    extra: &[u32],
+) -> Option<String> {
+    let id = engine::pat::gmatch(xml, "<Item id=\"(%d+)\"")
+        .iter()
+        .filter_map(|c| c[0].parse::<u32>().ok())
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let at = xml.find("<ItemSet ")?;
+    let v = variant.map_or(String::new(), |v| format!(" variant=\"{v}\""));
+    let mut x = format!(
+        "{}<Item id=\"{id}\"{v}>\nRarity: UNIQUE\n{text}\n</Item>\n{}",
+        &xml[..at],
+        &xml[at..]
+    );
+    let spec = x.find("<Spec ")?;
+    let nodes = spec + x[spec..].find("nodes=\"")? + 7;
+    let extra: String = extra.iter().map(|n| format!("{n},")).collect();
+    x.insert_str(nodes, &extra);
+    let spec_end = spec + x[spec..].find("</Spec>")?;
+    let socket_tag = format!("nodeId=\"{socket}\"/>");
+    match x[spec..spec_end].find(&socket_tag) {
+        Some(k) => {
+            let k = spec + k;
+            let start = x[..k].rfind("<Socket ")?;
+            x.replace_range(
+                start..k + socket_tag.len(),
+                &format!("<Socket itemId=\"{id}\" {socket_tag}"),
+            );
+        }
+        None => {
+            let s_at = spec + x[spec..spec_end].find("<Sockets>")? + 9;
+            x.insert_str(s_at, &format!("\n<Socket itemId=\"{id}\" {socket_tag}"));
+        }
+    }
+    Some(x)
+}
+
+/// The Calcs tab's inputs the corpus leaves at their defaults: its other
+/// buff modes and main socket groups, and the gems' own selections of
+/// skill part and active skill
+pub fn calcs_input_variants(data: &mut TypedData) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (id, xml) in corpus_builds()
+        .into_iter()
+        .filter(|(id, _)| id.starts_with("gen-"))
+        .take(8)
+    {
+        let effective = "<Input name=\"misc_buffMode\" string=\"EFFECTIVE\"/>";
+        for mode in ["COMBAT", "BUFFED", "UNBUFFED"] {
+            let v = xml.replace(
+                effective,
+                &format!("<Input name=\"misc_buffMode\" string=\"{mode}\"/>"),
+            );
+            out.push((format!("{id}-{mode}"), v));
+        }
+        if xml.matches("<Skill ").count() >= 2 {
+            let v = xml.replace(
+                "<Input name=\"skill_number\" number=\"1\"/>",
+                "<Input name=\"skill_number\" number=\"2\"/>",
+            );
+            out.push((format!("{id}-skill2"), v));
+        }
+    }
+    let parts = |g: &Gem| g.granted_effect.parts.as_ref().map_or(0, Vec::len);
+    let main = "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"1\"".to_string();
+    let part = gem_variants(
+        &data.skills,
+        |g| parts(g) >= 2,
+        |g| {
+            vec![(
+                format!("part-{}", g.id),
+                main.clone(),
+                format!("skillPart=\"1\" skillPartCalcs=\"{}\"", parts(g)),
+            )]
+        },
+    );
+    out.extend(part.into_iter().take(8));
+    let active = gem_variants(
+        &data.skills,
+        |g| g.secondary_granted_effect.is_some(),
+        |g| {
+            vec![(
+                format!("active2-{}", g.id),
+                "mainActiveSkill=\"1\" mainActiveSkillCalcs=\"2\"".to_string(),
+                String::new(),
+            )]
+        },
+    );
+    out.extend(active.into_iter().take(6));
+    out
 }
