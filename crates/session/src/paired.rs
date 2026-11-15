@@ -128,7 +128,7 @@ impl<'d> Paired<'d> {
             let r = typed.request(json)?;
             let answered = typed.typed_answered;
             let error = typed.typed_error.clone();
-            let replays: Vec<Replay> = typed.replays.drain(..).collect();
+            let replays = std::mem::take(&mut typed.replays);
             for replay in replays {
                 self.queue(replay)?;
             }
