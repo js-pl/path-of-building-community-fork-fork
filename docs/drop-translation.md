@@ -46,7 +46,7 @@ makes cyclic environments).
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/{calculator,power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -334,6 +334,16 @@ goes with them.
   session test's calcs phase (every cell's `breakdown` command); the
   breakdown-writing skill functions, the mirages and the Calcs inputs in
   its `variants` phase, against the oracle.
+- `compare.rs` (item, gem and anoint power): each candidate's power under
+  a power stat, the calculator over the candidates. The session test's
+  power phase asks the oracle for the same sorts: the gem dropdown's
+  candidates with their DPS, the unique and rare databases sorted by
+  power stats, and (added for this) the equipped amulet's anoint popup
+  sorted by four power stats per build, its first rows hovered (the
+  stats each anoint gives). Its check that threaded runs equal the
+  sequential one is kept in practice: the typed session calculates the
+  candidates on `Threads::available()` and compares bitwise with the
+  oracle's sequential calculation.
 
 ## Moved to the oracle
 
