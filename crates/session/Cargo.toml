@@ -12,13 +12,14 @@ default = ["translation", "source"]
 # Commands the typed engine does not have yet answered by upstream's
 # translated program (`crates/upstream`, `lua/session.lua`); without it
 # they are "not ported" errors
-translation = ["dep:upstream"]
+translation = ["dep:upstream", "dep:luai", "engine/translation"]
 # The typed data made from upstream's source directory
 # (`TypedData::from_source`), for native runs and tests
 source = ["dep:gamedata"]
 
 [dependencies]
 lua.workspace = true
+luai = { workspace = true, optional = true }
 engine.workspace = true
 upstream = { workspace = true, optional = true }
 gamedata = { workspace = true, optional = true }

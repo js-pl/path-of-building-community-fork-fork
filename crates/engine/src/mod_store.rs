@@ -11,9 +11,9 @@
 //! `includeTransfigured`) and `GetStat` the reservation stats to the
 //! translated methods.
 
-use lua::env::Env;
 use lua::rt::{self, first, func};
 use lua::{Key, LResult, LuaError, LuaStr, TableRef, Value};
+use luai::env::Env;
 use std::rc::Rc;
 
 /// Keys looked up on every mod, built once.

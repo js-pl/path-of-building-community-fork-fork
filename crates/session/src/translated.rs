@@ -24,7 +24,7 @@ mod bridge {
 }
 
 impl DataSource for Files {
-    fn load(&self, env: &Rc<lua::env::Env>, name: &str, args: &[Value]) -> LResult<Vec<Value>> {
+    fn load(&self, env: &Rc<luai::env::Env>, name: &str, args: &[Value]) -> LResult<Vec<Value>> {
         let rel = format!("{name}.lua");
         if let Some(chunk) = upstream::up::chunk(&format!("src/{rel}")) {
             return chunk(env, args);
@@ -49,7 +49,7 @@ pub struct Recording<D> {
 }
 
 impl<D: DataSource> DataSource for Recording<D> {
-    fn load(&self, env: &Rc<lua::env::Env>, name: &str, args: &[Value]) -> LResult<Vec<Value>> {
+    fn load(&self, env: &Rc<luai::env::Env>, name: &str, args: &[Value]) -> LResult<Vec<Value>> {
         let rel = format!("{name}.lua");
         if upstream::up::chunk(&format!("src/{rel}")).is_none() {
             self.read.borrow_mut().insert(rel);

@@ -18,9 +18,10 @@ and how the tests keep a reference without them.
 | `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve --typed`, `--translated`, `bundle --lua`, `bench`) |
 | `crates/equivalence` | `upstream`; `bridge.rs` converts the translated program's stores into typed ones | tests only |
 | `crates/importer::luagen` | the translator (1.9k lines), run by `crates/upstream/build.rs` | build only |
-| `crates/lua` | interpreter (parser, `env`, `rt`, `gc`, 6.4k lines) **and** library pieces: Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | the library pieces are in the typed engine and ship |
+| `crates/lua` | the library pieces: values and tables (`value`, with the `gc` cycle collector), table operations (`rt`), Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | in the typed engine and shipped |
+| `crates/luai` | the interpreter's parts: lexer, parser, syntax tree, standard library environment (`env`) | not in the shipped engine (CI checks `wasm`'s dependencies); the engine's `translation` feature (`install`, `mod_store`) and the importer use it |
 | `crates/importer`, `crates/gamedata` | the interpreter, to evaluate upstream's data files and `ModParser.lua` at build time | build only |
-| `crates/engine` | the library pieces everywhere; `engine::install`, `mod_store.rs`, `mods/convert.rs` and a `tree.rs` helper still touch `lua::env`/`lua::rt` (the replacements installed into the running translation, and conversions) | the library pieces |
+| `crates/engine` | the library pieces everywhere; with the `translation` feature, `engine::install` and `mod_store.rs` (the replacements installed into the running translation) use `luai::env` | the library pieces |
 
 The typed session no longer falls back for anything the session and
 equivalence tests exercise (`KNOWN_FALLBACKS` holds only cases where upstream
@@ -46,8 +47,8 @@ makes cyclic environments).
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
-| `equivalence/tests/{power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown`, `config` and `compare` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (15 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `equivalence/tests/spec.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown`, `power`, `config` and `compare` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `session/tests/typed.rs` (16 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), `nodepower` (node power on every tenth corpus build, four power stats, with cluster notables), `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -151,8 +152,8 @@ and commits or uploads the transcripts; nothing has to translate.
    variants and session sequences cover them; keep the oracle dumps for whole
    builds, the mod parser and data as they are.
 4. **Last: delete** `crates/upstream`, `luagen`, `lua/session.lua`,
-   `translated.rs`, `bridge.rs`, `engine::install`, `lua::gc`, and split
-   `crates/lua` into the library pieces the engine ships and the interpreter
+   `translated.rs`, `bridge.rs`, `engine::install`, `lua::gc`; `crates/lua`
+   is already split into the library pieces the engine ships and the interpreter
    the importer keeps.
 
 Why this order: step 1 has the user-facing benefit (a 2 MB engine, no
@@ -305,6 +306,16 @@ of them, so each difference is one between the translation and LuaJIT):
     `Classes/ItemsTab.lua`, "attempt to index a nil value") and at most
     three builds per items shard (`WEAPON_SLOT_SKIPS`), so that a broader
     regression cannot pass for it;
+  - node power of gen-0029 under Full DPS, 14.06 against -15.81 for
+    many nodes (two of five oracle runs): explained, upstream's `pairs`
+    order. `CalcsTab:PowerBuilder` goes through `pairs(spec.nodes)` and
+    shares one calculation between the nodes of a `modKey`, the first
+    one's, though such nodes can give different results (one in a
+    jewel's radius); `spec.nodes` is filled in `pairs` order of the tree's
+    nodes, which have the string key `root` too, so the first one follows
+    LuaJIT's string hash. The session's `nodePower` runs `PowerBuilder` on
+    `spec.nodes` filled in ascending order of the ids, and the typed
+    engine (`engine::power`) takes that order too;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
@@ -359,6 +370,12 @@ goes with them.
   sequential one is kept in practice: the typed session calculates the
   candidates on `Threads::available()` and compares bitwise with the
   oracle's sequential calculation.
+- `power.rs` (`node_power_matches_upstream`): node power on every tenth
+  corpus build with four power stats in turn, a depth of one point, the
+  first three cluster notables (all of them and the full depth with
+  `POWER_FULL`). The session test's `nodepower` phase asks the same of the
+  oracle: `nodePower` now takes the cluster notables to calculate
+  (`cluster`, by id) and answers their powers.
 
 ## Moved to the oracle
 

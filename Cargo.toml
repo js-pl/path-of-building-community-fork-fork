@@ -12,6 +12,7 @@ publish = false
 
 [workspace.dependencies]
 lua = { path = "crates/lua" }
+luai = { path = "crates/luai" }
 importer = { path = "crates/importer" }
 engine = { path = "crates/engine" }
 gamedata = { path = "crates/gamedata" }

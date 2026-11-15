@@ -11,7 +11,7 @@ fn main() {
                 stack.push(path);
             } else if path.extension().is_some_and(|e| e == "lua") {
                 let src = std::fs::read(&path).unwrap();
-                match lua::parser::parse(&src) {
+                match luai::parser::parse(&src) {
                     Ok(_) => ok += 1,
                     Err(e) => {
                         failed += 1;
