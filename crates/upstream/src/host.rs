@@ -2,9 +2,9 @@
 //! `src/HeadlessWrapper.lua` (v2.67.2), which stubs the SimpleGraphic host
 //! API, plus the module loader for translated modules and imported data.
 
-use lua::env::Env;
 use lua::rt::{self, err, first, func};
 use lua::{LResult, LuaStr, TableRef, Value};
+use luai::env::Env;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -307,7 +307,7 @@ impl Host {
         set(
             "ConPrintf",
             func("ConPrintf", |a| {
-                let msg = lua::env::string_format(a)?;
+                let msg = luai::env::string_format(a)?;
                 let _ = msg;
                 Ok(vec![])
             }),
@@ -352,7 +352,7 @@ impl Host {
                 let Value::Str(text) = text else {
                     return err("bad argument #1 to 'loadstring' (string expected)");
                 };
-                if let Err(e) = lua::parser::parse(text.as_bytes()) {
+                if let Err(e) = luai::parser::parse(text.as_bytes()) {
                     return Ok(vec![
                         Value::Nil,
                         s(&format!("[string]:{}: {}", e.line, e.msg)),

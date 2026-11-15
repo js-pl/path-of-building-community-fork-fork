@@ -245,7 +245,7 @@ pub fn constructor_plan(fields: &[Field]) -> ConstructorPlan {
             }
         };
         if let Some(step) = step {
-            template.get_or_insert((if needarr { narr } else { 0 }, crate::ljtab::hbits(nhash)));
+            template.get_or_insert((if needarr { narr } else { 0 }, lua::ljtab::hbits(nhash)));
             steps.push(step);
         }
     }
@@ -256,8 +256,8 @@ pub fn constructor_plan(fields: &[Field]) -> ConstructorPlan {
             }
             sizes
         }
-        None if needarr => (narr.clamp(3, 0x7ff), crate::ljtab::hbits(nhash)),
-        None => (0, crate::ljtab::hbits(nhash)),
+        None if needarr => (narr.clamp(3, 0x7ff), lua::ljtab::hbits(nhash)),
+        None => (0, lua::ljtab::hbits(nhash)),
     };
     let templated: Vec<bool> = {
         let mut t = vec![false; fields.len()];

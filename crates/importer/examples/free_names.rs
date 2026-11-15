@@ -1,6 +1,6 @@
 //! Lists top-level locals of a Lua file and the names their initialisers
 //! reference outside nested functions.
-use lua::ast::*;
+use luai::ast::*;
 use std::collections::BTreeSet;
 
 fn walk(e: &Expr, out: &mut BTreeSet<String>) {
@@ -39,7 +39,7 @@ fn walk(e: &Expr, out: &mut BTreeSet<String>) {
 fn main() {
     let path = std::env::args().nth(1).unwrap();
     let src = std::fs::read(&path).unwrap();
-    let block = lua::parser::parse(&src).unwrap();
+    let block = luai::parser::parse(&src).unwrap();
     for (s, line) in block.stats.iter().zip(&block.lines) {
         let (kind, names, exprs): (&str, Vec<String>, Vec<&Expr>) = match s {
             Stat::Local { names, values } => ("local", names.clone(), values.iter().collect()),

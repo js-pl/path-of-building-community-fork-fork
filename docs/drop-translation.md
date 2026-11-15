@@ -18,9 +18,10 @@ and how the tests keep a reference without them.
 | `crates/cli` | `upstream`, `lua::gc` | the native CLI (`pob serve --typed`, `--translated`, `bundle --lua`, `bench`) |
 | `crates/equivalence` | `upstream`; `bridge.rs` converts the translated program's stores into typed ones | tests only |
 | `crates/importer::luagen` | the translator (1.9k lines), run by `crates/upstream/build.rs` | build only |
-| `crates/lua` | interpreter (parser, `env`, `rt`, `gc`, 6.4k lines) **and** library pieces: Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | the library pieces are in the typed engine and ship |
+| `crates/lua` | the library pieces: values and tables (`value`, with the `gc` cycle collector), table operations (`rt`), Lua patterns (`pattern`), `tostring`/`%g` formatting (`format`, `value::format_number`), LuaJIT's `pairs` order (`ljtab`) | in the typed engine and shipped |
+| `crates/luai` | the interpreter's parts: lexer, parser, syntax tree, standard library environment (`env`) | not in the shipped engine (CI checks `wasm`'s dependencies); the engine's `translation` feature (`install`, `mod_store`) and the importer use it |
 | `crates/importer`, `crates/gamedata` | the interpreter, to evaluate upstream's data files and `ModParser.lua` at build time | build only |
-| `crates/engine` | the library pieces everywhere; `engine::install`, `mod_store.rs`, `mods/convert.rs` and a `tree.rs` helper still touch `lua::env`/`lua::rt` (the replacements installed into the running translation, and conversions) | the library pieces |
+| `crates/engine` | the library pieces everywhere; with the `translation` feature, `engine::install` and `mod_store.rs` (the replacements installed into the running translation) use `luai::env` | the library pieces |
 
 The typed session no longer falls back for anything the session and
 equivalence tests exercise (`KNOWN_FALLBACKS` holds only cases where upstream
@@ -151,8 +152,8 @@ and commits or uploads the transcripts; nothing has to translate.
    variants and session sequences cover them; keep the oracle dumps for whole
    builds, the mod parser and data as they are.
 4. **Last: delete** `crates/upstream`, `luagen`, `lua/session.lua`,
-   `translated.rs`, `bridge.rs`, `engine::install`, `lua::gc`, and split
-   `crates/lua` into the library pieces the engine ships and the interpreter
+   `translated.rs`, `bridge.rs`, `engine::install`, `lua::gc`; `crates/lua`
+   is already split into the library pieces the engine ships and the interpreter
    the importer keeps.
 
 Why this order: step 1 has the user-facing benefit (a 2 MB engine, no
