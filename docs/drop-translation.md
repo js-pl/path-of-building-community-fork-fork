@@ -48,7 +48,7 @@ makes cyclic environments).
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
 | `equivalence/tests/{power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `session/tests/typed.rs` (15 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -257,6 +257,14 @@ of them, so each difference is one between the translation and LuaJIT):
     disable each other, and `calcs.initEnv` breaks the cycle from the slot
     `pairs(itemDisablers)` gives first; against the oracle the weapon
     slots' comparisons of such tooltips are left out;
+  - Destructive Aspiration's "Minion Attack and Cast Speed" nodes
+    (timeless-DestructiveAspiration-1-gen-0001 and others, 2% or 3% on
+    both lines): explained, upstream's `pairs` order. Both stat lines of
+    that legion passive carry the range `(2-3)`, and
+    `BuildAllDependsAndPaths` fills each line with the roll of whichever
+    stat `pairs(changedNode.stats)` visits first, so both lines get the
+    attack or the cast speed roll depending on the string hash; against
+    the oracle the value of such a node's two equal lines is left out;
   - an item popup's mod list hovered on an entry tied with its neighbour
     on the sort key (gen-0055, Global Accuracy Rating (15-17)% against
     (18-20)% in the nightly): explained, upstream's `pairs` order. Tied
