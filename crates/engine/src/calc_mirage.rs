@@ -63,6 +63,19 @@ pub struct MirageCalc {
     pub gem: Option<GemSums>,
     /// The flags the copy's mod list sets, as the calculation left it
     pub mod_flags: std::collections::BTreeSet<String>,
+    /// The calculation the copy stands in (`newEnv`)
+    pub env: Box<CopyEnv>,
+}
+
+/// The calculation a mirage's copy was made in (`newEnv`): its stores and
+/// actors, which the copy's mod list (`skillModList`) is queried on
+#[derive(Clone, Debug)]
+pub struct CopyEnv {
+    pub stores: crate::mods::Stores,
+    pub actors: Vec<crate::actor::Actor>,
+    pub store_actor: std::collections::HashMap<crate::mods::StoreId, usize>,
+    /// The copy's mod list
+    pub list: crate::mods::StoreId,
 }
 
 /// A main skill's gem level and quality, and the sums of its mod list
@@ -353,9 +366,11 @@ impl<'a> Perform<'a> {
                 mut copy,
                 gem,
                 mod_flags,
+                env,
             } = recalc()?.mirage(ext, &self.input.limited)?;
             self.main_copy_gem = gem;
             self.main_copy_mod_flags = mod_flags;
+            self.main_copy_env = Some(env);
             // The player's output and main skill are the warriors'
             self.c.actors.actors[PLAYER].output = output;
             let n = crate::pat::num(warriors);
@@ -418,9 +433,11 @@ impl<'a> Perform<'a> {
                 mut copy,
                 gem,
                 mod_flags,
+                env,
             } = recalc()?.mirage(ext, &self.input.limited)?;
             self.main_copy_gem = gem;
             self.main_copy_mod_flags = mod_flags;
+            self.main_copy_env = Some(env);
             self.c.actors.actors[PLAYER].output = output;
             copy.info_message = Some(format!(
                 "Tawhoa's Chosen using {}",

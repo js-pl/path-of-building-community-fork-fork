@@ -240,6 +240,10 @@ fn typed_data_matches_upstream() {
     let start = t.elapsed();
     let t = Instant::now();
     let ldata = host.global("data");
+    // The flags as after every skill's first calculation, as the typed
+    // data has them; the copied stat maps stay out
+    host.look_up_skill_stats(false)
+        .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())));
     let items = ItemData::from_lua(&ldata, &host.global("colorCodes"))
         .unwrap_or_else(|e| panic!("item data: {e}"));
     let skills = SkillData::from_lua(

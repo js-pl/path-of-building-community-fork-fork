@@ -192,7 +192,7 @@ impl<'a> Ctx<'a> {
     }
 
     /// The store and cfg an entry's mods are queried with
-    fn store_cfg(&self, e: &J) -> Result<(engine::mods::StoreId, Cfg)> {
+    fn store_cfg(&self, e: &J) -> Result<(engine::mods::Query<'_>, engine::mods::StoreId, Cfg)> {
         let skill = &self.actor.skill;
         let cfg_name = str_of(e, "cfg");
         let cfg = cfg_name
@@ -205,14 +205,17 @@ impl<'a> Ctx<'a> {
         } else {
             None
         };
-        let store = match (store, cfg_name) {
-            (Some(s), _) => s,
-            (None, Some(_)) => skill
-                .list
-                .ok_or_else(|| format!("{NOT_PORTED}: a main skill copied from a mirage"))?,
-            (None, None) => self.r.actor(self.actor.actor).store,
-        };
-        Ok((store, cfg))
+        let missing = || format!("{NOT_PORTED}: a main skill copied from a mirage");
+        Ok(match (store, cfg_name) {
+            (Some(s), _) => (self.r.query(), s, cfg),
+            // `mainSkill.skillModList`: a mirage's copy's in its calculation
+            (None, Some(_)) => (
+                self.r.skill_query(skill).ok_or_else(missing)?,
+                skill.list.ok_or_else(missing)?,
+                cfg,
+            ),
+            (None, None) => (self.r.query(), self.r.actor(self.actor.actor).store, cfg),
+        })
     }
 
     /// The `{p:mod:1,2}` total of a cell, `None` for `?`
@@ -235,7 +238,7 @@ impl<'a> Ctx<'a> {
         let mut total = if more { 1.0 } else { 0.0 };
         for n in nums {
             let Some(e) = entry(n) else { break };
-            let (store, mut cfg) = self.store_cfg(e)?;
+            let (q, store, mut cfg) = self.store_cfg(e)?;
             if str_of(e, "cfg").is_none() {
                 if let Some(s) = str_of(e, "modSource") {
                     cfg.source = Some(s.into());
@@ -247,7 +250,6 @@ impl<'a> Ctx<'a> {
                 return Err(format!("{NOT_PORTED}: a cell's source on a skill's cfg"));
             }
             let names: Vec<Sym> = names_of(e, "modName").iter().map(|n| Sym::new(n)).collect();
-            let q = self.r.query();
             let t = str_of(e, "modType").ok_or("attempt to call Sum without a mod type")?;
             let v = match t {
                 "MORE" => q.more(store, Some(&cfg), &names)?,
@@ -535,6 +537,19 @@ impl TypedSession<'_> {
 
     /// `calcs`: the tab's sections with the cells shown, formatted
     pub fn calcs(&mut self) -> Result<J> {
+        self.calcs_output()?;
+        // The skill selection section's `updateFunc`, whether or not the
+        // cells after it are ported
+        let mut c = std::mem::take(&mut self.calcs_select);
+        let view = self.calcs.as_ref().and_then(|o| o.view.as_ref());
+        let res = match view {
+            Some(v) => {
+                self.refresh_skill_select(&mut c, self.build.calcs.skill_number, &v.skills, true)
+            }
+            None => Ok(()),
+        };
+        self.calcs_select = c;
+        res?;
         let show_minion = self.build.calcs.show_minion;
         let mut rows_enabled = Vec::new();
         let r = self.with_calcs(|ctx, _, _| {
@@ -625,18 +640,8 @@ impl TypedSession<'_> {
             }
             Ok(json!({ "sections": shown, "showMinion": show_minion }))
         })?;
-        // The skill selection section's `updateFunc`
         self.calcs_rows = rows_enabled;
-        let mut c = std::mem::take(&mut self.calcs_select);
-        let view = self.calcs.as_ref().and_then(|o| o.view.as_ref());
-        let res = match view {
-            Some(v) => {
-                self.refresh_skill_select(&mut c, self.build.calcs.skill_number, &v.skills, true)
-            }
-            None => Ok(()),
-        };
-        self.calcs_select = c;
-        res.map(|_| r)
+        Ok(r)
     }
 
     /// The Calcs tab's controls (`calcs.<name>`) as the translated
@@ -918,13 +923,11 @@ impl TypedSession<'_> {
         let mut rows = match given {
             Some(r) => r,
             None => {
-                let (store, mut cfg) = ctx.store_cfg(e)?;
+                let (q, store, mut cfg) = ctx.store_cfg(e)?;
                 cfg.source = str_of(e, "modSource").map(Into::into);
                 cfg.actor = str_of(e, "actor").map(Sym::new);
                 let syms: Vec<Sym> = names.iter().map(|n| Sym::new(n)).collect();
-                ctx.r
-                    .query()
-                    .tabulate(store, mod_type.map(ModType::new), Some(&cfg), &syms)?
+                q.tabulate(store, mod_type.map(ModType::new), Some(&cfg), &syms)?
                     .into_iter()
                     .map(|r| ModRow {
                         m: r.m.clone(),

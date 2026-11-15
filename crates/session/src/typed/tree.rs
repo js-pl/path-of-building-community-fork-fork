@@ -60,7 +60,7 @@ impl<'d> TypedSession<'d> {
         self.calcs = None;
         self.ui.output_revision += 1.0;
         self.ui.unsaved = true;
-        self.update_display_labels(false);
+        self.update_display_labels();
         let level_changed = self.estimate_progress()?;
         self.refresh_controls()?;
         if level_changed {

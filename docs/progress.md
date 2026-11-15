@@ -275,14 +275,23 @@ What remains for the full migration, in order:
    sidebar (`build.mainSocketGroup`, `mainSkill`, `mainSkillPart`, stage
    and mine counts, minion and minion skill) and of the Calcs tab
    (`calcs.*`, with `mode` and `showMinion`). `displayLabel` is kept on
-   the socket groups as upstream sets it (every group after loading, then
-   the groups the sidebar's calculation uses). Ported on the way:
+   the socket groups as upstream sets it (every group on each sidebar
+   calculation; `displaySkillList` only on the groups it uses). A
+   drop-down's `SetSel` selects before its handler runs, so a hidden
+   `mainSkillPart` keeps the selection, and one whose handler fails on an
+   empty main group (`displaySkillList[mainActiveSkill]` is nil) keeps it
+   with upstream's error. Ported on the way:
    `ProcessSocketGroup` clearing the cost of a triggered granted skill's
    level on the shared skill data, and `next(levels)` in
    `validateGemLevel` in the data's order (`GrantedEffect::first_level`).
-   `skills_edits_match`: random edit sequences (6 per build) give the
+   `skills_edits_match`: random edit sequences (15 per build, as the
+   nightly run; `SESSION_STEPS` sets another count) give the
    translation's `skills`, `state`, `outputs`, `calcs` and controls after
-   each step (358 edits: typed 4.8 s, translated 52 s with its replays).
+   each step, and an edit upstream refuses gives its error. The Calcs
+   tab's skill controls are refreshed before its cells, and a mirage's
+   copy as the Calcs tab's main skill (Reflection) brings the calculation
+   it was made in (`CopyEnv`, upstream's `newEnv`), which the cells on its
+   `skillModList` are queried on.
    After the sequence every group goes into Full DPS, one at a time.
    `calcFullDPS` sets up on `specEnv`'s cached databases, which become
    the parents of its environment's own (`Store::base`): `More` rounds
@@ -828,9 +837,12 @@ What remains for the full migration, in order:
      of Rage) is active in the first `initEnv` and gone from the next;
      triggered by General's Cry it is the main skill, and `calcs.mirages`
      does not find it again (`UPSTREAM_GEM_LIST_FAILS` in
-     `skills_gem_select_match`). The typed engine keeps the flags as the
-     data loads them, as a skill's first calculation upstream sees them,
-     and does not fail. The list also shows its group and the
+     `skills_gem_select_match`). The typed engine sets the flag from the
+     shared stat maps at load (`engine::data`), as every calculation
+     after a skill's first one upstream sees it, the intended behaviour
+     (the gem's disabled effect stays off); only a fresh process's first
+     calculation of such a skill differs
+     (`vaal_global_effect_matches_after_the_first_calculation`). The list also shows its group and the
      shown one again (`SetDisplayGroup`), and gives the slot's name box a
      sort cache by DPS.
      Choosing a gem by name in a gem slot (`GemSelectControl`'s text,
@@ -1215,6 +1227,19 @@ instantiate per worker, so it dominates regardless of the link.
 The typed port keeps upstream's results but not its shared mutable state;
 the tests align these:
 
+- `hasGlobalEffect` is set when a calculation first looks a skill's stat
+  up in `data.skillStatMap` (`skillStatMapMeta`, `processMod`), so it
+  depends on what the process calculated before: a fresh process's first
+  calculation of a Vaal transfigured gem with its second effect disabled
+  still has the second skill, and the gem select's DPS sort skips General's
+  Cry, Intimidating Cry, Chain Hook, Cleave of Rage, Rage and Blind
+  (`canSupport or hasGlobalEffect`) unless they were calculated before.
+  The typed engine has the flags as after every skill's first calculation
+  (`engine::data`); `typed_session_matches_translated` primes the
+  translation (`Host::look_up_skill_stats`), `game_data` compares with
+  upstream after the lookups, and
+  `vaal_global_effect_matches_after_the_first_calculation` shows the fresh
+  process's difference.
 - `modLib.setSource` in `mergeKeystones` rewrites the tree's shared keystone
   mods, so their source depends on earlier calculations
 - `grantedEffect.fromItem = true` marks a support on the shared skill data
@@ -1233,7 +1258,10 @@ the tests align these:
 - `calcFullDPS` reuses its first setup for each skill (`accelerate`); the
   typed one sets each skill up afresh, with equal results on the corpus
 - a weapon pass's cfg sees the pass's output live as `skillStats`: take
-  the cfg again (`pcfg`) after setting outputs a later query reads
+  the cfg again (`pcfg`) after setting outputs a later query reads; the
+  Calcs tab's cells and breakdowns read `weapon1Cfg`/`weapon2Cfg` after
+  the calculation, with `output.MainHand`/`OffHand` as `skillStats`
+  (Undeniable's attack speed per 150 Accuracy)
 - the Calcs tab's `SkillDPS` keeps `calcFullDPS`'s order: only the
   sidebar's table is sorted
 - `pairs` over number-keyed tables (allocated nodes, the spec's nodes,

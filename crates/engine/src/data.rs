@@ -129,6 +129,52 @@ impl Data {
                     }
                 }
             }
+            self.global_stat_effects(&granted_effect, &stat_map);
+        }
+    }
+
+    /// `hasGlobalEffect` from the shared stat maps: upstream's
+    /// `skillStatMapMeta` copies a `data.skillStatMap` entry into the
+    /// skill's `statMap` when a calculation first looks the stat up, and
+    /// `processMod` sets the flag then. The skill's stats (its stats,
+    /// constant and quality stats, which `buildSkillInstanceStats` gives)
+    /// are all looked up by its first calculation, so the flag is the one
+    /// every later calculation sees; a skill's very first calculation in a
+    /// process still sees it unset (an upstream quirk).
+    fn global_stat_effects(&self, granted_effect: &Value, stat_map: &Value) {
+        let shared = self.get("skillStatMap");
+        let list = |v: Value| if v.is_nil() { Vec::new() } else { ipairs(&v) };
+        let mut names = Vec::new();
+        for (_, n) in list(field(granted_effect, "stats")) {
+            names.push(n);
+        }
+        for key in ["constantStats", "qualityStats"] {
+            for (_, e) in list(field(granted_effect, key)) {
+                names.push(index(&e, &Value::Number(1.0)));
+            }
+        }
+        let global = |m: &Value| {
+            ipairs(m)
+                .into_iter()
+                .any(|(_, tag)| field(&tag, "type").raw_eq(&s("GlobalEffect")))
+        };
+        for name in names {
+            // The skill's own entry hides the shared one
+            if !index(stat_map, &name).is_nil() {
+                continue;
+            }
+            let map = index(&shared, &name);
+            for (_, mod_or_group) in list(map) {
+                let hit = if field(&mod_or_group, "name").truthy() {
+                    global(&mod_or_group)
+                } else {
+                    ipairs(&mod_or_group).into_iter().any(|(_, m)| global(&m))
+                };
+                if hit {
+                    set_index(granted_effect, s("hasGlobalEffect"), Value::Bool(true));
+                    return;
+                }
+            }
         }
     }
 

@@ -63,6 +63,50 @@ impl Host {
         self.env.global(name)
     }
 
+    /// Looks every skill's stats up in its `statMap`, as a calculation of
+    /// the skill does (`calcs.mergeSkillInstanceMods`): `skillStatMapMeta`
+    /// copies the shared stat maps then, and `processMod` sets
+    /// `hasGlobalEffect`. Upstream has these only for the skills calculated
+    /// so far in the process; the typed engine has them from the load, as
+    /// after every skill's first calculation. Without `keep_copies` the
+    /// copied entries are removed again, leaving only the flags.
+    pub fn look_up_skill_stats(&self, keep_copies: bool) -> LResult<()> {
+        let get = |v: &Value, k: &str| rt::index(v, &s(k));
+        let skills = get(&self.global("data"), "skills")?;
+        let Some(skills) = skills.as_table() else {
+            return Ok(());
+        };
+        for (_, ge) in skills.entries() {
+            let stat_map = get(&ge, "statMap")?;
+            let Some(own) = stat_map.as_table().cloned() else {
+                continue;
+            };
+            let mut names = Vec::new();
+            if let Some(t) = get(&ge, "stats")?.as_table() {
+                names.extend(t.array());
+            }
+            for key in ["constantStats", "qualityStats"] {
+                if let Some(t) = get(&ge, key)?.as_table() {
+                    names.extend(
+                        t.array()
+                            .iter()
+                            .filter_map(|e| e.as_table().map(|e| e.get_int(1))),
+                    );
+                }
+            }
+            for name in names {
+                if !own.get(&name).is_nil() {
+                    continue;
+                }
+                rt::index(&stat_map, &name)?;
+                if !keep_copies {
+                    own.set(name, Value::Nil);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// `runCallback(name, ...)`
     pub fn run_callback(&self, name: &str, args: &[Value]) -> LResult<Vec<Value>> {
         let f = rt::call(&self.global("runCallback"), &{

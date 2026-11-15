@@ -78,9 +78,9 @@ impl TypedSession<'_> {
         self.rebuild()
     }
 
-    /// The sidebar's calculation sets `displayLabel` on the groups it
-    /// uses; after loading, every group has one in upstream (`all`)
-    pub(super) fn update_display_labels(&mut self, all: bool) {
+    /// The sidebar's calculation sets `displayLabel` on every group, and
+    /// `displaySkillList` on the groups it uses
+    pub(super) fn update_display_labels(&mut self) {
         let Some(sb) = self.main.sidebar.as_ref() else {
             return;
         };
@@ -102,9 +102,7 @@ impl TypedSession<'_> {
         let calcs_group = n as usize;
         for (gi, g) in list.iter_mut().enumerate() {
             let listed = gi + 1 == main || (g.enabled && used.get(gi).copied().unwrap_or(false));
-            if all || listed {
-                g.display_label = Some(display_label(g));
-            }
+            g.display_label = Some(display_label(g));
             g.display_skill_list |= listed;
             // The calculations write back the main group's active skill
             let n = counts.get(gi).copied().unwrap_or(0) as f64;
@@ -477,6 +475,7 @@ impl TypedSession<'_> {
         match (name, sel, text) {
             ("mainSocketGroup", Some(_), _) => {
                 if let Some(i) = pick(&c.socket_group) {
+                    self.skill_select_mut(which).socket_group.sel = i;
                     match which {
                         Select::Sidebar => self.build.info.main_socket_group = i,
                         Select::Calcs => self.build.calcs.skill_number = i,
@@ -486,6 +485,7 @@ impl TypedSession<'_> {
             }
             ("mainSkill", Some(_), _) => {
                 if let Some(i) = pick(&c.skill) {
+                    self.skill_select_mut(which).skill.sel = i;
                     let g = self.selected_group(calcs)?;
                     let g = self.group_mut(g)?;
                     if calcs {
@@ -504,6 +504,13 @@ impl TypedSession<'_> {
                 };
                 if let Some(i) = pick(d) {
                     let entry = c.minion_entry(i as usize - 1);
+                    // `SetSel` selects before its handler runs (and fails)
+                    let k = self.skill_select_mut(which);
+                    match name {
+                        "mainSkillPart" => k.part.sel = i,
+                        "mainSkillMinion" => k.minion.sel = i,
+                        _ => k.minion_skill.sel = i,
+                    }
                     let gem = self.selected_gem(calcs)?;
                     match name {
                         "mainSkillPart" => set(
@@ -547,6 +554,12 @@ impl TypedSession<'_> {
             }
             ("mainSkillStageCount" | "mainSkillMineCount", _, Some(t)) => {
                 let n = engine::pat::to_number(t);
+                let k = self.skill_select_mut(which);
+                if name == "mainSkillStageCount" {
+                    k.stage.text = t.into();
+                } else {
+                    k.mine.text = t.into();
+                }
                 let gem = self.selected_gem(calcs)?;
                 if name == "mainSkillStageCount" {
                     set(
@@ -580,6 +593,14 @@ impl TypedSession<'_> {
             _ => return Err(format!("{}: control {path}", super::NOT_PORTED)),
         }
         Ok(json!([]))
+    }
+
+    /// The sidebar's or the Calcs tab's skill selection controls
+    fn skill_select_mut(&mut self, which: Select) -> &mut super::sidebar::SkillSelect {
+        match which {
+            Select::Sidebar => &mut self.controls.skill_select,
+            Select::Calcs => &mut self.calcs_select,
+        }
     }
 
     /// The socket group the selection shows, by index from 1
@@ -619,7 +640,8 @@ impl TypedSession<'_> {
             .get(gi as usize - 1)
             .and_then(|l| l.get((active as usize).wrapping_sub(1)))
             .and_then(|d| d.src)
-            .ok_or("attempt to index a nil value (srcInstance)")?;
+            // `displaySkillList[mainActiveSkill]` is nil: an empty group
+            .ok_or_else(|| format!("{}attempt to index a nil value", super::UPSTREAM_ERROR))?;
         let list = self
             .skills_tab()?
             .socket_group_list_mut()
