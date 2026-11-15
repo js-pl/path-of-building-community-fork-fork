@@ -78,25 +78,46 @@ pub struct BuildOutput {
 #[derive(Clone, Debug)]
 pub struct ViewSkill {
     pub flags: BTreeSet<String>,
-    /// `skillModList`, unless the skill is a copy from another calculation
+    /// `skillModList`, in [`CalcsView::copy`]'s stores when the skill is a
+    /// mirage's copy from another calculation
     pub list: Option<StoreId>,
+    /// Whether the skill is a mirage's copy
+    pub copied: bool,
     /// `skillCfg`, `weapon1Cfg`, `weapon2Cfg` and the offence's other cfgs,
     /// by name without `Cfg`
     pub cfgs: Vec<(String, Cfg)>,
 }
 
 impl ViewSkill {
-    fn of(m: &crate::calc_skill_mods::SkillMods, list: Option<StoreId>) -> ViewSkill {
+    /// The skill's cfgs; an attack's weapon cfgs see their hand's output
+    /// as `skillStats` (`weapon1Cfg.skillStats = output.MainHand`)
+    fn of(
+        m: &crate::calc_skill_mods::SkillMods,
+        list: Option<StoreId>,
+        output: Option<&crate::actor::Actor>,
+    ) -> ViewSkill {
         let mut cfgs = vec![("skill".to_string(), m.skill_cfg.clone())];
         for (n, c) in m.weapon_cfgs.iter().enumerate() {
             if let Some(c) = c {
-                cfgs.push((format!("weapon{}", n + 1), c.clone()));
+                let mut c = c.clone();
+                let hand = ["MainHand", "OffHand"][n];
+                if let Some(crate::actor::OutVal::Table(t)) =
+                    output.and_then(|a| a.output.get(&crate::mods::Sym::new(hand)))
+                {
+                    c.skill_stats = Some(
+                        t.iter()
+                            .filter_map(|(k, v)| v.num().map(|v| (crate::mods::Sym::new(k), v)))
+                            .collect(),
+                    );
+                }
+                cfgs.push((format!("weapon{}", n + 1), c));
             }
         }
         cfgs.extend(m.named_cfgs.iter().cloned());
         ViewSkill {
             flags: m.skill_flags.clone(),
             list,
+            copied: false,
             cfgs,
         }
     }
@@ -126,12 +147,16 @@ pub struct CalcsView {
     pub minion: Option<ViewActor>,
     /// The socket groups' active skills, as the sidebar's
     pub skills: crate::sidebar::Sidebar,
+    /// The calculation the player's main skill was copied from by a mirage
+    pub copy: Option<Box<crate::calc_mirage::CopyEnv>>,
 }
 
 /// [`CalcsView`] with the build its queries read
 pub struct CalcsRef<'a> {
     pub view: &'a CalcsView,
     pub env: &'a crate::actor::EnvActors<'a>,
+    /// [`CalcsView::copy`]'s actors
+    pub copy_env: Option<&'a crate::actor::EnvActors<'a>>,
 }
 
 impl CalcsRef<'_> {
@@ -145,6 +170,18 @@ impl CalcsRef<'_> {
     pub fn actor(&self, i: usize) -> &crate::actor::Actor {
         &self.env.actors[i]
     }
+
+    /// The queries of a skill's mod list: on the calculation a mirage's
+    /// copy comes from, for the copy
+    pub fn skill_query(&self, skill: &ViewSkill) -> Option<crate::mods::Query<'_>> {
+        if !skill.copied {
+            return Some(self.query());
+        }
+        Some(crate::mods::Query {
+            stores: &self.view.copy.as_ref()?.stores,
+            actors: self.copy_env?,
+        })
+    }
 }
 
 impl CalcsView {
@@ -152,20 +189,35 @@ impl CalcsView {
         let main = p.main();
         let player = ViewActor {
             actor: PLAYER,
-            skill: match &p.main_copy {
-                Some(m) => ViewSkill::of(m, None),
-                None => ViewSkill::of(p.mods(main), Some(p.lists[main].list)),
+            skill: match (&p.main_copy, &p.main_copy_env) {
+                (Some(m), Some(e)) => ViewSkill {
+                    copied: true,
+                    ..ViewSkill::of(m, Some(e.list), Some(&e.actors[PLAYER]))
+                },
+                (Some(m), None) => ViewSkill::of(m, None, None),
+                _ => ViewSkill::of(
+                    p.mods(main),
+                    Some(p.lists[main].list),
+                    Some(&p.c.actors.actors[PLAYER]),
+                ),
             },
         };
         let minion = p.env_minion.map(|m| {
             let k = p.minions[m].main_skill;
+            let actor = p.minions[m].actor;
             ViewActor {
-                actor: p.minions[m].actor,
-                skill: ViewSkill::of(p.mods(k), Some(p.lists[k].list)),
+                actor,
+                skill: ViewSkill::of(
+                    p.mods(k),
+                    Some(p.lists[k].list),
+                    Some(&p.c.actors.actors[actor]),
+                ),
             }
         });
         let skills = crate::sidebar::collect(p)?;
+        let copy = p.main_copy_env.take();
         Ok(CalcsView {
+            copy,
             stores: std::mem::take(&mut p.c.stores),
             actors: std::mem::take(&mut p.c.actors.actors),
             store_actor: std::mem::take(&mut p.c.actors.store_actor),
@@ -189,12 +241,24 @@ impl CalcsView {
             item_data: data.items,
             skill_data: data.skills,
         };
+        let copy_env = self.copy.as_mut().map(|c| crate::actor::EnvActors {
+            actors: std::mem::take(&mut c.actors),
+            store_actor: std::mem::take(&mut c.store_actor),
+            tab,
+            item_data: data.items,
+            skill_data: data.skills,
+        });
         let r = f(&CalcsRef {
             view: self,
             env: &env,
+            copy_env: copy_env.as_ref(),
         });
         self.actors = env.actors;
         self.store_actor = env.store_actor;
+        if let (Some(c), Some(e)) = (self.copy.as_mut(), copy_env) {
+            c.actors = e.actors;
+            c.store_actor = e.store_actor;
+        }
         r
     }
 }

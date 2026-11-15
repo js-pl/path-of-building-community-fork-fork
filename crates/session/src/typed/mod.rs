@@ -417,7 +417,7 @@ impl<'d> TypedSession<'d> {
         for id in &s.build.items.item_order_list {
             s.item_keys.insert(*id as u32, ());
         }
-        s.update_display_labels(true);
+        s.update_display_labels();
         s.estimate_progress()?;
         s.refresh_controls()?;
         // `buildMode:Init`'s last `SyncLoadouts()`

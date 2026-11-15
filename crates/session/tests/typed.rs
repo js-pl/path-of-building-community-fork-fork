@@ -1,5 +1,5 @@
 //! The typed engine's commands give the translated session's JSON, for
-//! every corpus build. `SESSION_FILTER=<substring>` limits the builds.
+//! every corpus build. `SESSION_FILTER=<substring>[,<substring>…]` limits the builds.
 
 use serde_json::{Value as J, json};
 use session::typed::{TypedData, TypedSession};
@@ -43,7 +43,9 @@ fn corpus() -> Vec<(String, PathBuf)> {
         ));
     }
     let filter = std::env::var("SESSION_FILTER").unwrap_or_default();
-    out.retain(|(id, p)| p.extension().is_some_and(|e| e == "xml") && id.contains(&filter));
+    out.retain(|(id, p)| {
+        p.extension().is_some_and(|e| e == "xml") && filter.split(',').any(|f| id.contains(f))
+    });
     out
 }
 
@@ -4273,10 +4275,11 @@ fn tree_edits_match(d: &mut Dispatcher) {
 fn skills_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
+    // 15 steps, as the nightly run: about a minute more on each shard
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(6);
+        .unwrap_or(15);
     let gems = answer(d.translated_request(r#"{"cmd":"gemList"}"#), "gemList");
     let gem_names: Vec<String> = gems["ok"]
         .as_array()
@@ -4389,7 +4392,13 @@ fn skills_edits_match(d: &mut Dispatcher) {
             let t = Instant::now();
             let tr = answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
-            let _ = (typed, tr);
+            let _ = tr;
+            // An edit upstream refuses: the translation answers the same,
+            // without changing its build
+            if typed.get("error").is_some() {
+                let tr = answer(d.translated_request(&r), "translated edit");
+                diff(&typed, &tr, &format!("{label} {r}"), &mut out);
+            }
             for f in ["skills", "state", "outputs", "calcs"] {
                 compare(d, &json!({"cmd": f}), &format!("{label} {r}"), &mut out);
             }

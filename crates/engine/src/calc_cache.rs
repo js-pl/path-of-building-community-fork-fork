@@ -375,11 +375,18 @@ impl Recalc for Recalculator<'_, '_> {
                 output.insert(Sym::new(k), OutVal::Num(v));
             }
         }
+        let env = Box::new(crate::calc_mirage::CopyEnv {
+            list: p.lists[p.main()].list,
+            stores: std::mem::take(&mut p.c.stores),
+            actors: std::mem::take(&mut p.c.actors.actors),
+            store_actor: std::mem::take(&mut p.c.actors.store_actor),
+        });
         Ok(crate::calc_mirage::MirageCalc {
             output,
             copy,
             gem,
             mod_flags,
+            env,
         })
     }
 }
