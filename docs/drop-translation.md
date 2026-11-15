@@ -284,7 +284,11 @@ of them, so each difference is one between the translation and LuaJIT):
     Weapon 2 before Weapon 1 has dropped the item, `IsItemValidForSlot`
     indexes `weaponTypeInfo` with its type and fails, leaving the build
     broken (about half of the oracle runs). Against the oracle the rest
-    of such a build is skipped;
+    of such a build is skipped, only for that failure (the oracle's
+    `oracleLastError` request gives it with its source position:
+    `Classes/ItemsTab.lua`, "attempt to index a nil value") and at most
+    three builds per items shard (`WEAPON_SLOT_SKIPS`), so that a broader
+    regression cannot pass for it;
   - node power `offence` `null` against 0 for builds without damage: a
     real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
     NaN)` is NaN (it keeps the left operand only when strictly greater,
