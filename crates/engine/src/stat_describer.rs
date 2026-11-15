@@ -231,38 +231,109 @@ impl StatDescriptions {
         let Some(desc) = desc else {
             return Ok(vec![]);
         };
-        for (k, v) in &desc.specials {
-            apply_special(&mut val, k, *v)?;
-        }
-        let fmt = |v: &(f64, f64, &str), flag: &str| -> String {
-            let one = |x: f64| lua_format(&format!("%{flag}{}", v.2), &[Arg::Num(x)]);
-            if v.0 == v.1 {
-                one(v.0)
-            } else {
-                format!("({}-{})", one(v.0), one(v.1))
+        render(desc, &mut val)
+    }
+
+    /// `describeStats(stats, scope)`: the lines of several stats, each
+    /// description once (by its first stat), by scope depth and order
+    pub fn describe_stats(
+        &self,
+        stats: &[(String, f64)],
+        scope: &str,
+    ) -> Result<Vec<String>, String> {
+        let chain = self.chain(scope);
+        // `describeStats[descriptor.stats[1]]`: depth (1 nearest), order
+        let mut found: Vec<(String, usize, u64, &Descriptor)> = Vec::new();
+        for (s, v) in stats {
+            if *v == 0.0 {
+                continue;
             }
-        };
-        let at = |n: &str| -> Option<&(f64, f64, &str)> { val.get(n.parse::<usize>().ok()?) };
-        let mut text = pat::gsub_fn(&desc.text, "{(%d)}", |c| at(&c[0]).map(|v| fmt(v, "")));
-        text = pat::gsub_fn(&text, "{}", |_| val.first().map(|v| fmt(v, "")));
-        text = pat::gsub_fn(&text, "{:%+?d}", |_| val.first().map(|v| fmt(v, "")));
-        text = pat::gsub_fn(&text, "{(%d):(%+?)d}", |c| {
-            let v = at(&c[0])?;
-            let (min, max) = (&v.0, &v.1);
-            if min == max || c[1] != "+" {
-                Some(fmt(v, &c[1]))
-            } else if *max < 0.0 {
-                Some(lua_format("-(%d-%d)", &[Arg::Num(-min), Arg::Num(-max)]))
+            for (k, sc) in chain.iter().enumerate() {
+                if let Some(&order) = sc.order.get(s) {
+                    if let Some(d) = sc.descriptors.get(&order)
+                        && d.lang.as_ref().is_some_and(|l| !l.is_empty())
+                    {
+                        let first = d.stats.first().cloned().unwrap_or_default();
+                        let e = (first.clone(), k + 1, order, d);
+                        match found.iter_mut().find(|f| f.0 == first) {
+                            Some(f) => *f = e,
+                            None => found.push(e),
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        found.sort_by(|a, b| {
+            if a.1 != b.1 {
+                b.1.cmp(&a.1)
             } else {
-                Some(lua_format("+(%d-%d)", &[Arg::Num(*min), Arg::Num(*max)]))
+                a.2.cmp(&b.2)
             }
         });
-        text = pat::gsub(&text, "%%%%", "%%");
-        Ok(pat::gmatch(&format!("{text}\\n"), "([^\\]+)\\n")
-            .into_iter()
-            .filter_map(|c| c.into_iter().next())
-            .collect())
+        let mut out = Vec::new();
+        for (_, _, _, d) in found {
+            let mut val: Vec<(f64, f64, &'static str)> = d
+                .stats
+                .iter()
+                .map(|s| {
+                    let v = stats.iter().find(|(k, _)| k == s).map_or(0.0, |(_, v)| *v);
+                    (v, v, "d")
+                })
+                .collect();
+            let lang = d.lang.as_deref().unwrap_or(&[]);
+            let desc = lang.iter().filter(|e| !e.gem_quality).find(|e| {
+                e.limit.iter().enumerate().all(|(i, (lo, hi))| {
+                    let min = val.get(i).map_or(0.0, |v| v.0);
+                    if lo.not {
+                        return hi.num != Some(min);
+                    }
+                    !(hi.num.is_some_and(|h| min > h) || lo.num.is_some_and(|l| min < l))
+                })
+            });
+            if let Some(desc) = desc {
+                out.extend(render(desc, &mut val)?);
+            }
+        }
+        Ok(out)
     }
+}
+
+/// A description line's text with its values (`applySpecial`, then the
+/// placeholders), split at its line breaks
+fn render(desc: &Desc, val: &mut Vec<(f64, f64, &'static str)>) -> Result<Vec<String>, String> {
+    for (k, v) in &desc.specials {
+        apply_special(val, k, *v)?;
+    }
+    let val = &*val;
+    let fmt = |v: &(f64, f64, &str), flag: &str| -> String {
+        let one = |x: f64| lua_format(&format!("%{flag}{}", v.2), &[Arg::Num(x)]);
+        if v.0 == v.1 {
+            one(v.0)
+        } else {
+            format!("({}-{})", one(v.0), one(v.1))
+        }
+    };
+    let at = |n: &str| -> Option<&(f64, f64, &str)> { val.get(n.parse::<usize>().ok()?) };
+    let mut text = pat::gsub_fn(&desc.text, "{(%d)}", |c| at(&c[0]).map(|v| fmt(v, "")));
+    text = pat::gsub_fn(&text, "{}", |_| val.first().map(|v| fmt(v, "")));
+    text = pat::gsub_fn(&text, "{:%+?d}", |_| val.first().map(|v| fmt(v, "")));
+    text = pat::gsub_fn(&text, "{(%d):(%+?)d}", |c| {
+        let v = at(&c[0])?;
+        let (min, max) = (&v.0, &v.1);
+        if min == max || c[1] != "+" {
+            Some(fmt(v, &c[1]))
+        } else if *max < 0.0 {
+            Some(lua_format("-(%d-%d)", &[Arg::Num(-min), Arg::Num(-max)]))
+        } else {
+            Some(lua_format("+(%d-%d)", &[Arg::Num(*min), Arg::Num(*max)]))
+        }
+    });
+    text = pat::gsub(&text, "%%%%", "%%");
+    Ok(pat::gmatch(&format!("{text}\\n"), "([^\\]+)\\n")
+        .into_iter()
+        .filter_map(|c| c.into_iter().next())
+        .collect())
 }
 
 /// `round(x, n)` of `Modules/Common.lua`
