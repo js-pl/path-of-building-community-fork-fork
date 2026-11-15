@@ -347,6 +347,7 @@ impl Recalc for Recalculator<'_, '_> {
         limited.push(skill_uuid(&copy, &env.groups));
         ext.skill = copy;
         let mut input = PerformInput::new(&build, self.data, false)?;
+        input.keep_cfgs = self.mode == CalcMode::Calcs;
         input.recalc = Some(self);
         input.limited = limited;
         input.external = Some(ext);

@@ -4117,18 +4117,15 @@ fn corpus_xml() -> Vec<(String, String)> {
 }
 
 /// The variant builds about breakdowns (`equivalence::variants`): the
-/// skills whose functions write breakdowns in each of their parts, and the
-/// Calcs tab's inputs the corpus leaves at their defaults. Not yet the
-/// mirages (`mirage_variants`): the typed Calcs tab does not keep the
-/// mirage's calculation, whose stores a main skill copied from it queries
-/// (`calcs` falls back, "a main skill copied from a mirage"); the
-/// engine's breakdowns of them are compared in
-/// `equivalence/tests/breakdown.rs`.
+/// skills whose functions write breakdowns in each of their parts, mirages
+/// of minion skills, and the Calcs tab's inputs the corpus leaves at their
+/// defaults
 fn breakdown_variants() -> Vec<(String, String)> {
     use equivalence::variants;
     let mut data = equivalence::typed_build::TypedData::load();
     let filter = std::env::var("SESSION_FILTER").unwrap_or_default();
     let mut out = variants::breakdown_skill_variants(&mut data);
+    out.extend(variants::mirage_variants(&mut data));
     out.extend(variants::calcs_input_variants(&mut data));
     out.retain(|(id, _)| id.contains(&filter));
     out

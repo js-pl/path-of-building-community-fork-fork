@@ -52,6 +52,10 @@ pub struct PerformInput<'a> {
     /// `env.buildBreakdown`: the sidebar's and the Calcs tab's calculations
     /// build breakdowns
     pub breakdown: bool,
+    /// The skills' named cfgs (`activeSkill.bleedCfg`, ...) are kept also
+    /// without breakdowns: a mirage's copy made for the Calcs tab, whose
+    /// cells query them
+    pub keep_cfgs: bool,
     /// Calculations of other skills and their cache
     pub recalc: Option<&'a dyn crate::calc_cache::Recalc>,
     /// `env.limitedSkills`: the skills whose own calculations are skipped
@@ -522,7 +526,7 @@ impl<'a> Perform<'a> {
 
     /// `activeSkill[name .. "Cfg"] = cfg`, kept where the Calcs tab reads it
     pub(crate) fn keep_cfg(&mut self, i: usize, name: impl Into<String>, cfg: &Cfg) {
-        if !self.input.breakdown {
+        if !self.input.breakdown && !self.input.keep_cfgs {
             return;
         }
         let name = name.into();
@@ -6970,6 +6974,7 @@ impl<'a> PerformInput<'a> {
             class_stats: [stat(0), stat(1), stat(2)],
             tree_version: &tree.version,
             breakdown,
+            keep_cfgs: false,
             recalc: None,
             limited: Vec::new(),
             skip_ehp: false,
