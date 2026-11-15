@@ -293,9 +293,9 @@ pub struct PassiveSpec<'t> {
     /// `clusterHashFormatVersion`: 1 for builds saved with legacy cluster
     /// node ids
     pub cluster_hash_format_version: f64,
-    /// `legacyClusterNodeMap` (in insertion order) and its reverse, while
+    /// `legacyClusterNodeMap` (in LuaJIT's `pairs` order) and its reverse, while
     /// the subgraphs are built
-    pub(crate) legacy_map: Option<Vec<(u32, u32)>>,
+    pub(crate) legacy_map: Option<LjMap<u32>>,
     pub(crate) legacy_reverse: Option<HashMap<u32, u32>>,
 }
 

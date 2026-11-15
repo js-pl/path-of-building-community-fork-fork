@@ -45,7 +45,8 @@ makes cyclic environments).
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
-| `equivalence/tests/{calculator,power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown` and `config` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
+| `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
+| `equivalence/tests/{power,spec}.rs` (`mods`, `calc_setup`, `items_tab`, `skills`, `perform`, `breakdown`, `config` and `compare` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
 | `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
@@ -255,6 +256,12 @@ of them, so each difference is one between the translation and LuaJIT):
     disable each other, and `calcs.initEnv` breaks the cycle from the slot
     `pairs(itemDisablers)` gives first; against the oracle the weapon
     slots' comparisons of such tooltips are left out;
+  - an item popup's mod list hovered on an entry tied with its neighbour
+    on the sort key (gen-0055, Global Accuracy Rating (15-17)% against
+    (18-20)% in the nightly): explained, upstream's `pairs` order. Tied
+    entries keep the order they were gathered in, so one index names
+    either mod; against the oracle such entries are not hovered (the lists
+    themselves compare with ties sorted);
   - a shared item set dragged back into the build: explained, upstream's
     `pairs` order. `ItemSetListControl:ReceiveDrag` adds the set's items in
     `pairs` order of their slot names, so their ids, and with them every
@@ -375,3 +382,10 @@ order over strings changes from run to run.
   (`next(levels)`, pantheon soul mods, flavour texts), is compared with
   the oracle's order directly. The binary form's round trip stays as it
   was.
+- `calculator.rs`: the same overrides per corpus build, sent by id
+  (`oracleCalculator`: nodes of `build.spec.nodes`, items of
+  `itemsTab.items`) to `calcsTab.miscCalculator` on the oracle; the base
+  and each override's player and minion outputs compare bitwise, as
+  before. A build that differs is asked of a fresh oracle (upstream keeps
+  changed skill data within a process); one corpus build (gen-0018)
+  needs it.
