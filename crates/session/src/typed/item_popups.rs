@@ -82,6 +82,8 @@ pub enum ItemPopup {
     ConvertAll(String),
     /// `TreeTab:FindTimelessJewel()`
     FindTimeless(Box<super::timeless_search::FindTimeless>),
+    /// The Configuration tab's Mod Browser (a custom group's Add Mod)
+    ModBrowser(Box<super::mod_browser::ModBrowser>),
     /// `main:OpenMessagePopup(title, msg)`: the message's lines and Ok
     Message {
         title: String,
@@ -209,6 +211,7 @@ impl<'d> TypedSession<'d> {
                 name.starts_with("list") || name.starts_with("source")
             }
             Some(ItemPopup::FindTimeless(_)) => name == "searchResults",
+            Some(ItemPopup::ModBrowser(_)) => name == "listControl",
             _ => false,
         };
         if req["click"].as_bool() == Some(true) && !list_click {
@@ -269,6 +272,20 @@ impl<'d> TypedSession<'d> {
             let r = self.spectre_library_control(&mut p, name, req);
             self.editor.popups[0] = ItemPopup::SpectreLibrary(p);
             self.refresh_item_popups();
+            return r.map(|_| json!([]));
+        }
+        if let Some(ItemPopup::ModBrowser(p)) = self.editor.popups.first() {
+            let mut p = p.clone();
+            let r = self.mod_browser_control(&mut p, name, req);
+            match r {
+                Ok(true) => {
+                    self.close_item_popup();
+                }
+                _ => {
+                    self.editor.popups[0] = ItemPopup::ModBrowser(p);
+                    self.refresh_item_popups();
+                }
+            }
             return r.map(|_| json!([]));
         }
         if let Some(ItemPopup::FindTimeless(p)) = self.editor.popups.first() {
@@ -459,6 +476,11 @@ impl<'d> TypedSession<'d> {
             (ItemPopup::ConvertAll(v), "convert") => {
                 self.convert_all_to_version(&v)?;
                 self.close_item_popup();
+            }
+            (ItemPopup::ModBrowser(p), name) => {
+                if self.mod_browser_button(&p, name)? {
+                    self.close_item_popup();
+                }
             }
             (ItemPopup::FindTimeless(mut p), name) => {
                 let closes = self.find_timeless_button(&mut p, name)?;
@@ -734,6 +756,7 @@ impl<'d> TypedSession<'d> {
             }),
             ItemPopup::ExportTree(p) => self.describe_export_tree(p),
             ItemPopup::FindTimeless(p) => self.describe_find_timeless(p),
+            ItemPopup::ModBrowser(p) => self.describe_mod_browser(p),
             ItemPopup::ResetTree => json!({
                 "title": "Reset Tree/Tattoos",
                 "lines": [],
