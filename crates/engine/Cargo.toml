@@ -6,8 +6,15 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+# `install`: the engine's ports installed into upstream's translated
+# program (`mod_store`), for the session's fallback and the tests that run
+# the translation; the shipped engine has neither them nor the interpreter
+translation = ["dep:luai"]
+
 [dependencies]
 lua.workspace = true
+luai = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = "1"

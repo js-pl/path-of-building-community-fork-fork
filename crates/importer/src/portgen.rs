@@ -5,7 +5,7 @@
 //! the helpers in `engine::mod_parser::val` and reaches the module's
 //! helpers and values through `c` (`engine::mod_parser::Ctx`).
 
-use lua::ast::*;
+use luai::ast::*;
 use std::collections::{BTreeSet, HashSet};
 use std::fmt::Write;
 

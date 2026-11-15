@@ -9,7 +9,8 @@ publish.workspace = true
 
 [dependencies]
 lua.workspace = true
-engine.workspace = true
+luai.workspace = true
+engine = { workspace = true, features = ["translation"] }
 importer.workspace = true
 gamedata.workspace = true
 serde_json.workspace = true

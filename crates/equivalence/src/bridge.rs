@@ -109,7 +109,7 @@ pub struct Bridge {
     pub originals: RefCell<Originals>,
     /// The Lua cfg of the query running, for what needs upstream's gem data
     pub lua_cfg: RefCell<Value>,
-    env: Rc<lua::env::Env>,
+    env: Rc<luai::env::Env>,
 }
 
 fn ptr(v: &Value) -> Option<*const u8> {
@@ -120,7 +120,7 @@ fn ptr(v: &Value) -> Option<*const u8> {
 }
 
 impl Bridge {
-    pub fn new(env: Rc<lua::env::Env>) -> Bridge {
+    pub fn new(env: Rc<luai::env::Env>) -> Bridge {
         Bridge {
             stores: Stores::default(),
             lua: Vec::new(),

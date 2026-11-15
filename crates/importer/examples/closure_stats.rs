@@ -1,5 +1,5 @@
 //! Statistics on function literals inside a file's table constructors.
-use lua::ast::*;
+use luai::ast::*;
 use std::collections::BTreeMap;
 
 #[derive(Default)]
@@ -131,7 +131,7 @@ fn block(b: &Block, st: &mut Stats) {
 fn main() {
     let path = std::env::args().nth(1).unwrap();
     let src = std::fs::read(&path).unwrap();
-    let b = lua::parser::parse(&src).unwrap();
+    let b = luai::parser::parse(&src).unwrap();
     let mut st = Stats::default();
     for s in &b.stats {
         if let Stat::Local { values, .. } = s {

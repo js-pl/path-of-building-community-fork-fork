@@ -1,9 +1,9 @@
 //! The global environment of translated code and the parts of LuaJIT's
 //! standard library upstream uses, with the same semantics.
 
-use crate::pattern::{self, Repl};
-use crate::rt::{self, err, first, func};
-use crate::value::{LResult, LuaError, LuaStr, Table, TableRef, Value};
+use lua::pattern::{self, Repl};
+use lua::rt::{self, err, first, func};
+use lua::value::{LResult, LuaError, LuaStr, Table, TableRef, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -74,7 +74,7 @@ fn arg(a: &[Value], i: usize) -> Value {
 fn check_str(a: &[Value], i: usize, fname: &str) -> LResult<LuaStr> {
     match a.get(i) {
         Some(Value::Str(s)) => Ok(s.clone()),
-        Some(v @ Value::Number(_)) => Ok(crate::to_string(v)),
+        Some(v @ Value::Number(_)) => Ok(lua::to_string(v)),
         v => err(format!(
             "bad argument #{} to '{fname}' (string expected, got {})",
             i + 1,
@@ -84,7 +84,7 @@ fn check_str(a: &[Value], i: usize, fname: &str) -> LResult<LuaStr> {
 }
 
 fn check_num(a: &[Value], i: usize, fname: &str) -> LResult<f64> {
-    match a.get(i).and_then(crate::to_number) {
+    match a.get(i).and_then(lua::to_number) {
         Some(n) => Ok(n),
         None => err(format!(
             "bad argument #{} to '{fname}' (number expected)",
@@ -170,7 +170,7 @@ fn install_base(env: &Rc<Env>) {
         func("tonumber", |a| {
             let base = opt_num(a, 1, "tonumber", 10.0)?;
             if base == 10.0 {
-                return ok1(crate::to_number(&arg(a, 0)).map(num).unwrap_or_default());
+                return ok1(lua::to_number(&arg(a, 0)).map(num).unwrap_or_default());
             }
             let st = check_str(a, 0, "tonumber")?;
             let t = st.to_str_lossy();
@@ -492,13 +492,13 @@ fn install_string(env: &Env) {
             (
                 "lower",
                 func("lower", |a| {
-                    ok1(s(crate::lower(check_str(a, 0, "lower")?.as_bytes())))
+                    ok1(s(lua::lower(check_str(a, 0, "lower")?.as_bytes())))
                 }),
             ),
             (
                 "upper",
                 func("upper", |a| {
-                    ok1(s(crate::upper(check_str(a, 0, "upper")?.as_bytes())))
+                    ok1(s(lua::upper(check_str(a, 0, "upper")?.as_bytes())))
                 }),
             ),
             (
@@ -643,7 +643,7 @@ fn install_string(env: &Env) {
                     let mut call_err = None;
                     let result = match &repl {
                         Value::Str(_) | Value::Number(_) => {
-                            let r = crate::to_string(&repl);
+                            let r = lua::to_string(&repl);
                             pattern::lua_gsub(
                                 st.as_bytes(),
                                 p.as_bytes(),
@@ -775,9 +775,9 @@ pub fn string_format(a: &[Value]) -> LResult<Vec<Value>> {
                 let x = check_num(a, idx, "format")?;
                 let p = prec.unwrap_or(6);
                 let mut b = match conv {
-                    b'f' | b'F' => crate::format::format_f(x.abs(), p),
-                    b'e' | b'E' => crate::format::format_e(x.abs(), p),
-                    _ => crate::format::format_g_flags(x.abs(), p, flags.contains('#')),
+                    b'f' | b'F' => lua::format::format_f(x.abs(), p),
+                    b'e' | b'E' => lua::format::format_e(x.abs(), p),
+                    _ => lua::format::format_g_flags(x.abs(), p, flags.contains('#')),
                 };
                 if conv.is_ascii_uppercase() {
                     b = b.to_uppercase();
@@ -943,7 +943,7 @@ fn install_table(env: &Env) {
                         let v = t.borrow().get_int(k);
                         match &v {
                             Value::Str(_) | Value::Number(_) => {
-                                out.extend_from_slice(crate::to_string(&v).as_bytes())
+                                out.extend_from_slice(lua::to_string(&v).as_bytes())
                             }
                             v => {
                                 return err(format!(

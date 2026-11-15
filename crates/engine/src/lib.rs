@@ -45,6 +45,7 @@ pub mod item_tools;
 pub mod items_tab;
 pub mod jewel;
 pub mod mod_parser;
+#[cfg(feature = "translation")]
 pub mod mod_store;
 pub mod mods;
 pub mod parallel;
@@ -65,7 +66,8 @@ pub mod xml;
 /// Replaces translated parts of upstream's running program with the
 /// engine's native ports. With `POB_TRANSLATED` set, the program stays
 /// fully translated, to compare the two.
-pub fn install(env: &std::rc::Rc<lua::env::Env>) -> lua::LResult<()> {
+#[cfg(feature = "translation")]
+pub fn install(env: &std::rc::Rc<luai::env::Env>) -> lua::LResult<()> {
     if std::env::var_os("POB_TRANSLATED").is_some() {
         return Ok(());
     }
@@ -74,7 +76,8 @@ pub fn install(env: &std::rc::Rc<lua::env::Env>) -> lua::LResult<()> {
 
 /// Upstream's class `name` (`common.classes[name]`), loaded as `getClass`
 /// of `Modules/Common.lua` loads it.
-pub(crate) fn class(env: &std::rc::Rc<lua::env::Env>, name: &str) -> lua::LResult<lua::TableRef> {
+#[cfg(feature = "translation")]
+pub(crate) fn class(env: &std::rc::Rc<luai::env::Env>, name: &str) -> lua::LResult<lua::TableRef> {
     use lua::{LuaError, Value, rt};
     let classes = rt::index(&env.global("common"), &Value::str("classes"))?;
     let mut class = rt::index(&classes, &Value::str(name))?;

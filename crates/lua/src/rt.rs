@@ -379,7 +379,7 @@ pub fn ipairs_table(v: &Value) -> LResult<TableRef> {
 }
 
 /// A field of a table constructor stored after its template
-/// ([`crate::ast::constructor_plan`]); nil keys are rejected.
+/// (`luai::ast::constructor_plan`); nil keys are rejected.
 #[inline]
 pub fn tset(t: &mut crate::value::Table, k: Value, v: Value) -> LResult<()> {
     match &k {
