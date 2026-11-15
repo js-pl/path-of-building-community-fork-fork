@@ -254,6 +254,14 @@ of them, so each difference is one between the translation and LuaJIT):
     disable each other, and `calcs.initEnv` breaks the cycle from the slot
     `pairs(itemDisablers)` gives first; against the oracle the weapon
     slots' comparisons of such tooltips are left out;
+  - Destructive Aspiration's "Minion Attack and Cast Speed" nodes
+    (timeless-DestructiveAspiration-1-gen-0001 and others, 2% or 3% on
+    both lines): explained, upstream's `pairs` order. Both stat lines of
+    that legion passive carry the range `(2-3)`, and
+    `BuildAllDependsAndPaths` fills each line with the roll of whichever
+    stat `pairs(changedNode.stats)` visits first, so both lines get the
+    attack or the cast speed roll depending on the string hash; against
+    the oracle the value of such a node's two equal lines is left out;
   - a shared item set dragged back into the build: explained, upstream's
     `pairs` order. `ItemSetListControl:ReceiveDrag` adds the set's items in
     `pairs` order of their slot names, so their ids, and with them every

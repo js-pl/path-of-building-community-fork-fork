@@ -107,6 +107,31 @@ fn unordered(v: &mut J) {
                 a.sort_by_key(|r| r.to_string());
                 m.remove("sel");
             }
+            // The two legion passives "Minion Attack and Cast Speed" an
+            // abyss jewel replaces a node with: each stat line has the same
+            // `(2-3)` range, which `BuildAllDependsAndPaths` fills with the
+            // roll of whichever stat `pairs(changedNode.stats)` visits
+            // first, so both lines carry one of the node's two rolls
+            if m.get("name").and_then(J::as_str) == Some("Minion Attack and Cast Speed")
+                && let Some(J::Array(a)) = m.get_mut("stats")
+                && a.len() == 2
+            {
+                let roll = |l: &J, stat: &str| {
+                    l.as_str()?
+                        .strip_prefix("Minions have ")?
+                        .strip_suffix(stat)?
+                        .parse::<u32>()
+                        .ok()
+                };
+                if let (Some(x), Some(y)) = (
+                    roll(&a[0], "% increased Attack Speed"),
+                    roll(&a[1], "% increased Cast Speed"),
+                ) && x == y
+                {
+                    a[0] = json!("Minions have #% increased Attack Speed");
+                    a[1] = json!("Minions have #% increased Cast Speed");
+                }
+            }
             for (k, x) in m.iter_mut() {
                 if k == "code"
                     && let Some(xml) = x.as_str().and_then(session::dispatch::decode_build_code)
