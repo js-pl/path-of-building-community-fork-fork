@@ -77,32 +77,36 @@ web/ (TypeScript, Preact)               crates/
 +-- engine client (RPC)                 +-- session   engine API: build sessions, JSON commands
 `-- worker pool --- engine.wasm ------> +-- wasm      C ABI over session for the browser
                                         +-- cli       `pob`: native runner, data bundles, benchmarks
-                                        +-- lua       Lua values, patterns, parser and runtime
-                                        +-- upstream  upstream's program translated to Rust (luagen)
+                                        +-- lua       Lua values, LuaJIT's table order, patterns
+                                        +-- luai      Lua parser and interpreter (importer only)
+                                        +-- upstream  upstream's program translated (until sub-step 8)
                                         `-- equivalence  tests against the oracle
+oracle/  upstream itself, headless on LuaJIT: committed outputs and a live session
 ```
 
 - **Engine API** (`crates/session`). Load or save a build (PoB XML and build
   codes, compatible with upstream in both directions), apply edits, get the
   sidebar, calcs tab cells and breakdowns, tooltips, run power calculations.
-  A session runs upstream's translated program and takes JSON requests
-  (`{"cmd": ...}`), answered by a Lua bridge (`crates/session/lua/session.lua`,
-  translated by `luagen` like upstream) that calls the same functions as
-  upstream's controls and tabs do, so every result is upstream's. Upstream's
-  own controls (sidebar skill selection, config options, calcs tab options)
-  are addressed by name and changed through their handlers. The engine does
-  no I/O. `session.lua` is being replaced command by command: a
-  `Dispatcher` answers the commands ported to the typed engine with it
-  and the rest with the translation, with the same JSON. Upstream's UI
-  data (`CalcSections.lua`) is evaluated at build time like game data.
+  A session takes JSON requests (`{"cmd": ...}`) and answers them with the
+  typed engine (`crates/session/src/typed`), with the JSON upstream's own
+  controls and tabs give: the same requests run on upstream itself by
+  `oracle/session.lua` (driving `crates/session/lua/session.lua`, which
+  calls the functions upstream's controls and tabs call and addresses its
+  controls by name) are the tests' reference. The engine does no I/O.
+  Upstream's UI data (`CalcSections.lua`) is evaluated at build time like
+  game data. *Until sub-step 7 of
+  [the deletion](drop-translation.md#step-4-in-sub-steps):* with the
+  `translation` feature, a `Dispatcher` answers what the typed engine does
+  not have with upstream's translated program running `session.lua`; no
+  command the tests exercise falls back any more.
 - **Data delivery.** `pob bundle` writes the typed engine's data (game
   data, mod parser, the current tree) into one compressed bundle
   (`core.bin`), and every tree version as a separate file
   (`session::bundle`). The site serves them as static assets; files the
   engine finds missing (older trees) are fetched and the request retried.
-  They are not compiled into the wasm module. With `--lua`, the bundle also
-  holds the Lua data files the translation reads, for an engine built with
-  it. The typed engine's game data is made at build time by `crates/gamedata`
+  They are not compiled into the wasm module. (*Until sub-step 7:* with
+  `--lua`, the bundle also holds the Lua data files the translation reads,
+  for an engine built with it.) The typed engine's game data is made at build time by `crates/gamedata`
   (the importer's tables with `Data.lua`'s processing, read into the
   engine's typed tables) and stored in `engine::codec`'s binary form:
   varints, interned strings, shared tables written once, compressed by the
@@ -110,12 +114,12 @@ web/ (TypeScript, Preact)               crates/
   running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.
-  The cargo feature `translation` (off by default in `wasm`, on in
-  `session` for the CLI and the tests) links the translated program as the
-  fallback of commands the typed engine does not have
-  (`build-wasm.mjs --translation`); built without it, as shipped, the
-  module holds neither the translation nor the Lua runtime's interpreter,
-  and those commands are `not ported: <cmd>` errors.
+  As shipped, the module holds neither the translation nor the Lua
+  interpreter, and commands the typed engine does not have are
+  `not ported: <cmd>` errors. (*Until sub-step 7:* the cargo feature
+  `translation`, off in `wasm` and on in `session` for the CLI and the
+  tests, links the translated program as their fallback,
+  `build-wasm.mjs --translation`.)
 - **Workers.** One engine instance per worker, communicating by messages: a
   main worker holds the build being edited, a background worker runs slow
   calculations (node power) on a copy, so edits never wait for them.
@@ -159,7 +163,7 @@ binary form of the game data. The parser runs on those: closures compute on
 a small value type of their own (`mod_parser::val`) and give typed mods, so
 no Lua value or evaluator is involved in parsing a line.
 
-**Whole-program translation.** `crates/upstream` is upstream's entire
+**Whole-program translation (until sub-step 8).** `crates/upstream` is upstream's entire
 program (`src/Modules`, `src/Classes`, `Launch.lua`, the libraries in
 `runtime/lua`) translated statement by statement to Rust by `luagen`
 (`crates/importer/src/luagen.rs`) in the crate's build script, so it is always
@@ -183,16 +187,16 @@ counted; a cycle collector (`lua::gc`) frees the cyclic environments upstream's
 calcs build on every calculation, following tables, closures and the cells
 they capture.
 
-The translation gives exact parity with upstream from the start, and it is
-the reference the typed engine is built against. It is scaffolding: the goal
-is to replace all of it with typed Rust, hot paths first (`ModDB`/`ModStore`
-lookups, `initEnv`, `perform`, Full DPS), each replacement tested against the
-translation and the oracle. Once nothing shipped runs on it, the engine is
-refactored and optimised freely; the speedups above come from that work, not
-from the translation. Long term the translation is dropped: `crates/upstream`,
-`luagen` and the Lua runtime go, the oracle is the only reference, and Lua is
-left only in the importer (reading upstream's data at build time) and in the
-oracle itself.
+The translation gave exact parity with upstream from the start and was the
+reference the typed engine was built against, one replacement at a time.
+That is done: nothing shipped runs on it, and every test takes its reference
+from the oracle (the session test does in CI). It goes in the sub-steps of
+[the deletion](drop-translation.md#step-4-in-sub-steps): `crates/upstream`,
+`luagen`, `lua::gc` and the translation's hooks, leaving Lua only in the
+importer (`crates/luai` reading upstream's data at build time), the library
+pieces the engine reproduces upstream with (`crates/lua`), and the oracle
+itself. The typed engine is refactored and optimised freely; the speedups
+come from that work.
 
 **Fail loudly.** The importer errors on embedded Lua functions or mod parser
 rules it does not know, so upstream changes cannot drift in silently.
@@ -204,8 +208,11 @@ rules it does not know, so upstream changes cannot drift in silently.
 Upstream itself, at the pinned commit, run headless with
 `src/HeadlessWrapper.lua` on LuaJIT in CI. A dumper script writes upstream's
 results as JSON to `tests/oracle/`, and CI checks that upstream reproduces
-them exactly. Expected values always come from the oracle and are never
-written by hand. Details, the JSON format and the determinism checks are in
+them exactly. For what a committed dump cannot hold (sessions of edits that
+adapt to the answers, variant builds, calculator overrides, upstream's
+tables), `oracle/session.lua` answers live, one JSON request per line, and
+the tests start it in CI. Expected values always come from the oracle and
+are never written by hand. Details, the JSON format and the determinism checks are in
 [oracle/README.md](../oracle/README.md).
 
 ### Layers
@@ -262,26 +269,27 @@ written by hand. Details, the JSON format and the determinism checks are in
 
 ### Running the tests
 
-- The translated program keeps about 12 MB of every build it loads, so
-  tests that load the corpus many times split it into shards, each run by
-  a child process of the test binary (`crates/testkit`): `perform.rs` and
-  `typed_session_matches_translated`. The children run in parallel, one
-  per core and as many as fit in memory at 3 GB each (`TEST_JOBS`,
-  `TEST_SLOT_GB`), over every test process on the machine.
+- The oracle tests need `oracle/setup.sh`'s LuaJIT; the session test uses
+  the live oracle with `SESSION_REFERENCE=oracle` (*until sub-step 8*
+  it defaults to the translation locally).
+- Tests that run many builds split them into shards, each run by a child
+  process of the test binary (`crates/testkit`) with an oracle process of
+  its own where it needs one: the session test, `oracle_variants.rs` and
+  `calculator.rs`. The children run in parallel, one per core and as many
+  as fit in memory (`TEST_JOBS`, `TEST_SLOT_GB`), over every test process
+  on the machine.
 - `cargo test --release` runs a binary at a time. `cargo nextest run
-  --release` runs every test in a process of its own, four at once (about
-  12 GB besides the sharded tests' children).
-- CI builds the tests once (`cargo nextest archive`, sccache keeps the
-  translated crate between runs when importer, lua and the submodule did
-  not change) and runs them on eight runners: the session test's shards
-  on three and the perform tests' on two (`TEST_SHARD_PARTITION`), the
-  others on three, split by binary in `.github/workflows/ci.yml`.
-  Equivalence tests side by side are about three times slower each: they
-  are bound by the runner's CPU.
+  --release` runs every test in a process of its own.
+- CI builds the tests once (`cargo nextest archive`) and runs them on seven
+  runners, split by binary in `.github/workflows/ci.yml`: the session
+  test's shards on three (`TEST_SHARD_PARTITION`), the oracle variants,
+  calculator and whole builds, items and trees, and the rest; every runner
+  with tests against the live oracle sets it up first.
 - `.github/workflows/full.yml` runs, nightly and by hand, the variants CI
-  samples in full: every trigger variant (`TRIGGERS_FULL=1`), every node
-  and cluster notable's power (`POWER_FULL=1`) and the session test's edit
-  sequences with 15 steps a build (`SESSION_STEPS=15`).
+  samples in full: every trigger variant (`TRIGGERS_FULL=1`, four
+  runners), every node and cluster notable's power (`POWER_FULL=1`) and the
+  session test's edit sequences with 15 steps a build (`SESSION_STEPS=15`,
+  five runners).
 
 ### Comparison rules
 
@@ -294,11 +302,12 @@ written by hand. Details, the JSON format and the determinism checks are in
 
 ## Keeping up with upstream
 
-Upstream moves about 5 calc or mod parser commits a week. Syncing starts
-now, while most of the program still runs translated: those parts follow
-upstream for free on every bump, and each typed replacement only has to catch
-up with the commits since it was written. The manifest records per file which
-upstream commit its port is in sync with.
+Upstream moves about 5 calc or mod parser commits a week. Data changes
+reach the engine through the importer and `gamedata` with no port; logic
+changes are ported into the typed engine by behaviour, located through the
+manifest, which records per file which upstream commit its port is in sync
+with. The oracle, regenerated at each bump, says what the port must give:
+its committed outputs for the corpus, its live session for everything else.
 
 ### Daily sync job
 
@@ -339,7 +348,7 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 - data download and startup time.
 
 `cargo run --release -p equivalence --bin bench` times the typed engine's
-calculations against the translation's on corpus builds (every tenth by
+calculations (*until sub-step 7* against the translation's) on corpus builds (every tenth by
 default, `--all`, `--filter <id>`), the median of `--reps` runs, per build
 and summed: loading a build, `init_env`, `perform` (`MAIN`), `build_outputs`
 (`MAIN` and `CALCS` with Full DPS, against `calcs.buildOutput` twice), the
@@ -382,8 +391,14 @@ each optimisation's numbers are in `docs/progress.md`.
    config, notes, party, tree, skill and config sets, export (code, link, XML)
    and builds saved in the browser. Open: compare, character import via
    OAuth, trade, art for the tree, node power split over several workers.
-6. **Daily sync.** Starts now, with the `sync` skill, alongside phase 7.
-7. **Typed engine.** Replace the whole translation with typed Rust, hot paths
+6. **Daily sync.** With the `sync` skill (`.claude/skills/sync/SKILL.md`),
+   alongside phase 7.
+7. **Typed engine.** Done for everything the engine API serves: the typed
+   engine answers every command the tests exercise, against the oracle, and
+   the translation is being deleted
+   ([the sub-steps](drop-translation.md#step-4-in-sub-steps)). What is not
+   ported yet is listed in `docs/progress.md`. The history follows.
+   Replace the whole translation with typed Rust, hot paths
    first, each step at parity with the translation and the oracle. Then
    refactor and optimise freely toward the performance targets, and drop the
    translation, `luagen` and the Lua runtime. The engine API keeps its JSON
