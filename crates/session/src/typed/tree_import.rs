@@ -218,7 +218,7 @@ impl<'d> TypedSession<'d> {
             return Err(format!("{NOT_PORTED}: a tree link of version {version}"));
         }
         let tree = self.data.tree(&version)?;
-        let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
+        let mut spec = self.new_spec(tree)?;
         spec.title = Some(p.name.clone());
         let decoded = spec.decode_url_message(&link).map_err(upstream_fails)?;
         if let Some(e) = decoded {
@@ -241,7 +241,7 @@ impl<'d> TypedSession<'d> {
                 }
             };
         let tree = self.data.tree(&version)?;
-        let mut spec = PassiveSpec::new(tree, &self.data.parser)?;
+        let mut spec = self.new_spec(tree)?;
         spec.title = Some(p.name.clone());
         spec.decode_poe_planner_url(link).map_err(upstream_fails)?;
         self.add_imported_spec(spec, &p.name)?;
