@@ -252,11 +252,6 @@ impl<'d> TypedSession<'d> {
 
     /// A custom modifier group's Add Mod
     pub(super) fn open_mod_browser(&mut self, block: usize) -> Result<()> {
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: the mod browser with a class change popup open"
-            ));
-        }
         let mut p = ModBrowser {
             block,
             supported: Arc::new(self.mod_browser_lines()?),

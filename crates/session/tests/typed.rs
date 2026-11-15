@@ -6853,3 +6853,62 @@ fn vaal_global_effect_matches_after_the_first_calculation() {
     );
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
+
+/// Upstream's input goes to the front popup alone (`main:OnFrame`): a tab
+/// control behind a popup, the class change popup or the item sets', is the
+/// same error in both sessions and changes nothing
+#[test]
+fn tab_controls_behind_a_popup_fail() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    let mut class_popups = 0;
+    for (id, path) in corpus().into_iter().take(4) {
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        let popups = |d: &mut Dispatcher| {
+            answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"]
+                .as_array()
+                .map_or(0, Vec::len)
+        };
+        let mut openers = vec![json!({"cmd": "control", "path": "items.setManage", "click": true})];
+        for sel in 1..=7 {
+            openers.push(json!({"cmd": "control", "path": "build.classDrop", "sel": sel}));
+        }
+        for opener in openers {
+            answer(d.request(&opener.to_string()), "open");
+            assert!(d.typed_active(), "{id} {opener}: {:?}", d.typed_error);
+            if popups(&mut d) == 0 {
+                continue;
+            }
+            if opener["path"] == "build.classDrop" {
+                class_popups += 1;
+            }
+            compare_views(&mut d, &["state"], &format!("{id} {opener}"), &mut out);
+            for r in [
+                json!({"cmd": "control", "path": "items.setManage", "click": true}),
+                json!({"cmd": "control", "path": "build.classDrop", "sel": 1}),
+                json!({"cmd": "control", "path": "tree.specConvert", "click": true}),
+                json!({"cmd": "control", "path": "configTab.setManage", "click": true}),
+                json!({"cmd": "control", "path": "items.itemList", "sel": 1, "dragTo": "items.sharedItemList"}),
+            ] {
+                let label = format!("{id} {opener} then {r}");
+                let t = answer(d.request(&r.to_string()), "typed");
+                assert!(d.typed_active(), "{label}: {:?}", d.typed_error);
+                let e = format!("control {} is behind a popup", r["path"].as_str().unwrap());
+                assert_eq!(t, json!({ "error": e }), "{label}");
+                let tr = answer(d.translated_request(&r.to_string()), "translated");
+                diff(&t, &tr, &label, &mut out);
+                compare_views(&mut d, &["state", "items"], &label, &mut out);
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "close");
+            assert_eq!(popups(&mut d), 0, "{id} {opener}");
+        }
+    }
+    assert!(class_popups > 0, "no class change popup opened");
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}

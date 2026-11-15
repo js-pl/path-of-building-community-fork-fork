@@ -241,9 +241,6 @@ impl<'d> TypedSession<'d> {
                 })?;
             }
             ("displayItemEnchant" | "displayItemEnchant2", Act::Click) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 self.enchant_display_item(if name.ends_with('2') { 2 } else { 1 })?;
                 self.refresh_item_popups();
             }
@@ -252,9 +249,6 @@ impl<'d> TypedSession<'d> {
                 | "displayItemAnoint4",
                 Act::Click,
             ) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 let slot = index_of(name, "displayItemAnoint").unwrap_or(1);
                 self.anoint_display_item(slot)?;
                 self.refresh_item_popups();
@@ -271,30 +265,18 @@ impl<'d> TypedSession<'d> {
                 }
             }
             ("displayItemAddCrucible", Act::Click) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 self.add_crucible_modifier_to_display_item()?;
                 self.refresh_item_popups();
             }
             ("displayItemAddCustom", Act::Click) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 self.add_custom_modifier_to_display_item()?;
                 self.refresh_item_popups();
             }
             ("displayItemAddImplicit", Act::Click) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 self.add_implicit_to_display_item()?;
                 self.refresh_item_popups();
             }
             ("displayItemCorrupt", Act::Click) => {
-                if self.has_item_popup() || self.class_popups_open() > 0 {
-                    return Err(format!("{NOT_PORTED}: a popup over another"));
-                }
                 self.corrupt_display_item()?;
                 self.refresh_item_popups();
             }
