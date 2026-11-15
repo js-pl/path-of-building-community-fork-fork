@@ -1,7 +1,7 @@
 //! The typed game data the `gamedata` crate makes from upstream's data
 //! files, written in its binary form and read back, equals what the typed
-//! tables' `from_lua` read from the `data` table of a started upstream
-//! host. Values compare in the binary form, so NaN placeholders compare
+//! tables' `from_lua` read from the `data` table of upstream started on the
+//! oracle (`oracle/values.lua`'s `data`). Values compare in the binary form, so NaN placeholders compare
 //! equal; a skill's own stat maps compare by what they resolve to, as
 //! upstream copies shared ones in on first use. Prints the data's size
 //! and how long making it, reading it and starting the host take.
@@ -13,11 +13,10 @@ use engine::game_data::GameData;
 use engine::item_data::ItemData;
 use engine::skill_data::{GrantedEffect, SkillData};
 use engine::tree::PassiveTree;
-use equivalence::upstream_src;
-use std::rc::Rc;
+use equivalence::{lua_json, upstream_src};
+use lua::rt;
+use session::Session;
 use std::time::{Duration, Instant};
-use upstream::host::Host;
-use upstream::imported::Imported;
 
 fn diff_items(got: &ItemData, want: &ItemData) -> Vec<String> {
     let mut out = Vec::new();
@@ -209,12 +208,116 @@ fn diff_config(got: &ConfigData, want: &ConfigData) -> Vec<String> {
     out
 }
 
+/// `Data.lua`'s `processMod` sets the source of every mod of a skill (its
+/// base, quality and level mods and its stat map's) to `Skill:<id>`, in
+/// `pairs(data.skills)` order; a gem and its transfigured variants share
+/// some of those tables, so the last skill `pairs` visits names them, which
+/// follows LuaJIT's per-process string hash. Shared tables get the source
+/// of the first of their skills by id, on both sides.
+fn shared_mod_sources(data: &lua::Value) {
+    use lua::value::TableRef;
+    use std::collections::HashMap;
+    let get = |v: &lua::Value, k: &str| rt::index(v, &lua::Value::str(k)).unwrap_or_default();
+    let tables = |v: &lua::Value| -> Vec<TableRef> {
+        v.as_table()
+            .map(|t| t.entries())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|(_, v)| v.as_table().cloned())
+            .collect()
+    };
+    let mut owners: HashMap<*const (), (TableRef, Vec<String>)> = HashMap::new();
+    let skills = get(data, "skills");
+    for (id, ge) in skills.as_table().map(|t| t.entries()).unwrap_or_default() {
+        let id = lua::to_string(&id.to_value()).to_str_lossy().into_owned();
+        let mut lists: Vec<TableRef> = ["baseMods", "qualityMods", "levelMods"]
+            .iter()
+            .filter_map(|k| get(&ge, k).as_table().cloned())
+            .collect();
+        lists.extend(tables(&get(&ge, "statMap")));
+        for list in lists {
+            for m in tables(&lua::Value::Table(list)) {
+                let mods = if m.get_str("name").is_nil() {
+                    tables(&lua::Value::Table(m))
+                } else {
+                    vec![m]
+                };
+                for m in mods {
+                    let inner = get(&m.get_str("value"), "mod");
+                    for t in std::iter::once(m).chain(inner.as_table().cloned()) {
+                        let p = std::rc::Rc::as_ptr(&t.0) as *const ();
+                        owners
+                            .entry(p)
+                            .or_insert((t, Vec::new()))
+                            .1
+                            .push(id.clone());
+                    }
+                }
+            }
+        }
+    }
+    for (t, mut ids) in owners.into_values() {
+        ids.sort();
+        ids.dedup();
+        if ids.len() > 1 && !t.get_str("source").is_nil() {
+            t.set_str("source", lua::Value::str(&format!("Skill:{}", ids[0])));
+        }
+    }
+}
+
+/// The typed data's orders that follow LuaJIT's `pairs` over number keys,
+/// the same in every run, against the oracle's (`values.lua`'s
+/// `pairsOrder`): the comparison above rebuilds every table in sorted order
+fn pairs_order_diffs(built: &GameData, order: &lua::Value) -> Vec<String> {
+    let get = |v: &lua::Value, k: &str| rt::index(v, &lua::Value::str(k)).unwrap_or_default();
+    let strings = |v: &lua::Value| -> Vec<String> {
+        v.as_table()
+            .map(|t| t.array())
+            .unwrap_or_default()
+            .iter()
+            .map(|s| lua::to_string(s).to_str_lossy().into_owned())
+            .collect()
+    };
+    let mut out = Vec::new();
+    let first = get(order, "firstLevels");
+    for (id, ge) in &built.skills.skills {
+        let want = get(&first, id).as_number().map(|n| n as i64);
+        if ge.first_level != want {
+            out.push(format!(
+                "skill {id} first level {:?} != {want:?}",
+                ge.first_level
+            ));
+        }
+    }
+    let pantheons = get(order, "pantheonLines");
+    for (god, (_, lines)) in &built.setup.pantheons {
+        let want: Vec<Vec<String>> = get(&pantheons, god)
+            .as_table()
+            .map(|t| t.array())
+            .unwrap_or_default()
+            .iter()
+            .map(strings)
+            .collect();
+        if *lines != want {
+            out.push(format!("pantheon {god} mod lines {lines:?} != {want:?}"));
+        }
+    }
+    let flavour = get(order, "flavourIds");
+    for (name, list) in &built.items.flavour_text {
+        let ids: Vec<String> = list.iter().map(|(id, _)| id.clone()).collect();
+        let want = strings(&get(&flavour, name));
+        if ids != want {
+            out.push(format!("flavour text {name:?} ids {ids:?} != {want:?}"));
+        }
+    }
+    out
+}
+
 #[test]
 fn typed_data_matches_upstream() {
     let t = Instant::now();
-    let built = gamedata::Source::load(&upstream_src())
-        .and_then(|s| s.game_data())
-        .unwrap_or_else(|e| panic!("{e}"));
+    let src = gamedata::Source::load(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+    let built = src.game_data().unwrap_or_else(|e| panic!("{e}"));
     let make = t.elapsed();
     let bytes = built.encode();
     let t = Instant::now();
@@ -234,37 +337,44 @@ fn typed_data_matches_upstream() {
     assert_eq!(data.encode(), bytes, "encoding is not deterministic");
 
     let t = Instant::now();
-    let host = Host::new(Rc::new(Imported::new(upstream_src())));
-    host.start()
-        .unwrap_or_else(|e| panic!("upstream failed to start: {}", lua::to_string(e.value())));
+    let oracle = Session::oracle(&upstream_src()).unwrap_or_else(|e| panic!("{e}"));
+    let req = serde_json::json!({"cmd": "oracleValue", "fn": "data", "params": {}});
+    let globals = oracle
+        .request(&req.to_string())
+        .and_then(|r| lua_json::answer(&r))
+        .unwrap_or_else(|e| panic!("{e}"));
+    let global = |k: &str| rt::index(&globals, &lua::Value::str(k)).unwrap_or_default();
     let start = t.elapsed();
     let t = Instant::now();
-    let ldata = host.global("data");
     // The flags as after every skill's first calculation, as the typed
-    // data has them; the copied stat maps stay out
-    host.look_up_skill_stats(false)
-        .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())));
-    let items = ItemData::from_lua(&ldata, &host.global("colorCodes"))
+    // data has them; the copied stat maps stay out (values.lua does both)
+    let ldata = global("data");
+    shared_mod_sources(&ldata);
+    let items = ItemData::from_lua(&ldata, &global("colorCodes"))
         .unwrap_or_else(|e| panic!("item data: {e}"));
-    let skills = SkillData::from_lua(
-        &ldata,
-        &host.global("colorCodes"),
-        &host.global("SkillType"),
-    )
-    .unwrap_or_else(|e| panic!("skill data: {e}"));
-    let setup = SetupData::from_lua(&ldata, &host.global("ModFlag"), &host.global("KeywordFlag"))
+    let skills = SkillData::from_lua(&ldata, &global("colorCodes"), &global("SkillType"))
+        .unwrap_or_else(|e| panic!("skill data: {e}"));
+    let setup = SetupData::from_lua(&ldata, &global("ModFlag"), &global("KeywordFlag"))
         .unwrap_or_else(|e| panic!("setup data: {e}"));
-    let config = ConfigData::from_lua(&ldata, &host.global("SkillType"))
+    let config = ConfigData::from_lua(&ldata, &global("SkillType"))
         .unwrap_or_else(|e| panic!("config data: {e}"));
     let from_lua = t.elapsed();
-    let var_list = lua::rt::call(
-        &host.global("LoadModule"),
-        &[lua::Value::str("Modules/ConfigOptions")],
-    )
-    .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())))
-    .into_iter()
-    .next()
-    .unwrap();
+    // The importer's data the typed data is made of, its tables rebuilt as
+    // the oracle's are: upstream builds the lists of string-keyed tables
+    // (item mods and bases, record fields) in `pairs` order, which follows
+    // LuaJIT's per-process string hash
+    let idata = lua_json::canonical(&lua::Value::Table(src.data.clone()));
+    shared_mod_sources(&idata);
+    let iglobal = |k: &str| lua_json::canonical(&src.global(k));
+    let got_items = ItemData::from_lua(&idata, &iglobal("colorCodes"))
+        .unwrap_or_else(|e| panic!("item data: {e}"));
+    let got_skills = SkillData::from_lua(&idata, &iglobal("colorCodes"), &iglobal("SkillType"))
+        .unwrap_or_else(|e| panic!("skill data: {e}"));
+    let got_setup = SetupData::from_lua(&idata, &iglobal("ModFlag"), &iglobal("KeywordFlag"))
+        .unwrap_or_else(|e| panic!("setup data: {e}"));
+    let got_config = ConfigData::from_lua(&idata, &iglobal("SkillType"))
+        .unwrap_or_else(|e| panic!("config data: {e}"));
+    let var_list = global("configOptions");
     assert_eq!(
         data.option_defaults,
         engine::config_tab::option_defaults(&var_list)
@@ -286,22 +396,25 @@ fn typed_data_matches_upstream() {
     assert_eq!(data.jewel_radius, radius);
     assert_eq!(
         data.latest_tree_version(),
-        lua::to_string(&host.global("latestTreeVersion")).to_str_lossy()
+        lua::to_string(&global("latestTreeVersion")).to_str_lossy()
     );
     let packed = miniz_oxide::deflate::compress_to_vec_zlib(&bytes, 6);
     eprintln!(
         "typed data: {} bytes, {} compressed; made in {make:?}, read in {read:?}; \
-         upstream host started in {start:?}, from_lua in {from_lua:?}",
+         upstream's data from the oracle in {start:?}, from_lua in {from_lua:?}",
         bytes.len(),
         packed.len()
     );
-    let diffs: Vec<String> = [
-        diff_items(&data.items, &items),
-        diff_skills(&data.skills, &skills),
-        diff_setup(&data.setup, &setup),
-        diff_config(&data.config, &config),
-    ]
-    .concat();
+    let mut diffs = pairs_order_diffs(&built, &global("pairsOrder"));
+    diffs.extend(
+        [
+            diff_items(&got_items, &items),
+            diff_skills(&got_skills, &skills),
+            diff_setup(&got_setup, &setup),
+            diff_config(&got_config, &config),
+        ]
+        .concat(),
+    );
     assert!(diffs.is_empty(), "typed data differs: {diffs:#?}");
 }
 
