@@ -223,12 +223,17 @@ of them, so each difference is one between the translation and LuaJIT):
     (`CurseList`, the Calcs tab's Curses and Debuffs row) is compared
     unordered;
   - gem names sharing a granted effect, `Vaal Righteous Fire` against
-    `... of Arcane Devotion` or `Explosive Trap` against `... of
-    Shrapnel` as a breakdown row's source and in a saved gem: explained,
-    upstream's `pairs` order. `Data.lua` makes such gems with one
-    `grantedEffect`, so `data.gemForSkill[grantedEffect]` names whichever
-    of them `pairs(data.gems)` sets up last; against the oracle every
-    such name is compared as the group's shortest;
+    `... of Arcane Devotion` as a breakdown row's source and in a saved
+    gem: explained, upstream's `pairs` order. `Data.lua` makes such gems
+    with one `grantedEffect`, so `data.gemForSkill[grantedEffect]` names
+    whichever of them `pairs(data.gems)` sets up last; against the oracle
+    every such name is compared as the group's shortest;
+  - a breakdown row's source `Explosive Trap` against `... of Shrapnel`:
+    explained, upstream's `pairs` order. A gem and its transfigured
+    variants share mod tables, and `processMod` sets their `Skill:`
+    source once per skill in `pairs(data.skills)` order, so the last
+    wins; against the oracle a row's source is compared as the shortest
+    skill name of its game id;
   - unique flavour text (Queen's Escape, Duskblight, a flask): explained,
     upstream's `pairs` order. A unique with several flavour texts shows the
     first `pairs(flavourTable)` gives (`ItemsTab:AddItemTooltip`); compared

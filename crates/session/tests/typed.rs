@@ -208,6 +208,12 @@ fn unordered(v: &mut J) {
                     }
                     *a = keep;
                 }
+                if k == "sourceName"
+                    && let J::String(n) = x
+                    && let Some(short) = ALTERNATES.get().and_then(|a| a.variants.get(n.as_str()))
+                {
+                    *n = short.clone();
+                }
                 // Connectors between two nodes that both link to the other
                 // keep the direction of the node `pairs(tree.nodes)`
                 // visits first; the nodes' table has a string key too
@@ -319,6 +325,11 @@ struct Alternates {
     /// Gem names sharing a granted effect (`data.gemForSkill` keeps the
     /// one `pairs(data.gems)` sets up last), to the shortest of them
     gems: Vec<(String, String)>,
+    /// Skill names of gems sharing a game id (a gem and its transfigured
+    /// variants), to the shortest: a breakdown row's source names the
+    /// skill whose `Skill:` source `processMod` set last on mods their
+    /// skills share, in `pairs(data.skills)` order
+    variants: std::collections::HashMap<String, String>,
     /// A unique's flavour texts but the first, to its first
     /// (`flavourLookup` is read in `pairs` order)
     flavours: Vec<(Vec<String>, Vec<String>)>,
@@ -344,13 +355,31 @@ impl Alternates {
         }
         // Longer names first, as a shorter one can be part of them
         gems.sort_by_key(|(n, _)| std::cmp::Reverse(n.len()));
+        let mut by_game_id: std::collections::BTreeMap<&str, Vec<&str>> = Default::default();
+        for g in data.game.skills.gems() {
+            by_game_id
+                .entry(g.game_id.as_str())
+                .or_default()
+                .push(&g.granted_effect.name);
+        }
+        let mut variants = std::collections::HashMap::new();
+        for names in by_game_id.values().filter(|n| n.len() > 1) {
+            let short = names.iter().min_by_key(|n| (n.len(), **n)).unwrap();
+            for n in names {
+                variants.insert(n.to_string(), short.to_string());
+            }
+        }
         let mut flavours = Vec::new();
         for list in data.game.items.flavour_text.values() {
             for (_, t) in list.iter().skip(1) {
                 flavours.push((t.clone(), list[0].1.clone()));
             }
         }
-        Alternates { gems, flavours }
+        Alternates {
+            gems,
+            variants,
+            flavours,
+        }
     }
 }
 
