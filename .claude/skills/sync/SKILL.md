@@ -6,96 +6,76 @@ argument-hint: "[upstream ref, default: origin/dev]"
 
 # Sync with upstream
 
-Bump `upstream/PathOfBuilding` to the given ref (default `dev`) and port what
-changed into the typed engine. Upstream itself, run headless on LuaJIT, is
-the only reference: its committed outputs (`tests/oracle`) and its live
-session (`oracle/session.lua`) say what the port must give. See
-`docs/design.md#keeping-up-with-upstream`.
+Bump `upstream/PathOfBuilding` to the given ref (default `origin/dev`) and
+port what changed into the typed engine. Upstream itself, run headless on
+LuaJIT (the oracle), is the only reference.
 
-Until sub-step 8 of the deletion (`docs/drop-translation.md#step-4-in-sub-steps`)
-`crates/upstream` still translates upstream's program in its build script;
-the notes marked *until sub-step 8* below go with it.
+`sync/sync.py` does the mechanical parts and prints only what the next step
+needs. Keep it that way: read the files this skill names when a step sends
+you there, not before, and don't read what the tests compare for you.
+
+If `crates/upstream` still exists, the translation has not been deleted yet
+(sub-step 8 of `docs/drop-translation.md`): stop and say so rather than
+syncing through it.
 
 ## 1. Triage
 
-- The submodule is shallow: `git -C upstream/PathOfBuilding fetch --depth=200 origin dev`
-  (deepen until the pinned commit is reachable; the range is needed for the log).
-- List the work: `git log --reverse --format='%h %s' <old>..FETCH_HEAD -- src`.
-  Go commit by commit, not through one squashed diff.
-- For each commit, `git show --name-only` and look every file up in
-  `sync/manifest.toml`:
-  - only `src/Data`, `src/TreeData` or `src/Export`: data, nothing to port
-    (the importer and `gamedata` read it at build time);
-  - `ported` or `partial`: port the behaviour where the entry's `port`
-    says (the typed engine is laid out freely, not by upstream's files);
-  - `todo`: not ported yet; note it in the PR, nothing to do;
-  - `skip`: deliberately not ported, with the `reason` in the entry
-    (export scripts, desktop-only parts); check it still holds;
-  - not in the manifest: a new file, see step 4.
-- Commits to the UI classes (`*Tab.lua`, `*Control.lua`) that the web UI
-  ports (`partial` with a `web/` port) have no test against upstream: check
-  each for new options, labels or controls by hand.
+`sync/sync.py triage [ref]` fetches upstream and lists the commits since the
+manifest's `upstream`, each with the files that may need a port, their
+status and where they are ported. Commits with nothing to port are one line
+(`[data only]`, `[todo only: ...]`). For each remaining commit,
+`sync/sync.py show <sha>` gives its diff without the data files.
 
-## 2. Bump and regenerate, in this order
+- `ported` / `partial`: port the behaviour where the port says (the typed
+  engine is laid out freely, not by upstream's files).
+- `todo`: not ported; list it in the PR, nothing to do.
+- `new`: a file not in the manifest; see [manifest.md](manifest.md).
+- Files the triage lists as ported in `web/` have no test against upstream:
+  check those diffs by hand for new options, labels or controls.
 
-1. `git -C upstream/PathOfBuilding checkout <new>`.
-2. If upstream's `Dockerfile` changed the LuaJIT commit, rerun `oracle/setup.sh`.
-3. `oracle/run.py dump` (about 2 minutes on 3 cores; `--jobs N` goes before
-   the command) writes `tests/oracle/<id>.json`, `modparser.jsonl` and
-   `data.jsonl`.
-4. `cargo run --release -p importer --bin synthlines`; if
-   `corpus/synthetic_mod_lines.txt` changed, run `dump` again (the oracle
-   parses those lines too).
-5. `oracle/run.py generate`, then `dump` again if `corpus/generated` changed.
-   Upstream data changes reshuffle generated builds; big diffs there are normal.
-6. `cargo run --release -p importer --bin portgen` regenerates
-   `crates/engine/src/mod_parser/generated.rs`.
+Data (`src/Data`, `src/TreeData`) reaches the engine through the importer at
+build time; the tests catch what it changes.
 
-On an unchanged submodule every step reproduces the committed files exactly;
-if one does not, that is a finding to report before bumping. Regenerated
-`tests/oracle`, `corpus/generated` and the synthetic lines belong in the sync
-PR. They are never edited by hand, and never regenerated to make a test pass
-outside a bump.
+## 2. Bump and regenerate
 
-## 3. Port, and let the tests find the drift
+1. `git -C upstream/PathOfBuilding checkout <new>` (the triage prints it).
+2. `oracle/setup.sh` if `.oracle/` is missing (once per machine; `regen`
+   reruns it when upstream's `Dockerfile` changes LuaJIT).
+3. `sync/sync.py regen` regenerates `corpus/generated`, `tests/oracle`, the
+   synthetic mod lines and `crates/engine/src/mod_parser/generated.rs`, in
+   order (about 2 minutes). It prints a line per step and a diff summary; on a failure, the
+   last lines of `target/sync/regen.log`.
 
-What each test says when upstream moved:
+Never open the regenerated files' diffs (megabytes of JSON; big diffs are
+normal). They belong in the PR as they are, and are never edited by hand or
+regenerated outside a bump.
 
-| Fails | Means | Fix |
-| --- | --- | --- |
-| `importer` or `gamedata` build | a data file uses a new embedded Lua function or an unknown mod parser rule | teach the importer; never skip the file |
-| `ModParser::new` reports a hash mismatch | upstream changed a closure ported by hand (`crates/engine/src/mod_parser/ported.rs`) | port the change, update the hash |
-| `equivalence --test data` | a data table the importer reads changed shape | `oracle/run.py data-json` and `DATA_JSON_DIR` show the difference (see the test's header) |
-| `--test mod_parser`, `--test mod_cache` | the mod parser's rules or `ModCache.lua` changed | port the rule; `portgen` covers the generated closures |
-| `--test game_data`, `--test item`, `--test tree` | the typed data, items or trees differ from upstream's tables (`oracleValue`) | port the data processing (`crates/gamedata`, `engine::data`, `item`, `tree`) |
-| `--test build_output` | a corpus build's outputs differ from `tests/oracle` | port the calc change (`engine::calc_*`), located through the manifest |
-| `--test oracle_variants`, `--test calculator` | variant builds or calculator overrides differ from the live oracle | as above; `CALCS_FILTER=<id>` narrows the run |
-| the session test (`SESSION_REFERENCE=oracle`) | a command, view or edit answers differently from upstream's | port the tab or control change (`crates/session/src/typed`); if the oracle itself fails, `crates/session/lua/session.lua` reaches a control upstream renamed or moved (`controls.<name>`) |
-| `oracle/run.py check` | upstream's outputs depend on the process (string-hash order) | a finding to report, never a tolerance |
-| `sync/check.py` | a file under `src/` is missing from the manifest | `sync/check.py --add` lists it as `todo`; give it its real status |
+## 3. Port
 
-Run the oracle tests with `oracle/setup.sh`'s LuaJIT installed;
-`SESSION_REFERENCE=oracle` makes the session test use it (CI does).
+Port each commit from step 1. Then run the tests narrowly first, the ones
+for what you ported, and the full set once at the end:
 
-*Until sub-step 8:* `crates/upstream` translates upstream's program in its
-build script, so an upstream construct `luagen` or the `lua` runtime lacks
-breaks the build: fix those, never the generated code. Locally the session
-test defaults to the translation; set `SESSION_REFERENCE=oracle` to test
-against upstream itself.
+- `cargo test --release -p equivalence --test <name>`; `CALCS_FILTER=<id>`
+  narrows to one build;
+- `SESSION_REFERENCE=oracle SESSION_PHASES=<phases> cargo test --release -p
+  session --test typed`.
+
+When a test fails and the cause isn't plain from its output, look the test
+up in [failures.md](failures.md). If upstream's behaviour is a quirk the
+port has to reproduce, record it in
+`docs/progress.md#upstream-quirks-met-so-far`.
 
 ## 4. Record
 
-- Set `upstream` in `sync/manifest.toml` to the new commit, and the `sync`
-  of every `ported`/`partial` entry you checked.
-- New upstream files: `sync/check.py --add`, then the real status and port.
-- Document upstream quirks the port has to reproduce (`docs/progress.md`,
-  "Upstream quirks").
+`sync/sync.py record` sets the manifest's `upstream` and every entry's
+`sync` to the new commit. Pass `--except <file> ...` for entries whose
+upstream change you did not port, and say why in the PR.
 
 ## Done
 
-`sync/check.py`, `cargo test --release` (with the oracle tests:
-`SESSION_REFERENCE=oracle` and LuaJIT, see `.github/workflows/ci.yml`),
-`oracle/run.py check` and the wasm tests pass. The PR lists the upstream
-commit range with links, and what was ported where. If something still
-fails after a few attempts, open an issue with the upstream diff and the
-failing tests instead of a PR.
+`sync/check.py`, `cargo test --release` with `SESSION_REFERENCE=oracle`
+(as `.github/workflows/ci.yml`), `oracle/run.py check` and the wasm tests
+pass. The PR lists the upstream commit range with links, what was ported
+where, and the `todo` files left out. If something still fails after a few
+attempts, open an issue with the upstream commit and the failing tests
+instead of a PR.

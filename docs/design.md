@@ -309,27 +309,29 @@ manifest, which records per file which upstream commit its port is in sync
 with. The oracle, regenerated at each bump, says what the port must give:
 its committed outputs for the corpus, its live session for everything else.
 
-### Daily sync job
+### Sync
 
-An LLM job runs every day with the `sync` skill
-(`.claude/skills/sync/SKILL.md`):
+A sync runs the `sync` skill (`.claude/skills/sync/SKILL.md`) when asked; no
+job is scheduled for now. `sync/sync.py` does its mechanical parts and
+prints only what the agent needs, to keep a sync's context small:
 
-1. Fetch upstream `dev` and list the new commits.
-2. Data-only changes: bump and regenerate. No porting needed.
-3. For each commit that touches ported files, look up the port locations in the
-   manifest and port the change, commit by commit.
-4. Bump the submodule, regenerate the oracle outputs, the corpus and the
-   generated ports, run all equivalence tests.
-5. Open a PR with the bump, the port and the upstream commit links. If tests
-   still fail after a bounded number of attempts, open an issue with the
-   upstream diff and the failing tests instead.
+1. `triage`: upstream's new commits, each with its files' manifest status
+   and port; commits with nothing to port on one line.
+2. For each commit that touches ported files, port the change by behaviour
+   where the manifest says (`show` gives the diff without the data files).
+3. Bump the submodule; `regen` regenerates the generated corpus, the oracle
+   outputs, the synthetic mod lines and the generated ports; run the tests.
+4. `record` updates the manifest's sync commits. Open a PR with the bump,
+   the port and the upstream commit links. If tests still fail after a
+   bounded number of attempts, open an issue with the upstream diff and the
+   failing tests instead.
 
 The deployed site follows upstream release tags; tracking `dev` daily keeps
 each step small.
 
 ### Guardrails
 
-- The job never edits oracle outputs, the corpus, `tests/tolerances.toml` or
+- A sync never edits oracle outputs, the corpus, `tests/tolerances.toml` or
   the comparison rules by hand. Oracle outputs and the generated corpus are
   only regenerated with their tools, in the PR that bumps the submodule, and
   CI fails if they differ from what upstream produces.
@@ -391,8 +393,8 @@ each optimisation's numbers are in `docs/progress.md`.
    config, notes, party, tree, skill and config sets, export (code, link, XML)
    and builds saved in the browser. Open: compare, character import via
    OAuth, trade, art for the tree, node power split over several workers.
-6. **Daily sync.** With the `sync` skill (`.claude/skills/sync/SKILL.md`),
-   alongside phase 7.
+6. **Sync.** With the `sync` skill (`.claude/skills/sync/SKILL.md`), on
+   request, against the oracle only once the translation is deleted.
 7. **Typed engine.** Done for everything the engine API serves: the typed
    engine answers every command the tests exercise, against the oracle, and
    the translation is being deleted
