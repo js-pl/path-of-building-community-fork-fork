@@ -831,6 +831,37 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             compare_saves(d, &format!("{id} tattooed copy"), &mut out);
             answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
             assert!(d.typed_active(), "{id} closePopup: {:?}", d.typed_error);
+            // The copy's tattoos removed while the first tree keeps its own,
+            // then the first tree's tattooed nodes: `ReplaceNode` empties
+            // the tattoo's shared reminder text only where the load's
+            // `BuildAllDependsAndPaths` already did
+            for r in [
+                json!({"cmd": "control", "path": "tree.reset", "click": true}),
+                json!({"cmd": "popupButton", "name": "removeTattoo"}),
+            ] {
+                answer(d.request(&r.to_string()), "remove the copy's tattoos");
+                assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            }
+            let label = format!("{id} the copy's tattoos removed");
+            compare_views(d, &["treeState", "state", "outputs"], &label, &mut out);
+            let r = json!({"cmd": "selectTreeSpec", "index": active}).to_string();
+            answer(d.request(&r), "selectTreeSpec");
+            compare_views(
+                d,
+                &["treeSpecs", "treeState", "state", "outputs"],
+                &label,
+                &mut out,
+            );
+            for o in xml.split("<Override ").skip(1) {
+                let Some(n) = attr(o, "nodeId") else { continue };
+                let req =
+                    json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
+                let typed = answer(d.request(&req), "typed");
+                let tr = answer(d.translated_request(&req), "translated");
+                diff(&typed, &tr, &format!("{label} first tree {req}"), &mut out);
+                compared += 1;
+            }
+            compare_saves(d, &label, &mut out);
             // The build again, its tattoos removed (Reset Tree/Tattoos'
             // Remove All Tattoos)
             let steps = [
