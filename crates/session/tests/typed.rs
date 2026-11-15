@@ -483,7 +483,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 15] = [
+const PHASES: [(&str, usize); 16] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -498,6 +498,7 @@ const PHASES: [(&str, usize); 15] = [
     ("overlays", 2),
     ("power", 2),
     ("variants", 2),
+    ("nodepower", 2),
     ("specs", 3),
 ];
 
@@ -571,6 +572,7 @@ fn typed_session_matches_translated() {
         "party" => party_match(data, &mut d),
         "new" => new_build_matches(&mut d),
         "power" => power_sorts_match(&mut d),
+        "nodepower" => node_power_match(data, &mut d),
         _ => panic!("unknown phase {phase}"),
     }
     at_build(&mut d, "");
@@ -582,8 +584,14 @@ fn typed_session_matches_translated() {
 /// Items tab's item databases (`controls` of `items.uniqueDB` sorted by a
 /// stat and searched, its inputs, `items.rareDB` searched) give the
 /// translation's, on every eighth corpus build
+/// Power stats the anoint popup is sorted by per build, and its rows
+/// hovered after each
+const ANOINT_SORTS: usize = 4;
+const ANOINT_ROWS: usize = 3;
+
 fn power_sorts_match(d: &mut Dispatcher) {
     let (mut failures, mut compared, mut items_compared) = (Vec::new(), 0, 0);
+    let mut anoints_compared = 0;
     let (mut t_typed, mut t_tr) = (Duration::ZERO, Duration::ZERO);
     let builds: Vec<_> = corpus().into_iter().step_by(8).collect();
     for (n, (id, path)) in mine(builds).into_iter().enumerate() {
@@ -736,9 +744,77 @@ fn power_sorts_match(d: &mut Dispatcher) {
                     .map_or(0, Vec::len);
             }
         }
+        // The anoint popup of the equipped amulet sorted by power stats
+        // in turn (each notable's power: the calculator with the amulet
+        // anointed with it, less without), its first rows hovered (the
+        // stats anointing each gives)
+        let items = answer(d.request(r#"{"cmd":"items"}"#), "items");
+        let amulet = items["ok"]["slots"]
+            .as_array()
+            .and_then(|s| s.iter().find(|s| s["name"] == "Amulet"))
+            .and_then(|s| s["item"].as_f64());
+        if let Some(amulet) = amulet {
+            let mut out = Vec::new();
+            let mut ok = true;
+            for e in [
+                json!({"cmd": "setDisplayItem", "id": amulet}),
+                json!({"cmd": "control", "path": "items.displayItemAnoint", "click": true}),
+            ] {
+                let r = answer(d.request(&e.to_string()), "anoint popup");
+                if let Some(err) = d.typed_error.take() {
+                    failures.push(format!("{id}: {e}: fell back: {err}"));
+                    ok = false;
+                    break;
+                }
+                if r.get("error").is_some() {
+                    ok = false;
+                    break;
+                }
+            }
+            let state = answer(d.request(r#"{"cmd":"state"}"#), "state");
+            let sorts = state["ok"]["popups"][0]["controls"]
+                .as_array()
+                .and_then(|c| c.iter().find(|c| c["path"] == "popup.notableDB.sort"))
+                .and_then(|c| c["list"].as_array())
+                .map_or(0, Vec::len);
+            if ok && sorts > 1 {
+                for k in 0..ANOINT_SORTS {
+                    let sel = 2 + (n * ANOINT_SORTS + k) % (sorts - 1);
+                    let e = json!({"cmd": "control", "path": "popup.notableDB.sort", "sel": sel});
+                    answer(d.request(&e.to_string()), "anoint sort");
+                    if let Some(err) = d.typed_error.take() {
+                        failures.push(format!("{id}: {e}: fell back: {err}"));
+                        break;
+                    }
+                    let label = format!("anoint sort {sel}");
+                    let r = r#"{"cmd":"state"}"#;
+                    let typed = answer(d.request(r), "typed state");
+                    let tr = answer(d.translated_request(r), "translated state");
+                    diff(&typed, &tr, &label, &mut out);
+                    for index in 1..=ANOINT_ROWS {
+                        let r = json!({"cmd": "controlTooltip", "path": "popup.notableDB", "index": index})
+                            .to_string();
+                        let typed = answer(d.request(&r), "typed anoint tooltip");
+                        let tr = answer(d.translated_request(&r), "translated anoint tooltip");
+                        diff(&typed, &tr, &format!("{label} {r}"), &mut out);
+                    }
+                    anoints_compared += 1;
+                }
+            }
+            answer(d.request(r#"{"cmd":"closePopup"}"#), "closePopup");
+            d.typed_error = None;
+            if !out.is_empty() {
+                let k = out.len();
+                out.truncate(10);
+                failures.push(format!(
+                    "{id}: {k} anoint differences\n    {}",
+                    out.join("\n    ")
+                ));
+            }
+        }
     }
     eprintln!(
-        "{compared} gem lists and item databases compared ({items_compared} unique rows): typed {t_typed:.1?}, translated {t_tr:.1?}"
+        "{compared} gem lists and item databases compared ({items_compared} unique rows), {anoints_compared} anoint sorts: typed {t_typed:.1?}, translated {t_tr:.1?}"
     );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -4177,46 +4253,72 @@ fn build_codes_decode() {
     );
 }
 
-/// Node power, the heat map's command, gives the translation's JSON:
-/// combined offence and defence and Full DPS, on a build
-/// (`SESSION_POWER=<substring>` picks others; it is slow on the translation)
-#[test]
-fn node_power_matches_translated() {
-    let data = data();
-    let translated = Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"));
-    let mut d = Dispatcher::new(translated, Some(data), Prefer::Typed);
-    let filter = std::env::var("SESSION_POWER").ok();
-    let mut failures = Vec::new();
-    for (id, path) in mine(corpus()) {
-        let sample = id == "gen-0001";
-        if !filter.as_deref().map_or(sample, |f| id.contains(f)) {
-            continue;
-        }
+/// Node power, the heat map's command (`CalcsTab:PowerBuilder()`): the
+/// powers of the spec's nodes, `powerMax` and the first three cluster
+/// notables' powers, on every tenth corpus build with one of four power
+/// stats in turn, nodes up to a depth of one point; with `POWER_FULL`
+/// every cluster notable at the full depth
+fn node_power_match(data: &TypedData, d: &mut Dispatcher) {
+    use engine::power::{cluster_nodes, power_stats};
+    let full = std::env::var_os("POWER_FULL").is_some();
+    let stats: Vec<String> = power_stats()
+        .into_iter()
+        .filter(|s| !s.ignore_for_nodes)
+        .map(|s| s.label.to_string())
+        .collect();
+    let labels = ["Offence/Defence", "Full DPS", "Life", "Taken Fire dmg"];
+    let builds: Vec<(String, PathBuf)> = corpus()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 10 == 3)
+        .map(|(_, b)| b)
+        .collect();
+    let (mut failures, mut compared, mut clusters) = (Vec::new(), 0, 0);
+    for (n, (id, path)) in mine(builds).into_iter().enumerate() {
+        at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
         );
-        assert!(d.typed_active(), "{id}: not loaded typed");
-        for index in [1, 2] {
-            let req = json!({"cmd": "nodePower", "index": index}).to_string();
-            let t = Instant::now();
-            let typed = answer(d.request(&req), "typed nodePower");
-            let tt = t.elapsed();
-            let t = Instant::now();
-            let tr = answer(d.translated_request(&req), "translated nodePower");
-            eprintln!(
-                "{id} stat {index}: typed {tt:.1?}, translated {:.1?}",
-                t.elapsed()
-            );
-            let mut out = Vec::new();
-            diff(&typed, &tr, "nodePower", &mut out);
-            if !out.is_empty() {
-                out.truncate(8);
-                failures.push(format!("{id} stat {index}:\n  {}", out.join("\n  ")));
+        if !d.typed_active() {
+            continue;
+        }
+        if !full {
+            for r in [
+                json!({"cmd": "control", "path": "tree.nodePowerMaxDepthSelect", "sel": 5}),
+                json!({"cmd": "control", "path": "tree.nodePowerMaxDepthCustom", "text": "1"}),
+            ] {
+                answer(d.request(&r.to_string()), "depth");
             }
         }
+        let label = labels[n % labels.len()];
+        let index = stats.iter().position(|s| s == label).map_or(1, |i| i + 1);
+        let version = engine::pat::gmatch(&xml, "<Spec [^>]-treeVersion=\"([^\"]+)\"")
+            .into_iter()
+            .next()
+            .and_then(|c| c.into_iter().next())
+            .unwrap_or_else(|| data.game.latest_tree_version().to_string());
+        let cluster: Vec<u32> = data
+            .tree(&version)
+            .map(cluster_nodes)
+            .unwrap_or_default()
+            .into_iter()
+            .take(if full { usize::MAX } else { 3 })
+            .collect();
+        let req = json!({"cmd": "nodePower", "index": index, "cluster": cluster}).to_string();
+        let typed = answer(d.request(&req), "typed nodePower");
+        let tr = answer(d.translated_request(&req), "reference nodePower");
+        clusters += typed["ok"]["cluster"].as_object().map_or(0, |c| c.len());
+        let mut out = Vec::new();
+        diff(&typed, &tr, &format!("nodePower {label}"), &mut out);
+        if !out.is_empty() {
+            out.truncate(8);
+            failures.push(format!("{id}:\n  {}", out.join("\n  ")));
+        }
+        compared += 1;
     }
+    eprintln!("{compared} builds' node powers compared, {clusters} cluster notables'");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 

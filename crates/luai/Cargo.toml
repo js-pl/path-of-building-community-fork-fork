@@ -1,0 +1,11 @@
+[package]
+name = "luai"
+description = "The Lua parser and standard library environment the importer and upstream's translated program run; not shipped, see docs/drop-translation.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+lua.workspace = true

@@ -730,7 +730,7 @@ impl Table {
         }
     }
 
-    /// A template slot for a string key (see [`crate::ast::Step::Reserve`]).
+    /// A template slot for a string key (see `luai::ast::Step::Reserve`).
     pub fn reserve(&mut self) {
         if self.lj.obj_newkey(self.objs()) {
             self.resized();

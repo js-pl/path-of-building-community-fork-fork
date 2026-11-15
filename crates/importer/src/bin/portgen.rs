@@ -18,7 +18,7 @@ fn main() {
     let mut im = importer::Importer::new(&src_dir);
     let tables = importer::mod_parser::import(&mut im, &raw).unwrap_or_else(|e| panic!("{e}"));
     let src = im.read(importer::mod_parser::FILE).unwrap();
-    let block = lua::parser::parse(&src).unwrap();
+    let block = luai::parser::parse(&src).unwrap();
     let funcs = portgen::functions_by_offset(&block);
 
     let mut refs = Vec::new();

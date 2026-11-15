@@ -3,8 +3,8 @@
 //! not run; they become [`FuncRef`]s naming where they come from, so the
 //! engine can map each to its Rust port. Anything else fails loudly.
 
-use lua::ast::*;
 use lua::value::{FuncRef, Key, LuaStr, Table, TableRef, Value};
+use luai::ast::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
@@ -88,14 +88,14 @@ impl Env {
     /// references) with the given `...` arguments, or for a file returning a
     /// function, calls it with them; returns what it returns.
     pub fn eval_file(&mut self, file: &str, src: &[u8], args: Vec<Value>) -> Result<Vec<Value>> {
-        let block = lua::parser::parse(src).map_err(|e| EvalError {
+        let block = luai::parser::parse(src).map_err(|e| EvalError {
             file: file.into(),
             line: e.line,
             msg: e.msg,
         })?;
         // `return function(params) ... end` runs its body with `args` as the
         // call's arguments
-        let (body, scope, varargs) = match lua::ast::data_wrapper(&block) {
+        let (body, scope, varargs) = match luai::ast::data_wrapper(&block) {
             Some(f) => {
                 let mut args = args.into_iter();
                 let scope = f
@@ -128,7 +128,7 @@ impl Env {
         names: &[&str],
         locals: HashMap<String, Value>,
     ) -> Result<HashMap<String, Value>> {
-        let block = lua::parser::parse(src).map_err(|e| EvalError {
+        let block = luai::parser::parse(src).map_err(|e| EvalError {
             file: file.into(),
             line: e.line,
             msg: e.msg,
@@ -173,7 +173,7 @@ impl Env {
     /// dotted names, e.g. `data.keystones`), in file order; for modules that
     /// mix data with code, such as `Modules/Data.lua`.
     pub fn eval_assigns(&mut self, file: &str, src: &[u8], targets: &[&str]) -> Result<()> {
-        let block = lua::parser::parse(src).map_err(|e| EvalError {
+        let block = luai::parser::parse(src).map_err(|e| EvalError {
             file: file.into(),
             line: e.line,
             msg: e.msg,
@@ -321,7 +321,7 @@ impl Evaluator<'_> {
                 Ok(())
             }
             Stat::Call(e) => {
-                match lua::ast::iife_body(s) {
+                match luai::ast::iife_body(s) {
                     Some(b) => {
                         self.block(b)?;
                     }
@@ -562,7 +562,7 @@ impl Evaluator<'_> {
                 positions[i] = count;
             }
         }
-        let plan = lua::ast::constructor_plan(fields);
+        let plan = luai::ast::constructor_plan(fields);
         let mut t = Table::with_sizes(plan.asize, plan.hbits);
         for step in plan.steps {
             let (i, template) = match step {

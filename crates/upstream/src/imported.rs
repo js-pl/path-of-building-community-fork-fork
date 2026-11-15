@@ -4,8 +4,8 @@
 
 use crate::host::DataSource;
 use importer::eval;
-use lua::env::Env;
 use lua::{LResult, LuaError, Value};
+use luai::env::Env;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 
@@ -66,7 +66,7 @@ pub fn load_data(
     src: Rc<Vec<u8>>,
     args: &[Value],
 ) -> LResult<Vec<Value>> {
-    let wrapped = lua::parser::parse(&src).is_ok_and(|b| lua::ast::data_wrapper(&b).is_some());
+    let wrapped = luai::parser::parse(&src).is_ok_and(|b| luai::ast::data_wrapper(&b).is_some());
     if !wrapped {
         return evaluate(env, &rel, &src, args);
     }

@@ -895,7 +895,45 @@ function api.nodePower(req)
 	local powerStat = b.treeTab.powerStatList[statIndex]
 	calcsTab.powerStat = powerStat
 	calcsTab.powerMax = nil
-	calcsTab:PowerBuilder()
+	-- The cluster notables `req.cluster` names, by id, in place of the
+	-- tree's every one for this calculation (their powers are each
+	-- calculated alone and leave `powerMax` as it is)
+	local spec = b.spec
+	local tree = spec.tree
+	local clusterMap = tree.clusterNodeMap
+	if req.cluster then
+		local sample = { }
+		for _, id in ipairs(req.cluster) do
+			local node = tree.nodes[id]
+			if node then
+				sample[node.dn] = node
+			end
+		end
+		tree.clusterNodeMap = sample
+	end
+	-- `PowerBuilder` goes through `pairs(spec.nodes)` and shares a
+	-- calculation between nodes of one `modKey`, the first's, though such
+	-- nodes can differ (one in a jewel's radius): that order is LuaJIT's
+	-- string hash's (`spec.nodes` is filled in `pairs` order of the tree's
+	-- nodes, which have the key `root` too). The nodes in ascending order
+	-- of their ids instead, as the typed engine takes them
+	local nodes = spec.nodes
+	local ids = { }
+	for id in pairs(nodes) do
+		t_insert(ids, id)
+	end
+	table.sort(ids)
+	local sorted = { }
+	for _, id in ipairs(ids) do
+		sorted[id] = nodes[id]
+	end
+	spec.nodes = sorted
+	local ok, err = pcall(calcsTab.PowerBuilder, calcsTab)
+	spec.nodes = nodes
+	tree.clusterNodeMap = clusterMap
+	if not ok then
+		error(err, 0)
+	end
 	local nodes = { }
 	for id, node in pairs(b.spec.nodes) do
 		local p = node.power
@@ -908,8 +946,19 @@ function api.nodePower(req)
 			}
 		end
 	end
+	local cluster
+	if req.cluster then
+		cluster = { }
+		for _, id in ipairs(req.cluster) do
+			local p = tree.nodes[id] and tree.nodes[id].power
+			if p and p.singleStat then
+				cluster[tostring(id)] = { single = p.singleStat }
+			end
+		end
+	end
 	local max = calcsTab.powerMax or { }
 	return {
+		cluster = cluster,
 		combined = powerStat == nil or powerStat.stat == nil,
 		max = { single = max.singleStat, offence = max.offence, defence = max.defence,
 			offencePerPoint = max.offencePerPoint, defencePerPoint = max.defencePerPoint },

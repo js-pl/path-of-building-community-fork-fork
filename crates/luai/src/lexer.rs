@@ -310,7 +310,7 @@ impl Lexer<'_> {
         }
         // LuaJIT number suffixes (LL, ULL, i) are not used upstream
         let text = &self.src[start..self.pos];
-        match crate::str_to_number(text) {
+        match lua::str_to_number(text) {
             Some(n) => Ok(n),
             None => self.err(format!(
                 "malformed number '{}'",

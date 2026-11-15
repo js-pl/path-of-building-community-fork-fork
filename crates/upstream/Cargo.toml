@@ -15,6 +15,7 @@ doctest = false
 
 [dependencies]
 lua.workspace = true
+luai.workspace = true
 importer.workspace = true
 
 [build-dependencies]

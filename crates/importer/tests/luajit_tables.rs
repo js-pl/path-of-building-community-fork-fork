@@ -28,7 +28,7 @@ fn pairs_order_matches_luajit() {
         "/../../tests/oracle/tables.jsonl"
     );
     let cases = std::fs::read_to_string(path).expect("tests/oracle/tables.jsonl");
-    let lib = lua::env::Env::new();
+    let lib = luai::env::Env::new();
     let table = lib.global("table");
     let f = |name: &str| table.as_table().unwrap().get_str(name);
     let (insert, remove) = (f("insert"), f("remove"));
