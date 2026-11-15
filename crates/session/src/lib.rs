@@ -13,12 +13,16 @@
 pub mod bundle;
 pub mod dispatch;
 #[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+pub mod paired;
+#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
 mod reference;
 #[cfg(feature = "translation")]
 mod translated;
 pub mod typed;
 
 pub use dispatch::{Dispatcher, Prefer};
+#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+pub use paired::Paired;
 #[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
 pub use reference::Session;
 #[cfg(feature = "translation")]
