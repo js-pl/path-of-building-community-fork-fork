@@ -536,11 +536,6 @@ impl<'d> TypedSession<'d> {
     pub fn item_list_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let input = parse(path).ok_or("no control")?;
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: the item list with a class change popup open"
-            ));
-        }
         self.update_sockets();
         self.refresh_item_list();
         let click = req["click"].as_bool().unwrap_or(false) || req["click"] == json!(1);

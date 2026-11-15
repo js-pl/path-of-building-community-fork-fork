@@ -43,8 +43,9 @@ makes cyclic environments).
 | Tests | Reference today |
 | --- | --- |
 | `equivalence/tests/build_output.rs`, `calcs.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
+| `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{perform,breakdown,calculator,power,item,spec,tree,config,game_data}.rs` (`mods`, `calc_setup`, `items_tab`, `skills` and `config_matches_upstream` retired, see [Retired tests](#retired-tests)) | the translation, live: intermediate state (stores, setup slices, breakdowns, calculator calls, node power) compared slice by slice through `bridge.rs` |
-| `session/tests/typed.rs` (12 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
+| `session/tests/typed.rs` (14 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power, and `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
 | `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
@@ -267,6 +268,11 @@ of them, so each difference is one between the translation and LuaJIT):
     gen-0020's General's Cry, 0 on one oracle run); against the oracle the
     candidates of builds with a mirage are compared without their DPS, and
     mirage candidates (General's Cry, Mirage Archer) are left out;
+  - Bonespire's Intimidating Cry without cost, after a Tempest Shield
+    trigger variant in the same oracle process: upstream keeps state from
+    the builds loaded before (like the shared-state alignments of the
+    session test); `oracle_variants.rs` asks a fresh oracle for a build
+    that differs and lists it as aligned when that one agrees;
   - tied mods in the item editor's corruption and crafting lists
     (`(4-6)% increased Strength/... Dexterity` against `... Intelligence`):
     explained, upstream's `pairs` order. `ItemsTab` gathers them in

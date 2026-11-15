@@ -95,11 +95,6 @@ impl<'d> TypedSession<'d> {
         if req["click"].as_bool() != Some(true) {
             return Err(format!("{NOT_PORTED}: control {path}"));
         }
-        if self.class_popups_open() > 0 {
-            return Err(format!(
-                "{NOT_PORTED}: managing sets with a class change popup open"
-            ));
-        }
         let kind = match path {
             "items.setManage" => SetKind::Item,
             "skills.setManage" => SetKind::Skill,
