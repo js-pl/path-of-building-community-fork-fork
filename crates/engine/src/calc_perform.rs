@@ -284,6 +284,8 @@ pub struct Perform<'a> {
     /// actor it stands on and whether the calculation it comes from is the
     /// Calcs tab's, which its minion's skills are made with
     pub(crate) external: Option<crate::calc_mirage::ExternalMain>,
+    /// The calculation the copy in `main_copy` was made in
+    pub main_copy_env: Option<Box<crate::calc_mirage::CopyEnv>>,
     /// The gem level and quality of the copy in `main_copy`
     pub(crate) main_copy_gem: Option<crate::calc_mirage::GemSums>,
     /// The flags of the copy's mod list in `main_copy`, as its calculation
@@ -772,6 +774,7 @@ pub fn perform<'a>(mut env: Env, input: PerformInput<'a>) -> Result<Perform<'a>>
         mirage: None,
         main_copy: None,
         external: None,
+        main_copy_env: None,
         main_copy_gem: None,
         main_copy_mod_flags: Default::default(),
         ally_life_list: Vec::new(),
