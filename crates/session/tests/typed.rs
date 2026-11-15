@@ -78,8 +78,27 @@ fn oracle() -> bool {
 /// enemy modifiers and exported mods (`<value>|Skill:..` runs). Build codes are compared decoded (zlib and miniz
 /// compress differently).
 fn unordered(v: &mut J) {
+    // A comma list in curse slot order, which follows `pairs` over the
+    // party's curse names
+    let sort_list = |s: &mut String| {
+        let mut parts: Vec<&str> = s.split(", ").collect();
+        parts.sort_unstable();
+        *s = parts.join(", ");
+    };
     match v {
         J::Object(m) => {
+            if let Some(J::String(s)) = m.get_mut("CurseList") {
+                sort_list(s);
+            }
+            if m.get("label").and_then(J::as_str) == Some("Curses and Debuffs")
+                && let Some(J::Array(cells)) = m.get_mut("cells")
+            {
+                for c in cells {
+                    if let Some(J::String(s)) = c.get_mut("text") {
+                        sort_list(s);
+                    }
+                }
+            }
             // Timeless jewel seeds whose totals differ only by the order
             // their weights were added in (the radius' `pairs` order)
             if m.get("class").and_then(J::as_str) == Some("TimelessJewelListControl")
@@ -139,6 +158,20 @@ fn unordered(v: &mut J) {
             }
         }
         J::Array(a) => a.iter_mut().for_each(unordered),
+        // `data.gemForSkill` names whichever alternate Vaal Righteous Fire
+        // `pairs(data.gems)` sets up last
+        J::String(s)
+            if s.contains("Vaal Righteous Fire of Arcane Devotion")
+                || s.contains("VaalRighteousFireAltX") =>
+        {
+            *s = s
+                .replace(
+                    "Vaal Righteous Fire of Arcane Devotion",
+                    "Vaal Righteous Fire",
+                )
+                .replace("VaalRighteousFireAltX", "VaalRighteousFire");
+            unordered(v);
+        }
         J::String(s) if s.contains('\n') => {
             let mut lines: Vec<&str> = s.split('\n').collect();
             let enemy_mods = s.starts_with("^7-----");
@@ -3205,6 +3238,12 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             skipped.push(format!("{id}: {e}"));
             return None;
         }
+        if oracle() && party_curses_ambiguous(d) {
+            skipped.push(format!(
+                "{id}: more party curses than the limit, which upstream picks in `pairs` order"
+            ));
+            return None;
+        }
         let mut out = Vec::new();
         let typed: Vec<J> = ["state", "outputs"]
             .iter()
@@ -3304,6 +3343,32 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
 /// The Party tab's views after a change
 const PARTY_VIEWS: [&str; 3] = ["party", "state", "outputs"];
 
+/// Whether the party's curses are more than its curse limit. Upstream
+/// slots them in `pairs` order over a table keyed by curse name, all of
+/// priority 0, so which ones take the slots follows LuaJIT's string hash,
+/// which it seeds per process: upstream itself differs from run to run.
+/// The translation (and the typed engine) take them in import order.
+fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
+    let save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
+    let xml = save["ok"]["xml"].as_str().unwrap_or("");
+    let Some(start) = xml.find("<ImportedBuffs name=\"Curse\">") else {
+        return false;
+    };
+    let body = &xml[start..];
+    let body = &body
+        [body.find('>').map_or(0, |i| i + 1)..body.find("</ImportedBuffs>").unwrap_or(body.len())];
+    let lines: Vec<&str> = body.lines().collect();
+    let limit = lines
+        .iter()
+        .position(|l| l.trim() == "--- Curse Limit ---")
+        .and_then(|i| lines.get(i + 1))
+        .and_then(|l| l.trim().parse::<usize>().ok())
+        .unwrap_or(1);
+    // A curse is its name line after a "---" separator (or the limit)
+    let curses = lines.iter().filter(|l| l.trim() == "---").count();
+    curses > limit
+}
+
 /// The Party tab's controls (`party.*`) changed at random on corpus builds
 /// with a party: import codes (other builds' exports, invalid text, a
 /// link) to each destination, appended or replacing, Clear, Disable Party
@@ -3345,6 +3410,7 @@ fn party_controls_match(
         }
         let mut rng = Lcg(seed(&id));
         let mut out = Vec::new();
+        let mut ambiguous = false;
         let edits = [
             ("editPartyMemberStats", "PartyMemberStats"),
             ("editAuras", "Aura"),
@@ -3416,6 +3482,13 @@ fn party_controls_match(
                 diff(&typed, &tr, &label, &mut out);
             }
             answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            if oracle() && party_curses_ambiguous(d) {
+                skipped.push(format!(
+                    "{id}: {label}: more party curses than the limit, which upstream picks in `pairs` order"
+                ));
+                ambiguous = true;
+                break;
+            }
             compare_views(d, &PARTY_VIEWS, &label, &mut out);
             // A control's hover tooltip
             let names = [
@@ -3432,7 +3505,7 @@ fn party_controls_match(
             diff(&t, &tr, &format!("{label} {q}"), &mut out);
             steps += 1;
         }
-        if out.is_empty() {
+        if out.is_empty() && !ambiguous {
             compare_saves(d, &format!("{id} after the party edits"), &mut out);
         }
         if !out.is_empty() {
@@ -5401,6 +5474,107 @@ fn timeless_search_match() {
         assert!(most > 10, "{id}: the searches found {most} seeds");
         compare_saves(&mut d, &id, &mut out);
     }
+    assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// The Configuration tab's Mod Browser (a custom modifier group's Add
+/// Mod) in the typed session as in the translated one: its list of
+/// supported lines, the search's ranking, the rows' sources, Add and a
+/// double click appending the line to the group
+#[test]
+fn mod_browser_match() {
+    let data = data();
+    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut out = Vec::new();
+    for id in ["gen-0016", "gen-0032"] {
+        let path = corpus().into_iter().find(|(i, _)| i == id).unwrap().1;
+        let xml = std::fs::read_to_string(path).unwrap();
+        answer(
+            d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
+            "load",
+        );
+        assert!(d.typed_active(), "{id} load: {:?}", d.typed_error);
+        // The shown group's controls get new indices with each Add
+        let open = json!({"open": true});
+        let c = |path: &str, v: J| {
+            let mut r = json!({"cmd": "control", "path": format!("popup.{path}")});
+            for (k, x) in v.as_object().unwrap() {
+                r[k] = x.clone();
+            }
+            r
+        };
+        let button = |name: &str| json!({"cmd": "popupButton", "name": name});
+        let steps = [
+            open.clone(),
+            c("listControl", json!({"sel": 3})),
+            c("search", json!({"text": "  Maximum LIFE "})),
+            c("listControl", json!({"sel": 2, "click": true})),
+            button("whatDoesItDo"),
+            button("save"),
+            open.clone(),
+            c("search", json!({"text": "inc fire dam"})),
+            c("search", json!({"text": "firedam"})),
+            c(
+                "listControl",
+                json!({"sel": 4, "click": true, "doubleClick": true}),
+            ),
+            open.clone(),
+            c("search", json!({"text": "zzzzqqqq"})),
+            button("save"),
+            open.clone(),
+            c("search", json!({"text": "mana"})),
+            c("listControl", json!({"sel": 99999})),
+            button("close"),
+        ];
+        for mut r in steps {
+            if r["open"] == true {
+                let paths: Vec<String> = (1000..1300).map(|n| format!("configTab.{n}")).collect();
+                let tr = answer(
+                    d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+                    "translated controls",
+                );
+                let group = tr["ok"]
+                    .as_object()
+                    .into_iter()
+                    .flatten()
+                    .find(|(_, c)| {
+                        c["shown"] == J::Bool(true) && c["class"] == "CustomModBlockControl"
+                    })
+                    .map(|(p, _)| p.clone())
+                    .expect("a custom modifier group");
+                r = json!({"cmd": "control", "path": format!("{group}.addModBtn"), "click": true});
+            }
+            answer(d.request(&r.to_string()), "typed");
+            assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
+            let label = format!("{id} {r}");
+            compare_views(&mut d, &["state", "outputs"], &label, &mut out);
+            let popups = answer(d.request(r#"{"cmd":"state"}"#), "state")["ok"]["popups"].clone();
+            if popups.as_array().is_some_and(|p| !p.is_empty()) {
+                for index in [1, 2, 7, 999999] {
+                    let q = json!({"cmd": "controlTooltip", "path": "popup.listControl", "index": index})
+                        .to_string();
+                    d.typed_error = None;
+                    let (mut t, mut tr) = (
+                        answer(d.request(&q), "typed"),
+                        answer(d.translated_request(&q), "translated"),
+                    );
+                    assert!(d.typed_error.is_none(), "{label} {q}: {:?}", d.typed_error);
+                    // A row's sources, in the `pairs` order of string keys
+                    // (which LuaJIT seeds per process)
+                    if oracle() {
+                        for v in [&mut t, &mut tr] {
+                            if let Some(a) = v["ok"]["lines"].as_array_mut() {
+                                a.sort_by_key(|l| l.to_string());
+                            }
+                        }
+                    }
+                    diff(&t, &tr, &format!("{label} {q}"), &mut out);
+                }
+            }
+        }
+        compare_saves(&mut d, id, &mut out);
+    }
+    out.truncate(30);
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 

@@ -531,8 +531,18 @@ What remains for the full migration, in order:
    controls are `configTab.<index>`, after every control the tab made: two
    per section, one per option and its label, then each
    `UpdateCustomModsControls` appends one per group of the active set (the
-   old ones stay, hidden; `ConfigUi::blocks`). Add Mod (its mod browser)
-   and the hidden groups' controls stay on the translation. A radius jewel's
+   old ones stay, hidden; `ConfigUi::blocks`). Add Mod's Mod Browser is
+   typed (`typed/mod_browser.rs`, `Modules/ConfigModBrowser.lua`): the
+   supported lines of the tree's nodes (lines the tree combined with the
+   next, `StatLine::combined`; bloodline and ascendancy sources) and
+   mastery effects, of the crafted, item (by their `tradeHashes`), veiled
+   and beastcraft mods at mid range, one per template, sorted; the
+   search's fuzzy ranking, the rows' sources, Add and a double click
+   appending the line to the group (whose controls move to new indices
+   then, as upstream's). `mod_browser_match` drives it on two builds;
+   against the oracle a row's sources are compared unordered (`pairs`
+   order of string keys). The hidden groups' controls stay on the
+   translation. A radius jewel's
    "Attributes in Radius" is the data of its last radius function, as
    each sets `jewelRadiusData[nodeId]` in turn (Transcendent Flesh's
    40 Str in gen-0029).

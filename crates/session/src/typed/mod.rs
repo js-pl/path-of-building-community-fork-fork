@@ -32,6 +32,7 @@ mod items;
 mod items_tab_controls;
 mod list_order;
 mod loadouts;
+mod mod_browser;
 mod node_tooltip;
 mod notes;
 mod party;
