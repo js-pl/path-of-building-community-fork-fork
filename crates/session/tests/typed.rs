@@ -453,7 +453,7 @@ fn session() -> Session {
 
 /// The phases of `typed_session_matches_translated`, with the number of
 /// shards each splits the corpus into
-const PHASES: [(&str, usize); 14] = [
+const PHASES: [(&str, usize); 15] = [
     ("commands", 2),
     ("geometry", 3),
     ("calcs", 3),
@@ -468,6 +468,7 @@ const PHASES: [(&str, usize); 14] = [
     ("overlays", 2),
     ("power", 2),
     ("variants", 2),
+    ("specs", 3),
 ];
 
 /// The typed engine's commands against the translated session's: the
@@ -527,9 +528,10 @@ fn typed_session_matches_translated() {
         "calcs" => calcs_match(data, &mut d, corpus_xml()),
         "variants" => calcs_match(data, &mut d, breakdown_variants()),
         "tree" => {
-            tree_edits_match(&mut d);
+            tree_edits_match(&mut d, corpus_xml());
             tree_controls_match(&mut d);
         }
+        "specs" => tree_edits_match(&mut d, spec_variants()),
         "skills" => skills_edits_match(&mut d),
         "save" => saves_match(&mut d),
         "items" => items_edits_match(&mut d),
@@ -4244,6 +4246,19 @@ fn breakdown_variants() -> Vec<(String, String)> {
     out
 }
 
+/// The variant builds about specs (`equivalence::variants`): jewels that
+/// allocate unconnected nodes, tattoos and timeless jewels
+fn spec_variants() -> Vec<(String, String)> {
+    use equivalence::variants;
+    let mut data = equivalence::typed_build::TypedData::load();
+    let filter = std::env::var("SESSION_FILTER").unwrap_or_default();
+    let mut out = variants::jewel_variants(&mut data);
+    out.extend(variants::tattoo_variants(&mut data));
+    out.extend(variants::timeless_variants(&mut data));
+    out.retain(|(id, _)| id.contains(&filter));
+    out
+}
+
 /// The Calcs tab's breakdowns of `builds`
 fn calcs_match(data: &'static TypedData, d: &mut Dispatcher, builds: Vec<(String, String)>) {
     let (mut failures, mut compared, mut cells, mut aligned) = (Vec::new(), 0, 0, 0);
@@ -4299,16 +4314,15 @@ impl Lcg {
 /// Random sequences of tree edits (clicks on allocated and unallocated
 /// nodes, ascendancies and masteries with an effect chosen, a reset) give
 /// the translation's sidebar, outputs and tree state after each step
-fn tree_edits_match(d: &mut Dispatcher) {
+fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
     let steps_per_build: usize = std::env::var("SESSION_STEPS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(6);
-    for (id, path) in mine(corpus()) {
+    for (id, xml) in mine(builds) {
         at_build(d, &id);
-        let xml = std::fs::read_to_string(&path).unwrap();
         answer(
             d.request(&json!({"cmd": "loadXml", "xml": xml}).to_string()),
             "load",
