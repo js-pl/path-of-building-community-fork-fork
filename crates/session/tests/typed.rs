@@ -216,6 +216,32 @@ fn unordered(v: &mut J) {
                 {
                     *n = short.clone();
                 }
+                // A control's list of mods, which upstream gathers in
+                // `pairs` order and sorts by the first line with numbers
+                // and ranges as `$` (`ItemsTab`'s corruption and crafting
+                // popups): ties in either order
+                if k == "list"
+                    && let J::Array(a) = x
+                    && a.len() > 1
+                    && a.iter().all(J::is_string)
+                {
+                    let norm = |l: &J| {
+                        let s = l.as_str().unwrap_or("").to_lowercase();
+                        let s = s.split('/').next().unwrap_or("").to_string();
+                        let s = engine::pat::gsub(&s, "%(.-%)", "$");
+                        let s = engine::pat::gsub(&s, "[%+%-%%]", "");
+                        engine::pat::gsub(&s, "%d+", "$")
+                    };
+                    let mut i = 0;
+                    while i < a.len() {
+                        let mut j = i + 1;
+                        while j < a.len() && norm(&a[j]) == norm(&a[i]) {
+                            j += 1;
+                        }
+                        a[i..j].sort_by_key(|l| l.to_string());
+                        i = j;
+                    }
+                }
                 // Connectors between two nodes that both link to the other
                 // keep the direction of the node `pairs(tree.nodes)`
                 // visits first; the nodes' table has a string key too
@@ -332,6 +358,8 @@ struct Alternates {
     /// skill whose `Skill:` source `processMod` set last on mods their
     /// skills share, in `pairs(data.skills)` order
     variants: std::collections::HashMap<String, String>,
+    /// The skills of curse gems (marks too)
+    curse_skills: std::collections::HashSet<String>,
     /// A unique's flavour texts but the first, to its first
     /// (`flavourLookup` is read in `pairs` order)
     flavours: Vec<(Vec<String>, Vec<String>)>,
@@ -377,9 +405,18 @@ impl Alternates {
                 flavours.push((t.clone(), list[0].1.clone()));
             }
         }
+        let curse_skills = data
+            .game
+            .skills
+            .gems()
+            .iter()
+            .filter(|g| g.tags.contains("curse"))
+            .map(|g| g.granted_effect.id.clone())
+            .collect();
         Alternates {
             gems,
             variants,
+            curse_skills,
             flavours,
         }
     }
@@ -526,6 +563,43 @@ fn power_sorts_match(d: &mut Dispatcher) {
         if let Ok(dir) = std::env::var("SESSION_DUMP") {
             for (k, v) in [("typed", &typed), ("translated", &tr)] {
                 std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
+            }
+        }
+        let (mut typed, mut tr) = (typed, tr);
+        // `GemSelectControl` calculates the candidates in `pairs` order of
+        // their ids, and a mirage (`CalcMirages`) picks its skill from the
+        // global cache by socket slot, where the candidates calculated
+        // before left theirs: on the oracle, which LuaJIT's string hash
+        // decides, so the candidates of builds with one are compared
+        // without their DPS (and their order, which follows it)
+        let mirage = [
+            "The Saviour",
+            "Tawhoa's Felling",
+            "SupportMirageArcher",
+            "GeneralsCry",
+        ]
+        .iter()
+        .any(|m| xml.contains(m));
+        // A mirage among the candidates (General's Cry, Mirage Archer)
+        // picks from the same cache: on any build, so these candidates
+        // are left out
+        let mirage_gem = |g: &J| {
+            let id = g["id"].as_str().unwrap_or("");
+            id.contains("GeneralsCry") || id.contains("MirageArcher")
+        };
+        if oracle() {
+            for v in [&mut typed, &mut tr] {
+                if let Some(a) = v["ok"]["gems"].as_array_mut() {
+                    a.retain(|g| !mirage_gem(g));
+                    if mirage {
+                        for g in a.iter_mut() {
+                            if let Some(o) = g.as_object_mut() {
+                                o.remove("dps");
+                            }
+                        }
+                        a.sort_by_key(|g| g["id"].to_string());
+                    }
+                }
             }
         }
         let mut out = Vec::new();
@@ -3541,7 +3615,17 @@ fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
         .unwrap_or(1);
     // A curse is its name line after a "---" separator (or the limit)
     let curses = lines.iter().filter(|l| l.trim() == "---").count();
-    curses > limit
+    // The party's curses take the slots the build's own leave free, so
+    // with one of those, too, fewer of them may fit (marks and curses
+    // also share the one mark slot)
+    let own = engine::pat::gmatch(xml, "<Gem [^>]-enabled=\"true\"[^>]-skillId=\"([^\"]+)\"")
+        .iter()
+        .any(|c| {
+            ALTERNATES
+                .get()
+                .is_some_and(|a| a.curse_skills.contains(&c[0]))
+        });
+    curses > limit || (curses > 1 && own)
 }
 
 /// The Party tab's controls (`party.*`) changed at random on corpus builds
