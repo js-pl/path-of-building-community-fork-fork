@@ -222,17 +222,38 @@ of them, so each difference is one between the translation and LuaJIT):
     are skipped (`party_curses_ambiguous`), and the curse list
     (`CurseList`, the Calcs tab's Curses and Debuffs row) is compared
     unordered;
-  - transfigured gem names, `Vaal Righteous Fire` against `... of Arcane
-    Devotion` as a breakdown row's source and in a saved gem: explained,
-    upstream's `pairs` order. `Data.lua` makes the alternate Vaal gems with
-    the base gem's `grantedEffect`, so `data.gemForSkill[grantedEffect]`
-    names whichever of them `pairs(data.gems)` sets up last; compared with
-    the base name against the oracle;
-  - unique flavour text, two uniques (`Duskblight`, a flask) with other
-    lore lines: explained, upstream's `pairs` order. A unique with several
-    flavour texts shows the first `pairs(flavourTable)` gives
-    (`ItemsTab:AddItemTooltip`);
-  - a connector of the 3.21 tree's Necromancer ascendancy, drawn as an arc
-    on one side and a line on the other;
+  - gem names sharing a granted effect, `Vaal Righteous Fire` against
+    `... of Arcane Devotion` or `Explosive Trap` against `... of
+    Shrapnel` as a breakdown row's source and in a saved gem: explained,
+    upstream's `pairs` order. `Data.lua` makes such gems with one
+    `grantedEffect`, so `data.gemForSkill[grantedEffect]` names whichever
+    of them `pairs(data.gems)` sets up last; against the oracle every
+    such name is compared as the group's shortest;
+  - unique flavour text (Queen's Escape, Duskblight, a flask): explained,
+    upstream's `pairs` order. A unique with several flavour texts shows the
+    first `pairs(flavourTable)` gives (`ItemsTab:AddItemTooltip`); compared
+    as the first in data order;
+  - a connector of the 3.21 tree, 26270 to 57283 against 57283 to 26270:
+    explained, upstream's `pairs` order. Both nodes list the other in
+    `out`, the first `pairs(tree.nodes)` visits keeps its direction, and
+    `tree.nodes` has the string key `root` among its numbers, so its
+    layout follows the string hash; compared undirected;
+  - a weapon that uses both hand slots (Oni-Goroshi) compared in a weapon
+    slot while the other holds it: explained, upstream's `pairs` order
+    (the oracle gives the comparison in two of four runs). The two slots
+    disable each other, and `calcs.initEnv` breaks the cycle from the slot
+    `pairs(itemDisablers)` gives first; against the oracle the weapon
+    slots' comparisons of such tooltips are left out;
+  - a shared item set dragged back into the build: explained, upstream's
+    `pairs` order. `ItemSetListControl:ReceiveDrag` adds the set's items in
+    `pairs` order of their slot names, so their ids, and with them every
+    later item step, follow the string hash; that drag is left out
+    against the oracle;
+  - node power `offence` `null` against 0 for builds without damage: a
+    real difference, fixed. `0 / 0` is NaN, and LuaJIT's `math.max(0,
+    NaN)` is NaN (it keeps the left operand only when strictly greater,
+    as x86's `maxsd`; `math.min` alike), where the Lua runtime and the
+    engine's `m_max` kept the left one, as PUC Lua does. Both now follow
+    LuaJIT, a NaN or a -0 on either side giving the right operand;
   - a Calcs cell's list of debuffs (`Maim, Assassin's Mark, Frostbite`) in
     another order: explained with the party's curses above.

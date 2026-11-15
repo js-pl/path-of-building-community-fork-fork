@@ -1621,6 +1621,12 @@ fn items_edits_match(d: &mut Dispatcher) {
                 json!({"cmd": "control", "path": "popup.sharedList", "sel": 1, "moveTo": 3}),
                 json!({"cmd": "closePopup"}),
             ] {
+                // Upstream adds the dragged set's items in `pairs` order of
+                // their slot names, so their ids depend on LuaJIT's string
+                // hash seed, as then do all later item steps
+                if oracle() && r["dragTo"] == "popup.setList" {
+                    continue;
+                }
                 log.push(r.to_string());
                 answer(d.request(&r.to_string()), "shared sets");
                 assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
@@ -2570,7 +2576,9 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
         if fl == tl {
             note_fallback("displayItem", "aligned with a fresh translation");
         } else {
-            diff(&tl, &rl, &format!("{label} {r}.lines"), out);
+            // Under their key, which the canonical forms go by
+            let (tl, rl) = (json!({ "lines": tl }), json!({ "lines": rl }));
+            diff(&tl, &rl, &format!("{label} {r}"), out);
         }
     }
     answer_typed

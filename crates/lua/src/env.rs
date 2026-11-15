@@ -437,9 +437,7 @@ fn install_math(env: &Env) {
                         // LuaJIT keeps the left operand only when it is
                         // strictly greater: a NaN or a -0 on either side
                         // gives the right one
-                        if !(m > x) {
-                            m = x;
-                        }
+                        m = if m > x { m } else { x };
                     }
                     ok1(num(m))
                 }),
@@ -453,9 +451,7 @@ fn install_math(env: &Env) {
                         // LuaJIT keeps the left operand only when it is
                         // strictly less: a NaN or a -0 on either side
                         // gives the right one
-                        if !(m < x) {
-                            m = x;
-                        }
+                        m = if m < x { m } else { x };
                     }
                     ok1(num(m))
                 }),
