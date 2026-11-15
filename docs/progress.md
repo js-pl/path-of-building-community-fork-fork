@@ -458,9 +458,10 @@ What remains for the full migration, in order:
    file. Its popups are typed too: Reset Tree/Tattoos (Remove All
    Tattoos: `RemoveTattooFromNode` of each tattooed node, its override
    dropped, `allMasteryOptions` false, and the tree node's reminder text,
-   which a tattoo without one emptied at load, left empty; with another
-   tree holding tattoos it stays on the translation; `overlays_match`
-   removes them on every tattoo variant), the version drop-down's
+   which a tattoo without one emptied at load, left empty; the tattoo's
+   shared reminder text is emptied only where the other trees' loads
+   already did; `overlays_match` removes them on every tattoo variant,
+   and on a tattooed copy with the first tree's tattoos left), the version drop-down's
    Convert / Copy + Convert (`ConvertToVersion`: a spec restored from the
    active one's undo state on the other version, inserted after it, the
    old one removed or kept, `SetActiveSpec` once with its loadout sync and
