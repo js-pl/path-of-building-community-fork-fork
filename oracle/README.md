@@ -13,9 +13,11 @@ oracle/run.py dump         # write tests/oracle/<id>.json for every corpus build
 oracle/run.py check        # what CI runs: dump twice, compare with tests/oracle
 oracle/run.py coverage     # line coverage, ~25 min on 4 cores, see below
 oracle/run.py generate     # regenerate corpus/generated, see corpus/corpus.toml
+oracle/run.py data-json    # upstream's data tables as JSON into target/oracle-data
 ```
 
-Every command splits the corpus over one LuaJIT process per CPU (`--jobs N`).
+Every command splits the corpus over one LuaJIT process per CPU; `--jobs N`
+goes before the command (`oracle/run.py --jobs 3 dump`).
 
 Only run `generate` and `dump` when the submodule, the corpus, the generator
 or the dumper changed, and commit the result in the same PR. Never edit `tests/oracle` by hand; CI fails
@@ -33,10 +35,33 @@ if the files differ from what upstream produces.
 | `data.lua` | Writes hashes of upstream's raw data tables |
 | `tables.lua` | Writes LuaJIT's `pairs` order for random number-keyed tables (`tables.jsonl`), which `lua::value::Table` reproduces |
 | `json.lua` | The exact JSON encoder both use |
-| `session.lua` | The engine API (`crates/session/lua/session.lua`) on upstream on LuaJIT, JSON lines on stdin and stdout; `Session::oracle` runs it, `SESSION_REFERENCE=oracle` makes it the session test's reference (see `docs/drop-translation.md`); its `oracleOutputs` request loads a build as `dump.lua` does and answers `dump.lua`'s JSON, the reference of `crates/equivalence/tests/oracle_variants.rs`; `oracleLastError` answers the last error with its source position; `oracleValue` answers one of `values.lua`'s values; `oracleCalculator` answers a build's calculator with overrides (`crates/equivalence/tests/calculator.rs`) |
+| `session.lua` | The engine API (`crates/session/lua/session.lua`, moving here in sub-step 8 of [the deletion](../docs/drop-translation.md#step-4-in-sub-steps)) on upstream on LuaJIT, JSON lines on stdin and stdout, with requests of its own; see [The live oracle](#the-live-oracle) |
 | `values.lua` | Upstream's tables for the tests of typed structures (`crates/equivalence/tests/{item,tree,game_data}.rs`): items, passive trees, the data table, encoded with their sharing and functions and read back by `equivalence::lua_json` |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
+
+## The live oracle
+
+`session.lua` answers the engine API's JSON requests (`{"cmd": ...}`) on
+upstream itself, one per line, as `pob serve` does on the typed engine.
+`Session::oracle` (`crates/session/src/reference.rs`) starts it; the tests
+that use it run in CI with `oracle/setup.sh`'s LuaJIT. Besides the engine
+API it answers requests of its own, by the start of the line:
+
+| Request | Answer | Used by |
+| --- | --- | --- |
+| `{"cmd":"oracleOutputs","xml":..,"id":..}` | loads a build as `dump.lua` does and answers its `MAIN` and `CALCS` outputs in `dump.lua`'s JSON | `crates/equivalence/tests/oracle_variants.rs` |
+| `{"cmd":"oracleCalculator","xml":..,"id":..,"cases":[..]}` | loads a build and answers `calcsTab.miscCalculator`: the base outputs and `calcFunc(override)`'s per case, nodes and items by id | `crates/equivalence/tests/calculator.rs` |
+| `{"cmd":"oracleValue","fn":..,"params":..}` | one of `values.lua`'s values | `crates/equivalence/tests/{item,tree,game_data}.rs` |
+| `{"cmd":"oracleLastError"}` | the last error with its source position (the answers leave it out, as the typed engine's errors have none) | the session test, to tell upstream failures apart |
+
+The session test (`crates/session/tests/typed.rs`) takes it as its reference
+with `SESSION_REFERENCE=oracle`, as CI does. Upstream gives some answers in
+`pairs` order over string keys, which LuaJIT seeds per process; the test
+compares those in a canonical form, each case listed with its reason in
+`docs/drop-translation.md`. Upstream also keeps state from the builds a
+process loaded before, so a build that differs is asked of a fresh process
+before it counts as a difference.
 
 ## Output format
 
