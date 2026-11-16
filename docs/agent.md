@@ -45,9 +45,11 @@ Examples of what the user types in the terminal:
    tool call evaluates hundreds of variants on all cores and returns a
    short table. The agent spends tokens on judgement, not on evaluating
    one node per call.
-4. **Applied directly, undone easily.** The agent's changes take effect at
-   once. Each tool call is one labelled undo step, listed in the UI's
-   history, and Ctrl+Z undoes it like any other change.
+4. **Applied directly, undone easily, never lost.** The agent's changes
+   take effect at once. Each tool call is one labelled undo step, and a
+   commit in the build's git history before the tool answers. No tool
+   deletes or replaces a build, and every version can be restored, also
+   after a restart (see [Build history](#build-history)).
 5. **The harness is the user's.** PoB builds no chat window and no
    terminal. The agent runs in whatever terminal the user likes and finds
    PoB through MCP. Nothing depends on one agent.
@@ -173,6 +175,67 @@ no network.
   or socket group. "Why is this node bad?" then needs no ids.
 - **Several builds.** The host can hold several open builds. Tools take an
   optional build and default to the one the UI shows.
+
+## Build history
+
+An agent edits a build directly, so nothing it does may lose one. The
+history is the first thing built, before any verb that changes a build.
+
+**A git repository of builds.** The host keeps its builds in one git
+repository in its own data directory, one file per build
+(`<name>.xml`, the XML `saveXml` writes), on one branch. A fork is a new
+file, not a branch. It's an ordinary repository the user can open with
+any git tool. The host writes it with `gix` (pure Rust, so no git install
+is needed), or with the git CLI if `gix` falls short.
+
+**Commits.**
+
+- **An agent step** is committed before its tool call answers, so a crash
+  can never lose an agent's change. The message is the undo step's label,
+  with trailers for its source and stat change (`Source: agent`,
+  `Full DPS: +3.1%`).
+- **The user's own edits** are coalesced: committed after 10 seconds
+  without a change, before any agent step (so the agent's commits stay
+  separate), and on close. A crash loses at most those seconds of the
+  user's clicks.
+- **The history only grows.** The host never resets, rebases or
+  force-pushes. Restoring a version is a new commit on top, so a restore
+  can be undone too.
+
+**Undo and history.** The session's undo stack covers recent steps in
+memory. The history covers everything, across restarts. Undo past what
+memory holds restores from the history.
+
+**Nothing replaces a build.** No verb deletes a build. Loading a build or
+starting a new one opens a new file; it never overwrites the current one.
+A build closed in the UI stays in the repository.
+
+**Verbs.** `history(build, n)` (the last versions with their labels and
+stat changes), `restore(build, version)`, and `eval` across versions
+(`diff` of two versions is two variants). The UI shows the history with
+a restore button per version.
+
+**What git doesn't protect against.** The user's agent can run shell
+commands, and with them it could delete files PoB can't protect. PoB
+lowers the risk but doesn't remove it:
+
+- the repository is in the host's data directory, outside the folder
+  the agent works in, so a harness that sandboxes writes to its working
+  folder (Claude Code's sandbox, Codex's workspace-write mode) can't
+  touch it;
+- the MCP server's instructions tell the agent never to touch PoB's
+  files outside the tools;
+- `pob host --backup <remote>` pushes the history to a remote the user
+  chooses (a private GitHub repository, another disk), after every commit
+  or on a timer, so a copy lives off the machine. That's the only real
+  protection against a deleted directory, and the doc for setting up the
+  host recommends it.
+
+The harness's own permission prompts remain the user's main guard for
+shell commands.
+
+**Browser-only mode** has no host and no git. It keeps its builds as it
+does today, and snapshots in IndexedDB can come later.
 
 ## The agent API
 
@@ -352,6 +415,11 @@ starts: read GGG's developer docs and terms from the source.
 - **Verbs:** each against the session commands it runs; their numbers are
   already the engine's, which the equivalence tests cover.
 - **The mod weights:** against upstream through the oracle.
+- **The history:** every restored version equals the XML committed for it
+  byte for byte; the history only grows (no commit ever disappears); an
+  agent step is committed before its answer, which a test that kills the
+  host right after the answer checks; no verb removes or overwrites a
+  build file.
 - **The host:** a UI client and an agent client on one host see the same
   versions and the same answers; an edit planned on an old version is
   refused; undoing an agent's step restores the build byte for byte
@@ -369,26 +437,33 @@ starts: read GGG's developer docs and terms from the source.
 
 Each one a PR, as usual:
 
-1. Sub-step 8 of the deletion (the prerequisite).
-2. `crates/agent` with the reading and changing verbs; `pob host
-   --headless`, the control socket and discovery; `pob ctl`.
-3. `pob mcp` and `pob agents install`: Claude Code or Codex in any
+1. **Build history**, `crates/history`: the git repository of builds,
+   commits with labels and trailers, coalescing, restore, the backup
+   push. It stands alone (XML in, versions out) and doesn't depend on
+   the session, so it can start now.
+2. Sub-step 8 of the deletion (the prerequisite for the rest).
+3. `crates/agent` with the reading and changing verbs, on the history
+   from the first edit; `pob host --headless`, the control socket and
+   discovery; `pob ctl`.
+4. `pob mcp` and `pob agents install`: Claude Code or Codex in any
    terminal works on a build.
-4. The web app on the host: the host serves it, the WebSocket transport in
-   `client.ts`, change events, the undo list with sources.
-5. `ui_context` and several open builds.
-6. `eval`, `assumptions`, objectives, constraints, the generators, `best`
+5. The web app on the host: the host serves it, the WebSocket transport in
+   `client.ts`, change events, the undo list with sources, the history
+   with restore.
+6. `ui_context` and several open builds.
+7. `eval`, `assumptions`, objectives, constraints, the generators, `best`
    and `improve`.
-7. `dominating` and `front` with the combination and respec search; jobs
+8. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
-8. The port of the mod weights with its oracle test; `evaluate_item`.
-9. Later: trade and prices, the cloud preview, an agent in the browser, a
-   desktop shell.
+9. The port of the mod weights with its oracle test; `evaluate_item`.
+10. Later: trade and prices, the cloud preview, an agent in the browser, a
+    desktop shell.
 
 ## Decided
 
 - Agent changes are applied directly; each tool call is one labelled undo
-  step.
+  step and one commit in the build's git history.
+- The build history comes first, before any verb that changes a build.
 - The harness runs in the user's own terminal and finds PoB through MCP;
   PoB embeds no terminal and no chat.
 - The build lives in a native host; the browser renders from it.
@@ -400,5 +475,5 @@ Each one a PR, as usual:
 - **design.md.** The host adds a second way to run the app (the web app on
   a native engine in a local process). Should design.md's architecture say
   so once this is accepted?
-- **Where builds live.** The host's own directory, or a folder the user
-  picks (and versions with git if they like).
+- **The backup remote.** Recommended in the docs, or asked for when the
+  host first starts.
