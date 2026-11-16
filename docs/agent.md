@@ -525,9 +525,39 @@ open.
 - **An agent in the browser, later.** `crates/agent` does no I/O, so the
   same verbs can run in the browser's workers for an agent that lives in
   the page.
-- **A desktop shell, later.** Tauri or similar can wrap the host and the
-  web app into one window. [design.md](design.md#goal) keeps a native
-  desktop app out of scope for now, and the host doesn't need one.
+- **A desktop app, later.** [design.md](design.md#goal) keeps a native
+  desktop app out of scope for now, and the host doesn't need one. But
+  the host makes it a packaging step rather than an architecture one, see
+  [A desktop app](#a-desktop-app).
+
+### A desktop app
+
+What the host already gives a desktop version: the native engine (threads,
+mimalloc), the web app served to a client over the WebSocket, builds on
+disk with their history and undo across restarts, `core.bin` made locally
+from upstream's files at the pinned commit, and the agent endpoint and
+`pob agent`, unchanged.
+
+What's left:
+
+- **A window.** Tauri fits: it's Rust, so the host runs in the app's own
+  process, and the UI loads in the system's webview. The UI keeps the
+  WebSocket transport rather than Tauri's own messaging, so the browser
+  and the desktop run the same UI code.
+- **Webviews.** WebView2 on Windows, WKWebView on macOS, WebKitGTK on
+  Linux: the tree's rendering and the workers need checking on each;
+  WebKitGTK is the likeliest to differ.
+- **Installers, signing, updates.** Signed installers for Windows and
+  macOS, and an updater. A data update fetches upstream's files at the new
+  pinned commit and rebuilds `core.bin` on the user's machine, the way
+  upstream's own updater fetches its data files.
+- **First run.** Fetching upstream's data and building `core.bin` takes a
+  while, so the first start shows its progress.
+- **Desktop conveniences.** Opening `.xml` builds from the file manager,
+  build code links, working offline after the first run.
+- **Security.** On a desktop, other programs on the machine can reach a
+  localhost server as easily as pages can, so the token and the `Origin`
+  check matter all the more.
 
 ## Deferred: trade and prices
 
