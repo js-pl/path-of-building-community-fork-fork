@@ -6,10 +6,12 @@ of [the deletion](drop-translation.md#step-4-in-sub-steps), which reshapes
 
 ## The question
 
-PoB has a console panel. In it runs the user's own coding agent (Claude
-Code, Codex, or any other terminal agent). The agent and the user work on
-**the same live build**: the agent's changes show in the tree, items and
-sidebar as it makes them, and the user's changes are visible to the agent.
+The user has PoB open and a terminal next to it. In the terminal runs their
+own coding agent (Claude Code, Codex, or any other agent that speaks MCP).
+The agent finds PoB's tools on its own, with nothing to configure per
+session. The agent and the user work on **the same live build**: the
+agent's changes show in the tree, items and sidebar as it makes them, and
+the user's changes are visible to the agent.
 
 The design is built around one question:
 
@@ -17,7 +19,7 @@ The design is built around one question:
 > truthfully, changes the build the way the user asked, and finds
 > improvements, tradeoffs and strictly better builds efficiently?**
 
-Examples of what the user types in the console:
+Examples of what the user types in the terminal:
 
 - "Why is my chaos resistance so low?" "What does my DPS assume about the
   enemy?"
@@ -30,8 +32,9 @@ Examples of what the user types in the console:
 
 ## Principles
 
-1. **One build, two editors.** One session holds the build. The UI and the
-   agent are both its clients. Neither has a copy that can drift.
+1. **One build, one owner.** Exactly one engine session holds a build. The
+   UI and the agent are both its clients. Neither has a copy that can
+   drift.
 2. **Truthful.** Every number comes from the engine, which the equivalence
    tests hold equal to upstream. Answers state what they assume (the
    config: enemy conditions, buffs, charges), say whether a number is
@@ -42,90 +45,140 @@ Examples of what the user types in the console:
    tool call evaluates hundreds of variants on all cores and returns a
    short table. The agent spends tokens on judgement, not on evaluating
    one node per call.
-4. **The user stays in control.** The agent's changes are labelled,
-   undoable steps. Large changes can be proposals the user previews in the
-   UI and accepts.
-5. **Harness-agnostic.** Nothing depends on one agent. The tools are a
-   shell command every terminal agent can run, and an MCP server for the
-   agents that prefer typed tools. Both come from one schema.
+4. **Applied directly, undone easily.** The agent's changes take effect at
+   once. Each tool call is one labelled undo step, listed in the UI's
+   history, and Ctrl+Z undoes it like any other change.
+5. **The harness is the user's.** PoB builds no chat window and no
+   terminal. The agent runs in whatever terminal the user likes and finds
+   PoB through MCP. Nothing depends on one agent.
 
-## Architecture
+## What runs where
+
+### The constraint that decides it
+
+The agent is a native process on the user's machine (or in a cloud
+container). It can spawn programs and open sockets; it can't reach into a
+browser tab. A browser tab can't spawn programs or listen on a socket. So
+an agent always needs a native piece of PoB to talk to, and the question is
+where the build lives.
+
+**Option A, the tab owns the build.** The engine stays in the browser's
+workers. A native bridge relays the agent's tool calls to the tab.
+
+- The page has to connect to a local port. From a hosted https site,
+  browsers gate that (Chrome's local network access permission, Safari's
+  stricter mixed-content rules), and it breaks differently per browser.
+- The build dies with the tab, and the agent can't work while it's closed.
+- Searches run in wasm: no shared-memory threads without cross-origin
+  isolation ([design.md](design.md#architecture), "Workers"), no mimalloc,
+  and they compete with the UI for the workers.
+
+**Option B, a native host owns the build (chosen).** A local `pob host`
+process holds the sessions on the native engine. The browser renders from
+it, and the agent's tools run in it.
+
+- The engine runs with threads and mimalloc, the fastest it gets
+  ([progress.md](progress.md), the bench).
+- The host serves the web app itself on `127.0.0.1`, so the page and the
+  host share an origin: no browser gating, no CORS.
+- The build lives in a file the host saves after every change. It
+  survives closing the tab or the agent.
+- A native piece is needed anyway (A needs its bridge), and the user who
+  runs a coding agent has native tools already.
+
+The same Rust code is the engine in both places, so the web app keeps its
+browser-only mode for users without an agent. That doesn't change.
+
+### The pieces
 
 ```text
- browser: the web app                         the console panel
-   tabs, tree, items, sidebar                   xterm.js
-        │ WebSocket: the engine API               │ PTY stream
-        │ (the JSON commands the worker takes)    │
- ───────┴──────────────── pob host ───────────────┴───────────────  local process
-   build sessions (the native typed engine, threads, warm caches)
-   change log: versions, labelled undo steps, proposals, the UI's context
-   agent workspace: AGENTS.md, CLAUDE.md, MCP configs; the harness in a PTY
-        │ control socket
- ───────┴──────────────────────────────────────────────────────────
-   pob ctl <verb>   ← the agent runs it in its shell (any harness)
-   pob mcp          ← MCP over stdio, a client of the same socket
+ user's terminal                            browser
+   claude / codex / ...                       the web app (Preact): tabs, tree, items
+     │ MCP over stdio                           │ WebSocket: the engine API
+     │ (the harness spawns it)                  │ + change events
+   pob mcp ───── control socket ──────┐         │
+   pob ctl ───── control socket ──────┤         │
+                                      ▼         ▼
+                      pob host (native, local, long-lived)
+                        build sessions: the typed engine, threads, warm caches
+                        change log: versions, labelled undo steps, sources
+                        jobs: searches on the rayon pool, progress, cancelling
+                        files: the builds on disk, core.bin
+                        serves the web app's static files on 127.0.0.1
 ```
 
-### `pob host`
+| Piece | Runs | Does |
+| --- | --- | --- |
+| the web app | browser | the UI. Its engine is the host over a WebSocket (agent mode) or wasm workers (browser-only mode), behind the one `call(cmd, args)` in `web/src/engine/client.ts` |
+| `pob host` | native, long-lived | owns the builds; answers the engine API for the UI and the agent API for the agent; saves; runs jobs |
+| `pob mcp` | native, spawned by the harness | an MCP server over stdio; finds the host, starts one if none runs, and passes the agent's tool calls to it |
+| `pob ctl` | native, run by hand or by scripts | the same agent API on the command line |
+| `crates/agent` | inside the host | the agent API's verbs; no I/O, so it also builds for wasm |
+| `crates/session`, `crates/engine` | inside the host, or in the browser's workers | exist today |
 
-A local process that owns the build:
+### The interfaces
 
-- **Sessions.** The native typed engine (threads, mimalloc, warm calculator
-  caches). It loads `core.bin`, which `pob bundle` makes locally from the
-  pinned submodule (see [Game data](#game-data)).
-- **The web app.** It serves the built web app on `127.0.0.1` and answers
-  its engine requests over a WebSocket. The web app already reaches its
-  engine through one function, `call(cmd, args)` in
-  `web/src/engine/client.ts`; in hosted mode that call goes to the host
-  instead of the worker. Same commands, same answers. Without a host the
-  web app keeps running on its wasm workers, with no console.
-- **The console.** It spawns the user's chosen harness (`claude`, `codex`,
-  or a command of their own) in a PTY, in an agent workspace, and streams
-  it to an xterm.js panel. The harness logs in with the user's own
-  account; the host never touches its credentials.
-- **The agent workspace.** A directory the host prepares per build: an
-  `AGENTS.md` (read by Codex and others) and a `CLAUDE.md` importing it,
-  with the tools and the truthfulness rules; `.mcp.json` and Codex's MCP
-  config pointing at `pob mcp`; the build's files. `POB_HOST` in the
-  harness's environment tells `pob ctl` where the control socket is.
+1. **The engine API** (exists): the session's JSON commands, shaped like
+   upstream's controls. The UI speaks it, over `postMessage` to a worker
+   or over the WebSocket to the host. Same commands, same answers.
+2. **The agent API** (new): build-level verbs with JSON schemas (below),
+   implemented by `crates/agent` on top of the session. The agent speaks
+   it through `pob mcp` or `pob ctl`.
+3. **Change events** (new): the host tells every client when a build
+   changed: its new version, the undo step's label, and its source (the
+   UI, an agent, a job). The UI re-renders on them; the agent reads them
+   with `changes_since`.
+4. **Discovery** (new): the host writes its control socket's path and a
+   random token to a file only the user can read (under
+   `$XDG_RUNTIME_DIR` on Linux, the user's app data elsewhere). `pob mcp`
+   and `pob ctl` read it; the browser gets the token from the URL the host
+   opens.
 
-Security: the host spawns shells, so a web page must never be able to
-talk to it. It binds to `127.0.0.1` only, the web app connects with a
-random token from the URL the host opens, it checks `Origin` and sends no
-CORS headers. The control socket is a Unix socket (a named pipe on
-Windows), readable only by the user. The harness runs with its own
-permission system; the host doesn't widen it, and PoB's tools need no
-network.
+### How the agent finds PoB
 
-### Live sync
+One-time, `pob agents install` registers `pob mcp` with the harnesses it
+finds, through each one's own mechanism (`claude mcp add --scope user`,
+`codex mcp add`, or their config files). After that, any terminal anywhere
+has PoB's tools. When the agent first calls one, `pob mcp` attaches to the
+running host, or starts one in the background and prints the URL to open.
 
-- **Versions.** Every change to the build, from the UI or the agent, bumps
-  its version and goes into the change log. The UI subscribes and
-  re-renders; the agent reads `changes_since(version)` to see what the user
-  did since its last look.
-- **Labelled undo.** An agent's change is one undo step labelled with what
-  it did (`agent: allocate Heart of Thunder`). Ctrl+Z in the UI undoes it
-  like any other change.
-- **Conflicts.** An agent edit can carry the version it was planned on;
-  if the user changed the build since, the host refuses it and the agent
-  looks again. That's optimistic concurrency, which is enough for one
-  user and one agent.
+The rules for using the tools truthfully go to the model as the MCP server's
+`instructions`, which harnesses pass on, so there is nothing to put in a
+project's `AGENTS.md`. A builds folder can still carry one for game
+knowledge the user wants the agent to have.
+
+### Security
+
+The host runs on the user's machine and edits their files, so a web page
+must never be able to talk to it. It binds to `127.0.0.1` only, the
+browser connects with the token from the URL, the WebSocket checks
+`Origin`, and the host sends no CORS headers. The control socket is a Unix
+socket (a named pipe on Windows) only the user can open. PoB's tools need
+no network.
+
+## Live sync
+
+- **Versions.** Every change to a build, from the UI or the agent, bumps
+  its version and goes into the change log.
+- **Undo.** An agent tool call is one undo step, labelled with what it did
+  and what it changed (`agent: allocate Heart of Thunder, Full DPS +3.1%`).
+  A multi-step tool call (a respec) is still one step. The UI lists the
+  steps with their source, and undo works on them like on the user's own.
+- **Conflicts.** An agent edit can carry the version it was planned on. If
+  the user changed the build since, the host refuses it and the agent looks
+  again. That's optimistic concurrency, which is enough for one user and
+  one agent.
 - **The UI's context.** `ui_context` tells the agent what the user is
-  looking at: the tab, the selected or hovered node, item, gem or socket
-  group, the Calcs tab's section. "Why is this node bad?" then needs no
-  ids.
-- **Proposals.** `propose(changes, note)` doesn't change the build. It
-  shows the change in the UI as a diff: ghost nodes on the tree, items
-  side by side, the sidebar's deltas. The user accepts or rejects it there.
-  A setting decides whether the agent may apply changes directly or
-  proposes them.
+  looking at: the build, the tab, the selected or hovered node, item, gem
+  or socket group. "Why is this node bad?" then needs no ids.
+- **Several builds.** The host can hold several open builds. Tools take an
+  optional build and default to the one the UI shows.
 
-## The tools
+## The agent API
 
-All tools are verbs of `crates/agent`: typed requests and answers with a
-JSON schema, no I/O, run in the host on the build's session. `pob ctl`
-prints their answers as compact text (JSON with `--json`), and `pob mcp`
-exposes the same verbs as MCP tools.
+Verbs of `crates/agent`: typed requests and answers with a JSON schema,
+run in the host on the build's session. `pob mcp` exposes each as an MCP
+tool; `pob ctl` prints their answers as compact text (JSON with `--json`).
 
 ### Reading and explaining
 
@@ -145,10 +198,11 @@ Each edit resolves names, is idempotent, and returns a `StatDiff`:
 spent), `set_mastery`, `set_ascendancy`, `set_gem`, `add_group`,
 `set_main_skill`, `add_item(text)` (as copied in game or from the trade
 site), `equip`, `craft` (bench mods, anoints, eldritch implicits, enchants,
-corruptions), `set_config`, `select_set`, `undo`. `propose(changes)` wraps
-any of them. Each verb maps onto the session's commands (`nodePath`,
-`clickNode`, `setGem`, `addItem`, `craftItem`, `control`, ...), so the
-agent's edits run the same code as the UI's, tested against upstream.
+corruptions), `set_config`, `select_set`, `undo`. `apply(changes)` makes
+several edits one undo step. Each verb maps onto the session's commands
+(`nodePath`, `clickNode`, `setGem`, `addItem`, `craftItem`, `control`, ...),
+so the agent's edits run the same code as the UI's, tested against
+upstream.
 
 ### Evaluating
 
@@ -157,7 +211,7 @@ The primitive every comparison is built on:
 > `eval(variants, stats) -> table`: each variant a list of changes, each
 > evaluated exactly on a copy of the build, all in parallel; the answer
 > one row per variant with the stats asked for, their deltas, and the
-> warnings each variant adds.
+> warnings each variant adds. Nothing changes in the build.
 
 A variant that fits a calculator override (nodes added or removed, an
 item replaced, a flask toggled) costs one misc calculator evaluation,
@@ -193,7 +247,7 @@ over what the engine can already rank:
 | config | pantheon, bandit, flask choice | config |
 | rares | what each stat is worth per slot (the mod weights below); pasted items | the port of `GenerateModWeights` |
 
-The verbs:
+The verbs (none changes the build; the agent applies what the user wants):
 
 - **`dominating(objectives, constraints, budget)`**: changes that are
   better in at least one objective and worse in none, within the budget.
@@ -221,10 +275,11 @@ found", because combinatorial search can't promise the optimum. Searches
 are deterministic: the same build gives the same answer with any thread
 count.
 
-**Jobs.** Searches that take more than a few seconds run as jobs: the
-call returns a job id, progress shows in the UI and through MCP progress
-notifications, and the user can cancel from the UI. Each search has a time
-budget the agent passes.
+**Jobs.** Searches that take more than a few seconds run as jobs in the
+host: the call returns a job id, progress shows in the UI and through MCP
+progress notifications, and the user can cancel from the UI. Each search
+has a time budget the agent passes. A job works on a copy of the build at
+its version, and its answer says which version that was.
 
 ### The mod weights (a port, in `engine`)
 
@@ -246,42 +301,38 @@ or `estimate`, the assumptions that matter, and `not ported: ...` where
 the engine has no answer. Full outputs stay in the host; the agent asks
 for more when it needs it.
 
-### The workspace's instructions
-
-The `AGENTS.md` the host writes holds the rules that make answers
-truthful, for any harness: numbers only from the tools; state the config
-assumptions; say when a number is an estimate; `try` or `eval` before
-changing; never trade defence for DPS without saying so; propose large
-changes; say what a search covered. Game knowledge the engine doesn't have
-(which uniques enable a build, what a Watcher's Eye mod is usually worth)
-goes there too, short. The project can ship and improve it like code.
-
 ## Game data
 
 `core.bin` is made from GGG's game data: upstream exports it from the game
 files and commits it in `src/Data` and `src/TreeData`, each file headed
-"(c) Grinding Gear Games". We read the same files from the submodule at
-build time.
+"(c) Grinding Gear Games", and its own updater downloads those files from
+upstream's GitHub.
 
-**Decision: `core.bin` is never published** for the host. Whoever runs
-`pob host` builds it with `pob bundle` from the pinned submodule, as the
-tests and the web app's build do. GGG's developer docs and terms couldn't
-be read from this environment. Secondary sources quote them as supporting
-no access to in-game data outside GGG's APIs (the passive tree being the
+**Decision: `core.bin` is never published.** `pob host` makes it on the
+user's machine with `pob bundle`, from upstream's files at the pinned
+commit: the submodule in a checkout of this repository, or, for an
+installed `pob`, upstream's files fetched from upstream's GitHub the way
+upstream's updater fetches them. GGG's developer docs and terms couldn't be
+read from this environment. Secondary sources quote them as supporting no
+access to in-game data outside GGG's APIs (the passive tree being the
 stated exception) and forbidding modifying or adapting the game client or
 its data without approval. Read conservatively, a new public copy of the
-data is a step this project doesn't need to take. Hosting the web app will
-need the same question answered for its own bundle; that stays open.
+data is a step this project doesn't need to take. Hosting the browser-only
+web app will need the same question answered for its bundle; that stays
+open.
 
 ## Other ways in
 
-- **Without the UI.** `pob host --headless` and `pob ctl` work in a plain
-  terminal: any agent can work on a build file with no browser at all.
-  This is also the first thing built.
-- **From the phone.** A Claude Code session in the cloud can run
-  `pob host --headless` in its container, and later serve the web app on
-  a preview port.
-- **A desktop shell.** Tauri or similar can later wrap the host and the
+- **Without the UI.** `pob host --headless` with `pob mcp` or `pob ctl`:
+  an agent works on a build file with no browser at all. This is the first
+  thing built.
+- **From the phone.** A Claude Code session in the cloud runs `pob host
+  --headless` in its container, and later serves the web app on a preview
+  port.
+- **An agent in the browser, later.** `crates/agent` does no I/O, so the
+  same verbs can run in the browser's workers for an agent that lives in
+  the page.
+- **A desktop shell, later.** Tauri or similar can wrap the host and the
   web app into one window. [design.md](design.md#goal) keeps a native
   desktop app out of scope for now, and the host doesn't need one.
 
@@ -301,45 +352,53 @@ starts: read GGG's developer docs and terms from the source.
 - **Verbs:** each against the session commands it runs; their numbers are
   already the engine's, which the equivalence tests cover.
 - **The mod weights:** against upstream through the oracle.
-- **The host:** a UI client and a `pob ctl` client on one host see the
-  same versions and the same answers; an agent edit planned on an old
-  version is refused; undo restores the build byte for byte (`saveXml`).
+- **The host:** a UI client and an agent client on one host see the same
+  versions and the same answers; an edit planned on an old version is
+  refused; undoing an agent's step restores the build byte for byte
+  (`saveXml`); a build reopened after the host restarts is the saved one.
 - **Search:** on small move sets, `front` and `dominating` equal an
   exhaustive search; every dominance claim holds in an exact evaluation;
   the same answers with any thread count.
+- **MCP:** a test client spawns `pob mcp`, which starts a host, and drives
+  it through load, edits, `eval`, a search job and undo.
 - **End to end:** Playwright drives the web app on a host while a script
-  runs `pob ctl`; the agent's edit shows in the tree and the sidebar, and
-  a proposal shows its diff.
+  runs `pob ctl`; the agent's edit shows in the tree, the sidebar and the
+  undo list.
 
 ## Steps
 
 Each one a PR, as usual:
 
 1. Sub-step 8 of the deletion (the prerequisite).
-2. `crates/agent` with the reading and changing verbs, `pob host
-   --headless` and `pob ctl`, and the workspace's `AGENTS.md`: Claude Code
-   or Codex in a plain terminal can work on a build.
-3. The web app on the host: the WebSocket transport in `client.ts`, live
-   updates from the change log, labelled undo.
-4. The console panel: the PTY, xterm.js, the harness picker, the
-   workspace files.
-5. `ui_context` and proposals with their diff in the UI.
-6. `eval`, `assumptions`, objectives, constraints, the generators,
-   `best` and `improve`.
+2. `crates/agent` with the reading and changing verbs; `pob host
+   --headless`, the control socket and discovery; `pob ctl`.
+3. `pob mcp` and `pob agents install`: Claude Code or Codex in any
+   terminal works on a build.
+4. The web app on the host: the host serves it, the WebSocket transport in
+   `client.ts`, change events, the undo list with sources.
+5. `ui_context` and several open builds.
+6. `eval`, `assumptions`, objectives, constraints, the generators, `best`
+   and `improve`.
 7. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
 8. The port of the mod weights with its oracle test; `evaluate_item`.
-9. `pob mcp`, generated from the verbs' schemas.
-10. Later: trade and prices, the cloud preview, a desktop shell.
+9. Later: trade and prices, the cloud preview, an agent in the browser, a
+   desktop shell.
+
+## Decided
+
+- Agent changes are applied directly; each tool call is one labelled undo
+  step.
+- The harness runs in the user's own terminal and finds PoB through MCP;
+  PoB embeds no terminal and no chat.
+- The build lives in a native host; the browser renders from it.
+- `core.bin` is never published.
+- Trade and prices are deferred.
 
 ## Questions for the owner
 
-- **The host.** It adds a mode in which the web app runs on a native engine
-  in a local process. That's not the desktop app design.md rules out, but
-  it is a second way to run the app. Should design.md say so?
-- **Default for agent changes.** Applied directly with labelled undo, or
-  proposed for the user to accept.
-- **The default harness** in the picker, and whether to offer only known
-  harnesses or any command.
-- **Where builds live** in the workspace: the host's own directory per
-  build, or a folder the user picks (and versions with git if they like).
+- **design.md.** The host adds a second way to run the app (the web app on
+  a native engine in a local process). Should design.md's architecture say
+  so once this is accepted?
+- **Where builds live.** The host's own directory, or a folder the user
+  picks (and versions with git if they like).
