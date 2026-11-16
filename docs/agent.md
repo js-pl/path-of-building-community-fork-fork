@@ -133,17 +133,19 @@ broadly** and **write narrowly**:
  user's terminal
    pob agent claude ──── starts and attaches to ────┐
                                                     ▼
- ┌─ agent container (untrusted) ─────────────────────────────┐
+ ┌─ agent container (untrusted), on an internal network ────┐
  │  claude / codex / ...     its scratch folder, its login   │
- │    │ MCP over streamable HTTP, a scoped token            │
- │    │ HTTPS to its model provider, through the proxy      │
  └────┼──────────────────────────────────────────────────────┘
-      │ the only route out of the container
+      │ the internal network's only way out
+ ┌────┴─ proxy container: an allowlist ──────────────────────┐
+ │  the model provider's hosts ─────────▶ internet           │
+ │  the agent endpoint ──────────────────▶ pob host          │
+ └────┼──────────────────────────────────────────────────────┘
       ▼
  pob host (native, local, long-lived; trusted)             browser
    agent endpoint: MCP tools, scoped tokens          ◀── the web app (Preact)
-   egress proxy: the model provider's hosts only         WebSocket: engine API
-   build sessions: the typed engine, threads, warm caches     + change events
+   build sessions: the typed engine, threads, warm caches     WebSocket: engine API
+                                                              + change events
    change log, jobs, the builds' git repository, core.bin
    serves the web app's static files on 127.0.0.1
    control socket ◀── pob ctl (the user's own scripts)
@@ -152,7 +154,8 @@ broadly** and **write narrowly**:
 | Piece | Runs | Does |
 | --- | --- | --- |
 | the web app | browser | the UI. Its engine is the host over a WebSocket (agent mode) or wasm workers (browser-only mode), behind the one `call(cmd, args)` in `web/src/engine/client.ts` |
-| `pob host` | native, long-lived | owns the builds and their history; answers the engine API for the UI and the agent API for agents; runs jobs; runs the agent endpoint and the egress proxy |
+| `pob host` | native, long-lived | owns the builds and their history; answers the engine API for the UI and the agent API for agents; runs jobs; runs the agent endpoint |
+| the proxy container | container, beside the agent's | the agent's only way out: an HTTPS proxy that allows the model provider's hosts and the host's agent endpoint, nothing else |
 | `pob agent <harness>` | native, in the user's terminal | starts the agent's container with its MCP config and token, and attaches the terminal to the harness in it |
 | the agent image | container | a small image with the harness CLIs and nothing of PoB's; built from a Dockerfile in this repository |
 | `pob ctl` | native, run by the user | the agent API on the command line over the control socket, for the user's own scripts; never mounted into a container |
@@ -195,21 +198,52 @@ server's `instructions`, which harnesses pass on.
 
 ### The container
 
-- **Runtime.** Docker or Podman; on macOS and Windows their VM-backed
-  versions. `pob agent` finds whichever is installed.
+- **Runtime.** Podman or Docker, whichever is installed; on macOS and
+  Windows their VM-backed versions (see [Windows](#windows)). The
+  container is the default. Running without one takes an explicit
+  `--no-container`.
 - **Files.** The container gets its scratch folder and its login volume.
   It mounts nothing of PoB's: no builds, no history, no `core.bin`, no
   control socket.
-- **Network.** The container's network has no route except to the host's
-  agent endpoint and its egress proxy. The proxy, part of `pob host`,
-  allows HTTPS to the harness's model provider and the hosts the harness
-  needs to run (a list per harness, in the host's config) and nothing
-  else. A hijacked agent can't send a build, a token or anything else to
-  a server of the attacker's.
-- **No escape hatch by default.** `pob agent --no-container` runs the
-  harness unsandboxed in the user's terminal, for users without a
-  container runtime. The tools stay just as narrow, but the shell is then
-  the user's own, and the host says so when it starts one.
+- **Network.** The agent's container sits on an internal network, which
+  both runtimes support and which has no route out. A second, small
+  container joins that network and the normal one, and is the only way
+  out: an HTTPS proxy that allows the harness's model provider, the hosts
+  the harness needs to run (a list per harness, in the host's config),
+  and the host's agent endpoint, nothing else. The harness finds it
+  through `HTTPS_PROXY`. The proxy is a container rather than part of the
+  host so the lockdown works the same on Linux, macOS and Windows, where
+  the runtimes reach the host differently. A hijacked agent can't send a
+  build, a token or anything else to a server of the attacker's.
+- **The explicit override.** `pob agent --no-container` runs the harness
+  unsandboxed in the user's terminal, for users without a container
+  runtime. The tools stay just as narrow, but the shell is then the user's
+  own: it says so each time it starts, and the UI marks that agent as
+  unsandboxed.
+
+### Windows
+
+- **The host** runs as a native Windows process. Its builds and history
+  are under `%LOCALAPPDATA%`, the control socket is a named pipe only the
+  user can open, and the web app is served on `127.0.0.1` as elsewhere.
+- **The containers** run in the WSL 2 VM that Docker Desktop and Podman
+  Desktop (Podman machine) use. The agent's container and the proxy are
+  Linux containers, the same image as everywhere.
+- **Reaching the host.** The proxy reaches the host through the runtime's
+  host name (`host.docker.internal`, `host.containers.internal`). How
+  that maps to the Windows side differs by runtime and by WSL's
+  networking mode (NAT or mirrored), so the agent endpoint's binding is
+  set per runtime: loopback where the runtime forwards to it, otherwise
+  only the WSL virtual adapter's address, never all interfaces. The
+  token is required either way. This needs testing on both runtimes and
+  both modes before it's called supported.
+- **The terminal.** `pob agent claude` works from Windows Terminal or
+  PowerShell; it attaches like `docker run -it`.
+- **The override.** `--no-container` runs the harness natively on Windows
+  where the harness supports that, or inside WSL.
+- **Paths and line endings.** The history repository is written by the
+  host, not by git for Windows, so no `autocrlf` setting changes a
+  build's bytes.
 
 Prior art: Claude Code's documented devcontainer runs the harness in a
 container with a firewall that allows only the hosts it needs. This design
@@ -320,9 +354,12 @@ rewrite it (see [The container](#the-container)); the tools can only add
 commits. With `--no-container` that protection is gone, and the harness's
 own permission prompts are the user's guard.
 
-**Backup.** `pob host --backup <remote>` pushes the history to a remote
-the user chooses (a private GitHub repository, another disk), after every
-commit or on a timer, against losing the disk.
+**Backup, optional.** The history is on one disk. With
+`pob host --backup <remote>` the host also pushes it to a second place the
+user chooses (a private GitHub repository, a folder on another disk),
+against losing that disk, or to have the builds on a second PC. Off by
+default and mentioned in the docs; agents can't touch the history either
+way.
 
 **Browser-only mode** has no host and no git. It keeps its builds as it
 does today, and snapshots in IndexedDB can come later.
@@ -532,7 +569,8 @@ starts: read GGG's developer docs and terms from the source.
   fields, cleaned and capped, and never in `summary` or the searches.
 - **The container:** from inside it, the host's files are absent, the
   control socket is absent, and every host but the agent endpoint and the
-  allowed model provider is unreachable.
+  allowed model provider is unreachable, on each runtime and on Windows
+  in both WSL networking modes.
 - **End to end:** Playwright drives the web app on a host while a script
   runs `pob ctl`; the agent's edit shows in the tree, the sidebar and the
   undo list.
@@ -550,7 +588,8 @@ Each one a PR, as usual:
    untrusted text kept apart from the start, on the history from the first
    edit; `pob host --headless` with the control socket and `pob ctl`.
 4. The agent endpoint (MCP over streamable HTTP, scoped tokens), the
-   egress proxy, the agent image and `pob agent`: Claude Code or Codex in
+   proxy container, the agent image and `pob agent`, on Linux, macOS and
+   Windows (both runtimes): Claude Code or Codex in
    a container works on a build.
 5. The web app on the host: the host serves it, the WebSocket transport in
    `client.ts`, change events, the undo list with sources, the history
@@ -576,14 +615,12 @@ Each one a PR, as usual:
 - The build lives in a native host; the browser renders from it.
 - `core.bin` is never published.
 - Trade and prices are deferred.
+- Podman or Docker by default; `--no-container` is the explicit override.
+- The backup push is optional, off by default.
 
 ## Questions for the owner
 
 - **design.md.** The host adds a second way to run the app (the web app on
   a native engine in a local process). Should design.md's architecture say
   so once this is accepted?
-- **The backup remote.** Recommended in the docs, or asked for when the
-  host first starts.
-- **A container runtime as a requirement.** Docker or Podman for agent
-  mode, with `--no-container` as the explicit unsandboxed fallback; or no
-  fallback at all.
+
