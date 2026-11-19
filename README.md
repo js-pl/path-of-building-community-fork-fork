@@ -50,6 +50,7 @@ cd web
 npm install
 npm run build:wasm   # public/engine.wasm, the typed engine (--translation: with upstream's translated program)
 npm run build:data   # public/data, generated from the submodule, never committed
+npm run build:art    # public/art, the tree's sprite sheets from the submodule, never committed (optional)
 npm run dev
 npm test             # the wasm engine against the translation (cargo build --release -p cli first)
 ```

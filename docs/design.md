@@ -390,9 +390,10 @@ each optimisation's numbers are in `docs/progress.md`.
    item sets, items from text, unique and rare templates, tooltips, and
    crafting with upstream's item editor: bases, affixes, variants, quality,
    influences, catalysts, cluster jewels, enchants, anoints, corruption),
-   config, notes, party, tree, skill and config sets, export (code, link, XML)
-   and builds saved in the browser. Open: compare, character import via
-   OAuth, trade, art for the tree, node power split over several workers.
+   config, notes, party, tree (with upstream's art for trees from 3.20,
+   copied from the submodule at build time), skill and config sets, export
+   (code, link, XML) and builds saved in the browser. Open: compare,
+   character import via OAuth, trade, node power split over several workers.
 6. **Sync.** With the `sync` skill (`.claude/skills/sync/SKILL.md`), on
    request, against the oracle only once the translation is deleted.
 7. **Typed engine.** Done for everything the engine API serves: the typed

@@ -58,7 +58,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/PassiveSpec.lua" = { status = "partial", port = "crates/engine/src/spec.rs crates/engine/src/spec_cluster.rs crates/session/src/typed/save.rs crates/session/src/typed/undo.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveSpecListControl.lua" = { status = "partial", port = "crates/session/src/typed/spec_sets.rs crates/session/lua/session.lua", note = "the Manage Passive Trees popup: rows, selection, a double click to activate, Copy, New, Rename and F2 with the name popup, Delete with its confirmation, rows dragged to reorder; the Items tab drop-down is not ported", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PassiveTree.lua" = { status = "partial", port = "crates/engine/src/tree.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"Classes/PassiveTreeView.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx crates/session/src/typed/tree.rs crates/session/src/typed/geometry.rs crates/session/src/typed/save.rs crates/session/src/typed/node_tooltip.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/PassiveTreeView.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx web/src/ui/treeArt.ts crates/session/src/typed/tree.rs crates/session/src/typed/geometry.rs crates/session/src/typed/save.rs crates/session/src/typed/node_tooltip.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/PathControl.lua" = { status = "todo" }
 "Classes/PoBArchivesProvider.lua" = { status = "todo" }
 "Classes/PoEAPI.lua" = { status = "todo" }
@@ -86,7 +86,7 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "Classes/TradeQueryRateLimiter.lua" = { status = "todo" }
 "Classes/TradeQueryRequests.lua" = { status = "todo" }
 "Classes/TradeStatWeightMultiplierListControl.lua" = { status = "todo" }
-"Classes/TreeTab.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx crates/session/src/typed/tree.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/spec_sets.rs crates/session/src/typed/tree_import.rs crates/session/src/typed/tree_tab.rs crates/session/src/typed/timeless_search.rs crates/session/src/typed/timeless_seeds.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
+"Classes/TreeTab.lua" = { status = "partial", port = "web/src/ui/TreeTab.tsx web/src/ui/treeArt.ts crates/session/src/typed/tree.rs crates/session/src/typed/save.rs crates/session/src/typed/sets.rs crates/session/src/typed/spec_sets.rs crates/session/src/typed/tree_import.rs crates/session/src/typed/tree_tab.rs crates/session/src/typed/timeless_search.rs crates/session/src/typed/timeless_seeds.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Classes/UndoHandler.lua" = { status = "partial", port = "crates/session/src/typed/undo.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/Bases/amulet.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "Data/Bases/axe.lua" = { status = "data", port = "crates/importer", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
@@ -354,41 +354,41 @@ upstream = "a69391d6daaaea1aaf8054668a094aad88dd7eaa"
 "TreeData/3_23_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_24/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_24_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_25/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_25/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_25/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_25_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_25_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_25_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_25_ruthless/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_25_ruthless/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_25_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_25_ruthless_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_25_ruthless_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_25_ruthless_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_26/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_26/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_26/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_26_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_26_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_26_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_26_ruthless/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_26_ruthless/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_26_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_26_ruthless_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_26_ruthless_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_26_ruthless_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_27/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_27/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_27/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_27_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_27_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_27_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_27_ruthless/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_27_ruthless/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_27_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_27_ruthless_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_27_ruthless_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_27_ruthless_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_28/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_28/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_28/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_28_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_28_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_28_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_28_ruthless/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_28_ruthless/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_28_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_28_ruthless_alternate/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_28_ruthless_alternate/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_28_ruthless_alternate/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_29/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_29/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_29/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
-"TreeData/3_29_ruthless/sprites.lua" = { status = "skip", reason = "the tree's sprite sheets and art; no game art is ported" }
+"TreeData/3_29_ruthless/sprites.lua" = { status = "data", port = "web/scripts/build-art.mjs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_29_ruthless/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_6/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }
 "TreeData/3_7/tree.lua" = { status = "data", port = "crates/gamedata/src/lib.rs", sync = "a69391d6daaaea1aaf8054668a094aad88dd7eaa" }

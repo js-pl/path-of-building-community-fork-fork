@@ -32,9 +32,21 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   // An edit the engine does not have yet: a notice, not an error
   const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(null), 6000);
+    return () => clearTimeout(t);
+  }, [notice]);
   const [rev, setRev] = useState(0);
   const [tab, setTab] = useState<Tab>("Tree");
   const [busy, setBusy] = useState(false);
+  // Only a slow edit shows the busy bar, so quick ones never flicker
+  const [showBusy, setShowBusy] = useState(false);
+  useEffect(() => {
+    if (!busy) return setShowBusy(false);
+    const t = setTimeout(() => setShowBusy(true), 150);
+    return () => clearTimeout(t);
+  }, [busy]);
 
   const refresh = useCallback(async () => {
     const s = await engine.call<State>("state");
@@ -80,7 +92,14 @@ export function App() {
   if (!state) {
     return (
       <div class="loading">
-        {error ? <pre class="error">{error}</pre> : <p>Loading the engine and game data...</p>}
+        {error ? (
+          <pre class="error">{error}</pre>
+        ) : (
+          <div class="loading-card">
+            <span class="spinner large" />
+            <p>Loading the engine and game data…</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -88,30 +107,41 @@ export function App() {
   return (
     <div class="app">
       <header class="topbar">
-        <span class="title">{state.name}</span>
-        <nav>
+        <span class="title" title={state.name}>
+          {state.name}
+          {state.unsaved ? <span class="unsaved" title="Unsaved changes" /> : null}
+        </span>
+        <nav class="tabs" role="tablist">
           {tabs.map((t) => (
-            <button key={t} class={t === tab ? "active" : ""} onClick={() => setTab(t)}>
+            <button key={t} role="tab" aria-selected={t === tab} class={t === tab ? "active" : ""} onClick={() => setTab(t)}>
               {t}
             </button>
           ))}
         </nav>
-        {busy ? <span class="busy">calculating...</span> : null}
+        <div class={"busy-bar" + (showBusy ? " shown" : "")} aria-hidden={!showBusy} />
       </header>
       <aside class="sidebar">
         <Sidebar {...props} />
       </aside>
       <main class="content">
-        {error ? (
-          <div class="error-bar" onClick={() => setError(null)}>
-            {error} <span class="dismiss">(dismiss)</span>
-          </div>
-        ) : null}
-        {notice ? (
-          <div class="notice-bar" onClick={() => setNotice(null)}>
-            {notice} <span class="dismiss">(dismiss)</span>
-          </div>
-        ) : null}
+        <div class="toasts">
+          {error ? (
+            <div class="toast error-toast" role="alert">
+              <span>{error}</span>
+              <button class="ghost" title="Dismiss" onClick={() => setError(null)}>
+                ✕
+              </button>
+            </div>
+          ) : null}
+          {notice ? (
+            <div class="toast" role="status">
+              <span>{notice}</span>
+              <button class="ghost" title="Dismiss" onClick={() => setNotice(null)}>
+                ✕
+              </button>
+            </div>
+          ) : null}
+        </div>
         {tab === "Import/Export" ? <ImportTab {...props} /> : null}
         {tab === "Tree" ? <TreeTab {...props} /> : null}
         {tab === "Skills" ? <SkillsTab {...props} /> : null}
