@@ -45,6 +45,8 @@ export type TreeNode = {
   ascendancy?: string;
   stats: string[];
   classStart?: string;
+  // The node's icon in the tree's sprite sheets
+  icon?: string;
   mastery?: boolean;
 };
 
