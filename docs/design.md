@@ -129,6 +129,9 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   version of a build in a git repository of its own, written with the
   installed git; optional, without git nothing is recorded. Its git is
   set in the app's settings (`crates/settings`, [settings.md](settings.md)).
+- **The agent API** (`crates/agent`, [agent.md](agent.md#built-crates-agent)).
+  Build-level verbs on the session's JSON commands, within a grant; no
+  I/O, builds come from a `Store` the host implements on the history.
 
 ## Mirroring upstream
 
