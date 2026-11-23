@@ -1,0 +1,17 @@
+[package]
+name = "agent"
+description = "The agent API: build-level verbs on the session, grants and agent directories, see docs/agent.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+session = { path = "../session", default-features = false }
+engine.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+session = { path = "../session", default-features = false, features = ["source"] }

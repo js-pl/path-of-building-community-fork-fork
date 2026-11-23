@@ -439,6 +439,62 @@ several edits one undo step. Each verb maps onto the session's commands
 so the agent's edits run the same code as the UI's, tested against
 upstream.
 
+### Built: `crates/agent`
+
+The reading and changing verbs above, except `explain`, `assumptions`,
+`ui_context` and `craft` (later steps), as `Agent::call(grant, request)`:
+a request is `{"verb": "...", ...}`, the answer `{"ok": ...}` or
+`{"error": "..."}`. `agent::VERBS` lists them. Decided where the design
+above was silent:
+
+- **Transport-agnostic, no I/O.** Requests and answers are JSON values;
+  builds come from a `Store` (`list`, `read`, `create`, `commit`, `log`,
+  `read_version`; nothing deletes or rewrites). The host implements it on
+  the builds directory and `Recorder::agent_step`; `MemStore` keeps builds
+  in memory for tests. `Agent` isn't `Send` (the typed data isn't), so a
+  host runs it on one thread and passes it the connections' requests.
+- **Naming builds.** `build` is a user's build by its name, which the
+  grant must list, or `agent/<name>` in the caller's own agent directory;
+  without it, the grant's first build. A name outside both is refused
+  without saying whether it exists. An agent's build names are directory
+  names every platform takes as they are (`grant::check_name`).
+- **Grants** (`Grant`): the connection's name (its commits'
+  `Source: agent <name>`), its agent directory and the user's builds it
+  may read and edit. Fixed when the connection is made; no verb takes or
+  changes one. Agent directories are named `<harness>-<UTC time>`
+  (`agent_dir_name`); `copy` and `import` create builds there.
+- **Steps.** Every changing verb runs its changes on the session, saves
+  the XML and commits it through the store before answering; a change
+  that fails, or a commit that fails, puts the build back as it was. A
+  change that changes nothing makes no commit (`unchanged`). The answer
+  has the label (`allocate Heart of Thunder (3 points), Full DPS +3.1%`),
+  the commit, the build's new `version` and the stats that changed
+  (`Full DPS 2.41M → 2.77M (+14.9%)`); Full DPS, EHP, Life and Energy
+  Shield go in the commit's trailers. `expect: <version>` refuses an edit
+  planned on another version. `version` counts the build's changes since
+  the host opened it.
+- **Undo** reloads the XML from before the build's last step (byte for
+  byte as saved), as a new commit; the last 100 steps are kept in memory,
+  older versions through `history` and `restore`, which commits an old
+  version on top (`Source: restore`).
+- **Names.** Nodes as `Name #id`; changes take an id, `#id`, `Name #id`
+  or a name only one node has. Items by slot and base (`Helmet: Hubris
+  Circlet`) with the lines the engine parsed; a line it didn't is counted
+  (`unparsed_lines`), not quoted. A unique's name is shown when the
+  engine's unique list has it. Socket groups and gems by their index in
+  `skills`, counting from 1; a gem name the engine doesn't know isn't
+  quoted. Items in `equip` by the ids `items` gives.
+- **Author text** comes only from `notes` (notes, group labels, set
+  titles, custom modifiers), `items` with `text: true` (names and raw
+  lines) and `export` (the XML), under `untrusted` with a note saying it
+  is data, never instructions; cleaned (colour codes, markup, control and
+  bidirectional characters) and capped, except the export. Warnings that
+  would quote an item's name say "an item" instead.
+- **Limits.** Requests up to 8 MB, items' text 20 kB, 200 changes per
+  `apply`; unknown fields are errors, so a typo isn't ignored.
+- Not ported yet: `export` as JSON, setting the class, custom modifiers
+  through `set_config`.
+
 ### Evaluating
 
 The primitive every comparison is built on:
