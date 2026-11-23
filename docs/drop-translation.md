@@ -185,7 +185,7 @@ not available.
 | 5 | `session::Paired`: the typed `Dispatcher` and a reference `Session` kept in step, the replay out of the `Dispatcher` | merged (#175) |
 | 6 | the web test against the native typed `pob serve` | merged (#174) |
 | 7 | CLI, bench and wasm: `--typed`, `--translated` and `bundle --lua` go, the bench is typed-only, the wasm `translation` feature and `has_translation` go, and so does the `Dispatcher`'s fallback | merged (#180) |
-| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc` (with its `Gc` wrapper and the translated closures' cells), the rest of the fallback code (`Prefer`, the dispatcher's queue); the session test's reference is the oracle only, `crates/session/lua/session.lua` moved to `oracle/api.lua` | done (#188: the oracle as the only reference; the deletion PR after it); confirmed by the owner on 2026-11-15 |
+| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc` (with its `Gc` wrapper and the translated closures' cells), the rest of the fallback code (`Prefer`, the dispatcher's queue); the session test's reference is the oracle only, `crates/session/lua/session.lua` moved to `oracle/api.lua` | done (#188: the oracle as the only reference; #190: the deletion); confirmed by the owner on 2026-11-15 |
 
 What the translation still answered in the session test (and the shipped
 engine answered `not ported` since sub-step 7) is listed in

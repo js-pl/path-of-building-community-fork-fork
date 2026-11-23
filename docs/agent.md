@@ -669,8 +669,8 @@ Each one a PR, as usual:
 1. **Build history**, `crates/history`: a git repository per build,
    commits with labels and trailers, coalescing, restore, the backup
    push; its settings in `crates/settings`. Done (#185, #186).
-2. Sub-step 8 of the deletion (the prerequisite for the rest). Done (#188
-   and the deletion PR after it).
+2. Sub-step 8 of the deletion (the prerequisite for the rest). Done (#188,
+   #190).
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
