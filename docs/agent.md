@@ -2,10 +2,9 @@
 
 Status: decided, being built in the [steps](#steps) below. Step 1, the
 build history, is built (`crates/history`, [history.md](history.md), with
-its settings in `crates/settings`, [settings.md](settings.md)). The
-prerequisite for the rest is sub-step 8 of
-[the deletion](drop-translation.md#step-4-in-sub-steps), which reshapes
-`session::dispatch`.
+its settings in `crates/settings`, [settings.md](settings.md)). Step 2,
+sub-step 8 of [the deletion](drop-translation.md#step-4-in-sub-steps),
+which reshaped `session::dispatch`, is done.
 
 ## The question
 
@@ -670,7 +669,8 @@ Each one a PR, as usual:
 1. **Build history**, `crates/history`: a git repository per build,
    commits with labels and trailers, coalescing, restore, the backup
    push; its settings in `crates/settings`. Done (#185, #186).
-2. Sub-step 8 of the deletion (the prerequisite for the rest).
+2. Sub-step 8 of the deletion (the prerequisite for the rest). Done (#188
+   and the deletion PR after it).
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
