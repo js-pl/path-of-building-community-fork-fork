@@ -69,7 +69,7 @@ pub struct Call {
 }
 
 /// Reads one line of at most [`MAX_LINE`] bytes; `None` at the end
-fn read_line(r: &mut impl BufRead) -> std::io::Result<Option<String>> {
+pub fn read_line(r: &mut impl BufRead) -> std::io::Result<Option<String>> {
     let mut buf = Vec::new();
     let n = r.take(MAX_LINE as u64 + 1).read_until(b'\n', &mut buf)?;
     if n == 0 {

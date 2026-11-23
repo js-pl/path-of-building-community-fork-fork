@@ -28,6 +28,12 @@
 //!                             calls one agent API verb on a running host, with a grant
 //!                             of the builds named; prints the answer as text (JSON with
 //!                             --json); without a verb, lists them
+//!   pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>]
+//!           [--no-start]
+//!                             the agent API as an MCP server on stdio, for a harness on
+//!                             this machine: relays to the host's control socket with a
+//!                             grant of the builds named, and starts a host (`--builds`)
+//!                             when none runs, unless --no-start
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
@@ -231,6 +237,7 @@ fn main() {
         Some("settings") if args.len() <= 3 => settings_cmd(&args[1..]),
         Some("host") => host_cmd(&args[1..]),
         Some("ctl") => ctl(&args[1..]),
+        Some("mcp") => mcp(&args[1..]),
         _ => usage(),
     }
 }
@@ -242,7 +249,8 @@ fn usage() -> ! {
          restore <version> | push <remote>\n       \
          pob settings [key [value]]\n       \
          pob host --headless [--builds <dir>] [--socket <path>]\n       \
-         pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...",
+         pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...\n       \
+         pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]",
     )
 }
 
@@ -485,6 +493,134 @@ fn call_host(
 #[cfg(not(unix))]
 fn call_host(_: &Path, _: &serde_json::Value, _: &serde_json::Value) -> serde_json::Value {
     die("pob ctl: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
+}
+
+fn mcp(args: &[String]) {
+    let (flags, rest) = flags(
+        args,
+        &["--socket", "--builds", "--build", "--agent"],
+        &["--no-start"],
+    );
+    if !rest.is_empty() {
+        usage();
+    }
+    let socket = socket_path(&flags);
+    let builds: Vec<String> = flags
+        .iter()
+        .filter(|(f, _)| *f == "--build")
+        .map(|(_, v)| v.to_string())
+        .collect();
+    let agent_dir = flag(&flags, "--agent").map(String::from);
+    let host_builds = flag(&flags, "--builds").map(String::from);
+    let start = flag(&flags, "--no-start").is_none();
+    let connect = move |harness: &str| -> Result<host::mcp::Relay, String> {
+        let mut hello = serde_json::json!({ "hello": { "harness": harness, "builds": builds } });
+        if let Some(a) = &agent_dir {
+            hello["hello"]["agent"] = serde_json::json!(a);
+        }
+        relay(&socket, &hello, start, host_builds.as_deref())
+    };
+    let stdin = std::io::stdin().lock();
+    let stdout = std::io::stdout().lock();
+    if let Err(e) = host::mcp::stdio(stdin, stdout, connect) {
+        die(e);
+    }
+}
+
+/// A relay to the host on `socket`, started when none runs and `start`
+#[cfg(unix)]
+fn relay(
+    socket: &Path,
+    hello: &serde_json::Value,
+    start: bool,
+    builds: Option<&str>,
+) -> Result<host::mcp::Relay, String> {
+    use host::control::unix::Client;
+    let client = match Client::connect(socket, hello) {
+        Ok(c) => c,
+        Err(e) if !start || socket_answers(socket) => return Err(e),
+        Err(_) => {
+            let (mut child, log) = start_host(socket, builds)?;
+            let deadline = Instant::now() + std::time::Duration::from_secs(30);
+            loop {
+                match Client::connect(socket, hello) {
+                    Ok(c) => break c,
+                    Err(e) => {
+                        if let Ok(Some(status)) = child.try_wait() {
+                            let tail = std::fs::read_to_string(&log).unwrap_or_default();
+                            let tail = tail.lines().last().unwrap_or_default().to_string();
+                            return Err(format!(
+                                "started a host, which stopped ({status}): {tail} (its log: {})",
+                                log.display()
+                            ));
+                        }
+                        if Instant::now() > deadline {
+                            return Err(format!("started a host, but it doesn't answer: {e}"));
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+            }
+        }
+    };
+    let mut client = client;
+    Ok(Box::new(move |req| client.call(req)))
+}
+
+/// Whether a host listens on `socket` (then a failed hello is its answer)
+#[cfg(unix)]
+fn socket_answers(socket: &Path) -> bool {
+    std::os::unix::net::UnixStream::connect(socket).is_ok()
+}
+
+/// Starts `pob host --headless` on `socket`, on its own: its own process
+/// group, its output in `host.log` beside the socket
+#[cfg(unix)]
+fn start_host(
+    socket: &Path,
+    builds: Option<&str>,
+) -> Result<(std::process::Child, PathBuf), String> {
+    use std::os::unix::process::CommandExt;
+    let exe = std::env::current_exe().map_err(|e| format!("starting a host: {e}"))?;
+    let dir = socket.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let log_path = dir.join("host.log");
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .map_err(|e| format!("{}: {e}", log_path.display()))?;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.args(["host", "--headless", "--socket"]).arg(socket);
+    if let Some(b) = builds {
+        cmd.args(["--builds", b]);
+    }
+    let child = cmd
+        .stdin(std::process::Stdio::null())
+        .stdout(log.try_clone().map_err(|e| e.to_string())?)
+        .stderr(log)
+        .process_group(0)
+        .spawn()
+        .map_err(|e| format!("starting a host: {e} (start one with `pob host --headless`)"))?;
+    eprintln!(
+        "pob mcp: started a host (pid {}), its log in {}",
+        child.id(),
+        log_path.display()
+    );
+    Ok((child, log_path))
+}
+
+#[cfg(not(unix))]
+fn relay(
+    _: &Path,
+    _: &serde_json::Value,
+    _: bool,
+    _: Option<&str>,
+) -> Result<host::mcp::Relay, String> {
+    Err(
+        "pob mcp: the control socket is a Unix socket; the named pipe for Windows isn't built yet"
+            .into(),
+    )
 }
 
 /// An answer as indented text: `key: value`, lists as `- item`
