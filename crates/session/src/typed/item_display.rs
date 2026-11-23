@@ -1,4 +1,4 @@
-//! `displayItem` of `lua/session.lua`: the item editor's display item, its
+//! `displayItem` of `oracle/api.lua`: the item editor's display item, its
 //! tooltip (`ItemsTab:AddItemTooltip`) and its controls as `layoutControls`
 //! lists them: upstream's `ItemsTab` controls of the editor (variants,
 //! sockets, enchant and anoint buttons, influences, quality, catalysts,

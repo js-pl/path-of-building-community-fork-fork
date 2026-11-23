@@ -1,7 +1,7 @@
 //! The engine API on the typed engine: a build loaded with
 //! `engine::build`, calculated with `engine::calcs`, and the commands
 //! ported so far answered from it with the JSON the translated session
-//! (`lua/session.lua`) gives. [`crate::Engine`] picks per command.
+//! (`oracle/api.lua`) gives. [`crate::Engine`] picks per command.
 
 mod build_controls;
 mod calcs;

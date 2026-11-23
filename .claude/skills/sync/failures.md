@@ -9,7 +9,7 @@
 | `--test game_data`, `--test item`, `--test tree` | the typed data, items or trees differ from upstream's tables (`oracleValue`) | port the data processing (`crates/gamedata`, `engine::data`, `item`, `tree`) |
 | `--test build_output` | a corpus build's outputs differ from `tests/oracle` | port the calc change (`engine::calc_*`), located through the manifest |
 | `--test oracle_variants`, `--test calculator` | variant builds or calculator overrides differ from the live oracle | as above; `CALCS_FILTER=<id>` narrows the run |
-| the session test (`SESSION_REFERENCE=oracle`) | a command, view or edit answers differently from upstream's | port the tab or control change (`crates/session/src/typed`); if the oracle itself fails, `crates/session/lua/session.lua` reaches a control upstream renamed or moved (`controls.<name>`) |
+| the session test | a command, view or edit answers differently from upstream's | port the tab or control change (`crates/session/src/typed`); if the oracle itself fails, `oracle/api.lua` reaches a control upstream renamed or moved (`controls.<name>`) |
 | `oracle/run.py check` | upstream's outputs depend on the process (string-hash order) | a finding to report, never a tolerance |
 | `sync/check.py` | a file under `src/` is missing from the manifest | see [manifest.md](manifest.md) |
 

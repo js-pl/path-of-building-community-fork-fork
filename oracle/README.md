@@ -34,8 +34,9 @@ if the files differ from what upstream produces.
 | `modparser.lua` | Writes mod parser outputs as JSON lines |
 | `data.lua` | Writes hashes of upstream's raw data tables |
 | `tables.lua` | Writes LuaJIT's `pairs` order for random number-keyed tables (`tables.jsonl`), which `lua::value::Table` reproduces |
+| `api.lua` | The engine API's commands (`{"cmd": ...}`), driving upstream's build mode the way its UI does; the typed engine answers the same JSON |
 | `json.lua` | The exact JSON encoder both use |
-| `session.lua` | The engine API (`crates/session/lua/session.lua`, moving here in sub-step 8 of [the deletion](../docs/drop-translation.md#step-4-in-sub-steps)) on upstream on LuaJIT, JSON lines on stdin and stdout, with requests of its own; see [The live oracle](#the-live-oracle) |
+| `session.lua` | The engine API (`api.lua`) on upstream on LuaJIT, JSON lines on stdin and stdout, with requests of its own; see [The live oracle](#the-live-oracle) |
 | `values.lua` | Upstream's tables for the tests of typed structures (`crates/equivalence/tests/{item,tree,game_data}.rs`): items, passive trees, the data table, encoded with their sharing and functions and read back by `equivalence::lua_json` |
 | `luacov.lua` | luacov config: `Modules/Calc*.lua` and `Modules/ModParser.lua` |
 | `run.py` | Reads `corpus/corpus.toml` and runs the scripts above |
@@ -56,8 +57,8 @@ API it answers requests of its own, by the start of the line:
 | `{"cmd":"oracleValue","fn":..,"params":..}` | one of `values.lua`'s values | `crates/equivalence/tests/{item,tree,game_data}.rs` |
 | `{"cmd":"oracleLastError"}` | the last error with its source position (the answers leave it out, as the typed engine's errors have none) | the session test, to tell upstream failures apart |
 
-The session test (`crates/session/tests/typed.rs`) takes it as its reference
-with `SESSION_REFERENCE=oracle`, as CI does. Upstream gives some answers in
+The session test (`crates/session/tests/typed.rs`) takes it as its only
+reference. Upstream gives some answers in
 `pairs` order over string keys, which LuaJIT seeds per process; the test
 compares those in a canonical form, each case listed with its reason in
 `docs/drop-translation.md`. Upstream also keeps state from the builds a

@@ -1,5 +1,5 @@
 //! The Notes tab (`Classes/NotesTab.lua`): `notes` and `setNotes` of
-//! `lua/session.lua`, on the text the tab's edit control holds.
+//! `oracle/api.lua`, on the text the tab's edit control holds.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 

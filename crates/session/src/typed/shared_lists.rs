@@ -136,9 +136,11 @@ impl<'d> TypedSession<'d> {
             .sets
             .iter()
             .map(|s| {
-                let slots: Vec<J> = s
-                    .slots
-                    .iter()
+                // By slot name, as upstream keeps them in a table by name
+                let mut slots: Vec<&(String, Arc<Item>)> = s.slots.iter().collect();
+                slots.sort_by(|a, b| a.0.cmp(&b.0));
+                let slots: Vec<J> = slots
+                    .into_iter()
                     .map(|(slot, i)| {
                         let mut o = item(i);
                         o["slot"] = json!(slot);

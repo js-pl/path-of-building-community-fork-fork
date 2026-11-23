@@ -1,5 +1,5 @@
 //! The tree view's node tooltip (`PassiveTreeView:AddNodeTooltip`, with
-//! `AddNodeName`): `nodeTooltip` of `lua/session.lua`, with the stat
+//! `AddNodeName`): `nodeTooltip` of `oracle/api.lua`, with the stat
 //! comparisons of allocating or unallocating the node and its path.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.

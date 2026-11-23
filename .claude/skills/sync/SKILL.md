@@ -57,7 +57,7 @@ for what you ported, and the full set once at the end:
 
 - `cargo test --release -p equivalence --test <name>`; `CALCS_FILTER=<id>`
   narrows to one build;
-- `SESSION_REFERENCE=oracle SESSION_PHASES=<phases> cargo test --release -p
+- `SESSION_PHASES=<phases> cargo test --release -p
   session --test typed`.
 
 When a test fails and the cause isn't plain from its output, look the test
@@ -73,8 +73,8 @@ upstream change you did not port, and say why in the PR.
 
 ## Done
 
-`sync/check.py`, `cargo test --release` with `SESSION_REFERENCE=oracle`
-(as `.github/workflows/ci.yml`), `oracle/run.py check` and the wasm tests
+`sync/check.py`, `cargo test --release` (on `oracle/setup.sh`'s LuaJIT, as
+`.github/workflows/ci.yml`), `oracle/run.py check` and the wasm tests
 pass. The PR lists the upstream commit range with links, what was ported
 where, and the `todo` files left out. If something still fails after a few
 attempts, open an issue with the upstream commit and the failing tests

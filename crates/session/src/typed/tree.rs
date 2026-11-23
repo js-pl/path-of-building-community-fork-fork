@@ -1,6 +1,6 @@
 //! The tree tab's edits and views (`clickNode`, `selectMastery`,
 //! `resetTree`, `treeState`, `nodePath`, `masteryOptions`, `treeSpecs`,
-//! `powerStats` of `lua/session.lua`) on the typed spec
+//! `powerStats` of `oracle/api.lua`) on the typed spec
 //! (`PassiveSpec:AllocNode`, `DeallocNode`, ...).
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.

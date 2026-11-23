@@ -1,11 +1,11 @@
-//! [`Paired`]: the typed engine with a reference [`Session`] (the oracle,
-//! or the translation) kept in step, for the tests that compare the two.
+//! [`Paired`]: the typed engine with a reference [`Session`] (upstream on
+//! the oracle's LuaJIT) kept in step, for the tests that compare the two.
 //! Each build-changing request the typed engine answers is queued and
 //! replayed on the reference before the reference answers anything; a
 //! request the typed engine does not answer goes to the reference, which
 //! then holds the build until the next load.
 
-use crate::dispatch::{Prefer, Replay};
+use crate::dispatch::Replay;
 use crate::typed::TypedData;
 use crate::{Dispatcher, Session};
 use serde_json::{Value as J, json};
@@ -64,8 +64,8 @@ pub(crate) fn outlives_build(json: &str) -> bool {
 
 /// A typed [`Dispatcher`] and a reference [`Session`] in step
 pub struct Paired<'d> {
-    /// The typed engine; none to answer everything on the reference
-    typed: Option<Dispatcher<'d>>,
+    /// The typed engine
+    typed: Dispatcher<'d>,
     reference: Session,
     /// Requests the typed engine answered that the reference has not seen
     pending: Vec<String>,
@@ -83,14 +83,10 @@ pub struct Paired<'d> {
 
 impl<'d> Paired<'d> {
     /// The typed engine on `data` with `reference`, whose empty build it
-    /// does not hold yet. `prefer` is the dispatcher's, as `Dispatcher::new`
-    /// took it.
-    pub fn new(reference: Session, data: Option<&'d TypedData>, prefer: Prefer) -> Paired<'d> {
-        let typed = data.filter(|_| prefer == Prefer::Typed).map(|d| {
-            let mut t = Dispatcher::typed(d);
-            t.record_replays = true;
-            t
-        });
+    /// does not hold yet
+    pub fn new(reference: Session, data: &'d TypedData) -> Paired<'d> {
+        let mut typed = Dispatcher::typed(data);
+        typed.record_replays = true;
         Paired {
             typed,
             reference,
@@ -103,13 +99,13 @@ impl<'d> Paired<'d> {
     }
 
     /// The reference session
-    pub fn translated(&self) -> &Session {
+    pub fn reference(&self) -> &Session {
         &self.reference
     }
 
     /// Whether the typed engine holds the current build
     pub fn typed_active(&self) -> bool {
-        !self.lost && self.typed.as_ref().is_some_and(Dispatcher::typed_active)
+        !self.lost && self.typed.typed_active()
     }
 
     /// Answers one JSON request: the typed engine's answer, or the
@@ -122,9 +118,8 @@ impl<'d> Paired<'d> {
         if held || load {
             self.typed_error = None;
         }
-        if (held || load)
-            && let Some(typed) = self.typed.as_mut()
-        {
+        if held || load {
+            let typed = &mut self.typed;
             let r = typed.request(json)?;
             let answered = typed.typed_answered;
             let error = typed.typed_error.clone();
@@ -151,9 +146,7 @@ impl<'d> Paired<'d> {
         // A gem slot's list leaves its calculations' selections on the gems
         let gem_slot = cmd == "gemList" && !req["group"].is_null();
         if gem_slot || !READ_ONLY.contains(&cmd.as_str()) {
-            if let Some(t) = self.typed.as_mut() {
-                t.drop_build();
-            }
+            self.typed.drop_build();
             self.lost = true;
             self.shared_unknown = true;
         }
@@ -173,9 +166,7 @@ impl<'d> Paired<'d> {
                     self.sync()?;
                     let lists = self.reference.request(r#"{"cmd":"sharedLists"}"#)?;
                     let v: J = serde_json::from_str(&lists).unwrap_or_default();
-                    if let Some(t) = self.typed.as_mut() {
-                        t.set_shared(&v["ok"]);
-                    }
+                    self.typed.set_shared(&v["ok"]);
                     self.shared_unknown = false;
                 }
                 if self.pending.iter().any(|r| outlives_build(r)) {
@@ -192,7 +183,7 @@ impl<'d> Paired<'d> {
     /// it is not replayed, so both have saved (and re-parsed their items)
     /// as often. So is a gem slot's list asked again just after, whose
     /// calculations leave selections on the gems.
-    pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
+    pub fn reference_request(&mut self, json: &str) -> Result<String, String> {
         let is_save = |r: &str| {
             serde_json::from_str::<J>(r)
                 .ok()

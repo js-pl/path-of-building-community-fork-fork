@@ -1,15 +1,13 @@
-//! The typed engine's commands give the translated session's JSON, for
+//! The typed engine's commands give the oracle's JSON, for
 //! every corpus build. `SESSION_FILTER=<substring>[,<substring>…]` limits the builds.
 
 use serde_json::{Value as J, json};
 use session::typed::{TypedData, TypedSession};
 // The typed engine with its reference kept in step, under the name the
 // tests were written with
-use session::{Paired as Dispatcher, Prefer, Session};
+use session::{Paired as Dispatcher, Session};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::time::{Duration, Instant};
-use upstream::imported::Imported;
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -56,21 +54,13 @@ fn answer(r: Result<String, String>, what: &str) -> J {
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{what}: {e}: {text}"))
 }
 
-/// Where two JSON values differ, as paths. Against the oracle, in their
-/// canonical forms ([`unordered`]).
+/// Where two JSON values differ, as paths, in their canonical forms
+/// ([`unordered`])
 fn diff(a: &J, b: &J, path: &str, out: &mut Vec<String>) {
-    if oracle() {
-        let (mut a, mut b) = (a.clone(), b.clone());
-        unordered(&mut a);
-        unordered(&mut b);
-        return diff_values(&a, &b, path, out);
-    }
-    diff_values(a, b, path, out)
-}
-
-/// Whether the reference is the oracle (`SESSION_REFERENCE=oracle`)
-fn oracle() -> bool {
-    std::env::var("SESSION_REFERENCE").is_ok_and(|r| r == "oracle")
+    let (mut a, mut b) = (a.clone(), b.clone());
+    unordered(&mut a);
+    unordered(&mut b);
+    diff_values(&a, &b, path, out)
 }
 
 /// What upstream gives in `pairs` order over string or table keys, which
@@ -151,7 +141,7 @@ fn unordered(v: &mut J) {
                 {
                     *x = J::String(xml);
                 }
-                // LuaJIT names what it indexed; the translation does not
+                // LuaJIT names what it indexed; the oracle does not
                 if k == "error"
                     && let J::String(e) = x
                     && let Some(i) = e.find("attempt to index ")
@@ -363,7 +353,7 @@ fn diff_values(a: &J, b: &J, path: &str, out: &mut Vec<String>) {
                 diff_values(u, v, &format!("{path}[{i}]"), out);
             }
         }
-        _ if a != b => out.push(format!("{path}: typed {a}, translated {b}")),
+        _ if a != b => out.push(format!("{path}: typed {a}, oracle {b}")),
         _ => {}
     }
 }
@@ -474,16 +464,12 @@ impl Alternates {
     }
 }
 
-/// The reference session: the translation, or with
-/// `SESSION_REFERENCE=oracle` upstream on LuaJIT (`oracle/session.lua`)
+/// The reference session: upstream on LuaJIT (`oracle/session.lua`)
 fn session() -> Session {
-    if oracle() {
-        return Session::oracle(&src()).unwrap_or_else(|e| panic!("{e}"));
-    }
-    Session::new(Rc::new(Imported::new(src()))).unwrap_or_else(|e| panic!("{e}"))
+    Session::oracle(&src()).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// The phases of `typed_session_matches_translated`, with the number of
+/// The phases of `typed_session_matches_oracle`, with the number of
 /// shards each splits the corpus into
 const PHASES: [(&str, usize); 16] = [
     ("commands", 2),
@@ -504,16 +490,15 @@ const PHASES: [(&str, usize); 16] = [
     ("specs", 3),
 ];
 
-/// The typed engine's commands against the translated session's: the
+/// The typed engine's commands against the oracle's: the
 /// sidebar and outputs, the tree's geometry, the Calcs tab, tree, skills
 /// and item edits, the saved files and the tooltips, each over the corpus. Each phase runs on shards of the
-/// corpus, each in a process of its own with one data and one translated
-/// session (`testkit::run_shards`): the translation keeps about 12 MB of
-/// every build it loads. `SESSION_PHASES=calcs,tree` runs only these,
+/// corpus, each in a process of its own with one data and one oracle
+/// session (`testkit::run_shards`). `SESSION_PHASES=calcs,tree` runs only these,
 /// `SESSION_SHARDS=<n>` splits each phase in `n` shards.
 #[test]
-fn typed_session_matches_translated() {
-    let test = "typed_session_matches_translated";
+fn typed_session_matches_oracle() {
+    let test = "typed_session_matches_oracle";
     let Some(shard) = testkit::shard() else {
         let phases = std::env::var("SESSION_PHASES").unwrap_or_default();
         let run = |p: &str| phases.is_empty() || phases.split(',').any(|x| x == p);
@@ -547,13 +532,7 @@ fn typed_session_matches_translated() {
     let (k, n) = part.split_once('/').unwrap();
     SHARD.set((k.parse().unwrap(), n.parse().unwrap())).unwrap();
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
-    // Every skill's `hasGlobalEffect` as after its first calculation, as
-    // the typed engine has it (`docs/progress.md`, "Upstream quirks")
-    if let Some(host) = d.translated().host() {
-        host.look_up_skill_stats(true)
-            .unwrap_or_else(|e| panic!("{}", lua::to_string(e.value())));
-    }
+    let mut d = Dispatcher::new(session(), data);
     at_build(&mut d, "");
     match phase {
         "commands" => commands_match(data, &mut d),
@@ -585,7 +564,7 @@ fn typed_session_matches_translated() {
 /// gem slot: `GemSelectControl`'s list, each gem's DPS in the slot) and the
 /// Items tab's item databases (`controls` of `items.uniqueDB` sorted by a
 /// stat and searched, its inputs, `items.rareDB` searched) give the
-/// translation's, on every eighth corpus build
+/// oracle's, on every eighth corpus build
 /// Power stats the anoint popup is sorted by per build, and its rows
 /// hovered after each
 const ANOINT_SORTS: usize = 4;
@@ -622,10 +601,10 @@ fn power_sorts_match(d: &mut Dispatcher) {
             continue;
         }
         let t = Instant::now();
-        let tr = answer(d.translated_request(&req), "translated gemList");
+        let tr = answer(d.reference_request(&req), "oracle gemList");
         t_tr += t.elapsed();
         if let Ok(dir) = std::env::var("SESSION_DUMP") {
-            for (k, v) in [("typed", &typed), ("translated", &tr)] {
+            for (k, v) in [("typed", &typed), ("oracle", &tr)] {
                 std::fs::write(format!("{dir}/{id}-{k}.json"), v.to_string()).unwrap();
             }
         }
@@ -651,18 +630,16 @@ fn power_sorts_match(d: &mut Dispatcher) {
             let id = g["id"].as_str().unwrap_or("");
             id.contains("GeneralsCry") || id.contains("MirageArcher")
         };
-        if oracle() {
-            for v in [&mut typed, &mut tr] {
-                if let Some(a) = v["ok"]["gems"].as_array_mut() {
-                    a.retain(|g| !mirage_gem(g));
-                    if mirage {
-                        for g in a.iter_mut() {
-                            if let Some(o) = g.as_object_mut() {
-                                o.remove("dps");
-                            }
+        for v in [&mut typed, &mut tr] {
+            if let Some(a) = v["ok"]["gems"].as_array_mut() {
+                a.retain(|g| !mirage_gem(g));
+                if mirage {
+                    for g in a.iter_mut() {
+                        if let Some(o) = g.as_object_mut() {
+                            o.remove("dps");
                         }
-                        a.sort_by_key(|g| g["id"].to_string());
                     }
+                    a.sort_by_key(|g| g["id"].to_string());
                 }
             }
         }
@@ -728,7 +705,7 @@ fn power_sorts_match(d: &mut Dispatcher) {
                 break;
             }
             let t = Instant::now();
-            let tr = answer(d.translated_request(&req), "translated item db");
+            let tr = answer(d.reference_request(&req), "oracle item db");
             t_tr += t.elapsed();
             let mut out = Vec::new();
             diff(&typed, &tr, &format!("itemDb {k}"), &mut out);
@@ -791,13 +768,13 @@ fn power_sorts_match(d: &mut Dispatcher) {
                     let label = format!("anoint sort {sel}");
                     let r = r#"{"cmd":"state"}"#;
                     let typed = answer(d.request(r), "typed state");
-                    let tr = answer(d.translated_request(r), "translated state");
+                    let tr = answer(d.reference_request(r), "oracle state");
                     diff(&typed, &tr, &label, &mut out);
                     for index in 1..=ANOINT_ROWS {
                         let r = json!({"cmd": "controlTooltip", "path": "popup.notableDB", "index": index})
                             .to_string();
                         let typed = answer(d.request(&r), "typed anoint tooltip");
-                        let tr = answer(d.translated_request(&r), "translated anoint tooltip");
+                        let tr = answer(d.reference_request(&r), "oracle anoint tooltip");
                         diff(&typed, &tr, &format!("{label} {r}"), &mut out);
                     }
                     anoints_compared += 1;
@@ -816,7 +793,7 @@ fn power_sorts_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{compared} gem lists and item databases compared ({items_compared} unique rows), {anoints_compared} anoint sorts: typed {t_typed:.1?}, translated {t_tr:.1?}"
+        "{compared} gem lists and item databases compared ({items_compared} unique rows), {anoints_compared} anoint sorts: typed {t_typed:.1?}, oracle {t_tr:.1?}"
     );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
@@ -911,7 +888,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
         for n in nodes {
             let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
             let typed = answer(d.request(&req), "typed");
-            let tr = answer(d.translated_request(&req), "translated");
+            let tr = answer(d.reference_request(&req), "oracle");
             let mut lines = Vec::new();
             diff(&typed, &tr, &req, &mut lines);
             if !lines.is_empty() {
@@ -922,7 +899,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
         // `ReplaceNode` wipes the reminder text a node reads from the
         // shared tree node (`wipeTable(old.reminderText)`), for every later
         // build of the process: a tooltip that differs is asked again of a
-        // fresh translation, and aligned when that one agrees
+        // fresh oracle session, and aligned when that one agrees
         if !recheck.is_empty() {
             let fresh = session();
             let load = json!({"cmd": "loadXml", "xml": xml}).to_string();
@@ -989,7 +966,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 let req =
                     json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
                 let typed = answer(d.request(&req), "typed");
-                let tr = answer(d.translated_request(&req), "translated");
+                let tr = answer(d.reference_request(&req), "oracle");
                 diff(&typed, &tr, &format!("{label} first tree {req}"), &mut out);
                 compared += 1;
             }
@@ -1005,7 +982,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 answer(d.request(&r.to_string()), "remove tattoos");
                 assert!(d.typed_active(), "{id} {r}: {:?}", d.typed_error);
             }
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             let label = format!("{id} tattoos removed");
             compare_views(
                 d,
@@ -1014,7 +991,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 &mut out,
             );
             compare_saves(d, &label, &mut out);
-            // The nodes' tooltips; a fresh translation for those the
+            // The nodes' tooltips; a fresh oracle session for those the
             // process-wide reminder text wipe changed
             let tattooed: Vec<u32> = xml
                 .split("<Override ")
@@ -1025,7 +1002,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
             for n in tattooed {
                 let req = json!({"cmd": "nodeTooltip", "id": n}).to_string();
                 let typed = answer(d.request(&req), "typed");
-                let tr = answer(d.translated_request(&req), "translated");
+                let tr = answer(d.reference_request(&req), "oracle");
                 let mut lines = Vec::new();
                 diff(&typed, &tr, &format!("{label} {req}"), &mut lines);
                 if !lines.is_empty() {
@@ -1076,7 +1053,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
                 let req =
                     json!({"cmd": "nodeTooltip", "id": n.parse::<u32>().unwrap()}).to_string();
                 let typed = answer(d.request(&req), "typed");
-                let tr = answer(d.translated_request(&req), "translated");
+                let tr = answer(d.reference_request(&req), "oracle");
                 diff(&typed, &tr, &format!("{label} {req}"), &mut out);
                 compared += 1;
             }
@@ -1095,7 +1072,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
     }
     spec_versions_match(d, &mut failures);
     eprintln!(
-        "{compared} overlay node tooltips compared, aligned with a fresh translation {}:\n{}",
+        "{compared} overlay node tooltips compared, aligned with a fresh oracle session {}:\n{}",
         aligned.len(),
         aligned.join("\n")
     );
@@ -1109,7 +1086,7 @@ fn overlays_match(data: &'static TypedData, d: &mut Dispatcher) {
 
 /// Corpus builds with a copy of their active spec on other tree versions,
 /// which the corpus has none of: switching to each and back gives the
-/// translation's sidebar, outputs, tree, items and file
+/// oracle's sidebar, outputs, tree, items and file
 fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
     let builds: Vec<(String, String)> = mine(corpus())
         .into_iter()
@@ -1159,21 +1136,18 @@ fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
             if !d.typed_active() {
                 break;
             }
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             // A copy upstream cannot show (nodes its tree version lacks)
-            let probe = answer(d.translated_request(r#"{"cmd":"state"}"#), "state");
+            let probe = answer(d.reference_request(r#"{"cmd":"state"}"#), "state");
             if probe.get("error").is_some() {
-                eprintln!(
-                    "{id}: spec {to} fails in the translation: {}",
-                    probe["error"]
-                );
+                eprintln!("{id}: spec {to} fails in the oracle: {}", probe["error"]);
                 broken = true;
                 break;
             }
             for c in ["state", "outputs", "treeState", "items", "treeSpecs"] {
                 let q = json!({ "cmd": c }).to_string();
                 let t = answer(d.request(&q), c);
-                let tr = answer(d.translated_request(&q), c);
+                let tr = answer(d.reference_request(&q), c);
                 diff(&t, &tr, &format!("spec {to}: {c}"), &mut out);
             }
         }
@@ -1202,11 +1176,11 @@ const KNOWN_FALLBACKS: &[&str] = &[
     // Upstream fails the rebuild after two cluster subgraphs shared an id
     // (`Entrance for subGraph not linked to parent socket???`)
     "rebuilding cluster subgraphs that shared an id",
-    // The tooltip's stat comparison, where the translation carries another
+    // The tooltip's stat comparison, where the oracle carries another
     // build's change of upstream's shared data (see `compare_display`)
-    "aligned with a fresh translation",
+    "aligned with a fresh oracle session",
     // Party builds upstream fails on as well (`party_match` checks that
-    // the translation fails on them too)
+    // the oracle fails on them too)
     "upstream fails too",
     // A fractional enemy level, which upstream's accuracy sums fail on
     "an enemy level without a monster accuracy",
@@ -1257,7 +1231,7 @@ fn report_fallbacks(phase: &str) {
     );
 }
 
-/// `newBuild` opens the translation's empty build: its views and file
+/// `newBuild` opens the oracle's empty build: its views and file
 fn new_build_matches(d: &mut Dispatcher) {
     answer(d.request(r#"{"cmd":"newBuild"}"#), "newBuild");
     assert!(
@@ -1276,7 +1250,7 @@ fn new_build_matches(d: &mut Dispatcher) {
     ] {
         let req = json!({"cmd": cmd}).to_string();
         let typed = answer(d.request(&req), cmd);
-        let tr = answer(d.translated_request(&req), cmd);
+        let tr = answer(d.reference_request(&req), cmd);
         diff(&typed, &tr, cmd, &mut out);
     }
     compare_saves(d, "newBuild", &mut out);
@@ -1288,17 +1262,14 @@ fn new_build_matches(d: &mut Dispatcher) {
     ] {
         let typed = answer(d.request(&req.to_string()), "typed edit");
         assert!(d.typed_active(), "{req}: {:?}", d.typed_error);
-        let tr = answer(
-            d.translated_request(r#"{"cmd":"skills"}"#),
-            "translated edit",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"skills"}"#), "oracle edit");
         assert!(tr.get("error").is_none(), "{req}: {tr}");
         assert!(typed.get("error").is_none(), "{req}: {typed}");
     }
     for cmd in ["state", "outputs", "skills"] {
         let req = json!({"cmd": cmd}).to_string();
         let typed = answer(d.request(&req), cmd);
-        let tr = answer(d.translated_request(&req), cmd);
+        let tr = answer(d.reference_request(&req), cmd);
         diff(&typed, &tr, &format!("after a skill: {cmd}"), &mut out);
     }
     compare_saves(d, "newBuild with a skill", &mut out);
@@ -1307,7 +1278,7 @@ fn new_build_matches(d: &mut Dispatcher) {
 }
 
 /// The notes, and the tooltips of every socket group and item and of
-/// nodes on and around the tree, give the translation's on every corpus
+/// nodes on and around the tree, give the oracle's on every corpus
 /// build, also after a few edits; `SESSION_NODES` sets the nodes per build
 fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
     let (mut failures, mut fell_back, mut aligned) = (Vec::new(), Vec::new(), Vec::new());
@@ -1330,7 +1301,7 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
         let mut rng = Lcg(seed(&id) + 23);
         let mut out = Vec::new();
-        // Requests that differ, rechecked on a fresh translation, with the
+        // Requests that differ, rechecked on a fresh oracle session, with the
         // edits made before them
         let mut recheck: Vec<(String, J, Vec<String>, Vec<String>)> = Vec::new();
         let edits = std::cell::RefCell::new(Vec::<String>::new());
@@ -1346,7 +1317,7 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
             let tt = t.elapsed();
             let fell = d.typed_error.take();
             let t = Instant::now();
-            let tr = answer(d.translated_request(&r), "translated");
+            let tr = answer(d.reference_request(&r), "oracle");
             let c = counts.entry(Box::leak(cmd.into_boxed_str())).or_default();
             match fell {
                 Some(e) => {
@@ -1470,8 +1441,8 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
         // Upstream changes shared skill data for good (`ProcessSocketGroup`
         // clears a triggered granted skill's level cost), so a build loaded
-        // earlier in the session can change the translation's answer: a
-        // request that differs is asked again of a fresh translation, with
+        // earlier in the session can change the oracle's answer: a
+        // request that differs is asked again of a fresh oracle session, with
         // the same edits before it, and aligned when that one agrees
         for (r, typed, lines, done) in recheck {
             let fresh = session();
@@ -1496,12 +1467,12 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "aligned with a fresh translation {}:\n{}",
+        "aligned with a fresh oracle session {}:\n{}",
         aligned.len(),
         aligned.join("\n")
     );
     for (cmd, (n, t, tr)) in &counts {
-        eprintln!("{cmd}: {n} compared, typed {t:.1?}, translated {tr:.1?}");
+        eprintln!("{cmd}: {n} compared, typed {t:.1?}, oracle {tr:.1?}");
     }
     eprintln!("fell back {}:\n{}", fell_back.len(), fell_back.join("\n"));
     assert!(
@@ -1515,13 +1486,13 @@ fn tooltips_match(data: &'static TypedData, d: &mut Dispatcher) {
 /// The views compared after a config or class edit
 const CONFIG_VIEWS: [&str; 4] = ["config", "state", "outputs", "treeState"];
 
-/// Compares read-only commands of the typed engine and the translation
+/// Compares read-only commands of the typed engine and the oracle
 fn compare_views(d: &mut Dispatcher, cmds: &[&str], label: &str, out: &mut Vec<String>) {
     for cmd in cmds {
         let q = json!({ "cmd": cmd }).to_string();
         let typed = answer(d.request(&q), cmd);
         assert!(d.typed_active(), "{label} {cmd}: {:?}", d.typed_error);
-        let tr = answer(d.translated_request(&q), cmd);
+        let tr = answer(d.reference_request(&q), cmd);
         diff(&typed, &tr, &format!("{label} {cmd}"), out);
     }
 }
@@ -1553,14 +1524,14 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
         .collect();
     if rng.below(5) == 0 {
         // The custom modifier groups: the shown ones' controls (found by
-        // asking the translation, as their indices follow every control
+        // asking the oracle, as their indices follow every control
         // the tab made), a new group
         let paths: Vec<String> = (1000..1200)
             .map(|n| format!("configTab.{n}.textEdit"))
             .collect();
         let tr = answer(
-            d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
-            "translated controls",
+            d.reference_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+            "oracle controls",
         );
         let shown: Vec<String> = tr["ok"]
             .as_object()
@@ -1659,8 +1630,8 @@ fn config_edit(d: &mut Dispatcher, rng: &mut Lcg) -> J {
 fn compare_custom_mod_groups(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
     let paths: Vec<String> = (1000..1200).map(|n| format!("configTab.{n}")).collect();
     let tr = answer(
-        d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
-        "translated controls",
+        d.reference_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+        "oracle controls",
     );
     let mut paths = vec!["configTab.customModsAddBlock".to_string()];
     for (p, c) in tr["ok"].as_object().into_iter().flatten() {
@@ -1679,12 +1650,12 @@ fn compare_custom_mod_groups(d: &mut Dispatcher, label: &str, out: &mut Vec<Stri
     }
     let q = json!({"cmd": "controls", "paths": paths}).to_string();
     let t = answer(d.request(&q), "typed controls");
-    let tr = answer(d.translated_request(&q), "translated controls");
+    let tr = answer(d.reference_request(&q), "oracle controls");
     diff(&t, &tr, &format!("{label} custom modifier groups"), out);
 }
 
 /// Random sequences of Configuration tab edits, class changes and undo
-/// give the translation's options (shown, values, tooltips), sidebar,
+/// give the oracle's options (shown, values, tooltips), sidebar,
 /// outputs and tree after each step; then a new build does
 fn config_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
@@ -1728,7 +1699,7 @@ fn config_edits_match(d: &mut Dispatcher) {
                     skipped.push(format!("{id}: {e}"));
                     break;
                 }
-                answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+                answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
                 compare_views(d, &CONFIG_VIEWS, &label, &mut out);
                 steps += 1;
                 continue;
@@ -1750,18 +1721,18 @@ fn config_edits_match(d: &mut Dispatcher) {
                     // Upstream's failure leaves its session broken: a
                     // fresh one for the builds after
                     at_build(d, &id);
-                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                    *d = Dispatcher::new(session(), data());
                 }
                 break;
             }
             if typed.get("error").is_some() || req["cmd"] == "controlTooltip" {
                 // An error changes nothing, nor does a tooltip: the
-                // translation's own answer
-                let tr = answer(d.translated_request(&r), "translated edit");
+                // oracle's own answer
+                let tr = answer(d.reference_request(&r), "oracle edit");
                 diff(&typed, &tr, &label, &mut out);
             }
             let t = Instant::now();
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             compare_views(d, &CONFIG_VIEWS, &label, &mut out);
             compare_custom_mod_groups(d, &label, &mut out);
@@ -1784,7 +1755,7 @@ fn config_edits_match(d: &mut Dispatcher) {
                     assert_eq!(path["ok"]["path"], json!([m]), "{id}: {label}: {p}");
                     let q = json!({"cmd": "nodeTooltip", "id": m}).to_string();
                     let t = answer(d.request(&q), "typed tooltip");
-                    let tr = answer(d.translated_request(&q), "translated tooltip");
+                    let tr = answer(d.reference_request(&q), "oracle tooltip");
                     diff(&t, &tr, &format!("{label} {q}"), &mut out);
                     popup_tooltips += 1;
                 }
@@ -1834,7 +1805,7 @@ fn config_edits_match(d: &mut Dispatcher) {
         failures.push(format!("newBuild ({n}):\n  {}", out.join("\n  ")));
     }
     eprintln!(
-        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays), {popup_tooltips} mastery tooltips compared with a popup open\nskipped:\n{}",
+        "{steps} edits: typed {:.1?}, oracle {:.1?} (with its replays), {popup_tooltips} mastery tooltips compared with a popup open\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -1863,7 +1834,7 @@ fn mine<T>(builds: Vec<T>) -> Vec<T> {
 
 /// Random sequences of item, set, spec, config set, level and socket
 /// group copy edits, items added, edited and saved from the editor give
-/// the translation's items, skills, sidebar, outputs and specs after each
+/// the oracle's items, skills, sidebar, outputs and specs after each
 /// step, and its file at the end
 fn items_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
@@ -1883,7 +1854,7 @@ fn items_edits_match(d: &mut Dispatcher) {
     for (id, path) in mine(corpus()) {
         at_build(d, &id);
         let xml = std::fs::read_to_string(&path).unwrap();
-        // The edits since the load, for a fresh translation's recheck
+        // The edits since the load, for a fresh oracle session's recheck
         let mut log = vec![json!({"cmd": "loadXml", "xml": xml}).to_string()];
         answer(d.request(&log[0]), "load");
         if !d.typed_active() {
@@ -1894,7 +1865,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         let compare = |d: &mut Dispatcher, req: &J, label: &str, out: &mut Vec<String>| {
             let r = req.to_string();
             let typed = answer(d.request(&r), "typed");
-            let tr = answer(d.translated_request(&r), "translated");
+            let tr = answer(d.reference_request(&r), "oracle");
             diff(&typed, &tr, &format!("{label} {r}"), out);
             typed
         };
@@ -1932,7 +1903,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                 // Upstream adds the dragged set's items in `pairs` order of
                 // their slot names, so their ids depend on LuaJIT's string
                 // hash seed, as then do all later item steps
-                if oracle() && r["dragTo"] == "popup.setList" {
+                if r["dragTo"] == "popup.setList" {
                     continue;
                 }
                 log.push(r.to_string());
@@ -2222,7 +2193,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                                             })
                                         })
                                 };
-                                if !(oracle() && tied(index)) {
+                                if !tied(index) {
                                     let req = json!({"cmd": "controlTooltip", "path": c["path"], "index": index + 1});
                                     compare(d, &req, &format!("step {step}"), &mut out);
                                     *popup_inputs.entry("tooltip".into()).or_default() += 1;
@@ -2673,12 +2644,12 @@ fn items_edits_match(d: &mut Dispatcher) {
                     // Upstream's own assert leaves its session broken for
                     // the builds after: a fresh one for them
                     at_build(d, &id);
-                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                    *d = Dispatcher::new(session(), data());
                 }
                 break;
             }
             let t = Instant::now();
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             let before = out.len();
             for f in ["state", "outputs", "skills", "treeSpecs"] {
@@ -2701,7 +2672,7 @@ fn items_edits_match(d: &mut Dispatcher) {
                 &format!("{label} {r}"),
                 &mut out,
             );
-            if oracle() && out.len() > before && weapon_slot_ambiguous(d, &req) {
+            if out.len() > before && weapon_slot_ambiguous(d, &req) {
                 out.truncate(before);
                 weapon_skips += 1;
                 skipped.push(format!(
@@ -2722,7 +2693,7 @@ fn items_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} item and set edits ({popups} item editor popups, inputs {popup_inputs:?}): typed {:.1?}, translated {:.1?} (with its replays), {weapon_skips} builds ended by a non-weapon in Weapon 1\nskipped:\n{}",
+        "{steps} item and set edits ({popups} item editor popups, inputs {popup_inputs:?}): typed {:.1?}, oracle {:.1?} (with its replays), {weapon_skips} builds ended by a non-weapon in Weapon 1\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -2770,7 +2741,7 @@ fn weapon_slot_ambiguous(d: &mut Dispatcher, req: &J) -> bool {
     // That failure, and no other: asked of the reference itself, not after
     // replaying the edits it failed on
     let last = answer(
-        d.translated().request(r#"{"cmd":"oracleLastError"}"#),
+        d.reference().request(r#"{"cmd":"oracleLastError"}"#),
         "oracleLastError",
     );
     last["ok"].as_str().is_some_and(|e| {
@@ -2786,9 +2757,9 @@ fn weapon_slot_ambiguous(d: &mut Dispatcher, req: &J) -> bool {
 const WEAPON_SLOT_SKIPS: usize = 3;
 
 /// `displayItem` of both. The tooltip's stat comparison of the
-/// translation can carry another build's mutation of upstream's shared
+/// oracle can carry another build's mutation of upstream's shared
 /// data (`ProcessSocketGroup` clears a triggered granted skill's level
-/// cost): lines that differ are asked again of a fresh translation, with
+/// cost): lines that differ are asked again of a fresh oracle session, with
 /// the edits of `log` since the load, and aligned when that one agrees
 /// Random choices in the front popup and the ones it opens (a list's
 /// rows clicked and keyed, enabled buttons, edits' text, a row's tooltip),
@@ -2805,7 +2776,7 @@ fn drive_popups(
     let cmp = |d: &mut Dispatcher, req: &J, out: &mut Vec<String>| {
         let r = req.to_string();
         let typed = answer(d.request(&r), "typed");
-        let tr = answer(d.translated_request(&r), "translated");
+        let tr = answer(d.reference_request(&r), "oracle");
         diff(&typed, &tr, &format!("{label} {r}"), out);
         typed
     };
@@ -2945,7 +2916,7 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
     let r = json!({"cmd": "displayItem"}).to_string();
     let mut typed = answer(d.request(&r), "typed");
     let answer_typed = typed.clone();
-    let mut tr = answer(d.translated_request(&r), "translated");
+    let mut tr = answer(d.reference_request(&r), "oracle");
     if !typed["ok"].is_object() || !tr["ok"].is_object() {
         diff(&typed, &tr, &format!("{label} {r}"), out);
         return answer_typed;
@@ -2959,7 +2930,7 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
         }
         let fl = answer(fresh.request(&r), "fresh")["ok"]["lines"].take();
         if fl == tl {
-            note_fallback("displayItem", "aligned with a fresh translation");
+            note_fallback("displayItem", "aligned with a fresh oracle session");
         } else {
             // Under their key, which the canonical forms go by
             let (tl, rl) = (json!({ "lines": tl }), json!({ "lines": rl }));
@@ -2971,15 +2942,22 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
 
 /// `saveXml` of both on the dispatcher's build: where they differ
 fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    compare_saves_with(d, label, out, |_| {});
+}
+
+/// [`compare_saves`], with both files put through `canon` first
+fn compare_saves_with(
+    d: &mut Dispatcher,
+    label: &str,
+    out: &mut Vec<String>,
+    canon: impl Fn(&mut J),
+) {
     let mut typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
-    let mut tr = answer(
-        d.translated_request(r#"{"cmd":"saveXml"}"#),
-        "translated save",
-    );
-    if oracle() {
-        unordered(&mut typed);
-        unordered(&mut tr);
-    }
+    let mut tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
+    unordered(&mut typed);
+    unordered(&mut tr);
+    canon(&mut typed);
+    canon(&mut tr);
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
     if a != b && std::env::var("DUMP_SAVES").is_ok() {
         eprintln!(
@@ -2997,14 +2975,14 @@ fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
                 .to_string()
         };
         out.push(format!(
-            "{label}: saveXml differs:\n  typed {:?}\n  translated {:?}",
+            "{label}: saveXml differs:\n  typed {:?}\n  oracle {:?}",
             at(a),
             at(b)
         ));
     }
 }
 
-/// `saveXml` and `saveCode` give the translation's file, byte for byte;
+/// `saveXml` and `saveCode` give the oracle's file, byte for byte;
 /// a file saved by either loads in the other to the same file, sidebar
 /// and outputs (design layer 8)
 fn saves_match(d: &mut Dispatcher) {
@@ -3020,10 +2998,7 @@ fn saves_match(d: &mut Dispatcher) {
             continue;
         }
         let mut out = Vec::new();
-        answer(
-            d.translated_request(r#"{"cmd":"treeState"}"#),
-            "translated load",
-        );
+        answer(d.reference_request(r#"{"cmd":"treeState"}"#), "oracle load");
         let t = Instant::now();
         let typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
         times[0] += t.elapsed();
@@ -3032,13 +3007,10 @@ fn saves_match(d: &mut Dispatcher) {
             assert!(e.starts_with("not ported"), "{id}: saveXml: {e}");
             continue;
         }
-        // The translation replays the typed save first
-        answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+        // The oracle replays the typed save first
+        answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
         let t = Instant::now();
-        let tr = answer(
-            d.translated_request(r#"{"cmd":"saveXml"}"#),
-            "translated save",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
         times[1] += t.elapsed();
         diff(&typed, &tr, "saveXml", &mut out);
         let code = |d: &mut Dispatcher, typed: bool| {
@@ -3047,7 +3019,7 @@ fn saves_match(d: &mut Dispatcher) {
                 if typed {
                     d.request(r)
                 } else {
-                    d.translated_request(r)
+                    d.reference_request(r)
                 },
                 "saveCode",
             )
@@ -3056,32 +3028,27 @@ fn saves_match(d: &mut Dispatcher) {
         diff(&a, &b, "saveCode", &mut out);
         let typed_xml = typed["ok"]["xml"].as_str().unwrap().to_string();
         let tr_xml = tr["ok"]["xml"].as_str().unwrap().to_string();
-        // The typed file in the translation
+        // The typed file in the oracle
         let views: Vec<J> = ["state", "outputs"]
             .iter()
             .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
             .collect();
         let load = json!({"cmd": "loadXml", "xml": typed_xml}).to_string();
-        answer(d.translated_request(&load), "translated load");
+        answer(d.reference_request(&load), "oracle load");
         for (c, v) in ["state", "outputs"].iter().zip(&views) {
-            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
-            diff(
-                v,
-                &tr,
-                &format!("typed file in the translation: {c}"),
-                &mut out,
-            );
+            let tr = answer(d.reference_request(&json!({"cmd": c}).to_string()), c);
+            diff(v, &tr, &format!("typed file in the oracle: {c}"), &mut out);
         }
         answer(d.request(&load), "typed load");
         compare_saves(d, "typed file", &mut out);
-        // The translated file in the typed engine
+        // The oracle file in the typed engine
         let load = json!({"cmd": "loadXml", "xml": tr_xml}).to_string();
         answer(d.request(&load), "typed load");
-        compare_saves(d, "translated file", &mut out);
+        compare_saves(d, "oracle file", &mut out);
         for c in ["state", "outputs"] {
             let t = answer(d.request(&json!({"cmd": c}).to_string()), c);
-            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
-            diff(&t, &tr, &format!("translated file: {c}"), &mut out);
+            let tr = answer(d.reference_request(&json!({"cmd": c}).to_string()), c);
+            diff(&t, &tr, &format!("oracle file: {c}"), &mut out);
         }
         n += 1;
         if !out.is_empty() {
@@ -3090,7 +3057,7 @@ fn saves_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{n} builds saved: typed saveXml {:.1?}, translated {:.1?}",
+        "{n} builds saved: typed saveXml {:.1?}, oracle {:.1?}",
         times[0], times[1]
     );
     assert!(
@@ -3406,14 +3373,11 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             times[1] += t.elapsed();
         }
         let t = Instant::now();
-        answer(
-            d.translated_request(r#"{"cmd":"state"}"#),
-            "translated load",
-        );
+        answer(d.reference_request(r#"{"cmd":"state"}"#), "oracle load");
         times[2] += t.elapsed();
         for (cmd, typed) in ["state", "outputs", "treeState"].iter().zip(typed) {
             let t = Instant::now();
-            let tr = answer(d.translated_request(&json!({"cmd": cmd}).to_string()), cmd);
+            let tr = answer(d.reference_request(&json!({"cmd": cmd}).to_string()), cmd);
             times[3] += t.elapsed();
             let mut out = Vec::new();
             diff(&typed, &tr, cmd, &mut out);
@@ -3424,7 +3388,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
         }
         if compared == 0 {
             // A build code loads typed to the same sidebar
-            let code = answer(d.translated_request(r#"{"cmd":"saveCode"}"#), "saveCode");
+            let code = answer(d.reference_request(r#"{"cmd":"saveCode"}"#), "saveCode");
             let req = json!({"cmd": "loadCode", "code": code["ok"]["code"]}).to_string();
             answer(d.request(&req), "loadCode");
             assert!(
@@ -3432,13 +3396,13 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
                 "{id}: the typed engine did not load the build code"
             );
             let typed = answer(d.request(r#"{"cmd":"state"}"#), "state");
-            let tr = answer(d.translated_request(r#"{"cmd":"state"}"#), "state");
+            let tr = answer(d.reference_request(r#"{"cmd":"state"}"#), "state");
             assert_eq!(typed, tr, "{id}: state after loadCode");
         }
         compared += 1;
     }
     eprintln!(
-        "{compared} builds: typed load {:.1?}, typed state+outputs {:.1?}; translated load and state {:.1?}, state+outputs {:.1?}",
+        "{compared} builds: typed load {:.1?}, typed state+outputs {:.1?}; oracle load and state {:.1?}, state+outputs {:.1?}",
         times[0], times[1], times[2], times[3]
     );
     eprintln!("skipped {}:\n{}", skipped.len(), skipped.join("\n"));
@@ -3451,7 +3415,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
 }
 
 /// `tree` (the geometry: nodes, cluster jewel subgraphs, connectors,
-/// classes) gives the translation's for every corpus build, and for an
+/// classes) gives the oracle's for every corpus build, and for an
 /// empty build on each tree version
 fn geometry_matches(d: &mut Dispatcher) {
     let mut builds: Vec<(String, String)> = corpus()
@@ -3494,7 +3458,7 @@ fn geometry_matches(d: &mut Dispatcher) {
         times[0] += t.elapsed();
         assert!(d.typed_active(), "{id}: {:?}", d.typed_error);
         let t = Instant::now();
-        let tr = answer(d.translated_request(r#"{"cmd":"tree"}"#), "translated tree");
+        let tr = answer(d.reference_request(r#"{"cmd":"tree"}"#), "oracle tree");
         times[1] += t.elapsed();
         assert!(tr.get("ok").is_some(), "{id}: {tr}");
         let mut out = Vec::new();
@@ -3512,7 +3476,7 @@ fn geometry_matches(d: &mut Dispatcher) {
         compared += 1;
     }
     eprintln!(
-        "{compared} trees: typed {:.1?}, translated {:.1?} (with its loads)\nskipped:\n{}",
+        "{compared} trees: typed {:.1?}, oracle {:.1?} (with its loads)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -3632,10 +3596,8 @@ fn with_party(xml: &str, buffs: &[(String, String)]) -> String {
 /// tree's is aligned. The number of lines so aligned.
 fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
     let (mut typed, mut tr) = (J::String(typed.into()), J::String(tr.into()));
-    if oracle() {
-        unordered(&mut typed);
-        unordered(&mut tr);
-    }
+    unordered(&mut typed);
+    unordered(&mut tr);
     let (typed, tr) = (typed.as_str().unwrap(), tr.as_str().unwrap());
     let mut aligned = 0;
     if typed.lines().count() != tr.lines().count() {
@@ -3657,9 +3619,7 @@ fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
         if keystone {
             aligned += 1;
         } else {
-            out.push(format!(
-                "saveXml differs:\n  typed {a:?}\n  translated {b:?}"
-            ));
+            out.push(format!("saveXml differs:\n  typed {a:?}\n  oracle {b:?}"));
             return aligned;
         }
     }
@@ -3723,7 +3683,7 @@ const PARTY_GROUPS: [&[&[&str]]; 8] = [
 /// The Party tab: corpus builds that export their buffs, some with
 /// socket groups added that give them buffs to export, and each corpus
 /// build with another's exported buffs imported as party members' give
-/// the translation's sidebar, outputs, Calcs tab and file.
+/// the oracle's sidebar, outputs, Calcs tab and file.
 /// `PARTY_STEP=<n>` takes every nth build (default 2)
 fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
     let step: usize = std::env::var("PARTY_STEP")
@@ -3750,9 +3710,9 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         if !d.typed_active() {
             let e = d.typed_error.clone().unwrap_or_default();
             // Where the typed engine fails, upstream does
-            let tr = answer(d.translated_request(r#"{"cmd":"outputs"}"#), "translated");
+            let tr = answer(d.reference_request(r#"{"cmd":"outputs"}"#), "oracle");
             if !e.starts_with("not ported") && tr.get("error").is_none() {
-                failures.push(format!("{id}: typed fails ({e}), the translation does not"));
+                failures.push(format!("{id}: typed fails ({e}), the oracle does not"));
             }
             if tr.get("error").is_some() {
                 // A build neither loads is not a fallback
@@ -3761,7 +3721,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             skipped.push(format!("{id}: {e}"));
             return None;
         }
-        if oracle() && party_curses_ambiguous(d) {
+        if party_curses_ambiguous(d) {
             skipped.push(format!(
                 "{id}: more party curses than the limit, which upstream picks in `pairs` order"
             ));
@@ -3772,12 +3732,9 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             .iter()
             .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
             .collect();
-        answer(
-            d.translated_request(r#"{"cmd":"state"}"#),
-            "translated load",
-        );
+        answer(d.reference_request(r#"{"cmd":"state"}"#), "oracle load");
         for (c, t) in ["state", "outputs"].iter().zip(&typed) {
-            let tr = answer(d.translated_request(&json!({"cmd": c}).to_string()), c);
+            let tr = answer(d.reference_request(&json!({"cmd": c}).to_string()), c);
             diff(t, &tr, c, &mut out);
         }
         if out.is_empty() {
@@ -3787,14 +3744,11 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
         // The tab's view, twice: its first layout wraps the notes label
         for k in 0..2 {
             let t = answer(d.request(r#"{"cmd":"party"}"#), "party");
-            let tr = answer(d.translated_request(r#"{"cmd":"party"}"#), "party");
+            let tr = answer(d.reference_request(r#"{"cmd":"party"}"#), "party");
             diff(&t, &tr, &format!("party view {k}"), &mut out);
         }
         let typed_save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
-        let tr = answer(
-            d.translated_request(r#"{"cmd":"saveXml"}"#),
-            "translated save",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
         if out.is_empty() {
             let a = typed_save["ok"]["xml"].as_str().unwrap_or("");
             let b = tr["ok"]["xml"].as_str().unwrap_or("");
@@ -3870,7 +3824,7 @@ const PARTY_VIEWS: [&str; 3] = ["party", "state", "outputs"];
 /// slots them in `pairs` order over a table keyed by curse name, all of
 /// priority 0, so which ones take the slots follows LuaJIT's string hash,
 /// which it seeds per process: upstream itself differs from run to run.
-/// The translation (and the typed engine) take them in import order.
+/// The oracle (and the typed engine) take them in import order.
 fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
     let save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
     let xml = save["ok"]["xml"].as_str().unwrap_or("");
@@ -3907,7 +3861,7 @@ fn party_curses_ambiguous(d: &mut Dispatcher) -> bool {
 /// link) to each destination, appended or replacing, Clear, Disable Party
 /// Effects, Rebuild All, Show Advanced Info and the edit boxes' texts.
 /// After each change the tab, the sidebar and the outputs, and at the end
-/// the saved file, are the translation's.
+/// the saved file, are the oracle's.
 fn party_controls_match(
     d: &mut Dispatcher,
     builds: &[(String, String)],
@@ -4006,16 +3960,16 @@ fn party_controls_match(
                     // Upstream's failure leaves its session broken: a
                     // fresh one for the builds after
                     at_build(d, &id);
-                    *d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+                    *d = Dispatcher::new(session(), data());
                 }
                 break;
             }
             if typed.get("error").is_some() {
-                let tr = answer(d.translated_request(&r), "translated party edit");
+                let tr = answer(d.reference_request(&r), "oracle party edit");
                 diff(&typed, &tr, &label, &mut out);
             }
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
-            if oracle() && party_curses_ambiguous(d) {
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
+            if party_curses_ambiguous(d) {
                 skipped.push(format!(
                     "{id}: {label}: more party curses than the limit, which upstream picks in `pairs` order"
                 ));
@@ -4034,7 +3988,7 @@ fn party_controls_match(
             let q = json!({"cmd": "controlTooltip", "path": format!("party.{}", names[rng.below(names.len())])});
             let q = q.to_string();
             let t = answer(d.request(&q), "typed tooltip");
-            let tr = answer(d.translated_request(&q), "translated tooltip");
+            let tr = answer(d.reference_request(&q), "oracle tooltip");
             diff(&t, &tr, &format!("{label} {q}"), &mut out);
             steps += 1;
         }
@@ -4056,7 +4010,7 @@ fn party_controls_match(
 /// random on every fourth corpus build. After each the sidebar (whose
 /// unsaved flag counts the search), the outputs and a control's tooltip,
 /// then node power within the depth chosen and the saved file, are the
-/// translation's.
+/// oracle's.
 fn tree_controls_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut skipped) = (Vec::new(), 0, Vec::new());
     let names = [
@@ -4152,10 +4106,10 @@ fn tree_controls_match(d: &mut Dispatcher) {
                 break;
             }
             if typed.get("error").is_some() {
-                let tr = answer(d.translated_request(&r), "translated tree control");
+                let tr = answer(d.reference_request(&r), "oracle tree control");
                 diff(&typed, &tr, &label, &mut out);
             }
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             compare_views(
                 d,
                 &["state", "outputs", "treeSpecs", "treeState"],
@@ -4165,7 +4119,7 @@ fn tree_controls_match(d: &mut Dispatcher) {
             let q = json!({"cmd": "controlTooltip", "path": path(names[rng.below(names.len())])})
                 .to_string();
             let t = answer(d.request(&q), "typed tooltip");
-            let tr = answer(d.translated_request(&q), "translated tooltip");
+            let tr = answer(d.reference_request(&q), "oracle tooltip");
             diff(&t, &tr, &format!("{label} {q}"), &mut out);
             steps += 1;
         }
@@ -4204,11 +4158,11 @@ fn tree_controls_match(d: &mut Dispatcher) {
     );
 }
 
-/// `nodePower` of the first power stat, typed against translated
+/// `nodePower` of the first power stat, typed against the oracle
 fn compare_node_power(d: &mut Dispatcher, out: &mut Vec<String>) {
     let q = r#"{"cmd":"nodePower","index":1}"#;
     let t = answer(d.request(q), "typed nodePower");
-    let tr = answer(d.translated_request(q), "translated nodePower");
+    let tr = answer(d.reference_request(q), "oracle nodePower");
     diff(&t, &tr, "nodePower", out);
 }
 
@@ -4310,7 +4264,7 @@ fn node_power_match(data: &TypedData, d: &mut Dispatcher) {
             .collect();
         let req = json!({"cmd": "nodePower", "index": index, "cluster": cluster}).to_string();
         let typed = answer(d.request(&req), "typed nodePower");
-        let tr = answer(d.translated_request(&req), "reference nodePower");
+        let tr = answer(d.reference_request(&req), "reference nodePower");
         clusters += typed["ok"]["cluster"].as_object().map_or(0, |c| c.len());
         let mut out = Vec::new();
         diff(&typed, &tr, &format!("nodePower {label}"), &mut out);
@@ -4362,13 +4316,13 @@ fn compare_calcs(
         let typed = answer(d.request(&req), "typed");
         times[0] += t.elapsed();
         let t = Instant::now();
-        let mut tr = answer(d.translated_request(&req), "translated");
+        let mut tr = answer(d.reference_request(&req), "oracle");
         times[1] += t.elapsed();
         aligned += align_keystone_sources(&typed, &mut tr, latest);
         let n = out.len();
         diff(&typed, &tr, &req, &mut out);
         if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
-            eprintln!("{id} {req}:\ntyped {typed}\ntranslated {tr}");
+            eprintln!("{id} {req}:\ntyped {typed}\noracle {tr}");
         }
     }
     (reqs.len() - 2, out, aligned)
@@ -4376,7 +4330,7 @@ fn compare_calcs(
 
 /// Upstream's tree keeps the source `modLib.mergeKeystones` last gave a
 /// keystone's own mods, also from builds loaded before in the session: a
-/// tree keystone's mod row that the translation shows as another source's
+/// tree keystone's mod row that the oracle shows as another source's
 /// (an item or a configuration of an earlier build that granted the
 /// keystone) takes the typed source. The number of rows so aligned.
 fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTree) -> usize {
@@ -4405,7 +4359,7 @@ fn align_keystone_sources(typed: &J, tr: &mut J, tree: &engine::tree::PassiveTre
     n
 }
 
-/// The Calcs tab gives the translation's JSON, for every corpus build
+/// The Calcs tab gives the oracle's JSON, for every corpus build
 /// The corpus builds' text
 fn corpus_xml() -> Vec<(String, String)> {
     corpus()
@@ -4464,7 +4418,7 @@ fn calcs_match(data: &'static TypedData, d: &mut Dispatcher, builds: Vec<(String
         }
     }
     eprintln!(
-        "{compared} builds, {cells} breakdowns: typed {:.1?}, translated {:.1?} (with its load); {aligned} keystone sources aligned",
+        "{compared} builds, {cells} breakdowns: typed {:.1?}, oracle {:.1?} (with its load); {aligned} keystone sources aligned",
         times[0], times[1]
     );
     assert!(
@@ -4496,7 +4450,7 @@ impl Lcg {
 
 /// Random sequences of tree edits (clicks on allocated and unallocated
 /// nodes, ascendancies and masteries with an effect chosen, a reset) give
-/// the translation's sidebar, outputs and tree state after each step
+/// the oracle's sidebar, outputs and tree state after each step
 fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
     let mut skipped = Vec::new();
@@ -4513,7 +4467,7 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
         if !d.typed_active() {
             continue;
         }
-        let tree = answer(d.translated_request(r#"{"cmd":"tree"}"#), "tree");
+        let tree = answer(d.reference_request(r#"{"cmd":"tree"}"#), "tree");
         let ids: Vec<u64> = tree["ok"]["nodes"]
             .as_array()
             .unwrap()
@@ -4537,12 +4491,12 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
                 let req = req.to_string();
                 let typed = answer(d.request(&req), "typed");
                 if edit {
-                    // The translation replays the typed edit
-                    answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+                    // The oracle replays the typed edit
+                    answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
                     assert!(d.typed_active(), "{step} {req}: {:?}", d.typed_error);
                     continue;
                 }
-                let tr = answer(d.translated_request(&req), "translated");
+                let tr = answer(d.reference_request(&req), "oracle");
                 diff(&typed, &tr, &format!("{step} {req}"), out);
             }
         };
@@ -4638,10 +4592,7 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
                 break;
             }
             let t = Instant::now();
-            let tr = answer(
-                d.translated_request(r#"{"cmd":"treeState"}"#),
-                "translated edit",
-            );
+            let tr = answer(d.reference_request(r#"{"cmd":"treeState"}"#), "oracle edit");
             times[1] += t.elapsed();
             let _ = tr;
             let mut follow = vec![
@@ -4682,7 +4633,7 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
         }
     }
     eprintln!(
-        "{steps} edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} edits: typed {:.1?}, oracle {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -4698,7 +4649,7 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
 /// Random sequences of Skills tab edits and skill selections (main socket
 /// group, groups enabled, in Full DPS, slots, gems added, renamed,
 /// levelled and removed, groups added and removed, the sidebar's and the
-/// Calcs tab's skill controls) give the translation's skills, sidebar,
+/// Calcs tab's skill controls) give the oracle's skills, sidebar,
 /// outputs, Calcs tab and controls after each step
 fn skills_edits_match(d: &mut Dispatcher) {
     let (mut failures, mut steps, mut times) = (Vec::new(), 0, [Duration::ZERO; 2]);
@@ -4708,7 +4659,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(15);
-    let gems = answer(d.translated_request(r#"{"cmd":"gemList"}"#), "gemList");
+    let gems = answer(d.reference_request(r#"{"cmd":"gemList"}"#), "gemList");
     let gem_names: Vec<String> = gems["ok"]
         .as_array()
         .unwrap()
@@ -4730,11 +4681,11 @@ fn skills_edits_match(d: &mut Dispatcher) {
         let compare = |d: &mut Dispatcher, req: &J, label: &str, out: &mut Vec<String>| {
             let r = req.to_string();
             let typed = answer(d.request(&r), "typed");
-            let tr = answer(d.translated_request(&r), "translated");
+            let tr = answer(d.reference_request(&r), "oracle");
             let n = out.len();
             diff(&typed, &tr, &format!("{label} {r}"), out);
             if n == 0 && !out.is_empty() && std::env::var("SESSION_DUMP").is_ok() {
-                eprintln!("{label} {r}:\ntyped {typed}\ntranslated {tr}");
+                eprintln!("{label} {r}:\ntyped {typed}\noracle {tr}");
             }
             typed
         };
@@ -4818,13 +4769,13 @@ fn skills_edits_match(d: &mut Dispatcher) {
                 break;
             }
             let t = Instant::now();
-            let tr = answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            let tr = answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             times[1] += t.elapsed();
             let _ = tr;
-            // An edit upstream refuses: the translation answers the same,
+            // An edit upstream refuses: the oracle answers the same,
             // without changing its build
             if typed.get("error").is_some() {
-                let tr = answer(d.translated_request(&r), "translated edit");
+                let tr = answer(d.reference_request(&r), "oracle edit");
                 diff(&typed, &tr, &format!("{label} {r}"), &mut out);
             }
             for f in ["skills", "state", "outputs", "calcs"] {
@@ -4893,7 +4844,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
         }
     }
     eprintln!(
-        "{steps} skills edits: typed {:.1?}, translated {:.1?} (with its replays)\nskipped:\n{}",
+        "{steps} skills edits: typed {:.1?}, oracle {:.1?} (with its replays)\nskipped:\n{}",
         times[0],
         times[1],
         skipped.join("\n")
@@ -4913,7 +4864,7 @@ fn skills_edits_match(d: &mut Dispatcher) {
 #[ignore]
 fn replay_sequence() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let seq: Vec<J> = serde_json::from_str(&std::env::var("SESSION_SEQ").unwrap()).unwrap();
     for (id, path) in mine(corpus()) {
         let xml = std::fs::read_to_string(&path).unwrap();
@@ -4924,13 +4875,10 @@ fn replay_sequence() {
         for req in &seq {
             let r = req.to_string();
             eprintln!("{id} {r}: typed {}", answer(d.request(&r), "typed"));
-            answer(d.translated_request(r#"{"cmd":"treeState"}"#), "replay");
+            answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             for f in ["skills", "state", "outputs", "treeState"] {
                 let q = json!({ "cmd": f }).to_string();
-                let (t, tr) = (
-                    answer(d.request(&q), f),
-                    answer(d.translated_request(&q), f),
-                );
+                let (t, tr) = (answer(d.request(&q), f), answer(d.reference_request(&q), f));
                 let mut out = Vec::new();
                 diff(&t, &tr, f, &mut out);
                 out.truncate(4);
@@ -4942,12 +4890,12 @@ fn replay_sequence() {
     }
 }
 
-/// The shared item list and item sets outlive a build the translation held:
+/// The shared item list and item sets outlive a build the oracle held:
 /// the next typed session reads them from it
 #[test]
 fn shared_lists_survive_a_fallback() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let builds: Vec<String> = corpus()
         .into_iter()
         .take(2)
@@ -4973,7 +4921,7 @@ fn shared_lists_survive_a_fallback() {
     }
     let mut out = Vec::new();
     compare_views(&mut d, &["sharedLists"], "before the fallback", &mut out);
-    // A key the typed session does not have: the translation holds the build
+    // A key the typed session does not have: the oracle holds the build
     let r = json!({"cmd": "control", "path": "items.sharedItemList", "key": "F2"});
     answer(d.request(&r.to_string()), "fallback");
     assert!(!d.typed_active());
@@ -4982,7 +4930,7 @@ fn shared_lists_survive_a_fallback() {
     let shared = json!({"cmd": "controls", "paths": ["items.sharedItemList"]}).to_string();
     let (t, tr) = (
         answer(d.request(&shared), "typed"),
-        answer(d.translated_request(&shared), "translated"),
+        answer(d.reference_request(&shared), "oracle"),
     );
     assert!(
         t["ok"]["items.sharedItemList"]["list"]
@@ -5001,7 +4949,7 @@ fn shared_lists_survive_a_fallback() {
         let t = answer(d.request(&r.to_string()), "typed");
         assert!(d.typed_active(), "{r}: {:?}", d.typed_error);
         if r["cmd"] == "controlTooltip" {
-            let tr = answer(d.translated_request(&r.to_string()), "translated");
+            let tr = answer(d.reference_request(&r.to_string()), "oracle");
             diff(&t, &tr, &r.to_string(), &mut out);
         }
         compare_views(&mut d, &["state", "items"], &r.to_string(), &mut out);
@@ -5015,7 +4963,7 @@ fn shared_lists_survive_a_fallback() {
 #[test]
 fn tree_links_import_and_export() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     for (k, (id, path)) in corpus().into_iter().step_by(17).take(4).enumerate() {
         let xml = std::fs::read_to_string(path).unwrap();
@@ -5109,7 +5057,7 @@ fn tree_links_import_and_export() {
     assert!(out.is_empty(), "{}", out.join("\n"));
     // A mastery on a node the link's tree does not have: upstream fails,
     // the typed session hands it over
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let (_, path) = corpus().into_iter().next().unwrap();
     let xml = std::fs::read_to_string(path).unwrap();
     answer(
@@ -5139,7 +5087,7 @@ fn tree_links_import_and_export() {
 #[test]
 fn items_dropped_on_slots_and_minion_sets() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let Some((id, path)) = corpus().into_iter().find(|(id, _)| id == "gen-0006") else {
         return;
     };
@@ -5257,7 +5205,7 @@ fn items_dropped_on_slots_and_minion_sets() {
 #[test]
 fn items_tab_controls_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "items.setSelect",
@@ -5282,7 +5230,7 @@ fn items_tab_controls_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {r} controls"), out);
             compare_views(d, &["state", "items", "outputs"], &format!("{id} {r}"), out);
@@ -5322,7 +5270,7 @@ fn items_tab_controls_match() {
             let r = json!({"cmd": "controlTooltip", "path": "items.setSelect", "index": index});
             let (t, tr) = (
                 answer(d.request(&r.to_string()), "typed"),
-                answer(d.translated_request(&r.to_string()), "translated"),
+                answer(d.reference_request(&r.to_string()), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {r}"), &mut out);
         }
@@ -5338,7 +5286,7 @@ fn items_tab_controls_match() {
 #[test]
 fn build_controls_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let mut paths: Vec<String> = [
         "buildLoadouts",
@@ -5379,7 +5327,7 @@ fn build_controls_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(d, &["state", "outputs"], &format!("{id} {label}"), out);
@@ -5392,7 +5340,7 @@ fn build_controls_match() {
                     let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
                     let (t, tr) = (
                         answer(d.request(&r.to_string()), "typed"),
-                        answer(d.translated_request(&r.to_string()), "translated"),
+                        answer(d.reference_request(&r.to_string()), "oracle"),
                     );
                     diff(&t, &tr, &format!("{id} {label} {r}"), out);
                 }
@@ -5514,12 +5462,12 @@ fn build_controls_match() {
 }
 
 /// The Skills tab's set drop-down and gem options, in the typed session
-/// as in the translated one: their descriptions, the default level's
+/// as in the oracle: their descriptions, the default level's
 /// tooltips, the gem list they change, the save, and a reload
 #[test]
 fn skills_controls_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths: Vec<String> = [
         "setSelect",
@@ -5561,7 +5509,7 @@ fn skills_controls_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(d, &["state", "skills"], &format!("{id} {label}"), out);
@@ -5570,7 +5518,7 @@ fn skills_controls_match() {
                     json!({"cmd": "controlTooltip", "path": "skills.defaultLevel", "index": index});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
@@ -5590,7 +5538,7 @@ fn skills_controls_match() {
             let r = json!({"cmd": "gemList", "group": group, "slot": gems.len() + 1});
             let (t, tr) = (
                 answer(d.request(&r.to_string()), "typed"),
-                answer(d.translated_request(&r.to_string()), "translated"),
+                answer(d.reference_request(&r.to_string()), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} {r}"), out);
         };
@@ -5644,12 +5592,12 @@ fn skills_controls_match() {
 }
 
 /// The Spectre Library (Manage Spectres...), in the typed session as in the
-/// translated one: its lists, search, rows' tooltips, adding, dragging,
+/// oracle: its lists, search, rows' tooltips, adding, dragging,
 /// removing, Save and Cancel
 #[test]
 fn spectre_library_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let builds: Vec<(String, PathBuf)> = corpus()
         .into_iter()
@@ -5676,7 +5624,7 @@ fn spectre_library_match() {
                     let r = json!({"cmd": "controlTooltip", "path": path, "index": index});
                     let (t, tr) = (
                         answer(d.request(&r.to_string()), "typed"),
-                        answer(d.translated_request(&r.to_string()), "translated"),
+                        answer(d.reference_request(&r.to_string()), "oracle"),
                     );
                     diff(&t, &tr, &format!("{id} {label} {r}"), out);
                 }
@@ -5736,14 +5684,14 @@ fn spectre_library_match() {
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 
-/// Find a Timeless Jewel in the typed session as in the translated one:
+/// Find a Timeless Jewel in the typed session as in the oracle:
 /// the popup's settings, the node lists the sliders and the node
 /// drop-down write, the protected notables, the trade choices, Reset, the
 /// tooltips, the build's `timelessData` saved and kept for the next opening
 #[test]
 fn find_timeless_jewel_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let builds: Vec<(String, PathBuf)> = corpus()
         .into_iter()
@@ -5804,12 +5752,10 @@ fn find_timeless_jewel_match() {
                 }
                 let (mut t, mut tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
-                if oracle() {
-                    unordered(&mut t);
-                    unordered(&mut tr);
-                }
+                unordered(&mut t);
+                unordered(&mut tr);
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
         };
@@ -5899,14 +5845,14 @@ fn find_timeless_jewel_match() {
 }
 
 /// Find a Timeless Jewel's Search in the typed session as in the
-/// translated one: each non-Abyss jewel type on a socket, with desired and
+/// oracle: each non-Abyss jewel type on a socket, with desired and
 /// fallback weights, required and minimum weights, protected notables, a
 /// total minimum weight and All Sockets; the results' rows, selection and
 /// the trade button, kept for the next opening
 #[test]
 fn timeless_search_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let builds: Vec<(String, PathBuf)> = corpus()
         .into_iter()
@@ -6047,13 +5993,11 @@ fn timeless_search_match() {
                     d.typed_error = None;
                     let (mut t, mut tr) = (
                         answer(d.request(&q), "typed"),
-                        answer(d.translated_request(&q), "translated"),
+                        answer(d.reference_request(&q), "oracle"),
                     );
                     assert!(d.typed_error.is_none(), "{id} {q}: {:?}", d.typed_error);
-                    if oracle() {
-                        unordered(&mut t);
-                        unordered(&mut tr);
-                    }
+                    unordered(&mut t);
+                    unordered(&mut tr);
                     diff(&t, &tr, &format!("{id} {q}"), &mut out);
                 }
                 continue;
@@ -6074,7 +6018,7 @@ fn timeless_search_match() {
                 d.typed_error = None;
                 let (t, tr) = (
                     answer(d.request(&q), "typed"),
-                    answer(d.translated_request(&q), "translated"),
+                    answer(d.reference_request(&q), "oracle"),
                 );
                 assert!(d.typed_error.is_none(), "{id} {q}: {:?}", d.typed_error);
                 diff(&t, &tr, &format!("{id} {q}"), &mut out);
@@ -6102,13 +6046,13 @@ fn timeless_search_match() {
 }
 
 /// The Configuration tab's Mod Browser (a custom modifier group's Add
-/// Mod) in the typed session as in the translated one: its list of
+/// Mod) in the typed session as in the oracle: its list of
 /// supported lines, the search's ranking, the rows' sources, Add and a
 /// double click appending the line to the group
 #[test]
 fn mod_browser_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     for id in ["gen-0016", "gen-0032"] {
         let path = corpus().into_iter().find(|(i, _)| i == id).unwrap().1;
@@ -6154,8 +6098,8 @@ fn mod_browser_match() {
             if r["open"] == true {
                 let paths: Vec<String> = (1000..1300).map(|n| format!("configTab.{n}")).collect();
                 let tr = answer(
-                    d.translated_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
-                    "translated controls",
+                    d.reference_request(&json!({"cmd": "controls", "paths": paths}).to_string()),
+                    "oracle controls",
                 );
                 let group = tr["ok"]
                     .as_object()
@@ -6180,16 +6124,14 @@ fn mod_browser_match() {
                     d.typed_error = None;
                     let (mut t, mut tr) = (
                         answer(d.request(&q), "typed"),
-                        answer(d.translated_request(&q), "translated"),
+                        answer(d.reference_request(&q), "oracle"),
                     );
                     assert!(d.typed_error.is_none(), "{label} {q}: {:?}", d.typed_error);
                     // A row's sources, in the `pairs` order of string keys
                     // (which LuaJIT seeds per process)
-                    if oracle() {
-                        for v in [&mut t, &mut tr] {
-                            if let Some(a) = v["ok"]["lines"].as_array_mut() {
-                                a.sort_by_key(|l| l.to_string());
-                            }
+                    for v in [&mut t, &mut tr] {
+                        if let Some(a) = v["ok"]["lines"].as_array_mut() {
+                            a.sort_by_key(|l| l.to_string());
                         }
                     }
                     diff(&t, &tr, &format!("{label} {q}"), &mut out);
@@ -6203,12 +6145,12 @@ fn mod_browser_match() {
 }
 
 /// The Skills tab's socket group list, in the typed session as in the
-/// translated one: rows, selection, rows' tooltips, New, Delete with its
+/// oracle: rows, selection, rows' tooltips, New, Delete with its
 /// confirmation, the Delete key, Delete All and reordering
 #[test]
 fn skills_group_list_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "skills.groupList",
@@ -6234,7 +6176,7 @@ fn skills_group_list_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6251,7 +6193,7 @@ fn skills_group_list_match() {
                     json!({"cmd": "controlTooltip", "path": "skills.groupList", "index": index});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
@@ -6300,13 +6242,13 @@ fn skills_group_list_match() {
 }
 
 /// The Skills tab's controls of the shown socket group, in the typed
-/// session as in the translated one: each row shown in turn, the slot
+/// session as in the oracle: each row shown in turn, the slot
 /// drop-down's tooltips, and edits of the label, slot, enabled, Full DPS
 /// and an item's group's count
 #[test]
 fn skills_group_detail_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "skills.groupLabel",
@@ -6334,7 +6276,7 @@ fn skills_group_detail_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6348,7 +6290,7 @@ fn skills_group_detail_match() {
                     json!({"cmd": "controlTooltip", "path": "skills.groupSlot", "index": index});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
@@ -6408,14 +6350,14 @@ fn skills_group_detail_match() {
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 
-/// The Skills tab's gem slots, in the typed session as in the translated
+/// The Skills tab's gem slots, in the typed session as in the oracle
 /// one: their texts and states as groups are shown, the count's tooltip,
 /// and edits of a gem's level, quality, enabled box, count and Vaal
 /// skill boxes, and deleting gems
 #[test]
 fn skills_gem_slots_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let parts = [
         "Delete",
@@ -6452,7 +6394,7 @@ fn skills_gem_slots_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6465,7 +6407,7 @@ fn skills_gem_slots_match() {
                 let r = json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Count")});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
@@ -6541,12 +6483,12 @@ fn skills_gem_slots_match() {
 }
 
 /// The Skills tab's sockets line, Optimise Sockets and the imbued support's
-/// controls, in the typed session as in the translated one, as groups are
+/// controls, in the typed session as in the oracle, as groups are
 /// shown, slots selected, sockets rebuilt and imbued supports cleared
 #[test]
 fn skills_sockets_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "skills.socketsLabel",
@@ -6573,7 +6515,7 @@ fn skills_sockets_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6653,12 +6595,12 @@ const UPSTREAM_GEM_LIST_FAILS: &[(&str, &str, &str)] = &[(
 )];
 
 /// Choosing gems by name in the Skills tab's gem slots, in the typed session
-/// as in the translated one: exact names, prefixes, initials, tags, no
+/// as in the oracle: exact names, prefixes, initials, tags, no
 /// match, the slot after the last gem, and a name after a gem list
 #[test]
 fn skills_gem_select_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let mut upstream_fails = Vec::new();
     let parts = ["Name", "Level", "Quality", "Enable", "Count", "ErrMsg"];
@@ -6683,7 +6625,7 @@ fn skills_gem_select_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6736,11 +6678,11 @@ fn skills_gem_select_match() {
         let r = json!({"cmd": "gemList", "group": k + 1, "slot": 3});
         let (t, tr) = (
             answer(d.request(&r.to_string()), "typed"),
-            answer(d.translated_request(&r.to_string()), "translated"),
+            answer(d.reference_request(&r.to_string()), "oracle"),
         );
         if tr.get("error").is_some() {
             // Only the documented upstream failure: its calculation leaves
-            // the candidate's gem data in the translation's slot, so the
+            // the candidate's gem data in the oracle's slot, so the
             // build's remaining steps cannot be compared
             match UPSTREAM_GEM_LIST_FAILS.iter().find(|(b, _, _)| *b == id) {
                 Some(&(_, gem, error)) if tr["error"] == error => {
@@ -6753,7 +6695,7 @@ fn skills_gem_select_match() {
                     upstream_fails.push(id.clone());
                 }
                 _ => out.push(format!(
-                    "{id} {r}: translated {tr}, typed {}",
+                    "{id} {r}: oracle {tr}, typed {}",
                     truncate(&t.to_string())
                 )),
             }
@@ -6767,7 +6709,7 @@ fn skills_gem_select_match() {
         ] {
             step(&mut d, r, &mut out);
         }
-        compare_saves(&mut d, &id, &mut out);
+        compare_saves_with(&mut d, &id, &mut out, without_support_skill_parts);
     }
     let expected: Vec<String> = UPSTREAM_GEM_LIST_FAILS
         .iter()
@@ -6777,13 +6719,38 @@ fn skills_gem_select_match() {
     assert!(out.is_empty(), "{}", out.join("\n"));
 }
 
+/// A saved file without the `skillPart` of support gems. The gem list's
+/// DPS sort calculates each candidate in the slot
+/// (`GemSelectControl:CalcOutputWithThisGem`) and puts back the slot's
+/// gem data and level but not the `skillPart` the calculation set on it,
+/// so a support chosen in the slot afterwards keeps the part of whichever
+/// candidate was calculated last: `pendingGems` follows `pairs(self.gems)`,
+/// in an order LuaJIT seeds per process. Only active effects read it.
+fn without_support_skill_parts(v: &mut J) {
+    if let Some(xml) = v["ok"]["xml"].as_str() {
+        let lines: Vec<String> = xml
+            .split('\n')
+            .map(|l| {
+                if l.trim_start().starts_with("<Gem ")
+                    && l.contains("gemId=\"Metadata/Items/Gems/SupportGem")
+                {
+                    engine::pat::gsub(l, " skillPart=\"%d+\"", "")
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect();
+        v["ok"]["xml"] = J::String(lines.join("\n"));
+    }
+}
+
 /// Keys over the Skills tab's socket group rows (`OnHoverKeyUp`) and the gem
 /// slots' enabled boxes' tooltips, in the typed session as in the
-/// translated one
+/// oracle
 #[test]
 fn skills_hover_keys_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "skills.groupList",
@@ -6809,7 +6776,7 @@ fn skills_hover_keys_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6823,7 +6790,7 @@ fn skills_hover_keys_match() {
                     json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}{part}")});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 diff(&t, &tr, &format!("{id} {label} {r}"), out);
             }
@@ -6857,11 +6824,11 @@ fn skills_hover_keys_match() {
 }
 
 /// Gem names with tags (`:`) in the Skills tab's gem slots, and imbued
-/// supports chosen by name, in the typed session as in the translated one
+/// supports chosen by name, in the typed session as in the oracle
 #[test]
 fn skills_gem_tags_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let paths = [
         "skills.gemSlot1Level",
@@ -6887,7 +6854,7 @@ fn skills_gem_tags_match() {
             let views = json!({"cmd": "controls", "paths": paths}).to_string();
             let (t, tr) = (
                 answer(d.request(&views), "typed"),
-                answer(d.translated_request(&views), "translated"),
+                answer(d.reference_request(&views), "oracle"),
             );
             diff(&t, &tr, &format!("{id} {label} controls"), out);
             compare_views(
@@ -6943,15 +6910,15 @@ fn skills_gem_tags_match() {
 }
 
 /// The build's Back, Save, Save As and Help >>: Back with unsaved changes
-/// asks as the translated session does (its Cancel and Don't Save too);
-/// what the translation cannot do (save files, leave the build, read the
+/// asks as the oracle does (its Cancel and Don't Save too);
+/// what the oracle cannot do (save files, leave the build, read the
 /// help file) answers in the typed session alone: Save gives the build's
 /// XML and counts the changes as saved, Back without changes and Don't
 /// Save report the build closed, Help >> shows the help's Loadouts section
 #[test]
 fn build_buttons_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let builds: Vec<(String, PathBuf)> = corpus().into_iter().take(2).collect();
     for (id, path) in builds {
@@ -7052,11 +7019,11 @@ fn build_buttons_match() {
 
 /// The gem slots' quality tooltips (the gems' quality stats described,
 /// `describeStats`) of every gem of a few builds, in the typed session as
-/// in the translated one
+/// in the oracle
 #[test]
 fn skills_quality_tooltips_match() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let mut count = 0;
     let builds: Vec<(String, PathBuf)> = corpus()
@@ -7091,11 +7058,14 @@ fn skills_quality_tooltips_match() {
                     json!({"cmd": "controlTooltip", "path": format!("skills.gemSlot{i}Quality")});
                 let (t, tr) = (
                     answer(d.request(&r.to_string()), "typed"),
-                    answer(d.translated_request(&r.to_string()), "translated"),
+                    answer(d.reference_request(&r.to_string()), "oracle"),
                 );
                 if let Some(e) = d.typed_error.take() {
                     out.push(format!("{id} group {} {r}: fell back: {e}", k + 1));
                 }
+                let (mut t, mut tr) = (t, tr);
+                vaal_righteous_fire_effect(&mut t);
+                vaal_righteous_fire_effect(&mut tr);
                 diff(&t, &tr, &format!("{id} group {} {r}", k + 1), &mut out);
                 count += 1;
             }
@@ -7103,6 +7073,30 @@ fn skills_quality_tooltips_match() {
     }
     eprintln!("{count} quality tooltips compared");
     assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// A Vaal Righteous Fire's tooltip with its second effect named as the
+/// plain gem's: `data.gemForSkill` names whichever alternate Vaal
+/// Righteous Fire `pairs(data.gems)` sets up last (see [`unordered`]), and
+/// with it the effect the tooltip lists, `Righteous Fire` or
+/// `Righteous Fire of Arcane Devotion`
+fn vaal_righteous_fire_effect(v: &mut J) {
+    let Some(lines) = v["ok"]["lines"].as_array_mut() else {
+        return;
+    };
+    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+    if !lines
+        .iter()
+        .any(|l| text(l).contains("Vaal Righteous Fire"))
+    {
+        return;
+    }
+    for l in lines.iter_mut() {
+        let t = text(l);
+        if t.ends_with("Righteous Fire of Arcane Devotion") && !t.contains("Vaal ") {
+            l["text"] = J::String(t.replace("Righteous Fire of Arcane Devotion", "Righteous Fire"));
+        }
+    }
 }
 
 /// A Vaal transfigured gem with its second effect disabled (Vaal Cleave of
@@ -7114,7 +7108,7 @@ fn skills_quality_tooltips_match() {
 /// Cleave of Rage (the main skill, with no hit on these weapons), every later
 /// one does not. The typed engine has the flag from the load, as every
 /// calculation after the first: the typed session differs from a fresh
-/// translated one only on the load, and agrees after an edit and on a
+/// oracle only on the load, and agrees after an edit and on a
 /// load again.
 #[test]
 fn vaal_global_effect_matches_after_the_first_calculation() {
@@ -7131,7 +7125,7 @@ fn vaal_global_effect_matches_after_the_first_calculation() {
         assert!(d.typed_active(), "load: {:?}", d.typed_error);
     };
     // The variant, saved
-    let mut d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data());
     load(&mut d, &xml);
     let g = answer(d.request(r#"{"cmd":"addSocketGroup"}"#), "add")["ok"]["index"]
         .as_u64()
@@ -7163,8 +7157,8 @@ fn vaal_global_effect_matches_after_the_first_calculation() {
     let variant = format!("{}{tag}{}", &saved[..start], &saved[end..]);
     assert!(variant.contains("enableGlobal2=\"false\""), "{variant}");
 
-    // A fresh translation: its first calculation still has Cleave of Rage
-    let mut d = Dispatcher::new(session(), Some(data()), Prefer::Typed);
+    // A fresh oracle session: its first calculation still has Cleave of Rage
+    let mut d = Dispatcher::new(session(), data());
     load(&mut d, &variant);
     let mut first = Vec::new();
     compare_views(&mut d, &["outputs"], "load", &mut first);
@@ -7194,7 +7188,7 @@ fn vaal_global_effect_matches_after_the_first_calculation() {
 #[test]
 fn tab_controls_behind_a_popup_fail() {
     let data = data();
-    let mut d = Dispatcher::new(session(), Some(data), Prefer::Typed);
+    let mut d = Dispatcher::new(session(), data);
     let mut out = Vec::new();
     let mut class_popups = 0;
     for (id, path) in corpus().into_iter().take(4) {
@@ -7235,7 +7229,7 @@ fn tab_controls_behind_a_popup_fail() {
                 assert!(d.typed_active(), "{label}: {:?}", d.typed_error);
                 let e = format!("control {} is behind a popup", r["path"].as_str().unwrap());
                 assert_eq!(t, json!({ "error": e }), "{label}");
-                let tr = answer(d.translated_request(&r.to_string()), "translated");
+                let tr = answer(d.reference_request(&r.to_string()), "oracle");
                 diff(&t, &tr, &label, &mut out);
                 compare_views(&mut d, &["state", "items"], &label, &mut out);
             }

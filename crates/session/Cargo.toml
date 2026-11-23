@@ -37,8 +37,8 @@ equivalence = { path = "../equivalence" }
 
 [[test]]
 name = "session"
-required-features = ["translation"]
+required-features = ["source"]
 
 [[test]]
 name = "typed"
-required-features = ["translation", "source"]
+required-features = ["source"]
