@@ -223,6 +223,35 @@ local function behindPopup(path)
 	return "control " .. tostring(path) .. " is behind a popup"
 end
 
+-- Runs `f` with `pairs` of the table `t` going by key, sorted: one of the
+-- orders `pairs` gives, where upstream's result depends on it
+local function byKey(t, f)
+	local pairs0 = pairs
+	pairs = function(x)
+		if x ~= t then
+			return pairs0(x)
+		end
+		local keys = { }
+		for k in pairs0(x) do
+			keys[#keys + 1] = k
+		end
+		table.sort(keys)
+		local i = 0
+		return function()
+			i = i + 1
+			local k = keys[i]
+			if k ~= nil then
+				return k, x[k]
+			end
+		end
+	end
+	local ok, err = pcall(f)
+	pairs = pairs0
+	if not ok then
+		error(err, 0)
+	end
+end
+
 function api.control(req)
 	if main.popups[1] and not tostring(req.path):match("^popup%.") then
 		error(behindPopup(req.path), 0)
@@ -269,7 +298,17 @@ function api.control(req)
 			local dragType, dragValue = control:GetDragValue(control.selIndex, control.selValue)
 			if not target.CanReceiveDrag or target:CanReceiveDrag(dragType, dragValue) then
 				target.selDragIndex = req.at or #target.list + 1
-				target:ReceiveDrag(dragType, dragValue, control)
+				if dragType == "SharedItemList" then
+					-- ItemSetListClass:ReceiveDrag copies the shared set's
+					-- items in `pairs(value.slots)` order, which LuaJIT seeds
+					-- per process: by slot name, one of the orders `pairs`
+					-- gives, so the items' ids are defined
+					byKey(dragValue.slots, function()
+						target:ReceiveDrag(dragType, dragValue, control)
+					end)
+				else
+					target:ReceiveDrag(dragType, dragValue, control)
+				end
 				target.selDragIndex = nil
 				if control.OnDragSend then
 					control:OnDragSend(control.selIndex, control.selValue, target)

@@ -555,10 +555,10 @@ impl<'d> TypedSession<'d> {
         index: usize,
         at: Option<f64>,
     ) -> Result<()> {
-        // `pairs(value.slots)`: the slot names in the order they were set
-        // (the order of `pairs(itemsTab.slots)` when the set was shared),
-        // which is the order the session's tables keep string keys in
-        let shared = self.shared()?.sets[index - 1].clone();
+        // `pairs(value.slots)`, whose order LuaJIT seeds per process: by
+        // slot name, one of the orders it gives, as the oracle drives it
+        let mut shared = self.shared()?.sets[index - 1].clone();
+        shared.slots.sort_by(|a, b| a.0.cmp(&b.0));
         let len = self.build.items.item_set_order_list.len();
         let at = at.unwrap_or(len as f64 + 1.0);
         if at < 1.0 || at.fract() != 0.0 || at as usize > len + 1 {
