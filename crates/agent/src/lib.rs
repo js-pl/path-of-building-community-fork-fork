@@ -19,6 +19,7 @@
 
 pub mod grant;
 mod read;
+pub mod schema;
 pub mod store;
 pub mod text;
 mod write;
