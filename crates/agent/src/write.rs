@@ -35,7 +35,7 @@ const CHANGES: &[(&str, &[&str])] = &[
 ];
 
 /// An item's text cap
-const ITEM_CAP: usize = 20_000;
+pub(crate) const ITEM_CAP: usize = 20_000;
 /// Changes in one `apply`
 const MAX_CHANGES: usize = 200;
 /// A label's cap
@@ -638,7 +638,7 @@ fn reload(o: &mut Open) -> R<()> {
 }
 
 /// The stats a change is measured by, as the sidebar calculation has them
-fn stats(s: &mut Dispatcher) -> R<Vec<Option<f64>>> {
+pub(crate) fn stats(s: &mut Dispatcher) -> R<Vec<Option<f64>>> {
     let out = cmd(s, json!({ "cmd": "outputs" }))?;
     Ok(DIFF_STATS
         .iter()
@@ -648,7 +648,10 @@ fn stats(s: &mut Dispatcher) -> R<Vec<Option<f64>>> {
 
 /// `Full DPS 2.41M → 2.77M (+14.9%)` for each stat that changed, and the
 /// commit's trailers
-fn diff(before: &[Option<f64>], after: &[Option<f64>]) -> (Vec<String>, Vec<(String, String)>) {
+pub(crate) fn diff(
+    before: &[Option<f64>],
+    after: &[Option<f64>],
+) -> (Vec<String>, Vec<(String, String)>) {
     let mut lines = Vec::new();
     let mut trailers = Vec::new();
     for ((_, label, points), (b, a)) in DIFF_STATS.iter().zip(before.iter().zip(after)) {
@@ -715,15 +718,20 @@ fn gem_of(skills: &J, g: u64, k: u64) -> R<J> {
         .ok_or_else(|| format!("group {g} has no gem {k}"))
 }
 
-fn check_slot(s: &mut Dispatcher, slot: &str) -> R<()> {
+/// The build's item slots
+pub(crate) fn item_slots(s: &mut Dispatcher) -> R<Vec<String>> {
     let items = cmd(s, json!({ "cmd": "items" }))?;
-    let slots: Vec<&str> = items["slots"]
+    Ok(items["slots"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|x| x["name"].as_str())
-        .collect();
-    if slots.contains(&slot) {
+        .filter_map(|x| x["name"].as_str().map(String::from))
+        .collect())
+}
+
+fn check_slot(s: &mut Dispatcher, slot: &str) -> R<()> {
+    let slots = item_slots(s)?;
+    if slots.iter().any(|x| x == slot) {
         Ok(())
     } else {
         Err(format!("no slot {slot:?}; the slots: {}", slots.join(", ")))

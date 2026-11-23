@@ -471,6 +471,12 @@ impl<'d> TypedSession<'d> {
         Some(object(out))
     }
 
+    /// The typed build, for callers that run the engine on it directly
+    /// (the agent API's mod weights)
+    pub fn build(&self) -> &Build<'d> {
+        &self.build
+    }
+
     /// `outputs`: the sidebar calculation's player and minion outputs
     pub fn outputs(&self) -> J {
         let mut o = Map::new();
