@@ -941,8 +941,8 @@ Each one a PR, as usual:
    socket and `pob ctl`. Done (#191, #193), except the
    Windows named pipe.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
-   agents install`: any harness works on a build. Done (#194, #195,
-   #196), except the Windows named pipe, which `pob mcp` needs there too.
+   agents install`: any harness works on a build. Done (#194, #196,
+   #197), except the Windows named pipe, which `pob mcp` needs there too.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
    Linux, macOS and Windows.
 6. The web app on the host: the host serves it, the WebSocket transport in
