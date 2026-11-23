@@ -1140,10 +1140,7 @@ fn spec_versions_match(d: &mut Dispatcher, failures: &mut Vec<String>) {
             // A copy upstream cannot show (nodes its tree version lacks)
             let probe = answer(d.reference_request(r#"{"cmd":"state"}"#), "state");
             if probe.get("error").is_some() {
-                eprintln!(
-                    "{id}: spec {to} fails in the oracle: {}",
-                    probe["error"]
-                );
+                eprintln!("{id}: spec {to} fails in the oracle: {}", probe["error"]);
                 broken = true;
                 break;
             }
@@ -1265,10 +1262,7 @@ fn new_build_matches(d: &mut Dispatcher) {
     ] {
         let typed = answer(d.request(&req.to_string()), "typed edit");
         assert!(d.typed_active(), "{req}: {:?}", d.typed_error);
-        let tr = answer(
-            d.reference_request(r#"{"cmd":"skills"}"#),
-            "oracle edit",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"skills"}"#), "oracle edit");
         assert!(tr.get("error").is_none(), "{req}: {tr}");
         assert!(typed.get("error").is_none(), "{req}: {typed}");
     }
@@ -2949,10 +2943,7 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
 /// `saveXml` of both on the dispatcher's build: where they differ
 fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
     let mut typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
-    let mut tr = answer(
-        d.reference_request(r#"{"cmd":"saveXml"}"#),
-        "oracle save",
-    );
+    let mut tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
     unordered(&mut typed);
     unordered(&mut tr);
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
@@ -2995,10 +2986,7 @@ fn saves_match(d: &mut Dispatcher) {
             continue;
         }
         let mut out = Vec::new();
-        answer(
-            d.reference_request(r#"{"cmd":"treeState"}"#),
-            "oracle load",
-        );
+        answer(d.reference_request(r#"{"cmd":"treeState"}"#), "oracle load");
         let t = Instant::now();
         let typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
         times[0] += t.elapsed();
@@ -3010,10 +2998,7 @@ fn saves_match(d: &mut Dispatcher) {
         // The oracle replays the typed save first
         answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
         let t = Instant::now();
-        let tr = answer(
-            d.reference_request(r#"{"cmd":"saveXml"}"#),
-            "oracle save",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
         times[1] += t.elapsed();
         diff(&typed, &tr, "saveXml", &mut out);
         let code = |d: &mut Dispatcher, typed: bool| {
@@ -3040,12 +3025,7 @@ fn saves_match(d: &mut Dispatcher) {
         answer(d.reference_request(&load), "oracle load");
         for (c, v) in ["state", "outputs"].iter().zip(&views) {
             let tr = answer(d.reference_request(&json!({"cmd": c}).to_string()), c);
-            diff(
-                v,
-                &tr,
-                &format!("typed file in the oracle: {c}"),
-                &mut out,
-            );
+            diff(v, &tr, &format!("typed file in the oracle: {c}"), &mut out);
         }
         answer(d.request(&load), "typed load");
         compare_saves(d, "typed file", &mut out);
@@ -3381,10 +3361,7 @@ fn commands_match(data: &'static TypedData, d: &mut Dispatcher) {
             times[1] += t.elapsed();
         }
         let t = Instant::now();
-        answer(
-            d.reference_request(r#"{"cmd":"state"}"#),
-            "oracle load",
-        );
+        answer(d.reference_request(r#"{"cmd":"state"}"#), "oracle load");
         times[2] += t.elapsed();
         for (cmd, typed) in ["state", "outputs", "treeState"].iter().zip(typed) {
             let t = Instant::now();
@@ -3630,9 +3607,7 @@ fn compare_party_saves(typed: &str, tr: &str, out: &mut Vec<String>) -> usize {
         if keystone {
             aligned += 1;
         } else {
-            out.push(format!(
-                "saveXml differs:\n  typed {a:?}\n  oracle {b:?}"
-            ));
+            out.push(format!("saveXml differs:\n  typed {a:?}\n  oracle {b:?}"));
             return aligned;
         }
     }
@@ -3745,10 +3720,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             .iter()
             .map(|c| answer(d.request(&json!({"cmd": c}).to_string()), c))
             .collect();
-        answer(
-            d.reference_request(r#"{"cmd":"state"}"#),
-            "oracle load",
-        );
+        answer(d.reference_request(r#"{"cmd":"state"}"#), "oracle load");
         for (c, t) in ["state", "outputs"].iter().zip(&typed) {
             let tr = answer(d.reference_request(&json!({"cmd": c}).to_string()), c);
             diff(t, &tr, c, &mut out);
@@ -3764,10 +3736,7 @@ fn party_match(data: &'static TypedData, d: &mut Dispatcher) {
             diff(&t, &tr, &format!("party view {k}"), &mut out);
         }
         let typed_save = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
-        let tr = answer(
-            d.reference_request(r#"{"cmd":"saveXml"}"#),
-            "oracle save",
-        );
+        let tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
         if out.is_empty() {
             let a = typed_save["ok"]["xml"].as_str().unwrap_or("");
             let b = tr["ok"]["xml"].as_str().unwrap_or("");
@@ -4611,10 +4580,7 @@ fn tree_edits_match(d: &mut Dispatcher, builds: Vec<(String, String)>) {
                 break;
             }
             let t = Instant::now();
-            let tr = answer(
-                d.reference_request(r#"{"cmd":"treeState"}"#),
-                "oracle edit",
-            );
+            let tr = answer(d.reference_request(r#"{"cmd":"treeState"}"#), "oracle edit");
             times[1] += t.elapsed();
             let _ = tr;
             let mut follow = vec![
@@ -4900,10 +4866,7 @@ fn replay_sequence() {
             answer(d.reference_request(r#"{"cmd":"treeState"}"#), "replay");
             for f in ["skills", "state", "outputs", "treeState"] {
                 let q = json!({ "cmd": f }).to_string();
-                let (t, tr) = (
-                    answer(d.request(&q), f),
-                    answer(d.reference_request(&q), f),
-                );
+                let (t, tr) = (answer(d.request(&q), f), answer(d.reference_request(&q), f));
                 let mut out = Vec::new();
                 diff(&t, &tr, f, &mut out);
                 out.truncate(4);
