@@ -1,10 +1,9 @@
 //! Lua support for the port: values, patterns, number formatting and table
 //! order with the semantics upstream runs under (LuaJIT 2.1), what the typed
 //! engine ships. The Lua parser and the standard library environment, which
-//! only the importer and upstream's translated program run, are in `luai`.
+//! only the importer runs, are in `luai`.
 
 pub mod format;
-pub mod gc;
 pub mod ljtab;
 pub mod modlib;
 pub mod pattern;

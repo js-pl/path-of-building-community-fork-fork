@@ -644,7 +644,7 @@ impl TypedSession<'_> {
         Ok(r)
     }
 
-    /// The Calcs tab's controls (`calcs.<name>`) as the translated
+    /// The Calcs tab's controls (`calcs.<name>`) as upstream's
     /// session's `controls` describes them, after `calcs`
     pub fn calcs_control(&self, name: &str) -> Option<J> {
         let c = &self.calcs_select;

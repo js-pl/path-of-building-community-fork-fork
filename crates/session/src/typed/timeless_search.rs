@@ -1360,7 +1360,7 @@ impl<'d> TypedSession<'d> {
         let idx = index
             .filter(|i| *i >= 1.0 && i.fract() == 0.0)
             .map(|i| i as usize);
-        // The translation's message (LuaJIT names the local)
+        // Upstream's message, without the local LuaJIT names
         let nil = || Err(format!("{UPSTREAM_ERROR}attempt to index a nil value"));
         let mut lines = |l: &[&str]| {
             for s in l {

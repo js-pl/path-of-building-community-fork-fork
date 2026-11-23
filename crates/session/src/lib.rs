@@ -1,32 +1,26 @@
 //! Engine API: build sessions answering JSON requests, `{"cmd": "...", ...}`.
 //!
 //! A [`Dispatcher`] answers each command with the typed engine
-//! ([`typed`]) where it is ported. With the `translation` feature (the
-//! default) the other commands go to a [`Session`] running upstream's
-//! translated program headless (see `upstream::host`), answered by
-//! `lua/session.lua`, which drives upstream's build mode the way its UI
-//! does; without it they are "not ported" errors, and neither the
-//! translation nor the Lua runtime is linked. The engine does no I/O: data
-//! files come from upstream's source directory or are handed over in
-//! memory ([`Files`]), as the browser does.
+//! ([`typed`]); commands it does not have are "not ported" errors. A
+//! [`Session`] answers the same commands on upstream itself, on the
+//! oracle's LuaJIT (`oracle/session.lua`), as the tests' reference, and
+//! [`Paired`] keeps the two in step. The engine does no I/O: data files
+//! come from upstream's source directory or are handed over in memory
+//! ([`Files`]), as the browser does.
 
 pub mod bundle;
 pub mod dispatch;
-#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod paired;
-#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 mod reference;
-#[cfg(feature = "translation")]
-mod translated;
 pub mod typed;
 
-pub use dispatch::{Dispatcher, Prefer};
-#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+pub use dispatch::Dispatcher;
+#[cfg(not(target_arch = "wasm32"))]
 pub use paired::Paired;
-#[cfg(any(feature = "translation", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub use reference::Session;
-#[cfg(feature = "translation")]
-pub use translated::Recording;
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};

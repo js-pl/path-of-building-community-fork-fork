@@ -1,4 +1,4 @@
-// Responses of the engine API (crates/session/lua/session.lua)
+// Responses of the engine API (oracle/api.lua gives the same on upstream)
 
 export type Control = {
   class: string;

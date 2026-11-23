@@ -7,7 +7,7 @@
 //! Upstream visits the tree's tables with `pairs`, and some results depend
 //! on the order (which of two notables with one name is kept, the order of
 //! linked nodes); the tables are visited in the order the data lists them,
-//! as the translation does.
+//! as LuaJIT does for these tables.
 
 use crate::mod_parser::ModParser;
 use crate::mods::convert::{get, number, text};

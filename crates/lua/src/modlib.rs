@@ -1,8 +1,7 @@
 //! `modLib.createMod` of upstream's `Modules/ModTools.lua` on Lua values:
 //! for the importer, which reads upstream's ModParser tables, and the mod
 //! parser, whose tables still build mods as Lua values. Here, not in the
-//! engine, so the importer (and the translation built with it) does not
-//! depend on the engine.
+//! engine, so the importer does not depend on the engine.
 
 use crate::{TableRef, Value};
 

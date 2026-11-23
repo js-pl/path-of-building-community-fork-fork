@@ -1,17 +1,17 @@
 # Dropping the translation
 
-Status: option C accepted; steps 1 to 3 done (the browser build and
-`pob serve` are typed-only by default, the oracle session is the session
-test's reference in CI, and no equivalence test uses the translation any
-more), step 4 (the deletion) under way in the sub-steps
-[below](#step-4-in-sub-steps). The goal in
-[design.md](design.md#mirroring-upstream) is that `crates/upstream`, `luagen`
-and the Lua runtime's interpreter leave the shipped and tested engine, the
-oracle stays the only reference, and Lua is left in the importer and the
-oracle. This note lists what still depends on them and how the tests keep a
-reference without them.
+Status: done. Option C was accepted and all four steps are done: the
+translation (`crates/upstream`, `luagen`, `lua::gc`, `engine::install` and
+`mod_store`, the session's `translation` feature and the dispatcher's
+fallback) is deleted (sub-step 8 [below](#step-4-in-sub-steps)), the
+oracle is the only reference, locally too, and Lua is left in the importer
+(`crates/luai`), the library pieces the engine ships (`crates/lua`) and the
+oracle (`oracle/api.lua`, the engine API's driver that the translation ran
+as `crates/session/lua/session.lua`). The rest of this note is the record
+of how it went: what depended on the translation and how the tests kept a
+reference without it.
 
-## What links them today
+## What linked them (before sub-step 8)
 
 | Code | Uses | Shipped? |
 | --- | --- | --- |
@@ -44,14 +44,14 @@ makes cyclic environments).
 
 ## Where the tests get their reference
 
-| Tests | Reference today |
+| Tests | Reference (before sub-step 8) |
 | --- | --- |
 | `equivalence/tests/build_output.rs` (whole builds, `MAIN` and `CALCS`), `mod_parser.rs`, `data.rs` | the oracle's committed outputs (`tests/oracle`, 13 MB) |
 | `equivalence/tests/oracle_variants.rs` (the variant families of `equivalence::variants`: skill functions, triggers, mods, tattoos, timeless jewels, mirages, unconnected-allocation jewels, Calcs inputs, every Configuration option; whole builds, `MAIN` and `CALCS`) | the oracle, live (`oracleOutputs` of `oracle/session.lua`); every trigger variant in the nightly (`TRIGGERS_FULL`) |
 | `equivalence/tests/{item,tree,game_data}.rs` (typed items: every unique and rare template and every corpus build's items; the passive trees; the typed data tables) | the oracle, live (`oracleValue` of `oracle/session.lua`, see [Moved to the oracle](#moved-to-the-oracle)) |
 | `equivalence/tests/calculator.rs` (calculator overrides: nodes added and removed, items replaced or taken off, flasks toggled, a condition; base and override outputs, player and minion) | the oracle, live (`oracleCalculator` of `oracle/session.lua`: `calcsTab.miscCalculator` on the loaded build), numbers bitwise |
 | `session/tests/typed.rs` (16 phases: commands, geometry, calcs, tree, skills, save, items, config, tooltips, party, new, overlays, power (with the anoint popup's power sorts), `nodepower` (node power on every tenth corpus build, four power stats, with cluster notables), `variants`: the Calcs tab's breakdowns of the breakdown-writing skill functions, the mirages and the Calcs input variants, and `specs`: the tree edits of `tree` on the jewel, tattoo and timeless variant builds) | in CI the oracle, live (`SESSION_REFERENCE=oracle`, LuaJIT from `oracle/setup.sh`); locally by default the translation: random edit sequences whose next step is chosen from the previous answers (thousands of edits and views per run), plus fresh translated sessions to align upstream's shared state |
-| `session/tests/session.rs`, `web/tests` | the translation (native against wasm) |
+| `session/tests/session.rs`, `web/tests` | the translation (native against wasm); since sub-steps 6 and 8 the typed engine on its own (`web/tests` against the native `pob serve`) |
 
 The live, adaptive tests are the hard part. Their sequences depend on the
 answers, and some comparisons need a fresh upstream session on demand (the
@@ -184,14 +184,16 @@ not available.
 | 4 | the remaining equivalence tests to the oracle (`calculator.rs` on `oracleCalculator`; `spec.rs`, `power.rs`, `compare.rs` retired into session phases) | done (#160, #164, #168, #169, #171) |
 | 5 | `session::Paired`: the typed `Dispatcher` and a reference `Session` kept in step, the replay out of the `Dispatcher` | merged (#175) |
 | 6 | the web test against the native typed `pob serve` | merged (#174) |
-| 7 | CLI, bench and wasm: `--typed`, `--translated` and `bundle --lua` go, the bench is typed-only, the wasm `translation` feature and `has_translation` go, and so does the `Dispatcher`'s fallback | merged (#180); the `Dispatcher`'s own fallback is still in `crates/session` (`translation` feature) |
-| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc`, the rest of the fallback code; the session test's reference is the oracle only | next: confirmed by the owner on 2026-11-15 |
+| 7 | CLI, bench and wasm: `--typed`, `--translated` and `bundle --lua` go, the bench is typed-only, the wasm `translation` feature and `has_translation` go, and so does the `Dispatcher`'s fallback | merged (#180) |
+| 8 | the deletion: `crates/upstream`, `luagen`, the luagen step of `crates/session/build.rs`, `translated.rs`, `engine::install`, `class`, `mod_store`, `lua::gc` (with its `Gc` wrapper and the translated closures' cells), the rest of the fallback code (`Prefer`, the dispatcher's queue); the session test's reference is the oracle only, `crates/session/lua/session.lua` moved to `oracle/api.lua` | done (#188: the oracle as the only reference; #190: the deletion); confirmed by the owner on 2026-11-15 |
 
-Other docs mark what only holds after sub-step 7 or 8 as such.
+What the translation still answered in the session test (and the shipped
+engine answered `not ported` since sub-step 7) is listed in
+`docs/progress.md`, "Not ported yet".
 
 ## The oracle session (step 2)
 
-`oracle/session.lua` runs `lua/session.lua` on upstream headless on the
+`oracle/session.lua` runs `api.lua` (then `crates/session/lua/session.lua`) on upstream headless on the
 oracle's LuaJIT, one JSON request and response per line, as `pob serve`.
 It differs from the translation's host only where headless upstream has
 no implementation: `Inflate` and `Deflate` are zlib through LuaJIT's FFI,
