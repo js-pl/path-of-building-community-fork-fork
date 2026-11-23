@@ -207,7 +207,7 @@ impl<'d> TypedSession<'d> {
             let calc = MiscCalculator::new(&self.build, &calc_data)?;
             base = compare::base_gem_dps(&calc, opts.field);
             let full_dps = opts.field == "FullDPS" || self.view_mode == "TREE";
-            let pending: Vec<&Arc<Gem>> = gems
+            let mut pending: Vec<&Arc<Gem>> = gems
                 .iter()
                 .copied()
                 .filter(|gem| {
@@ -215,6 +215,12 @@ impl<'d> TypedSession<'d> {
                         || (gem.granted_effect.has_global_effect && !gem.granted_effect.support)
                 })
                 .collect();
+            // Upstream runs them in `pairs` order of `data.gems`, which
+            // LuaJIT seeds per process; the selections each calculation
+            // leaves on the slot's gem (`skillMinion`, ...) depend on the
+            // order, so they go by id, one of the orders `pairs` gives (the
+            // oracle's `gemList` does the same)
+            pending.sort_by(|a, b| a.id.cmp(&b.id));
             let default_level = skills_tab.default_gem_level;
             let quality = skills_tab.default_gem_quality;
             let cands: Vec<GemCandidate> = pending
