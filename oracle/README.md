@@ -53,6 +53,7 @@ API it answers requests of its own, by the start of the line:
 | --- | --- | --- |
 | `{"cmd":"oracleOutputs","xml":..,"id":..}` | loads a build as `dump.lua` does and answers its `MAIN` and `CALCS` outputs in `dump.lua`'s JSON | `crates/equivalence/tests/oracle_variants.rs` |
 | `{"cmd":"oracleCalculator","xml":..,"id":..,"cases":[..]}` | loads a build and answers `calcsTab.miscCalculator`: the base outputs and `calcFunc(override)`'s per case, nodes and items by id | `crates/equivalence/tests/calculator.rs` |
+| `{"cmd":"oracleModWeights","xml":..,"id":..,"cases":[..]}` | loads a build and answers `TradeQueryGenerator`'s mod weights per case (a slot, stat weights, the trade popup's options), each group of mods weighed by key | `crates/equivalence/tests/mod_weights.rs` |
 | `{"cmd":"oracleValue","fn":..,"params":..}` | one of `values.lua`'s values | `crates/equivalence/tests/{item,tree,game_data}.rs` |
 | `{"cmd":"oracleLastError"}` | the last error with its source position (the answers leave it out, as the typed engine's errors have none) | the session test, to tell upstream failures apart |
 

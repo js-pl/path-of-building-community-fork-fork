@@ -88,8 +88,11 @@ jobs:
           - name: items and tree
             filter: 'binary(=item) | binary(=tree) | binary(=game_data)'
             oracle: true
+          - name: mod weights
+            filter: 'binary(=mod_weights)'
+            oracle: true
           - name: rest
-            filter: 'not (test(=typed_session_matches_oracle) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=tree) | binary(=game_data))'
+            filter: 'not (test(=typed_session_matches_oracle) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=tree) | binary(=game_data) | binary(=mod_weights))'
             oracle: true
     name: test (${{ matrix.name }})
     env:

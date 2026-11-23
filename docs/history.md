@@ -1,7 +1,7 @@
 # Build history
 
 Every version of a build, kept in git. This is step 1 of the agent design
-on the `claude/nice-ride-t0g45i` branch (`docs/agent.md`, "Build history"):
+([agent.md](agent.md), "Build history"):
 an agent edits a build directly, so nothing it does may lose one, and the
 history comes before any verb that changes a build. It is built as
 `crates/history` and stands alone: XML in, versions out, no session.
@@ -58,6 +58,6 @@ A version is anything git names a commit by: a hash or its prefix,
 
 ## Next
 
-The host (`docs/agent.md` steps 3 and 6) holds a `Recorder` per open
+The host ([agent.md](agent.md) steps 3 and 6) holds a `Recorder` per open
 build, feeds it the session's saves, calls `tick` from its event loop, and
 shows `log` with a restore button per version.

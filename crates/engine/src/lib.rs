@@ -47,6 +47,7 @@ pub mod jewel;
 pub mod mod_parser;
 #[cfg(feature = "translation")]
 pub mod mod_store;
+pub mod mod_weights;
 pub mod mods;
 pub mod parallel;
 pub mod party;

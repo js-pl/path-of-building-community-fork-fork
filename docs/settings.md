@@ -66,6 +66,5 @@ pob settings <key> <value>      sets it: true or false (on/off, yes/no, 1/0), a 
 The web app will get an Options dialog, opened where upstream's Options
 button is, with upstream's options ported over time and a Build history
 section for the settings above. The browser can't start git, so that
-section takes effect once the app runs on the host (`docs/agent.md` on
-`claude/nice-ride-t0g45i`, step 6), which reads and writes this file; in
+section takes effect once the app runs on the host ([agent.md](agent.md), step 6), which reads and writes this file; in
 browser-only mode it is shown disabled.
