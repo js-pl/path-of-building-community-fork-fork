@@ -828,7 +828,7 @@ Each one a PR, as usual:
 9. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
 10. The port of the mod weights with its oracle test; `evaluate_item`.
-    Done (#189, and its PR).
+    Done (#189, #195).
 11. Later: trade and prices, cloud sessions, an agent in the browser, a
     desktop app.
 
