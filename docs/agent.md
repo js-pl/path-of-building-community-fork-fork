@@ -777,7 +777,7 @@ Each one a PR, as usual:
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
-   socket and `pob ctl`. Done (#191, and this PR's host), except the
+   socket and `pob ctl`. Done (#191, #193), except the
    Windows named pipe.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
    agents install`: any harness works on a build.
