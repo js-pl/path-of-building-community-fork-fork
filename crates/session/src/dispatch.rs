@@ -80,6 +80,11 @@ impl<'d> Dispatcher<'d> {
         self.typed.is_some()
     }
 
+    /// The typed engine's build, when it holds one
+    pub fn typed_build(&self) -> Option<&engine::build::Build<'d>> {
+        self.typed.as_ref().map(TypedSession::build)
+    }
+
     /// Answers one JSON request, as `Session::request` does
     pub fn request(&mut self, json: &str) -> Result<String, String> {
         self.typed_error = None;

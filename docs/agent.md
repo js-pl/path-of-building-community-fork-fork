@@ -7,7 +7,8 @@ sub-step 8 of [the deletion](drop-translation.md#step-4-in-sub-steps),
 which reshaped `session::dispatch`, is done. Step 3, the verbs
 (`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
-done.
+done. Step 10, the mod weights and `evaluate_item`
+([below](#built-evaluate_item)), is done.
 
 ## The question
 
@@ -641,6 +642,41 @@ goes by key, and the oracle test makes upstream do the same. Not ported:
 Pearl of Tsoatha's weights. `crates/equivalence/tests/mod_weights.rs`
 compares them with upstream's.
 
+### Built: `evaluate_item`
+
+A reading verb of `crates/agent` (`crates/agent/src/evaluate.rs`); it
+changes nothing and makes no commit:
+
+```
+{"verb": "evaluate_item", "build"?, "slot"?, "text"? | "item"?,
+ "weights"?: true, "stat_weights"?: [{"stat": "FullDPS", "weight": 1}, ...],
+ "corrupted"?: false, "eldritch"?: "none" | "regular" | "presence",
+ "jewel"?: "base" | "abyss",
+ "special"?: "megalomaniac" | "watchers_eye" | "pearl_of_tsoatha",
+ "limit"?: 15}
+```
+
+- **The item**: `text` as copied in game, or `item`, an id `items`
+  gives; `slot` is where it goes, else the first slot it fits. It is
+  added and equipped on a copy of the build (a session of its own loaded
+  from the saved XML), with the engine's full calculation before and
+  after, so `changed` holds the same `before → after (+x%)` lines
+  `add_item` in that slot would give. The answer names the item by slot
+  and base (`item`, `replaces`), with the engine's `lines`, the slots it
+  `fits` and the `unparsed_lines` counted; a base the engine doesn't
+  know isn't quoted. A pasted item's name and lines are only under
+  `untrusted`.
+- **The mod weights** of the slot (`weights: false` leaves them out):
+  `engine::mod_weights` on the build as it is, tested on the base of the
+  slot's item as upstream does; the best `limit` mods by `gain` at a mid
+  roll, each with its value, `per_point` and trade id, marked as
+  estimates. `stat_weights` defaults to upstream's (Full DPS 1, EHP 0.5);
+  `corrupted`, `eldritch`, `jewel` and `special` are the trade popup's
+  options. A slot alone gives only the weights; Megalomaniac needs no
+  slot.
+- Not ported: Pearl of Tsoatha's weights (answered as `not_ported`), the
+  talisman and scourge options, the trade query itself.
+
 ### Answers sized for an LLM
 
 Every answer is short and self-describing: numbers with their deltas in
@@ -791,7 +827,8 @@ Each one a PR, as usual:
    and `improve`.
 9. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
-10. The port of the mod weights with its oracle test (done); `evaluate_item`.
+10. The port of the mod weights with its oracle test; `evaluate_item`.
+    Done (#189, and its PR).
 11. Later: trade and prices, cloud sessions, an agent in the browser, a
     desktop app.
 
