@@ -313,9 +313,7 @@ impl<'d> TypedSession<'d> {
                 let item = self.display_item.as_mut().unwrap();
                 item.influences = [false; 8];
                 if item.has_elder_shaper_and_all_conqueror_influences {
-                    for i in 0..6 {
-                        item.influences[i] = true;
-                    }
+                    item.influences[..6].fill(true);
                 } else {
                     for i in chosen {
                         if i > 0 {
