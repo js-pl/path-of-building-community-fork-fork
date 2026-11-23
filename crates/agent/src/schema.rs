@@ -17,10 +17,11 @@ pub const READING: &[&str] = &[
     "search",
     "history",
     "changes_since",
+    "evaluate_item",
 ];
 
 /// The verbs whose answers can carry the author's text under `untrusted`
-pub const UNTRUSTED_TEXT: &[&str] = &["notes", "items", "export"];
+pub const UNTRUSTED_TEXT: &[&str] = &["notes", "items", "export", "evaluate_item"];
 
 fn build() -> J {
     json!({
@@ -207,6 +208,36 @@ pub fn input_schema(verb: &str) -> Option<J> {
             json!({ "build": build(), "version": { "type": "integer", "minimum": 0 } }),
             &[],
         ),
+        "evaluate_item" => (
+            json!({
+                "build": build(),
+                "slot": { "type": "string", "description": "the slot to evaluate in; default: the first slot the item fits. A slot alone gives only its mod weights" },
+                "text": { "type": "string", "description": "an item's text, as copied in game or from the trade site" },
+                "item": { "type": "integer", "minimum": 0, "description": "an item of the build by its id as `items` gives it, instead of text" },
+                "weights": { "type": "boolean", "description": "whether to add the slot's mod weights; default true" },
+                "stat_weights": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "description": "the stats the weights are worth, as power stats; default Full DPS 1, EHP 0.5",
+                    "items": {
+                        "type": "object",
+                        "required": ["stat"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "stat": { "type": "string", "description": "a power stat (FullDPS, TotalEHP, Life, FireResist, ...)" },
+                            "weight": { "type": "number", "description": "default 1" },
+                        },
+                    },
+                },
+                "corrupted": { "type": "boolean", "description": "weigh corrupted implicits too" },
+                "eldritch": { "type": "string", "enum": ["none", "regular", "presence"], "description": "eldritch implicits to weigh" },
+                "jewel": { "type": "string", "enum": ["base", "abyss"], "description": "the jewel type for a jewel socket" },
+                "special": { "type": "string", "enum": ["megalomaniac", "watchers_eye", "pearl_of_tsoatha"], "description": "a unique weighed its own way" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 200, "description": "how many mods to list; default 15" },
+            }),
+            &[],
+        ),
         "undo" => (json!({ "build": build(), "expect": expect() }), &[]),
         "restore" => (
             json!({
@@ -278,6 +309,17 @@ mod tests {
                 assert!(s["properties"].get(r.as_str().unwrap()).is_some(), "{v}");
             }
         }
+        let s = input_schema("evaluate_item").unwrap();
+        let mut props: Vec<&str> = s["properties"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let mut fields = crate::evaluate::FIELDS.to_vec();
+        props.sort();
+        fields.sort();
+        assert_eq!(props, fields);
         for v in READING.iter().chain(UNTRUSTED_TEXT).chain(CHANGES) {
             assert!(crate::VERBS.iter().any(|(n, _)| n == v), "{v}");
         }
