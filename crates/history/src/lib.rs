@@ -21,7 +21,7 @@
 mod git;
 mod recorder;
 
-pub use git::{GIT_ENV, Git};
+pub use git::{GIT_ENV, Git, GitOptions};
 pub use recorder::{QUIET, Recorder};
 
 use std::fmt;

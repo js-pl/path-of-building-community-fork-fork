@@ -10,12 +10,15 @@
 //!   pob bench <xml>           times making the data, loading, editing and node power for
 //!                             a build on the typed engine
 //!   pob history <dir> <verb>  a build's history, a git repository of its own in <dir>,
-//!                             written with the installed git (`POB_GIT` picks another):
+//!                             written with the git the settings name (`POB_GIT` overrides):
 //!                               commit <xml> [label]   commits the build in <xml>
 //!                               log [n]                the last n versions (20)
 //!                               show <version>         the build's XML at a version
 //!                               restore <version>      a version again, as a new commit
 //!                               push <remote>          a backup, never forced
+//!   pob settings [key [value]]
+//!                             the settings file (`POB_SETTINGS` picks another): all of
+//!                             it and the git it gives, one setting, or sets one
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
@@ -216,6 +219,7 @@ fn main() {
         Some("bundle") if args.len() == 2 => bundle(Path::new(&args[1])),
         Some("bench") if args.len() == 2 => bench(&args[1]),
         Some("history") if args.len() >= 3 => history(Path::new(&args[1]), &args[2..]),
+        Some("settings") if args.len() <= 3 => settings_cmd(&args[1..]),
         _ => usage(),
     }
 }
@@ -224,19 +228,19 @@ fn usage() -> ! {
     die(
         "usage: pob serve | pob bundle <out dir> | pob bench <build.xml>\n       \
          pob history <dir> commit <build.xml> [label] | log [n] | show <version> | \
-         restore <version> | push <remote>",
+         restore <version> | push <remote>\n       \
+         pob settings [key [value]]",
     )
 }
 
 fn history(dir: &Path, args: &[String]) {
-    use history::{BuildRepo, Git, Message};
-    let git = Git::find().unwrap_or_else(|| {
-        die(format!(
-            "no git: install git (git for Windows on Windows) or set {} to its path \
-             (it may be set to `off`)",
-            history::GIT_ENV
-        ))
-    });
+    use history::{BuildRepo, Message};
+    let (_, settings) = load_settings();
+    let git = match settings.history.git() {
+        Ok(Some(git)) => git,
+        Ok(None) => die("the history is off: pob settings history.enabled true"),
+        Err(e) => die(format!("{e} (pob settings history.git <path>)")),
+    };
     let repo = BuildRepo::open(git, dir).unwrap_or_else(|e| die(e));
     let version = |rev: &str| repo.resolve(rev).unwrap_or_else(|e| die(e));
     let done = |v: Option<history::Version>| match v {
@@ -273,6 +277,51 @@ fn history(dir: &Path, args: &[String]) {
         ("show", [rev]) => print!("{}", repo.read(&version(rev)).unwrap_or_else(|e| die(e))),
         ("restore", [rev]) => done(repo.restore(&version(rev)).unwrap_or_else(|e| die(e))),
         ("push", [remote]) => repo.push(remote).unwrap_or_else(|e| die(e)),
+        _ => usage(),
+    }
+}
+
+fn load_settings() -> (PathBuf, settings::Settings) {
+    let path = settings::default_path().unwrap_or_else(|| {
+        die(format!(
+            "no config directory; set {} to the settings file",
+            settings::SETTINGS_ENV
+        ))
+    });
+    let s = settings::Settings::load(&path).unwrap_or_else(|e| die(e));
+    (path, s)
+}
+
+fn settings_cmd(args: &[String]) {
+    let (path, mut s) = load_settings();
+    match args {
+        [] => {
+            println!("{}", path.display());
+            for (key, about) in settings::KEYS {
+                let value = s.get(key).unwrap_or_else(|e| die(e));
+                println!("  {key} = {value:?}\n      {about}");
+            }
+            match s.history.git() {
+                Ok(Some(git)) => {
+                    let config = git
+                        .config()
+                        .map(|c| format!(", gitconfig {}", c.display()))
+                        .unwrap_or_default();
+                    println!(
+                        "history: on, {} ({}{config})",
+                        git.version(),
+                        git.program().display()
+                    )
+                }
+                Ok(None) => println!("history: off"),
+                Err(e) => println!("history: not kept: {e}"),
+            }
+        }
+        [key] => println!("{}", s.get(key).unwrap_or_else(|e| die(e))),
+        [key, value] => {
+            s.set(key, value).unwrap_or_else(|e| die(e));
+            s.save(&path).unwrap_or_else(|e| die(e));
+        }
         _ => usage(),
     }
 }

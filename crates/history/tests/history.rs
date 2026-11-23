@@ -255,3 +255,48 @@ fn directory_names_every_platform_takes() {
     assert_eq!(dir_name("Console"), "Console");
     assert_eq!(dir_name("Ünïcode ✓"), "Ünïcode ✓");
 }
+
+#[test]
+fn a_gitconfig_of_its_own_replaces_the_global_one() {
+    let root = scratch("gitconfig");
+    let config = root.join("pob.gitconfig");
+    std::fs::write(
+        &config,
+        "[user]\n\tname = Exile\n\temail = exile@wraeclast\n",
+    )
+    .unwrap();
+    let options = history::GitOptions {
+        enabled: true,
+        program: Some("git".into()),
+        config: Some(config.clone()),
+    };
+    let git = Git::from_options(&options).unwrap().unwrap();
+    assert_eq!(git.config(), Some(config.as_path()));
+    let r = BuildRepo::open(git, root.join("b")).unwrap();
+    r.commit(V1, &Message::user("a")).unwrap();
+    let out = std::process::Command::new("git")
+        .args([
+            "-C",
+            r.dir().to_str().unwrap(),
+            "log",
+            "-1",
+            "--format=%an <%ae>",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        "Exile <exile@wraeclast>"
+    );
+    // Off is off; a gitconfig that isn't there is an error
+    let off = history::GitOptions {
+        enabled: false,
+        ..options.clone()
+    };
+    assert!(Git::from_options(&off).unwrap().is_none());
+    let missing = history::GitOptions {
+        config: Some(root.join("none")),
+        ..options
+    };
+    assert!(Git::from_options(&missing).is_err());
+}

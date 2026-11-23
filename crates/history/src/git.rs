@@ -23,24 +23,91 @@ const INHERITED: &[&str] = &[
     "GIT_PREFIX",
 ];
 
+/// How to find git, as the user set it (the `history` section of the
+/// settings file, `crates/settings`)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitOptions {
+    /// Whether to keep a history at all
+    pub enabled: bool,
+    /// The git program; `None` searches for one
+    pub program: Option<PathBuf>,
+    /// A gitconfig used instead of the user's global one (`~/.gitconfig`),
+    /// through `GIT_CONFIG_GLOBAL`; `None` keeps the user's
+    pub config: Option<PathBuf>,
+}
+
+impl Default for GitOptions {
+    fn default() -> GitOptions {
+        GitOptions {
+            enabled: true,
+            program: None,
+            config: None,
+        }
+    }
+}
+
 /// An installed git program, e.g. git for Windows' `git.exe`
 #[derive(Clone, Debug)]
 pub struct Git {
     program: PathBuf,
     version: String,
+    config: Option<PathBuf>,
 }
 
 impl Git {
-    /// The git to use: `POB_GIT` if set (a path, or `off` for none), else
-    /// `git` on the `PATH`, else, on Windows, git for Windows where its
-    /// installer puts it. `None` when there is none: the history is
-    /// optional and the caller keeps working without it.
+    /// The git to use with the default options: `POB_GIT` if set (a path,
+    /// or `off` for none), else `git` on the `PATH`, else, on Windows, git
+    /// for Windows where its installer puts it. `None` when there is none:
+    /// the history is optional and the caller keeps working without it.
     pub fn find() -> Option<Git> {
-        match std::env::var_os(GIT_ENV) {
-            Some(v) if is_off(&v) => None,
-            Some(v) => Git::at(v).ok(),
-            None => candidates().into_iter().find_map(|p| Git::at(p).ok()),
+        Git::from_options(&GitOptions::default()).ok().flatten()
+    }
+
+    /// The git `options` ask for. `POB_GIT` overrides them (a path, or
+    /// `off`). `Ok(None)` when the history is turned off; an error when it
+    /// is on and the git or the gitconfig set can't be used, or no git is
+    /// found, so the user learns why there is no history.
+    pub fn from_options(options: &GitOptions) -> Result<Option<Git>, Error> {
+        let env = std::env::var_os(GIT_ENV);
+        if env.as_deref().is_some_and(is_off) || (env.is_none() && !options.enabled) {
+            return Ok(None);
         }
+        let git = match (env, &options.program) {
+            (Some(v), _) => Git::at(v)?,
+            (None, Some(p)) => Git::at(p)?,
+            (None, None) => candidates()
+                .into_iter()
+                .find_map(|p| Git::at(p).ok())
+                .ok_or_else(|| {
+                    Error::NoGit(
+                        "no git on the PATH; install git (git for Windows on Windows) or set its path"
+                            .into(),
+                    )
+                })?,
+        };
+        match &options.config {
+            Some(c) => git.with_config(c).map(Some),
+            None => Ok(Some(git)),
+        }
+    }
+
+    /// This git reading `config` instead of the user's global gitconfig;
+    /// an error if there is no such file
+    pub fn with_config(mut self, config: impl Into<PathBuf>) -> Result<Git, Error> {
+        let config = config.into();
+        if !config.is_file() {
+            return Err(Error::Invalid(format!(
+                "no gitconfig at {}",
+                config.display()
+            )));
+        }
+        self.config = Some(config);
+        Ok(self)
+    }
+
+    /// The gitconfig used instead of the user's global one, if any
+    pub fn config(&self) -> Option<&Path> {
+        self.config.as_deref()
     }
 
     /// The git program at `program` (a path, or a name looked up on the
@@ -60,7 +127,11 @@ impl Git {
             )));
         }
         let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        Ok(Git { program, version })
+        Ok(Git {
+            program,
+            version,
+            config: None,
+        })
     }
 
     /// The program run, as given or found
@@ -126,6 +197,11 @@ impl Git {
         cmd.args(args);
         for v in INHERITED {
             cmd.env_remove(v);
+        }
+        if let Some(config) = &self.config {
+            // Replaces `~/.gitconfig` (git 2.32 and later); the system's
+            // and the repository's config still apply
+            cmd.env("GIT_CONFIG_GLOBAL", config);
         }
         // Never wait for a password on a terminal nobody sees
         cmd.env("GIT_TERMINAL_PROMPT", "0");
