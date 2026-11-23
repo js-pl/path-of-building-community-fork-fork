@@ -8,6 +8,7 @@ pub mod data_lua;
 mod enchantments;
 mod jsonc;
 pub mod mod_parser;
+mod query_mods;
 mod uniques;
 
 use engine::calc_setup::SetupData;
@@ -360,6 +361,7 @@ impl Source {
             enchantments: self.enchantments()?,
             vestigial_mod_mappings: self.vestigial_mod_mappings()?,
             craft: self.craft()?,
+            query_mods: self.query_mods()?,
         })
     }
 }

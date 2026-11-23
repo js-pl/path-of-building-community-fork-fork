@@ -68,6 +68,8 @@ pub struct TypedData {
     /// The jewel sockets of the latest tree
     pub socket_ids: Vec<u32>,
     pub trees: Trees,
+    /// `Data/QueryMods.lua`
+    pub query_mods: engine::mod_weights::QueryMods,
     /// The timeless jewels' data, made when a build first needs it
     timeless: std::sync::OnceLock<std::sync::Arc<engine::timeless::Timeless>>,
 }
@@ -85,6 +87,7 @@ impl TypedData {
             config_vars: _,
             jewel_radius,
             tree_versions,
+            query_mods,
             ..
         } = GameData::decode(&bytes).unwrap_or_else(|e| panic!("{e}"));
         let parser = src.mod_parser().unwrap_or_else(|e| panic!("{e}"));
@@ -107,6 +110,7 @@ impl TypedData {
             radius: jewel_radius,
             socket_ids,
             trees,
+            query_mods,
             timeless: Default::default(),
         }
     }
@@ -127,6 +131,16 @@ impl TypedData {
         let version = engine::build::tree_version(root);
         self.trees.get(&version, &self.parser);
         version
+    }
+
+    /// What item parsing reads
+    pub fn item_context(&self) -> engine::item::ItemContext<'_> {
+        engine::item::ItemContext {
+            data: &self.items,
+            parser: &self.parser,
+            jewel_radius: &self.radius,
+            default_affix_quality: 0.5,
+        }
     }
 
     /// What the calculations read

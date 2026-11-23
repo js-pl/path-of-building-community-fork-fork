@@ -48,6 +48,8 @@ pub struct GameData {
     pub vestigial_mod_mappings: Vec<(String, String)>,
     /// The mods of the Add Modifier popup
     pub craft: crate::item_data::CraftData,
+    /// `Data/QueryMods.lua`: the mods the mod weights weigh
+    pub query_mods: crate::mod_weights::QueryMods,
 }
 
 /// Enchantment lines by source
@@ -93,6 +95,7 @@ crate::codec_struct!(GameData {
     enchantments,
     vestigial_mod_mappings,
     craft,
+    query_mods,
 });
 
 impl GameData {
