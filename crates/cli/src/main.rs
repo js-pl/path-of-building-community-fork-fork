@@ -9,6 +9,13 @@
 //!                             fetches when a build needs it
 //!   pob bench <xml>           times making the data, loading, editing and node power for
 //!                             a build on the typed engine
+//!   pob history <dir> <verb>  a build's history, a git repository of its own in <dir>,
+//!                             written with the installed git (`POB_GIT` picks another):
+//!                               commit <xml> [label]   commits the build in <xml>
+//!                               log [n]                the last n versions (20)
+//!                               show <version>         the build's XML at a version
+//!                               restore <version>      a version again, as a new commit
+//!                               push <remote>          a backup, never forced
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
@@ -208,10 +215,64 @@ fn main() {
         Some("serve") if args.len() == 1 => serve(),
         Some("bundle") if args.len() == 2 => bundle(Path::new(&args[1])),
         Some("bench") if args.len() == 2 => bench(&args[1]),
+        Some("history") if args.len() >= 3 => history(Path::new(&args[1]), &args[2..]),
         _ => usage(),
     }
 }
 
 fn usage() -> ! {
-    die("usage: pob serve | pob bundle <out dir> | pob bench <build.xml>")
+    die(
+        "usage: pob serve | pob bundle <out dir> | pob bench <build.xml>\n       \
+         pob history <dir> commit <build.xml> [label] | log [n] | show <version> | \
+         restore <version> | push <remote>",
+    )
+}
+
+fn history(dir: &Path, args: &[String]) {
+    use history::{BuildRepo, Git, Message};
+    let git = Git::find().unwrap_or_else(|| {
+        die(format!(
+            "no git: install git (git for Windows on Windows) or set {} to its path \
+             (it may be set to `off`)",
+            history::GIT_ENV
+        ))
+    });
+    let repo = BuildRepo::open(git, dir).unwrap_or_else(|e| die(e));
+    let version = |rev: &str| repo.resolve(rev).unwrap_or_else(|e| die(e));
+    let done = |v: Option<history::Version>| match v {
+        Some(v) => println!("{}", v.short()),
+        None => println!("unchanged"),
+    };
+    match (args[0].as_str(), &args[1..]) {
+        ("commit", [xml, label @ ..]) if label.len() <= 1 => {
+            let text = std::fs::read_to_string(xml).unwrap_or_else(|e| die(format!("{xml}: {e}")));
+            let label = label.first().map_or("Edit", String::as_str);
+            done(
+                repo.commit(&text, &Message::user(label))
+                    .unwrap_or_else(|e| die(e)),
+            );
+        }
+        ("log", n) if n.len() <= 1 => {
+            let n = n
+                .first()
+                .map_or(20, |n| n.parse().unwrap_or_else(|_| usage()));
+            for e in repo.log(n).unwrap_or_else(|e| die(e)) {
+                let trailers: String = e
+                    .trailers
+                    .iter()
+                    .map(|(k, v)| format!("  {k}: {v}"))
+                    .collect();
+                println!(
+                    "{}  {:<8}  {}{trailers}",
+                    e.version.short(),
+                    e.source.to_string(),
+                    e.label
+                );
+            }
+        }
+        ("show", [rev]) => print!("{}", repo.read(&version(rev)).unwrap_or_else(|e| die(e))),
+        ("restore", [rev]) => done(repo.restore(&version(rev)).unwrap_or_else(|e| die(e))),
+        ("push", [remote]) => repo.push(remote).unwrap_or_else(|e| die(e)),
+        _ => usage(),
+    }
 }
