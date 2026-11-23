@@ -43,10 +43,15 @@
 //!                               revoke <id>            revokes one
 //!                               connections            the running host's connections
 //!                               disconnect <id>        closes one
+//!                               install [--build <name>]...
+//!                                                      adds `pob mcp` to the harnesses
+//!                                                      found (Claude Code, Codex)
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+mod install;
 
 use session::Dispatcher;
 use session::typed::TypedData;
@@ -263,7 +268,7 @@ fn usage() -> ! {
          pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...\n       \
          pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]\n       \
          pob agents token [--build <name>]... [--name <n>] [--agent <dir>] [--url <url>] | tokens | \
-         revoke <id> | connections | disconnect <id>   [--tokens <file>] [--socket <path>] [--json]",
+         revoke <id> | connections | disconnect <id> | install [--build <name>]...   [--tokens <file>] [--socket <path>] [--json]",
     )
 }
 
@@ -611,6 +616,7 @@ fn agents(args: &[String]) {
                 "  claude mcp add --transport http pob {url} --header \"Authorization: Bearer {token}\""
             );
         }
+        ["install"] => install_cmd(&flags),
         ["tokens"] => {
             let tokens = host::tokens::Tokens::new(tokens_path(&flags));
             let list = tokens.list().unwrap_or_else(|e| die(e));
@@ -652,6 +658,54 @@ fn agents(args: &[String]) {
             println!("closed {id}");
         }
         _ => usage(),
+    }
+}
+
+/// `pob agents install`: `pob mcp` into the harnesses found, with the
+/// flags given (`--build`, `--builds`, `--socket`, `--agent`)
+fn install_cmd(flags: &[(&str, &str)]) {
+    let exe = std::env::current_exe()
+        .and_then(|e| e.canonicalize())
+        .unwrap_or_else(|e| die(format!("where pob is: {e}")));
+    let mut args = Vec::new();
+    for (f, v) in flags {
+        if matches!(*f, "--build" | "--builds" | "--socket" | "--agent") {
+            args.push(f.to_string());
+            args.push(v.to_string());
+        }
+    }
+    let line = install::command_line(&exe, &args);
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    let home =
+        std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+    let env = install::Env {
+        path: &path,
+        home: home.as_deref(),
+    };
+    let mut failed = false;
+    for r in install::install(&line, &env) {
+        match r.outcome {
+            install::Outcome::NotFound => println!("{}: not found", r.harness),
+            install::Outcome::Already => println!("{}: has {} already", r.harness, install::NAME),
+            install::Outcome::Added(how) => println!("{}: added ({how})", r.harness),
+            install::Outcome::Failed(e) => {
+                failed = true;
+                println!("{}: failed: {e}", r.harness)
+            }
+        }
+    }
+    let words = install::shell_words(&line);
+    println!(
+        "\nBy hand, the server is the command `{words}` on stdio:\n  \
+         claude mcp add --scope user {name} -- {words}\n  \
+         codex mcp add {name} -- {words}\n  \
+         or in a harness's JSON config: {}",
+        serde_json::json!({ "mcpServers": { install::NAME: {
+            "command": line[0], "args": &line[1..] } } }),
+        name = install::NAME,
+    );
+    if failed {
+        std::process::exit(1);
     }
 }
 

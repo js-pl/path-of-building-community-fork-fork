@@ -7,7 +7,8 @@ sub-step 8 of [the deletion](drop-translation.md#step-4-in-sub-steps),
 which reshaped `session::dispatch`, is done. Step 3, the verbs
 (`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
-done.
+done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
+install` ([below](#built-mcp)), is done.
 
 ## The question
 
@@ -636,6 +637,31 @@ for HTTP, axum).
   hellos on the control socket, `{"admin": "connections"}` and
   `{"admin": {"disconnect": <id>}}`, which only the host's own registry
   answers.
+- **`pob agents install [--build <b>]... [--builds <dir>] [--socket
+  <path>] [--agent <dir>]`** adds `pob mcp` (this `pob`'s full path, with
+  those flags) as the server `pob` to the harnesses it finds: Claude Code
+  through `claude mcp add --scope user pob -- <pob> mcp ...`, Codex through
+  `codex mcp add pob -- ...` or, without the `codex` command, a
+  `[mcp_servers.pob]` table appended to `~/.codex/config.toml`. Run again,
+  it changes nothing: an entry with the same command line is left, an
+  older one (`pob` moved) is replaced through the harness's `mcp remove`;
+  a Codex table that differs is left for the user to change. It always
+  prints the line to add by hand, and the JSON a harness's config takes.
+  Claude Code's health check (`initialize`) needs no host: `pob mcp`
+  reaches the host only on the first tool call.
+
+How to connect a harness:
+
+```sh
+# on this machine, over stdio (no token)
+pob agents install --build RF       # or by hand:
+claude mcp add --scope user pob -- /path/to/pob mcp --build RF
+# anywhere else, over HTTP with a token
+pob host --headless &               # MCP on http://127.0.0.1:8731/mcp
+pob agents token --build RF --name claude
+claude mcp add --transport http pob http://127.0.0.1:8731/mcp \
+  --header "Authorization: Bearer pob_..."
+```
 
 ### Evaluating
 
@@ -879,7 +905,8 @@ Each one a PR, as usual:
    socket and `pob ctl`. Done (#191, #193), except the
    Windows named pipe.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
-   agents install`: any harness works on a build.
+   agents install`: any harness works on a build. Done (#194, #195,
+   #196), except the Windows named pipe, which `pob mcp` needs there too.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
    Linux, macOS and Windows.
 6. The web app on the host: the host serves it, the WebSocket transport in
