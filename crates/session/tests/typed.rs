@@ -2942,10 +2942,22 @@ fn compare_display(d: &mut Dispatcher, label: &str, log: &[String], out: &mut Ve
 
 /// `saveXml` of both on the dispatcher's build: where they differ
 fn compare_saves(d: &mut Dispatcher, label: &str, out: &mut Vec<String>) {
+    compare_saves_with(d, label, out, |_| {});
+}
+
+/// [`compare_saves`], with both files put through `canon` first
+fn compare_saves_with(
+    d: &mut Dispatcher,
+    label: &str,
+    out: &mut Vec<String>,
+    canon: impl Fn(&mut J),
+) {
     let mut typed = answer(d.request(r#"{"cmd":"saveXml"}"#), "typed save");
     let mut tr = answer(d.reference_request(r#"{"cmd":"saveXml"}"#), "oracle save");
     unordered(&mut typed);
     unordered(&mut tr);
+    canon(&mut typed);
+    canon(&mut tr);
     let (a, b) = (typed["ok"]["xml"].as_str(), tr["ok"]["xml"].as_str());
     if a != b && std::env::var("DUMP_SAVES").is_ok() {
         eprintln!(
@@ -6697,7 +6709,7 @@ fn skills_gem_select_match() {
         ] {
             step(&mut d, r, &mut out);
         }
-        compare_saves(&mut d, &id, &mut out);
+        compare_saves_with(&mut d, &id, &mut out, without_support_skill_parts);
     }
     let expected: Vec<String> = UPSTREAM_GEM_LIST_FAILS
         .iter()
@@ -6705,6 +6717,31 @@ fn skills_gem_select_match() {
         .collect();
     assert_eq!(upstream_fails, expected, "the gem lists that fail upstream");
     assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// A saved file without the `skillPart` of support gems. The gem list's
+/// DPS sort calculates each candidate in the slot
+/// (`GemSelectControl:CalcOutputWithThisGem`) and puts back the slot's
+/// gem data and level but not the `skillPart` the calculation set on it,
+/// so a support chosen in the slot afterwards keeps the part of whichever
+/// candidate was calculated last: `pendingGems` follows `pairs(self.gems)`,
+/// in an order LuaJIT seeds per process. Only active effects read it.
+fn without_support_skill_parts(v: &mut J) {
+    if let Some(xml) = v["ok"]["xml"].as_str() {
+        let lines: Vec<String> = xml
+            .split('\n')
+            .map(|l| {
+                if l.trim_start().starts_with("<Gem ")
+                    && l.contains("gemId=\"Metadata/Items/Gems/SupportGem")
+                {
+                    engine::pat::gsub(l, " skillPart=\"%d+\"", "")
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect();
+        v["ok"]["xml"] = J::String(lines.join("\n"));
+    }
 }
 
 /// Keys over the Skills tab's socket group rows (`OnHoverKeyUp`) and the gem
@@ -7026,6 +7063,9 @@ fn skills_quality_tooltips_match() {
                 if let Some(e) = d.typed_error.take() {
                     out.push(format!("{id} group {} {r}: fell back: {e}", k + 1));
                 }
+                let (mut t, mut tr) = (t, tr);
+                vaal_righteous_fire_effect(&mut t);
+                vaal_righteous_fire_effect(&mut tr);
                 diff(&t, &tr, &format!("{id} group {} {r}", k + 1), &mut out);
                 count += 1;
             }
@@ -7033,6 +7073,30 @@ fn skills_quality_tooltips_match() {
     }
     eprintln!("{count} quality tooltips compared");
     assert!(out.is_empty(), "{}", out.join("\n"));
+}
+
+/// A Vaal Righteous Fire's tooltip with its second effect named as the
+/// plain gem's: `data.gemForSkill` names whichever alternate Vaal
+/// Righteous Fire `pairs(data.gems)` sets up last (see [`unordered`]), and
+/// with it the effect the tooltip lists, `Righteous Fire` or
+/// `Righteous Fire of Arcane Devotion`
+fn vaal_righteous_fire_effect(v: &mut J) {
+    let Some(lines) = v["ok"]["lines"].as_array_mut() else {
+        return;
+    };
+    let text = |l: &J| l["text"].as_str().unwrap_or("").to_string();
+    if !lines
+        .iter()
+        .any(|l| text(l).contains("Vaal Righteous Fire"))
+    {
+        return;
+    }
+    for l in lines.iter_mut() {
+        let t = text(l);
+        if t.ends_with("Righteous Fire of Arcane Devotion") && !t.contains("Vaal ") {
+            l["text"] = J::String(t.replace("Righteous Fire of Arcane Devotion", "Righteous Fire"));
+        }
+    }
 }
 
 /// A Vaal transfigured gem with its second effect disabled (Vaal Cleave of

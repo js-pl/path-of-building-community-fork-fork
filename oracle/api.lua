@@ -544,7 +544,7 @@ end
 
 -- The shared item list and item sets, which outlive builds: each item's
 -- text and its quality (NormaliseQuality changes only that), the sets'
--- slots in `pairs` order
+-- slots by name (upstream keeps them in a table by slot name)
 function api.sharedLists()
 	local function item(i)
 		return { raw = i.raw, quality = i.quality }
@@ -558,6 +558,7 @@ function api.sharedLists()
 				x.slot = slotName
 				t_insert(slots, x)
 			end
+			table.sort(slots, function(a, b) return a.slot < b.slot end)
 			return { title = s.title, slots = slots }
 		end),
 	}
