@@ -37,7 +37,7 @@ pub struct ExportTree {
     shrinking: bool,
 }
 
-/// A decoding error upstream fails on as well: the translation's failure
+/// A decoding error upstream fails on as well
 fn upstream_fails(e: String) -> String {
     if e.starts_with(engine::spec::MASTERY_NODE_MISSING) {
         format!("{NOT_PORTED}: {e} (upstream fails)")

@@ -109,7 +109,7 @@ impl TypedSession<'_> {
             text.push_str(&format!("Slot: {s}\r\n"));
         }
         for gem in &g.gem_list {
-            // `%d` of nil fails in the translation too; `%s` writes "nil"
+            // `%d` of nil fails upstream too; `%s` writes "nil"
             let (Some(level), Some(quality)) = (gem.level, gem.quality) else {
                 return Err(format!(
                     "{NOT_PORTED}: copying a gem without a level or quality"

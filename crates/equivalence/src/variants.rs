@@ -348,8 +348,8 @@ pub fn mirage_variants(data: &mut TypedData) -> Vec<(String, String)> {
 
 /// One build of each of [`trigger_variants`]' gems, items, socket groups
 /// and main skills: its templates in turn, so every trigger configuration
-/// runs and every template is used. A trigger variant takes over a second
-/// in the translated program, and the whole set half an hour
+/// runs and every template is used; the whole set takes long (the nightly
+/// runs it, `TRIGGERS_FULL`)
 pub fn trigger_sample(all: Vec<(String, String)>) -> Vec<(String, String)> {
     // An id without its template
     let key = |id: &str| id.rsplit_once("-gen-").map_or(id, |(k, _)| k).to_string();
@@ -619,7 +619,7 @@ pub fn timeless_variants(data: &mut TypedData) -> Vec<(String, String)> {
     }
     // The Abyss jewels last: a conquered node's `setSource` rewrites the
     // source of the mod parser's cached mods, which the legion keystones
-    // share, so in a translation that calculated them before a keystone
+    // share, so in a session that calculated them before a keystone
     // conquered by another jewel names another node
     out.extend(abyss_out);
     out

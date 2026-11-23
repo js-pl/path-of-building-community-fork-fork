@@ -14,10 +14,6 @@ LuaJIT (the oracle), is the only reference.
 needs. Keep it that way: read the files this skill names when a step sends
 you there, not before, and don't read what the tests compare for you.
 
-If `crates/upstream` still exists, the translation has not been deleted yet
-(sub-step 8 of `docs/drop-translation.md`): stop and say so rather than
-syncing through it.
-
 ## 1. Triage
 
 `sync/sync.py triage [ref]` fetches upstream and lists the commits since the

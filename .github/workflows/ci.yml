@@ -20,18 +20,18 @@ jobs:
       - run: sync/check.py
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
-      # The engine without the translation, as the browser ships it
+      # The engine as the browser ships it
       - run: cargo clippy -p session -p wasm --no-default-features -- -D warnings
-      # ... which holds no Lua interpreter (`luai`) or translated program
-      - run: "! cargo tree -p wasm -e normal --prefix none | grep -E '^(luai|upstream|importer) '"
+      # ... which holds no Lua interpreter (`luai`) or importer
+      - run: "! cargo tree -p wasm -e normal --prefix none | grep -E '^(luai|importer) '"
       # Generated ports must match upstream's source
       - run: cargo run --release -p importer --bin portgen
       - run: cargo run --release -p importer --bin synthlines
       - run: git diff --exit-code -- crates/engine/src/mod_parser/generated.rs corpus/synthetic_mod_lines.txt
 
   # The tests, built once in release (the equivalence tests are slow in
-  # debug builds); sccache keeps the crates whose sources did not change,
-  # the translated program above all, over runs and jobs
+  # debug builds); sccache keeps the crates whose sources did not change
+  # over runs and jobs
   build:
     runs-on: ubuntu-latest
     env:

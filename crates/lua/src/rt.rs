@@ -1,4 +1,4 @@
-//! Lua operations with LuaJIT's semantics, for code translated from Lua:
+//! Lua operations with LuaJIT's semantics:
 //! indexing with metatables, calls, arithmetic with string coercion,
 //! comparison, concatenation. Errors are returned, as Lua raises them.
 
@@ -29,25 +29,7 @@ pub fn func(name: &str, f: impl Fn(&[Value]) -> LResult<Vec<Value>> + 'static) -
     Value::Function(Rc::new(Function {
         name: name.into(),
         f: Box::new(f),
-        upvalues: Vec::new(),
-        slot: Default::default(),
     }))
-}
-
-/// A translated closure, with the cells it captures (which `f` holds too).
-pub fn func_up(
-    name: &str,
-    upvalues: Vec<Cell>,
-    f: impl Fn(&[Value]) -> LResult<Vec<Value>> + 'static,
-) -> Value {
-    let r = Rc::new(Function {
-        name: name.into(),
-        f: Box::new(f),
-        upvalues,
-        slot: Default::default(),
-    });
-    crate::gc::register_function(&r);
-    Value::Function(r)
 }
 
 /// `obj[key]`, with `__index`.
@@ -149,7 +131,7 @@ pub fn call(f: &Value, args: &[Value]) -> LResult<Vec<Value>> {
             call(&handler, &a)
         }
         Value::Func(r) => err(format!(
-            "attempt to call untranslated function {} ({}:{})",
+            "attempt to call function {} ({}:{}), which has no implementation here",
             r.key, r.file, r.line
         )),
         v => err(format!("attempt to call a {} value", v.type_name())),
@@ -409,32 +391,4 @@ pub fn treasize(t: &mut crate::value::Table, n: u32) {
     if t.asize() <= n as usize {
         t.reasize(n);
     }
-}
-
-/// A local captured by a closure, shared between them.
-pub type Cell = crate::value::CellRef;
-
-pub fn cell(v: Value) -> Cell {
-    let c = Rc::new(crate::value::Gc::new(RefCell::new(v)));
-    crate::gc::register_cell(&c);
-    c
-}
-
-/// How a block of translated statements ended.
-pub enum Flow {
-    Next,
-    Break,
-    Return(Vec<Value>),
-}
-
-/// Reads a cell, releasing the borrow before the value is used.
-#[inline]
-pub fn get(c: &Cell) -> Value {
-    c.borrow().clone()
-}
-
-/// Writes a cell.
-#[inline]
-pub fn set(c: &Cell, v: Value) {
-    *c.borrow_mut() = v;
 }

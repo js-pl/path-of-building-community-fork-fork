@@ -81,7 +81,6 @@ web/ (TypeScript, Preact)               crates/
                                         +-- settings  the app's settings.json
                                         +-- lua       Lua values, LuaJIT's table order, patterns
                                         +-- luai      Lua parser and interpreter (importer only)
-                                        +-- upstream  upstream's program translated (until sub-step 8)
                                         `-- equivalence  tests against the oracle
 oracle/  upstream itself, headless on LuaJIT: committed outputs and a live session
 ```
@@ -92,23 +91,17 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   A session takes JSON requests (`{"cmd": ...}`) and answers them with the
   typed engine (`crates/session/src/typed`), with the JSON upstream's own
   controls and tabs give: the same requests run on upstream itself by
-  `oracle/session.lua` (driving `crates/session/lua/session.lua`, which
-  calls the functions upstream's controls and tabs call and addresses its
-  controls by name) are the tests' reference. The engine does no I/O.
-  Upstream's UI data (`CalcSections.lua`) is evaluated at build time like
-  game data. *Until sub-step 7 of
-  [the deletion](drop-translation.md#step-4-in-sub-steps):* with the
-  `translation` feature, a `Dispatcher` answers what the typed engine does
-  not have with upstream's translated program running `session.lua`; no
-  command the tests exercise falls back any more.
+  `oracle/session.lua` (driving `oracle/api.lua`, which calls the
+  functions upstream's controls and tabs call and addresses its controls by
+  name) are the tests' reference. Commands the typed engine does not have
+  are `not ported: <cmd>` errors. The engine does no I/O. Upstream's UI
+  data (`CalcSections.lua`) is evaluated at build time like game data.
 - **Data delivery.** `pob bundle` writes the typed engine's data (game
   data, mod parser, the current tree) into one compressed bundle
   (`core.bin`), and every tree version as a separate file
   (`session::bundle`). The site serves them as static assets; files the
   engine finds missing (older trees) are fetched and the request retried.
-  They are not compiled into the wasm module. (*Until sub-step 7:* with
-  `--lua`, the bundle also holds the Lua data files the translation reads,
-  for an engine built with it.) The typed engine's game data is made at build time by `crates/gamedata`
+  They are not compiled into the wasm module. The typed engine's game data is made at build time by `crates/gamedata`
   (the importer's tables with `Data.lua`'s processing, read into the
   engine's typed tables) and stored in `engine::codec`'s binary form:
   varints, interned strings, shared tables written once, compressed by the
@@ -116,12 +109,8 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   running Lua.
 - **WASM.** `crates/wasm` is a plain C ABI (`alloc`, `request`,
   `result_ptr`/`result_len`, ...), so no generated bindings are needed.
-  As shipped, the module holds neither the translation nor the Lua
-  interpreter, and commands the typed engine does not have are
-  `not ported: <cmd>` errors. (*Until sub-step 7:* the cargo feature
-  `translation`, off in `wasm` and on in `session` for the CLI and the
-  tests, links the translated program as their fallback,
-  `build-wasm.mjs --translation`.)
+  The module holds no Lua interpreter, and commands the typed engine does
+  not have are `not ported: <cmd>` errors.
 - **Workers.** One engine instance per worker, communicating by messages: a
   main worker holds the build being edited, a background worker runs slow
   calculations (node power) on a copy, so edits never wait for them.
@@ -169,40 +158,28 @@ binary form of the game data. The parser runs on those: closures compute on
 a small value type of their own (`mod_parser::val`) and give typed mods, so
 no Lua value or evaluator is involved in parsing a line.
 
-**Whole-program translation (until sub-step 8).** `crates/upstream` is upstream's entire
-program (`src/Modules`, `src/Classes`, `Launch.lua`, the libraries in
-`runtime/lua`) translated statement by statement to Rust by `luagen`
-(`crates/importer/src/luagen.rs`) in the crate's build script, so it is always
-in sync with the submodule and never edited by hand. The generated code runs on
-a dynamic runtime with LuaJIT's semantics (`lua::rt`, `lua::env`: values,
-metatables, the standard library with LuaJIT's `table.sort`, `%.14g` number
-formatting, and LuaJIT's table layout (`lua::ljtab`: array and hash parts,
-collision chains, resizes, constructor templates), so `pairs` visits number
-and boolean keys in LuaJIT's order, checked against LuaJIT by
-`oracle/tables.lua`. Strings, tables and functions hash by a random seed or
-by address in LuaJIT, so upstream cannot depend on their order: they follow
-in insertion order, and count towards the sizes without taking a slot of
-the layout). The typed engine keeps upstream's number-keyed tables in the
-same layout (`lua::ljtab::LjMap`). A headless
-host (`crates/upstream/src/host.rs`, a port of `HeadlessWrapper.lua`) runs it
-like the oracle does. Data files are not translated: the importer evaluates
-them at run time, and the functions they contain are translated by `luagen`
-like the rest. Generated functions are split into segment functions, since
-rustc's borrow checker is superlinear in function size. Values are reference
-counted; a cycle collector (`lua::gc`) frees the cyclic environments upstream's
-calcs build on every calculation, following tables, closures and the cells
-they capture.
+**Lua semantics without Lua.** Where upstream's results depend on Lua
+itself, the typed engine reproduces LuaJIT with the library pieces of
+`crates/lua`: Lua patterns (`lua::pattern`, `engine::pat`), `%.14g` number
+formatting (`lua::format`), and LuaJIT's table layout (`lua::ljtab`: array
+and hash parts, collision chains, resizes, constructor templates), so the
+typed engine visits upstream's number-keyed tables (`lua::ljtab::LjMap`) in
+LuaJIT's `pairs` order, checked against LuaJIT by `oracle/tables.lua`.
+Strings, tables and functions hash by a random seed or by address in
+LuaJIT, so upstream cannot depend on their order.
 
-The translation gave exact parity with upstream from the start and was the
+**The translation (retired).** Until sub-step 8 of
+[the deletion](drop-translation.md#step-4-in-sub-steps), `crates/upstream`
+was upstream's entire program translated statement by statement to Rust by
+`luagen`, on a dynamic runtime with LuaJIT's semantics and a cycle
+collector. It gave exact parity with upstream from the start and was the
 reference the typed engine was built against, one replacement at a time.
-That is done: nothing shipped runs on it, and every test takes its reference
-from the oracle (the session test does in CI). It goes in the sub-steps of
-[the deletion](drop-translation.md#step-4-in-sub-steps): `crates/upstream`,
-`luagen`, `lua::gc` and the translation's hooks, leaving Lua only in the
-importer (`crates/luai` reading upstream's data at build time), the library
-pieces the engine reproduces upstream with (`crates/lua`), and the oracle
-itself. The typed engine is refactored and optimised freely; the speedups
-come from that work.
+Once the typed engine answered every command the tests exercise and every
+test took its reference from the oracle, it was deleted with `luagen`,
+`lua::gc` and its hooks (`engine::install`, `mod_store`), leaving Lua only
+in the importer (`crates/luai` reading upstream's data at build time), the
+library pieces above, and the oracle itself. The typed engine is
+refactored and optimised freely; the speedups come from that work.
 
 **Fail loudly.** The importer errors on embedded Lua functions or mod parser
 rules it does not know, so upstream changes cannot drift in silently.
@@ -276,8 +253,7 @@ are never written by hand. Details, the JSON format and the determinism checks a
 ### Running the tests
 
 - The oracle tests need `oracle/setup.sh`'s LuaJIT; the session test uses
-  the live oracle with `SESSION_REFERENCE=oracle` (*until sub-step 8*
-  it defaults to the translation locally).
+  the live oracle as its only reference.
 - Tests that run many builds split them into shards, each run by a child
   process of the test binary (`crates/testkit`) with an oracle process of
   its own where it needs one: the session test, `oracle_variants.rs` and
@@ -356,7 +332,7 @@ the initial corpus (LuaJIT, headless). Targets, to be set with the engine:
 - data download and startup time.
 
 `cargo run --release -p equivalence --bin bench` times the typed engine's
-calculations (*until sub-step 7* against the translation's) on corpus builds (every tenth by
+calculations on corpus builds (every tenth by
 default, `--all`, `--filter <id>`), the median of `--reps` runs, per build
 and summed: loading a build, `init_env`, `perform` (`MAIN`), `build_outputs`
 (`MAIN` and `CALCS` with Full DPS, against `calcs.buildOutput` twice), the
@@ -387,7 +363,8 @@ each optimisation's numbers are in `docs/progress.md`.
    (`crates/session/tests`, `web/tests` compares the wasm engine with the
    native one). Open: incremental and parallel calcs and the performance
    targets, which come with the typed engine. The wasm size: 80 MB (15 MB
-   gzipped) with the translation, 8.2 MB (2.0 MB gzipped) without it.
+   gzipped) with the translation, 8.2 MB (2.0 MB gzipped) on the typed
+   engine alone, as shipped.
 4. **Frontend MVP.** Done: import a build code or XML, stat sidebar, passive
    tree with node power, calcs tab with breakdowns.
 5. **Full frontend.** Skills, items (including crafting), config, notes, party,
@@ -401,26 +378,22 @@ each optimisation's numbers are in `docs/progress.md`.
    (code, link, XML) and builds saved in the browser. Open: compare,
    character import via OAuth, trade, node power split over several workers.
 6. **Sync.** With the `sync` skill (`.claude/skills/sync/SKILL.md`), on
-   request, against the oracle only once the translation is deleted.
+   request, against the oracle.
 7. **Typed engine.** Done for everything the engine API serves: the typed
    engine answers every command the tests exercise, against the oracle, and
-   the translation is being deleted
+   the translation is deleted
    ([the sub-steps](drop-translation.md#step-4-in-sub-steps)). What is not
-   ported yet is listed in `docs/progress.md`. The history follows.
-   Replace the whole translation with typed Rust, hot paths
-   first, each step at parity with the translation and the oracle. Then
-   refactor and optimise freely toward the performance targets, and drop the
-   translation, `luagen` and the Lua runtime. The engine API keeps its JSON
-   commands, with `session.lua` replaced by Rust.
-   Replacements are installed into the running translation
-   (`engine::install`) and replace its methods; `POB_TRANSLATED=1` turns
-   them off to compare. Native code that still works on the program's Lua
-   tables is only faster where it saves the translation's dispatch: the
-   queries of `ModStore`, `ModDB` and `ModList`
-   (`crates/engine/src/mod_store.rs`) took about 25% off edits and node
-   power, a native `PassiveSpec:BuildPathFromNode` nothing. Speedups to the
-   translation's runtime (generational cycle collection, hashed strings)
-   go with it; the lasting work is the typed engine.
+   ported yet is listed in `docs/progress.md`. The history follows: the
+   whole translation was replaced with typed Rust, hot paths first, each
+   step at parity with the translation and the oracle, then dropped with
+   `luagen` and the Lua runtime; the engine API kept its JSON commands.
+   Comparisons with "the translated" stores, tree, spec, item or tab below
+   were against the translation; their tests were retired or compare with
+   the oracle now. Before the typed engine, native replacements were
+   installed into the running translation (`engine::install`): the queries
+   of `ModStore`, `ModDB` and `ModList` took about 25% off edits and node
+   power, a native `PassiveSpec:BuildPathFromNode` nothing; the lasting
+   work is the typed engine.
 
    The typed engine starts with the mod core (`crates/engine/src/mods`):
    interned names, typed mods, tags and values, ModDB and ModList stores in

@@ -878,8 +878,8 @@ impl<'d> TypedSession<'d> {
                         flavour = Some(t.clone());
                     }
                 } else if let Some((_, t)) = list.first() {
-                    // `pairs` of the ids: the translation keeps string keys
-                    // in the order they were set
+                    // `pairs` of the ids: string keys in the order they
+                    // were set
                     flavour = Some(t.clone());
                 }
             }

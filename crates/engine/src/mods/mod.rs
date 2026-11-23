@@ -1,6 +1,6 @@
 //! The typed modifier core: mods, their tags, the stores that hold them and
-//! the queries the calculations make. Plain Rust, replacing the translation
-//! of upstream's `ModStore`, `ModDB`, `ModList` and `modLib.createMod`.
+//! the queries the calculations make: a port of upstream's `ModStore`,
+//! `ModDB`, `ModList` and `modLib.createMod`.
 
 pub mod build;
 mod codec;

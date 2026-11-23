@@ -1,8 +1,7 @@
 //! Runs a test's work in child processes of the test binary, in parallel.
 //!
-//! The translated program keeps about 12 MB of every build it loads, next
-//! to the 1.6 GB it starts with, so tests that load the corpus many times
-//! split their builds into shards, each run by a fresh process. The
+//! Tests that load the corpus many times split their builds into shards,
+//! each run by a fresh process (with its own oracle session). The
 //! children run at once as far as the machine allows: one per core, and as
 //! many as fit in its memory at `TEST_SLOT_GB` each (default 3). The limit
 //! holds over every test process on the machine (`cargo test` runs a

@@ -151,10 +151,7 @@ fn scale_from_lua(v: &Value) -> Result<StatScale> {
 }
 
 fn stat_map_from_lua(v: &Value) -> Result<StatMap> {
-    let conv = Converter {
-        templates: true,
-        ..Converter::default()
-    };
+    let conv = Converter { templates: true };
     let mut entries = Vec::new();
     let mut error = None;
     for e in array(v) {
@@ -414,10 +411,7 @@ impl GrantedEffect {
                 .map(|x| Ok((string(&rt_index(x, 1))?, number(&rt_index(x, 2))?)))
                 .collect::<Result<_>>()?,
             base_mods: {
-                let conv = Converter {
-                    templates: true,
-                    ..Converter::default()
-                };
+                let conv = Converter { templates: true };
                 array(&get(v, "baseMods"))
                     .iter()
                     .map(|m| conv.mod_(m))

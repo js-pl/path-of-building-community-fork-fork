@@ -23,13 +23,9 @@ See `docs/design.md` before making architectural decisions.
     order, patterns, number formatting), `luai` (the interpreter the
     importer runs upstream's data files with)
   - `equivalence` (tests against the oracle), `testkit` (sharded test runs)
-  - until sub-step 8 of [the deletion](docs/drop-translation.md#step-4-in-sub-steps):
-    `upstream` (upstream's whole program translated to Rust by luagen in its
-    build script; never edit generated code, fix luagen or the runtime),
-    which the session's `translation` feature and the bench still use
 - `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a commit on upstream `dev`; never edit it
-- `docs/` holds design decisions; `docs/drop-translation.md` tracks removing
-  the translation
+- `docs/` holds design decisions; `docs/drop-translation.md` records how
+  the translation of upstream's program was removed
 - `oracle/` runs upstream headless on LuaJIT as the test reference:
   `tests/oracle` is its committed output, and `oracle/session.lua` answers
   the engine API live for the session and variant tests (set it up with

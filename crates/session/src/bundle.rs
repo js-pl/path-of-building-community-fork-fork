@@ -5,8 +5,7 @@
 //! `crates/gamedata` at build time: the game data ([`GAME_DATA`]), the
 //! mod parser ([`MOD_PARSER`]) and one passive tree per version
 //! ([`tree_path`], each compressed on its own, as older versions are
-//! served as separate files). A bundle for the translation also holds
-//! upstream's Lua data files, by their path relative to upstream's `src/`.
+//! served as separate files).
 //!
 //! Format (before compression): `PBDB`, u32 file count, then per file a u32
 //! path length, the path, a u32 data length and the data. Integers are
