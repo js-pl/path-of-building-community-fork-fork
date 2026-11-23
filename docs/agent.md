@@ -589,6 +589,53 @@ for HTTP, axum).
   The wall for an agent that isn't trusted with the user's files is its
   sandbox: the default container mounts neither the socket nor the
   builds, and reaches the host only over HTTP, with a token.
+- **MCP over streamable HTTP** (`host::http`), served by `pob host` on
+  `127.0.0.1:8731` by default (`--listen <addr>`, `--listen none` for
+  none; a default address taken is a warning, an asked-for one an error).
+  One endpoint, `/mcp`, a hand-rolled HTTP/1.1 server on a thread per
+  connection: a POST carries one JSON-RPC message (or a batch) and is
+  answered with one JSON body, or 202 for notifications. The host sends
+  nothing of its own, so there is no SSE stream: GET is 405. `initialize`
+  makes a session (`Mcp-Session-Id`); later requests carry it, and a
+  session that ended or belongs to another token is 404, a request without
+  one 400; DELETE ends one. An `MCP-Protocol-Version` header the host
+  doesn't serve is 400. A request with an `Origin` that isn't this machine
+  (`localhost`, a loopback address) is 403, against DNS rebinding. Bodies
+  are capped like control socket lines; 64 connections and 256 sessions
+  at a time, the least recently used session going first.
+- **Tokens** (`host::tokens`). `pob agents token [--build <b>]... [--name
+  <n>] [--agent <dir>]` mints one: `pob_` and 32 random bytes in hex,
+  printed once, with the `claude mcp add --transport http ... --header
+  "Authorization: Bearer ..."` line to use it. Each token names its
+  connection (`--name`, `http` by default: its commits' `Source: agent
+  <name>`), its builds and its agent directory (`<name>-<time>` unless
+  `--agent`), fixed when minted; every session made with it shares them.
+  There is no UI yet, so no default build: a token without `--build` has
+  only its agent directory. The tokens file (`tokens.json` in the data
+  directory, `POB_TOKENS`, `--tokens`) keeps each token's SHA-256, never
+  the token, written whole with mode 0600 and moved into place. The host
+  reads it on every request, so `pob agents revoke <id>` is refused from
+  the next request on, whether or not a host runs; a running host also
+  closes the token's sessions then. `pob agents tokens` lists them, by
+  their id (the hash's first 8 hex digits) and grant. A token missing,
+  wrong or revoked is 401 with `WWW-Authenticate: Bearer`. The spec's
+  OAuth flow is not served: harnesses take a static bearer header.
+- **Off loopback.** Any `--listen` address but loopback warns that the
+  token is all that guards the endpoint. Plain HTTP is served on loopback
+  and on what counts as a container network: link-local addresses
+  (169.254.0.0/16, fe80::/10), Podman's default 10.88.0.0/16, and
+  172.16.0.0/12 (Docker's bridges, WSL's NAT adapter). Any other address,
+  `0.0.0.0` and a LAN among them, needs HTTPS: `--tls-cert <pem> --tls-key
+  <pem>`, a certificate the user supplies, served with rustls (ring), or
+  the host stops.
+- **Connections.** The host lists its connections, control socket and
+  HTTP sessions alike (kind, connection name, MCP client, grant, token,
+  calls), for `pob agents connections`; `pob agents disconnect <id>`
+  closes one (a socket is shut down, a session forgotten, so its client
+  must initialize again with a token that still works). Both are `admin`
+  hellos on the control socket, `{"admin": "connections"}` and
+  `{"admin": {"disconnect": <id>}}`, which only the host's own registry
+  answers.
 
 ### Evaluating
 
@@ -792,7 +839,11 @@ starts: read GGG's developer docs and terms from the source.
   the same answers with any thread count.
 - **MCP:** a test client drives a host on each transport (stdio through
   `pob mcp`, HTTP with a token) through reads, edits, `eval`, a search job
-  and undo.
+  and undo. Built for what there is: `crates/host/tests/mcp.rs` (stdio
+  over the control socket) and `tests/http.rs` (HTTP and HTTPS):
+  initialize, the tools, a read, an edit committed before its answer,
+  another build refused, a missing, wrong, other or revoked token
+  refused.
 - **Agent directories:** an agent creates and edits builds in its own
   directory without a grant and nowhere else; promoting moves a build in
   one commit; cleaning removes the directory's files but not their

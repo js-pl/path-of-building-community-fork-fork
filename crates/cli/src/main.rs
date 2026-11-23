@@ -19,10 +19,12 @@
 //!   pob settings [key [value]]
 //!                             the settings file (`POB_SETTINGS` picks another): all of
 //!                             it and the git it gives, one setting, or sets one
-//!   pob host --headless [--builds <dir>] [--socket <path>]
+//!   pob host --headless [--builds <dir>] [--socket <path>] [--listen <addr>|none]
+//!           [--tls-cert <pem> --tls-key <pem>] [--tokens <file>]
 //!                             owns the builds in <dir> (`POB_BUILDS`) with their history
 //!                             and answers the agent API on the control socket
-//!                             (`POB_SOCKET`), see docs/agent.md
+//!                             (`POB_SOCKET`) and as MCP over HTTP with tokens (on
+//!                             127.0.0.1:8731 by default), see docs/agent.md
 //!   pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json]
 //!           <verb> [key=value]... | <verb> '<json fields>'
 //!                             calls one agent API verb on a running host, with a grant
@@ -34,6 +36,13 @@
 //!                             this machine: relays to the host's control socket with a
 //!                             grant of the builds named, and starts a host (`--builds`)
 //!                             when none runs, unless --no-start
+//!   pob agents <verb>         tokens for MCP over HTTP and the host's connections:
+//!                               token [--build <name>]... [--name <n>] [--agent <dir>]
+//!                                                      mints a token, shown once
+//!                               tokens                 lists them (`POB_TOKENS`, --tokens)
+//!                               revoke <id>            revokes one
+//!                               connections            the running host's connections
+//!                               disconnect <id>        closes one
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
@@ -238,6 +247,7 @@ fn main() {
         Some("host") => host_cmd(&args[1..]),
         Some("ctl") => ctl(&args[1..]),
         Some("mcp") => mcp(&args[1..]),
+        Some("agents") => agents(&args[1..]),
         _ => usage(),
     }
 }
@@ -248,9 +258,12 @@ fn usage() -> ! {
          pob history <dir> commit <build.xml> [label] | log [n] | show <version> | \
          restore <version> | push <remote>\n       \
          pob settings [key [value]]\n       \
-         pob host --headless [--builds <dir>] [--socket <path>]\n       \
+         pob host --headless [--builds <dir>] [--socket <path>] [--listen <addr>|none] \
+         [--tls-cert <pem> --tls-key <pem>] [--tokens <file>]\n       \
          pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...\n       \
-         pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]",
+         pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]\n       \
+         pob agents token [--build <name>]... [--name <n>] [--agent <dir>] [--url <url>] | tokens | \
+         revoke <id> | connections | disconnect <id>   [--tokens <file>] [--socket <path>] [--json]",
     )
 }
 
@@ -385,7 +398,18 @@ fn socket_path(flags: &[(&str, &str)]) -> PathBuf {
 }
 
 fn host_cmd(args: &[String]) {
-    let (flags, rest) = flags(args, &["--builds", "--socket"], &["--headless"]);
+    let (flags, rest) = flags(
+        args,
+        &[
+            "--builds",
+            "--socket",
+            "--listen",
+            "--tls-cert",
+            "--tls-key",
+            "--tokens",
+        ],
+        &["--headless"],
+    );
     if !rest.is_empty() || flag(&flags, "--headless").is_none() {
         die("pob host needs --headless for now: the web app on the host is a later step");
     }
@@ -394,6 +418,7 @@ fn host_cmd(args: &[String]) {
         .or_else(host::default_builds)
         .unwrap_or_else(|| die(format!("no data directory; set {}", host::BUILDS_ENV)));
     let socket = socket_path(&flags);
+    let http = http_endpoint(&flags);
     let (_, settings) = load_settings();
     let git = match settings.history.git() {
         Ok(g) => g,
@@ -406,14 +431,93 @@ fn host_cmd(args: &[String]) {
         eprintln!("pob host: no history: builds are saved, their versions aren't");
     }
     std::fs::create_dir_all(&builds).unwrap_or_else(|e| die(format!("{}: {e}", builds.display())));
-    serve_host(builds, socket, git);
+    serve_host(builds, socket, git, http);
+}
+
+/// MCP over HTTP as the flags ask for it: the listener, TLS, the tokens
+struct HttpEndpoint {
+    listener: std::net::TcpListener,
+    tls: Option<std::sync::Arc<host::http::TlsConfig>>,
+    tokens: host::tokens::Tokens,
+}
+
+fn tokens_path(flags: &[(&str, &str)]) -> PathBuf {
+    flag(flags, "--tokens")
+        .map(PathBuf::from)
+        .or_else(host::tokens::default_path)
+        .unwrap_or_else(|| {
+            die(format!(
+                "no data directory; set {}",
+                host::tokens::TOKENS_ENV
+            ))
+        })
+}
+
+/// Binds MCP over HTTP: `--listen` (127.0.0.1 by default; `none` for
+/// none), HTTPS with `--tls-cert` and `--tls-key`, which an address other
+/// than loopback or a container network needs
+fn http_endpoint(flags: &[(&str, &str)]) -> Option<HttpEndpoint> {
+    use host::http::{self, Exposure};
+    let asked = flag(flags, "--listen");
+    let addr = asked.unwrap_or(http::DEFAULT_LISTEN);
+    if addr == "none" {
+        return None;
+    }
+    let (listener, at) = match http::listen(addr) {
+        Ok(l) => l,
+        Err(e) if asked.is_some() => die(format!("pob host: MCP over HTTP: {e}")),
+        Err(e) => {
+            eprintln!("pob host: no MCP over HTTP: {e} (pick another address with --listen)");
+            return None;
+        }
+    };
+    let tls = match (flag(flags, "--tls-cert"), flag(flags, "--tls-key")) {
+        (Some(c), Some(k)) => {
+            Some(http::tls_config(Path::new(c), Path::new(k)).unwrap_or_else(|e| die(e)))
+        }
+        (None, None) => None,
+        _ => die("pob host: --tls-cert and --tls-key go together"),
+    };
+    let exposure = http::exposure(at.ip());
+    if exposure != Exposure::Loopback {
+        eprintln!(
+            "pob host: warning: MCP on {at} can be reached from other machines or containers; \
+             the token is all that guards it"
+        );
+    }
+    if exposure == Exposure::Open && tls.is_none() {
+        die(format!(
+            "pob host: {at} is neither loopback nor a container network: serve HTTPS with \
+             --tls-cert <pem> and --tls-key <pem>"
+        ));
+    }
+    let scheme = if tls.is_some() { "https" } else { "http" };
+    eprintln!(
+        "pob host: MCP on {scheme}://{at}{}, with tokens from `pob agents token`",
+        http::PATH
+    );
+    Some(HttpEndpoint {
+        listener,
+        tls,
+        tokens: host::tokens::Tokens::new(tokens_path(flags)),
+    })
 }
 
 #[cfg(unix)]
-fn serve_host(builds: PathBuf, socket: PathBuf, git: Option<history::Git>) {
+fn serve_host(
+    builds: PathBuf,
+    socket: PathBuf,
+    git: Option<history::Git>,
+    http: Option<HttpEndpoint>,
+) {
     let listener = host::control::unix::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
-    std::thread::spawn(move || host::control::unix::accept(listener, tx));
+    let registry = std::sync::Arc::new(host::connections::Registry::default());
+    if let Some(h) = http {
+        let endpoint = host::http::Http::new(h.tokens, tx.clone(), registry.clone());
+        std::thread::spawn(move || endpoint.serve(h.listener, h.tls));
+    }
+    std::thread::spawn(move || host::control::unix::accept(listener, tx, registry));
     let store = host::FsStore::new(&builds, git);
     let data = data();
     eprintln!(
@@ -426,8 +530,139 @@ fn serve_host(builds: PathBuf, socket: PathBuf, git: Option<history::Git>) {
 }
 
 #[cfg(not(unix))]
-fn serve_host(_: PathBuf, _: PathBuf, _: Option<history::Git>) {
+fn serve_host(_: PathBuf, _: PathBuf, _: Option<history::Git>, _: Option<HttpEndpoint>) {
     die("pob host: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
+}
+
+/// `pob agents`: tokens and connections
+fn agents(args: &[String]) {
+    // The verb and its argument first, then the flags
+    let positional = args.iter().take_while(|a| !a.starts_with("--")).count();
+    let (rest, args) = args.split_at(positional.min(2));
+    let rest: Vec<&str> = rest.iter().map(String::as_str).collect();
+    let (flags, extra) = flags(
+        args,
+        &[
+            "--tokens", "--socket", "--build", "--agent", "--name", "--url",
+        ],
+        &["--json"],
+    );
+    if !extra.is_empty() {
+        usage();
+    }
+    let json_out = flag(&flags, "--json").is_some();
+    let print = |v: serde_json::Value| {
+        if json_out {
+            println!("{v}");
+        } else {
+            print!("{}", text(&v, 0));
+        }
+    };
+    match rest.as_slice() {
+        ["token"] => {
+            let tokens = host::tokens::Tokens::new(tokens_path(&flags));
+            let name = flag(&flags, "--name").unwrap_or("http");
+            let now = host::control::now();
+            let dir = flag(&flags, "--agent")
+                .map(String::from)
+                .unwrap_or_else(|| agent::agent_dir_name(name, now));
+            let mut grant = agent::Grant::new(
+                name.chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+                    .take(32)
+                    .collect::<String>(),
+                dir,
+            );
+            if grant.connection.is_empty() {
+                die("--name is letters, digits, - and _");
+            }
+            for (f, b) in &flags {
+                if *f == "--build" {
+                    if *b == "agents" {
+                        die("agents is not a build");
+                    }
+                    grant = grant.with_build(*b);
+                }
+            }
+            let (token, entry) = tokens.mint(&grant, now).unwrap_or_else(|e| die(e));
+            let url = flag(&flags, "--url").map(String::from).unwrap_or_else(|| {
+                format!("http://{}{}", host::http::DEFAULT_LISTEN, host::http::PATH)
+            });
+            if json_out {
+                let mut v = entry.to_json();
+                v["token"] = serde_json::json!(token);
+                v["url"] = serde_json::json!(url);
+                println!("{v}");
+                return;
+            }
+            println!("{token}");
+            eprintln!(
+                "token {} for {} (agent directory {}), shown once; revoke it with `pob agents revoke {}`",
+                entry.id,
+                if entry.builds.is_empty() {
+                    "no build".to_string()
+                } else {
+                    entry.builds.join(", ")
+                },
+                entry.agent,
+                entry.id
+            );
+            eprintln!(
+                "  claude mcp add --transport http pob {url} --header \"Authorization: Bearer {token}\""
+            );
+        }
+        ["tokens"] => {
+            let tokens = host::tokens::Tokens::new(tokens_path(&flags));
+            let list = tokens.list().unwrap_or_else(|e| die(e));
+            print(serde_json::json!({
+                "tokens": list.iter().map(|t| t.to_json()).collect::<Vec<_>>()
+            }));
+        }
+        ["revoke", id] => {
+            let tokens = host::tokens::Tokens::new(tokens_path(&flags));
+            if !tokens.revoke(id).unwrap_or_else(|e| die(e)) {
+                die(format!("no token {id}; `pob agents tokens` lists them"));
+            }
+            // Refused from the next request on; a running host also closes
+            // its sessions now
+            let closed = admin(&socket_path(&flags), serde_json::json!({ "revoked": id }))
+                .ok()
+                .and_then(|v| v["closed"].as_u64())
+                .unwrap_or(0);
+            println!("revoked {id}; {closed} connection(s) closed");
+        }
+        ["connections"] => print(
+            admin(&socket_path(&flags), serde_json::json!("connections"))
+                .unwrap_or_else(|e| die(e)),
+        ),
+        ["disconnect", id] => {
+            let id: u64 = id
+                .parse()
+                .unwrap_or_else(|_| die("a connection's id is a number"));
+            let v = admin(
+                &socket_path(&flags),
+                serde_json::json!({ "disconnect": id }),
+            )
+            .unwrap_or_else(|e| die(e));
+            if v["closed"] != true {
+                die(format!(
+                    "no connection {id}; `pob agents connections` lists them"
+                ));
+            }
+            println!("closed {id}");
+        }
+        _ => usage(),
+    }
+}
+
+#[cfg(unix)]
+fn admin(socket: &Path, req: serde_json::Value) -> Result<serde_json::Value, String> {
+    host::control::unix::admin(socket, req)
+}
+
+#[cfg(not(unix))]
+fn admin(_: &Path, _: serde_json::Value) -> Result<serde_json::Value, String> {
+    Err("the control socket is a Unix socket; the named pipe for Windows isn't built yet".into())
 }
 
 fn ctl(args: &[String]) {

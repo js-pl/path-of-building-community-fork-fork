@@ -11,7 +11,7 @@ See `docs/design.md` before making architectural decisions.
   - `session`: the engine API (build sessions answering JSON commands) and
     the native and oracle `Session`s the tests compare it with
   - `wasm` (C ABI for the browser), `cli` (`pob`: serve, bundle, bench,
-    history, settings, host, ctl, mcp)
+    history, settings, host, ctl, mcp, agents)
   - `history` (a build's versions, one git repository per build, written
     with the installed git; optional), see `docs/history.md`
   - `settings` (the app's `settings.json`, e.g. the history's git), see
@@ -20,7 +20,7 @@ See `docs/design.md` before making architectural decisions.
     agent directories, author text kept apart; no I/O), see `docs/agent.md`
   - `host` (`pob host --headless`: the builds directory with its history,
     the control socket `pob ctl` and `pob mcp` call, and the agent API as
-    MCP), see `docs/agent.md`
+    MCP on stdio and over HTTP with tokens), see `docs/agent.md`
   - `importer` (reads upstream's data and ModParser tables at build time),
     `gamedata` (the engine's typed game data from the importer's tables, in
     `engine::codec`'s binary form)
