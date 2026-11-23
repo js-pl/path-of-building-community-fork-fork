@@ -1,6 +1,6 @@
 //! The Items tab's item tooltip (`ItemsTab:AddItemTooltip` with
 //! `AddItemStatDifferences`): `itemTooltip` and `previewItem` of
-//! `lua/session.lua`, with the stat comparisons of equipping the item in
+//! `oracle/api.lua`, with the stat comparisons of equipping the item in
 //! each slot it fits, or of toggling a flask or tincture.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.

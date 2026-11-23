@@ -1,4 +1,4 @@
-//! The tree's undo (`undo` of `lua/session.lua`, which undoes on the active
+//! The tree's undo (`undo` of `oracle/api.lua`, which undoes on the active
 //! spec): `UndoHandler` with `PassiveSpec:CreateUndoState` and
 //! `RestoreUndoState`, and `newBuild`.
 //!

@@ -1,7 +1,7 @@
 //! The unique and rare item databases (`main.uniqueDB`, `main.rareDB` of
 //! `Modules/Main.lua`), the uniques `buildTreeDependentUniques` of
 //! `Data/Uniques/Special/Generated.lua` makes from the latest tree, the
-//! `itemDb` command of `lua/session.lua`, and the Forbidden jewels'
+//! `itemDb` command of `oracle/api.lua`, and the Forbidden jewels'
 //! counterparts (`ItemsTab:AddForbiddenJewelCounterpart`,
 //! `UpdateForbiddenJewelCounterpart`).
 //!

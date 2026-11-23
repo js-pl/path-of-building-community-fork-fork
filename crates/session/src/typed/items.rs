@@ -1,5 +1,5 @@
 //! The Items tab's views and simple edits (`items`, `equipItem`,
-//! `deleteItem`, `selectItemSet` of `lua/session.lua`) on the typed
+//! `deleteItem`, `selectItemSet` of `oracle/api.lua`) on the typed
 //! items tab (`ItemsTab:UpdateSockets`, `ItemSlotControl:SetSelItemId`,
 //! `ItemsTab:DeleteItem`, `SetActiveItemSet`).
 //!

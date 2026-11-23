@@ -2,7 +2,7 @@
 //! `AddSeparator`), the stat comparisons of `buildMode:CompareStatList`,
 //! and the Skills tab's socket group tooltip
 //! (`SkillsTab:AddSocketGroupTooltip`): `socketGroupTooltip` of
-//! `lua/session.lua`.
+//! `oracle/api.lua`.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 

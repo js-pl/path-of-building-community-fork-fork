@@ -160,7 +160,7 @@ pub extern "C" fn start() {
     set_result(r);
 }
 
-/// Runs one JSON request (see `crates/session/lua/session.lua`). On an
+/// Runs one JSON request (see `oracle/api.lua`). On an
 /// error, files that were missing are listed in `"missing"`.
 ///
 /// # Safety

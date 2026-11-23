@@ -1,4 +1,4 @@
-//! The tree's geometry (`tree` of `lua/session.lua`): the spec's nodes with
+//! The tree's geometry (`tree` of `oracle/api.lua`): the spec's nodes with
 //! their positions and art, cluster jewel subgraphs included, the
 //! connectors between them and the classes, in tree coordinates.
 //!

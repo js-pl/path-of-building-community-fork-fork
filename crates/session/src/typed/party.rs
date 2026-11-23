@@ -1,4 +1,4 @@
-//! The Party tab's view (`party` of `lua/session.lua`): its controls in
+//! The Party tab's view (`party` of `oracle/api.lua`): its controls in
 //! layout order, as `Classes/PartyTab.lua` lays them out, with the labels
 //! `ParseBuffs` gives the imported buffs, or their texts in the edit boxes
 //! with the advanced info shown.

@@ -53,11 +53,11 @@ jobs:
           - { name: triggers oracle 2/4, filter: 'test(=triggers_match_oracle)', shards: 2/4, oracle: true }
           - { name: triggers oracle 3/4, filter: 'test(=triggers_match_oracle)', shards: 3/4, oracle: true }
           - { name: triggers oracle 4/4, filter: 'test(=triggers_match_oracle)', shards: 4/4, oracle: true }
-          - { name: session 1/5, filter: 'test(=typed_session_matches_translated)', shards: 1/5, oracle: true }
-          - { name: session 2/5, filter: 'test(=typed_session_matches_translated)', shards: 2/5, oracle: true }
-          - { name: session 3/5, filter: 'test(=typed_session_matches_translated)', shards: 3/5, oracle: true }
-          - { name: session 4/5, filter: 'test(=typed_session_matches_translated)', shards: 4/5, oracle: true }
-          - { name: session 5/5, filter: 'test(=typed_session_matches_translated)', shards: 5/5, oracle: true }
+          - { name: session 1/5, filter: 'test(=typed_session_matches_oracle)', shards: 1/5, oracle: true }
+          - { name: session 2/5, filter: 'test(=typed_session_matches_oracle)', shards: 2/5, oracle: true }
+          - { name: session 3/5, filter: 'test(=typed_session_matches_oracle)', shards: 3/5, oracle: true }
+          - { name: session 4/5, filter: 'test(=typed_session_matches_oracle)', shards: 4/5, oracle: true }
+          - { name: session 5/5, filter: 'test(=typed_session_matches_oracle)', shards: 5/5, oracle: true }
     name: full (${{ matrix.name }})
     env:
       TRIGGERS_FULL: "1"
@@ -66,8 +66,6 @@ jobs:
       # Smaller shards: the edit phases take 2.5 times as long
       SESSION_SHARDS: "6"
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
-      # Upstream itself on LuaJIT as the reference
-      SESSION_REFERENCE: ${{ matrix.oracle && 'oracle' || '' }}
     steps:
       - uses: actions/checkout@v4
         with:

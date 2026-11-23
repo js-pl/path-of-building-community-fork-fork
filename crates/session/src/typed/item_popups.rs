@@ -6,7 +6,7 @@
 //! `item_corrupt.rs`), `AddImplicitPopup` (Add Implicit to Item, in
 //! `item_add_implicit.rs`), `ItemsTab:AddCustomModifierToDisplayItem`
 //! (Add Modifier to Item, in `item_add_modifier.rs`),
-//! `ItemsTab:AddCrucibleModifierToDisplayItem` (in `item_crucible.rs`), as `lua/session.lua` shows them (`describePopups`) and drives them
+//! `ItemsTab:AddCrucibleModifierToDisplayItem` (in `item_crucible.rs`), as `oracle/api.lua` shows them (`describePopups`) and drives them
 //! (`control` of `popup.*`, `popupButton`, `closePopup`).
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.

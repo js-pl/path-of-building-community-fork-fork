@@ -1,6 +1,6 @@
 //! Switching sets and specs, copying socket groups and the character
 //! level (`selectTreeSpec`, `selectConfigSet`, `copySocketGroup`,
-//! `pasteSocketGroup` and the level's `control` of `lua/session.lua`):
+//! `pasteSocketGroup` and the level's `control` of `oracle/api.lua`):
 //! `TreeTab:SetActiveSpec`, `ConfigTab:SetActiveConfigSet`,
 //! `SkillsTab:PasteSocketGroup` and the level box's change function.
 //!

@@ -2,7 +2,7 @@
 //! warnings (`RefreshStatList`, `AddDisplayStatList`, `FormatStat`,
 //! `InsertItemWarnings`, `EstimatePlayerProgress`), the class and skill
 //! selection controls (`RefreshSkillSelectControls`, the class drop-downs)
-//! and the `state` command of `lua/session.lua`.
+//! and the `state` command of `oracle/api.lua`.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 

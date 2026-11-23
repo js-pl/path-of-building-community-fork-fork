@@ -1,7 +1,7 @@
 //! The Skills tab's edits and views (`skills`, `gemList`,
 //! `setMainSocketGroup`, `setSocketGroup`, `addSocketGroup`,
 //! `removeSocketGroup`, `setGem`, `removeGem`, `selectSkillSet` of
-//! `lua/session.lua`) and the skill selection controls' handlers
+//! `oracle/api.lua`) and the skill selection controls' handlers
 //! (`buildMode`'s and the Calcs tab's), on the typed build.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.

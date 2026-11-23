@@ -2,8 +2,8 @@
 --
 -- Every command calls the same upstream functions as the control or tab the
 -- user would use in upstream (pinned at v2.67.2), so results stay identical.
--- Translated to Rust by luagen in crates/session's build script; requests and
--- responses are JSON (dkjson, upstream's own library).
+-- Run on the oracle's LuaJIT by session.lua; requests and responses are JSON
+-- (dkjson, upstream's own library).
 
 local json = require("dkjson")
 local t_insert = table.insert

@@ -1,5 +1,5 @@
 //! The Items tab's item edits and the editor's display item (`addItem`,
-//! `editItem`, `setDisplayItem`, `saveDisplayItem` of `lua/session.lua`):
+//! `editItem`, `setDisplayItem`, `saveDisplayItem` of `oracle/api.lua`):
 //! `ItemsTab:AddItem`, `AddDisplayItem`, `CreateDisplayItemFromRaw`,
 //! `CopyAnointsAndEldritchImplicits`, `SetDisplayItem`.
 //!

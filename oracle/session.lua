@@ -1,11 +1,9 @@
--- The engine API on the oracle: crates/session/lua/session.lua, the session
--- the translation runs, on upstream headless on LuaJIT. JSON requests on
--- stdin, one per line; one JSON response per line on stdout, as `pob serve`.
+-- The engine API on the oracle: api.lua on upstream headless on LuaJIT, the
+-- reference of the session tests. JSON requests on stdin, one per line; one
+-- JSON response per line on stdout, as `pob serve`.
 --
 -- Run from upstream's src/ directory (upstream uses paths relative to it):
 --   luajit <repo>/oracle/session.lua
--- See docs/drop-translation.md: the reference the session tests can use
--- instead of the translation.
 
 local oracleDir = arg[0]:match("^(.*)/[^/]+$") or "."
 local headless = dofile(oracleDir .. "/headless.lua")
@@ -20,7 +18,7 @@ function print(...)
 	io.stderr:write(table.concat(parts, "\t"), "\n")
 end
 
--- As the translation's host: files are read only (upstream would save its
+-- As the engine: files are read only (upstream would save its
 -- settings next to its source)
 local ioOpen = io.open
 function io.open(path, mode)
@@ -65,7 +63,7 @@ function Inflate(data)
 	end
 end
 
-local api = dofile(oracleDir .. "/../crates/session/lua/session.lua")
+local api = dofile(oracleDir .. "/api.lua")
 local first = api.handle('{"cmd":"newBuild"}')
 assert(first:match('^{"ok"'), "newBuild failed: " .. first)
 
@@ -175,7 +173,7 @@ for line in io.lines() do
 		if raw:match('^{"error"') then
 			lastError = dkjson.decode(raw).error
 		end
-		-- The translation's errors carry no source positions
+		-- The typed engine's errors carry no source positions
 		local res = raw:gsub('^{"error":"[^"]-%.lua:%d+: ', '{"error":"')
 		out:write(res, "\n")
 		out:flush()
