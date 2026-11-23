@@ -10,11 +10,13 @@ history comes before any verb that changes a build. It is built as
 
 - **The installed git.** The history is written by running the git the
   user has installed (git for Windows' `git.exe` under Windows), not by a
-  git library. `POB_GIT` picks another program, or turns the history off
-  (`POB_GIT=off`). Under Windows, git for Windows is also found where its
+  git library. The settings ([settings.md](settings.md)) pick the program,
+  a gitconfig of its own, and whether to keep a history at all;
+  `POB_GIT` overrides them (a path, or `off`). Under Windows, git for Windows is also found where its
   installer puts it when it isn't on the `PATH`, and git runs without a
   console window.
-- **Optional.** Without git there is no history and nothing fails:
+- **Optional.** Turned off, or without git, there is no history and
+  nothing fails:
   `History::open` gives no repository, and a `Recorder` made from that
   records nothing, so callers have one code path.
 - **One repository per build.** `<root>/<build>/` is an ordinary git

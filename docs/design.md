@@ -78,6 +78,7 @@ web/ (TypeScript, Preact)               crates/
 `-- worker pool --- engine.wasm ------> +-- wasm      C ABI over session for the browser
                                         +-- cli       `pob`: native runner, data bundles, benchmarks
                                         +-- history   a build's versions, one git repository per build
+                                        +-- settings  the app's settings.json
                                         +-- lua       Lua values, LuaJIT's table order, patterns
                                         +-- luai      Lua parser and interpreter (importer only)
                                         +-- upstream  upstream's program translated (until sub-step 8)
@@ -130,7 +131,8 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   but uses web-native UI instead of copying the desktop UI pixel by pixel.
 - **Build history** (`crates/history`, [history.md](history.md)). Every
   version of a build in a git repository of its own, written with the
-  installed git; optional, without git nothing is recorded.
+  installed git; optional, without git nothing is recorded. Its git is
+  set in the app's settings (`crates/settings`, [settings.md](settings.md)).
 
 ## Mirroring upstream
 

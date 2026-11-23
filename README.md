@@ -25,7 +25,7 @@ repository but generated from the upstream submodule at build time.
 
 | Path | Purpose |
 | --- | --- |
-| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `session` (engine API), `wasm` (the engine for the browser), `cli` (`pob`, native runner), `history` (builds' versions in git), `equivalence` (oracle tests) |
+| `crates/` | Rust: `engine`, `importer`, `lua` (Lua semantics, parser and runtime), `upstream` (upstream's program translated to Rust), `session` (engine API), `wasm` (the engine for the browser), `cli` (`pob`, native runner), `history` (builds' versions in git), `settings` (the app's settings file), `equivalence` (oracle tests) |
 | `web/` | The web app (TypeScript, Preact, Vite) |
 | `upstream/PathOfBuilding` | Upstream PoB Community, pinned to a commit on `dev` (git submodule) |
 | `oracle/` | Runs upstream headless to produce expected outputs and coverage |
