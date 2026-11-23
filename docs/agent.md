@@ -4,7 +4,10 @@ Status: decided, being built in the [steps](#steps) below. Step 1, the
 build history, is built (`crates/history`, [history.md](history.md), with
 its settings in `crates/settings`, [settings.md](settings.md)). Step 2,
 sub-step 8 of [the deletion](drop-translation.md#step-4-in-sub-steps),
-which reshaped `session::dispatch`, is done.
+which reshaped `session::dispatch`, is done. Step 3, the verbs
+(`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
+with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
+done.
 
 ## The question
 
@@ -495,6 +498,50 @@ above was silent:
 - Not ported yet: `export` as JSON, setting the class, custom modifiers
   through `set_config`.
 
+### Built: the headless host
+
+`crates/host`, run as `pob host --headless [--builds <dir>] [--socket
+<path>]`:
+
+- **The builds directory** (`--builds`, `POB_BUILDS`, else `builds/` in
+  the data directory: `%LOCALAPPDATA%`, `~/Library/Application Support`
+  or `$XDG_DATA_HOME`/`~/.local/share`, each with
+  `path-of-building-fork-fork/`): the user's builds as `<name>/build.xml`,
+  a git repository each ([history.md](history.md)); agent directories as
+  `agents/<dir>/<name>/`, the same way. `agents` is therefore no user
+  build's name. `FsStore` is the agent API's `Store` on it: each step is
+  committed with `Recorder::agent_step` before the verb answers; a build
+  with no history yet is first committed as it was found, so the agent's
+  first step can be undone from the history too. With the history off the
+  files are still written.
+- **The control socket** (`--socket`, `POB_SOCKET`, else `control.sock`
+  in the data directory): a Unix socket, mode 0600 in a directory made
+  0700. One JSON line per request and per answer; the first line is the
+  hello that fixes the connection's grant:
+  `{"hello": {"harness": "ctl", "builds": ["RF"], "agent": "<dir>"}}`,
+  answered with the connection's name, agent directory and builds.
+  `agent` reuses an agent directory, else the connection gets a new one
+  (`<harness>-<time>`). The socket is the user's, so a hello may name any
+  of their builds; nothing after it changes the grant. A socket left by a
+  host that is gone is replaced; a running one is an error. Lines are
+  capped at the request limit.
+- **One engine thread.** The agent API runs on the main thread; each
+  connection reads on a thread of its own and passes its requests over a
+  channel, so requests are answered one at a time, in order.
+- **`pob ctl [--socket <path>] [--build <name>]... [--agent <dir>]
+  [--json] <verb> [key=value]...`** (or one JSON object of fields) calls a
+  verb with a grant of the builds named and prints the answer as indented
+  text, or as JSON with `--json`; values that read as JSON are JSON
+  (`nodes='["Heart of Thunder"]'`), else strings. Each call is a new
+  connection, so builds made in an agent directory are reached again with
+  `--agent <dir>`. Without a verb it lists them.
+- **Windows: not yet.** Rust's standard library has no named pipes, so
+  the control socket is Unix only for now; on Windows `pob host` and `pob
+  ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
+  comes with step 4 or 5, when Windows is tested.
+- Not yet: the web app on the host (step 6), MCP (step 4), job and time
+  budgets (step 9; today's verbs are single edits).
+
 ### Evaluating
 
 The primitive every comparison is built on:
@@ -730,7 +777,8 @@ Each one a PR, as usual:
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
-   socket and `pob ctl`.
+   socket and `pob ctl`. Done (#191, #193), except the
+   Windows named pipe.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
    agents install`: any harness works on a build.
 5. The default container: the Containerfile, the proxy, `pob agent`, on

@@ -32,7 +32,9 @@ dependencies = [
 name = "cli"
 version = "0.0.0"
 dependencies = [
+ "agent",
  "history",
+ "host",
  "mimalloc",
  "serde_json",
  "session",
@@ -112,6 +114,16 @@ dependencies = [
 [[package]]
 name = "history"
 version = "0.0.0"
+
+[[package]]
+name = "host"
+version = "0.0.0"
+dependencies = [
+ "agent",
+ "history",
+ "serde_json",
+ "session",
+]
 
 [[package]]
 name = "importer"

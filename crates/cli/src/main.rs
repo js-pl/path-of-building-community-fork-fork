@@ -19,6 +19,15 @@
 //!   pob settings [key [value]]
 //!                             the settings file (`POB_SETTINGS` picks another): all of
 //!                             it and the git it gives, one setting, or sets one
+//!   pob host --headless [--builds <dir>] [--socket <path>]
+//!                             owns the builds in <dir> (`POB_BUILDS`) with their history
+//!                             and answers the agent API on the control socket
+//!                             (`POB_SOCKET`), see docs/agent.md
+//!   pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json]
+//!           <verb> [key=value]... | <verb> '<json fields>'
+//!                             calls one agent API verb on a running host, with a grant
+//!                             of the builds named; prints the answer as text (JSON with
+//!                             --json); without a verb, lists them
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
@@ -220,6 +229,8 @@ fn main() {
         Some("bench") if args.len() == 2 => bench(&args[1]),
         Some("history") if args.len() >= 3 => history(Path::new(&args[1]), &args[2..]),
         Some("settings") if args.len() <= 3 => settings_cmd(&args[1..]),
+        Some("host") => host_cmd(&args[1..]),
+        Some("ctl") => ctl(&args[1..]),
         _ => usage(),
     }
 }
@@ -229,7 +240,9 @@ fn usage() -> ! {
         "usage: pob serve | pob bundle <out dir> | pob bench <build.xml>\n       \
          pob history <dir> commit <build.xml> [label] | log [n] | show <version> | \
          restore <version> | push <remote>\n       \
-         pob settings [key [value]]",
+         pob settings [key [value]]\n       \
+         pob host --headless [--builds <dir>] [--socket <path>]\n       \
+         pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...",
     )
 }
 
@@ -324,4 +337,193 @@ fn settings_cmd(args: &[String]) {
         }
         _ => usage(),
     }
+}
+
+/// `--flag value` pairs and the rest of the arguments
+fn flags<'a>(
+    args: &'a [String],
+    with_value: &[&str],
+    bare: &[&str],
+) -> (Vec<(&'a str, &'a str)>, Vec<&'a str>) {
+    let mut out = Vec::new();
+    let mut rest = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        if with_value.contains(&a) {
+            let v = args.get(i + 1).unwrap_or_else(|| usage());
+            out.push((a, v.as_str()));
+            i += 2;
+        } else if bare.contains(&a) {
+            out.push((a, ""));
+            i += 1;
+        } else {
+            rest.extend(args[i..].iter().map(String::as_str));
+            break;
+        }
+    }
+    (out, rest)
+}
+
+fn flag<'a>(flags: &[(&str, &'a str)], name: &str) -> Option<&'a str> {
+    flags.iter().find(|(f, _)| *f == name).map(|(_, v)| *v)
+}
+
+fn socket_path(flags: &[(&str, &str)]) -> PathBuf {
+    flag(flags, "--socket")
+        .map(PathBuf::from)
+        .or_else(host::default_socket)
+        .unwrap_or_else(|| die(format!("no data directory; set {}", host::SOCKET_ENV)))
+}
+
+fn host_cmd(args: &[String]) {
+    let (flags, rest) = flags(args, &["--builds", "--socket"], &["--headless"]);
+    if !rest.is_empty() || flag(&flags, "--headless").is_none() {
+        die("pob host needs --headless for now: the web app on the host is a later step");
+    }
+    let builds = flag(&flags, "--builds")
+        .map(PathBuf::from)
+        .or_else(host::default_builds)
+        .unwrap_or_else(|| die(format!("no data directory; set {}", host::BUILDS_ENV)));
+    let socket = socket_path(&flags);
+    let (_, settings) = load_settings();
+    let git = match settings.history.git() {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("pob host: the history is not kept: {e}");
+            None
+        }
+    };
+    if git.is_none() {
+        eprintln!("pob host: no history: builds are saved, their versions aren't");
+    }
+    std::fs::create_dir_all(&builds).unwrap_or_else(|e| die(format!("{}: {e}", builds.display())));
+    serve_host(builds, socket, git);
+}
+
+#[cfg(unix)]
+fn serve_host(builds: PathBuf, socket: PathBuf, git: Option<history::Git>) {
+    let listener = host::control::unix::listen(&socket).unwrap_or_else(|e| die(e));
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || host::control::unix::accept(listener, tx));
+    let store = host::FsStore::new(&builds, git);
+    let data = data();
+    eprintln!(
+        "pob host: builds in {}, control socket {}",
+        builds.display(),
+        socket.display()
+    );
+    let mut agent = agent::Agent::new(data, store);
+    host::control::answer(&mut agent, rx);
+}
+
+#[cfg(not(unix))]
+fn serve_host(_: PathBuf, _: PathBuf, _: Option<history::Git>) {
+    die("pob host: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
+}
+
+fn ctl(args: &[String]) {
+    let (flags, rest) = flags(args, &["--socket", "--build", "--agent"], &["--json"]);
+    let Some((verb, fields)) = rest.split_first() else {
+        println!("verbs:");
+        for (v, about) in agent::VERBS {
+            println!("  {v:<15} {about}");
+        }
+        return;
+    };
+    let mut req = serde_json::json!({ "verb": verb });
+    match fields {
+        [one] if one.trim_start().starts_with('{') => {
+            let v: serde_json::Value =
+                serde_json::from_str(one).unwrap_or_else(|e| die(format!("not JSON: {e}")));
+            for (k, v) in v.as_object().into_iter().flatten() {
+                req[k] = v.clone();
+            }
+        }
+        _ => {
+            for f in fields {
+                let (k, v) = f
+                    .split_once('=')
+                    .unwrap_or_else(|| die(format!("{f}: fields are key=value")));
+                // A value that reads as JSON is JSON (numbers, lists), else a string
+                req[k] = serde_json::from_str(v).unwrap_or_else(|_| serde_json::json!(v));
+            }
+        }
+    }
+    let builds: Vec<&str> = flags
+        .iter()
+        .filter(|(f, _)| *f == "--build")
+        .map(|(_, v)| *v)
+        .collect();
+    let mut hello = serde_json::json!({ "hello": { "harness": "ctl", "builds": builds } });
+    if let Some(a) = flag(&flags, "--agent") {
+        hello["hello"]["agent"] = serde_json::json!(a);
+    }
+    let answer = call_host(&socket_path(&flags), &hello, &req);
+    if flag(&flags, "--json").is_some() {
+        println!("{answer}");
+    } else if let Some(e) = answer.get("error") {
+        die(e.as_str().unwrap_or_default());
+    } else {
+        print!("{}", text(&answer["ok"], 0));
+    }
+    if answer.get("error").is_some() {
+        std::process::exit(1);
+    }
+}
+
+#[cfg(unix)]
+fn call_host(
+    socket: &Path,
+    hello: &serde_json::Value,
+    req: &serde_json::Value,
+) -> serde_json::Value {
+    let mut c = host::control::unix::Client::connect(socket, hello).unwrap_or_else(|e| die(e));
+    c.call(req).unwrap_or_else(|e| die(e))
+}
+
+#[cfg(not(unix))]
+fn call_host(_: &Path, _: &serde_json::Value, _: &serde_json::Value) -> serde_json::Value {
+    die("pob ctl: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
+}
+
+/// An answer as indented text: `key: value`, lists as `- item`
+fn text(v: &serde_json::Value, indent: usize) -> String {
+    use serde_json::Value as J;
+    let pad = "  ".repeat(indent);
+    let scalar = |v: &J| match v {
+        J::String(s) => s.replace('\n', &format!("\n{pad}  ")),
+        J::Null => "-".into(),
+        v => v.to_string(),
+    };
+    let mut out = String::new();
+    match v {
+        J::Object(o) => {
+            for (k, v) in o {
+                match v {
+                    J::Object(m) if !m.is_empty() => {
+                        out.push_str(&format!("{pad}{k}:\n{}", text(v, indent + 1)))
+                    }
+                    J::Array(a) if !a.is_empty() => {
+                        out.push_str(&format!("{pad}{k}:\n{}", text(v, indent + 1)))
+                    }
+                    J::Array(_) => out.push_str(&format!("{pad}{k}: none\n")),
+                    v => out.push_str(&format!("{pad}{k}: {}\n", scalar(v))),
+                }
+            }
+        }
+        J::Array(a) => {
+            for v in a {
+                match v {
+                    J::Object(_) | J::Array(_) => {
+                        let inner = text(v, indent + 1);
+                        out.push_str(&format!("{pad}-\n{inner}"));
+                    }
+                    v => out.push_str(&format!("{pad}- {}\n", scalar(v))),
+                }
+            }
+        }
+        v => out.push_str(&format!("{pad}{}\n", scalar(v))),
+    }
+    out
 }
