@@ -254,8 +254,8 @@ impl<'d> TypedSession<'d> {
             if i <= g.gem_list.len() {
                 g.gem_list.remove(i - 1);
             }
-            for k in i - 1..g.gem_list.len() {
-                slots.set_from_gem(k, &g.gem_list[k]);
+            for (k, gem) in g.gem_list.iter().enumerate().skip(i - 1) {
+                slots.set_from_gem(k, gem);
             }
         } else {
             // Typing in the slot after the last gem adds one

@@ -10,7 +10,10 @@ See `docs/design.md` before making architectural decisions.
     tree), shipped in the browser
   - `session`: the engine API (build sessions answering JSON commands) and
     the native and oracle `Session`s the tests compare it with
-  - `wasm` (C ABI for the browser), `cli` (`pob`: serve, bundle, bench)
+  - `wasm` (C ABI for the browser), `cli` (`pob`: serve, bundle, bench,
+    history)
+  - `history` (a build's versions, one git repository per build, written
+    with the installed git; optional), see `docs/history.md`
   - `importer` (reads upstream's data and ModParser tables at build time),
     `gamedata` (the engine's typed game data from the importer's tables, in
     `engine::codec`'s binary form)

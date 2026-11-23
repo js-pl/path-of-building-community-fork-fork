@@ -1,0 +1,10 @@
+[package]
+name = "history"
+description = "A build's history as a git repository of its own, written with the installed git"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]

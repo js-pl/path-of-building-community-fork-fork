@@ -22,6 +22,7 @@ dependencies = [
 name = "cli"
 version = "0.0.0"
 dependencies = [
+ "history",
  "mimalloc",
  "serde_json",
  "session",
@@ -99,6 +100,10 @@ dependencies = [
  "lua",
  "miniz_oxide",
 ]
+
+[[package]]
+name = "history"
+version = "0.0.0"
 
 [[package]]
 name = "importer"

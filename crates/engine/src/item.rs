@@ -2100,9 +2100,7 @@ impl Item {
             }
             "has elder, shaper and all conqueror influences" => {
                 self.has_elder_shaper_and_all_conqueror_influences = true;
-                for i in 0..6 {
-                    self.influences[i] = true;
-                }
+                self.influences[..6].fill(true);
             }
             _ if lower.contains("if the eater of worlds is dominant") => {
                 self.can_have_eldritch_influence = true
