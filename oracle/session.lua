@@ -156,6 +156,91 @@ local function oracleCalculator(req)
 	return '{"ok":' .. toJSON(res) .. '}'
 end
 
+-- `{"cmd":"oracleModWeights","xml":..,"id":..,"cases":[..]}` loads a
+-- build and answers `TradeQueryGenerator`'s mod weights for each case:
+-- `StartQuery(slot, options)` and its `ExecuteQuery`, with a slot of the
+-- items tab by name and the options of the trade popup (`statWeights` as
+-- `{stat, weightMult}` with the power stat's transform, `includeCorrupted`,
+-- `includeTalisman`, `includeScourge`, `includeEldritch`, `jewelType`,
+-- `special` by item name). Each group of mods is weighed an entry at a
+-- time by key, one of the orders `pairs` gives (upstream weighs the first
+-- of the entries sharing a trade mod id in `pairs` order, which LuaJIT
+-- seeds per process). The weights are sorted by trade mod id
+-- (crates/equivalence/tests/mod_weights.rs)
+local function oracleModWeights(req)
+	local ok, res = pcall(function()
+		loadBuildFromXML(req.xml, req.id or "weights")
+		local gen = new("TradeQueryGenerator"):TradeQueryGenerator({ itemsTab = build.itemsTab })
+		local function byKey(f)
+			return function(self, mods)
+				local keys = { }
+				for k in pairs(mods) do
+					keys[#keys + 1] = k
+				end
+				table.sort(keys)
+				for _, k in ipairs(keys) do
+					f(self, { [k] = mods[k] })
+				end
+			end
+		end
+		gen.GenerateModWeights = byKey(gen.GenerateModWeights)
+		gen.GeneratePassiveNodeWeights = byKey(gen.GeneratePassiveNodeWeights)
+		local answer = { cases = { } }
+		for i, c in ipairs(req.cases) do
+			local okCase, result = pcall(function()
+				local statWeights = { }
+				for _, w in ipairs(c.statWeights) do
+					local entry = { stat = w.stat, weightMult = w.weightMult }
+					for _, s in ipairs(data.powerStatList) do
+						if s.stat == w.stat then
+							entry.label = s.label
+							entry.transform = s.transform
+						end
+					end
+					statWeights[#statWeights + 1] = entry
+				end
+				local options = {
+					statWeights = statWeights,
+					includeCorrupted = c.includeCorrupted,
+					includeTalisman = c.includeTalisman,
+					includeScourge = c.includeScourge,
+					includeEldritch = c.includeEldritch,
+					jewelType = c.jewelType,
+					special = c.special and { itemName = c.special },
+				}
+				local slot = c.slot and build.itemsTab.slots[c.slot]
+				assert(slot or not c.slot, "no slot " .. tostring(c.slot))
+				gen.calcContext = { }
+				gen:StartQuery(slot, options)
+				local co = gen.calcContext.co
+				assert(co, "no query for slot " .. tostring(c.slot))
+				main:ClosePopup()
+				while coroutine.status(co) ~= "dead" do
+					local okCo, err = coroutine.resume(co, gen)
+					if not okCo then
+						error(err, 0)
+					end
+				end
+				gen.calcContext.co = nil
+				table.sort(gen.modWeights, function(a, b)
+					return a.tradeModId < b.tradeModId
+				end)
+				return {
+					category = gen.calcContext.itemCategory,
+					baseStatValue = gen.calcContext.baseStatValue,
+					weights = gen.modWeights,
+				}
+			end)
+			answer.cases[i] = okCase and result or { error = tostring(result) }
+		end
+		return answer
+	end)
+	if not ok then
+		return dkjson.encode({ error = tostring(res) })
+	end
+	return '{"ok":' .. toJSON(res) .. '}'
+end
+
 local lastError
 for line in io.lines() do
 	if line:match('^{"cmd":"oracleOutputs"') then
@@ -163,6 +248,9 @@ for line in io.lines() do
 		out:flush()
 	elseif line:match('^{"cmd":"oracleCalculator"') then
 		out:write(oracleCalculator(dkjson.decode(line)), "\n")
+		out:flush()
+	elseif line:match('^{"cmd":"oracleModWeights"') then
+		out:write(oracleModWeights(dkjson.decode(line)), "\n")
 		out:flush()
 	elseif line:match('^{"cmd":"oracleValue"') then
 		out:write(oracleValue(dkjson.decode(line)), "\n")

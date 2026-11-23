@@ -529,6 +529,16 @@ the weights equal upstream's. These weights are linear estimates, so
 answers built on them say so, and a pasted item is always evaluated
 exactly.
 
+Built: `engine::mod_weights::mod_weights(calc, item_context, query_mods,
+slot, options, threads)` gives a slot's weights (each mod's trade id, the
+line tested, its value, the weight per point and the gain), with
+`weighted_ratio` for upstream's `WeightedRatioOutputs`; `query_mods` is
+`GameData::query_mods`. Upstream weighs the first of the entries sharing a
+trade mod id in `pairs` order, which LuaJIT seeds per process; the port
+goes by key, and the oracle test makes upstream do the same. Not ported:
+Pearl of Tsoatha's weights. `crates/equivalence/tests/mod_weights.rs`
+compares them with upstream's.
+
 ### Answers sized for an LLM
 
 Every answer is short and self-describing: numbers with their deltas in
@@ -677,7 +687,7 @@ Each one a PR, as usual:
    and `improve`.
 9. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
-10. The port of the mod weights with its oracle test; `evaluate_item`.
+10. The port of the mod weights with its oracle test (done); `evaluate_item`.
 11. Later: trade and prices, cloud sessions, an agent in the browser, a
     desktop app.
 
