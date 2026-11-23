@@ -1179,6 +1179,13 @@ local function gemSelectList(req)
 	local control = slot.nameSpec
 	control.sortCache = nil
 	control:UpdateSortCache()
+	-- The pending gems in `pairs` order of the gems, which LuaJIT seeds per
+	-- process: what their calculations leave on the slot's gem
+	-- (`skillMinion`, ...) depends on it, so they go by id, one of the
+	-- orders `pairs` gives (crates/session/src/typed/gem_select.rs)
+	if control.sortCache and control.sortCache.pendingGems then
+		table.sort(control.sortCache.pendingGems)
+	end
 	control:BuildList("")
 	control:DPSBuilder()
 	local cache = control.sortCache
