@@ -12,6 +12,9 @@ agent = { path = "../agent" }
 history = { path = "../history" }
 session = { path = "../session", default-features = false }
 serde_json.workspace = true
+# TLS for MCP over HTTP off loopback, with ring for tokens' randomness and hashes
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+ring = "0.17"
 
 [dev-dependencies]
 session = { path = "../session", default-features = false, features = ["source"] }

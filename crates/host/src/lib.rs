@@ -4,9 +4,12 @@
 //! ([`mcp`]); the web app's WebSocket (step 6) comes later, so
 //! `--headless` is what there is.
 
+pub mod connections;
 pub mod control;
+pub mod http;
 pub mod mcp;
 pub mod store;
+pub mod tokens;
 
 pub use store::FsStore;
 
