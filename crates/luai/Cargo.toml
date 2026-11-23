@@ -1,6 +1,6 @@
 [package]
 name = "luai"
-description = "The Lua parser and standard library environment the importer and upstream's translated program run; not shipped, see docs/drop-translation.md"
+description = "The Lua parser and standard library environment the importer runs upstream's data files with; not shipped"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -3,8 +3,8 @@
 //! (`optimiseSockets`, which rebuilds the item's sockets for the groups
 //! socketed in it) and the imbued support's label, gem box and clear
 //! button (`imbuedSupportLabel`, `imbuedSupport`, `imbuedSupportClear`).
-//! Choosing an imbued support by name (`GemSelectControl`) stays on the
-//! translation.
+//! Choosing an imbued support by name (`GemSelectControl`) is not
+//! ported.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 

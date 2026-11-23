@@ -9,7 +9,7 @@
 //! texts and states are set when a group is shown and when they are
 //! edited ([`SlotTexts`]). Choosing a gem by name (`GemSelectControl`),
 //! the edits of the slot after the last gem, which add one, and the
-//! quality and enabled boxes' tooltips stay on the translation.
+//! quality and enabled boxes' tooltips are not ported.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 

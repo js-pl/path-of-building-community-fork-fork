@@ -16,7 +16,6 @@ luai = { path = "crates/luai" }
 importer = { path = "crates/importer" }
 engine = { path = "crates/engine" }
 gamedata = { path = "crates/gamedata" }
-upstream = { path = "crates/upstream" }
 testkit = { path = "crates/testkit" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -24,7 +23,8 @@ serde_json = "1"
 # calculations' time (docs/progress.md, "Performance")
 mimalloc = { version = "0.1", default-features = false }
 
-# luagen runs in crates/upstream's build script; optimised, it takes seconds
+# The build scripts evaluate upstream's Lua (crates/session, crates/gamedata);
+# optimised, it takes seconds
 [profile.dev.build-override]
 opt-level = 3
 

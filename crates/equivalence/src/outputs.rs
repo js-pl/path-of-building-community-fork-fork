@@ -1,8 +1,7 @@
-//! Actor outputs of the translation and of the typed engine as JSON, to
-//! compare them key for key.
+//! Actor outputs of the typed engine as JSON, to compare them key for key.
 
 use engine::actor::OutVal;
-use lua::{Key, Value, rt};
+use lua::{Key, Value};
 use serde_json::{Map, Value as J, json};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -33,46 +32,7 @@ pub fn key_str(k: &Key) -> String {
     lua::to_string(&k.to_value()).to_str_lossy().into_owned()
 }
 
-fn name_of(v: &Value, k: &str) -> String {
-    let x = rt::index(v, &Value::str(k)).unwrap_or_default();
-    lua::to_string(&x).to_str_lossy().into_owned()
-}
-
-/// An output of the translation as JSON: arrays under `#`, gems and items
-/// by name, functions as `$func`
-pub fn lua_out(v: &Value, key: &str) -> J {
-    match v {
-        Value::Nil => J::Null,
-        Value::Bool(b) => J::Bool(*b),
-        Value::Number(n) => number(*n),
-        Value::Str(x) => J::String(x.to_str_lossy().into_owned()),
-        Value::Table(_) if key == "sourceGem" => json!({"$gem": name_of(v, "nameSpec")}),
-        Value::Table(_) if key == "sourceItem" => json!({"$item": name_of(v, "name")}),
-        Value::Table(_) => {
-            let mut m = Map::new();
-            let mut ints: BTreeMap<i64, J> = BTreeMap::new();
-            for (k, x) in entries(v) {
-                match k {
-                    Key::Int(i) => {
-                        ints.insert(i, lua_out(&x, ""));
-                    }
-                    k => {
-                        let k = key_str(&k);
-                        let j = lua_out(&x, &k);
-                        m.insert(k, j);
-                    }
-                }
-            }
-            if !ints.is_empty() {
-                m.insert("#".into(), J::Array(ints.into_values().collect()));
-            }
-            J::Object(m)
-        }
-        _ => json!("$func"),
-    }
-}
-
-/// A typed output as [`lua_out`] encodes the translation's
+/// A typed output as JSON: arrays under `#`, gems and items by name
 pub fn typed_out(v: &OutVal) -> J {
     match v {
         OutVal::Num(n) => number(*n),
@@ -102,22 +62,8 @@ pub fn typed_out(v: &OutVal) -> J {
     }
 }
 
-/// A translated actor's outputs by name, without the minion's (`Minion`),
-/// compared as its own
-pub fn lua_outputs(out: &Value) -> BTreeMap<String, J> {
-    entries(out)
-        .into_iter()
-        .map(|(k, v)| {
-            let k = key_str(&k);
-            let j = lua_out(&v, &k);
-            (k, j)
-        })
-        .filter(|(k, _)| k != "Minion")
-        .collect()
-}
-
 pub fn typed_outputs(out: &engine::calcs::Output) -> BTreeMap<String, J> {
-    // `output.Minion`, a mirage's copy's minion's, as `lua_outputs`
+    // `output.Minion`, a mirage's copy's minion's, compared as its own
     out.iter()
         .filter(|(k, _)| k.as_str() != "Minion")
         .map(|(k, v)| (k.as_str().to_string(), typed_out(v)))

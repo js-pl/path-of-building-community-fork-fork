@@ -375,7 +375,7 @@ impl TypedSession<'_> {
                     return None;
                 }
             }
-            // The tab's other controls are the translation's
+            // The tab's other controls are not ported
             Err(_) if name != "customModsAddBlock" => return None,
             Err(_) => {}
         }

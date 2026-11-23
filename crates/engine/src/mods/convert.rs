@@ -1,5 +1,5 @@
 //! Converts upstream's mods as Lua values (the importer's data, the mod
-//! parser's output, the translated program's stores) into typed ones.
+//! parser's output) into typed ones.
 //! Conversion fails on any field or tag it does not know, so what upstream
 //! adds shows up instead of being dropped.
 
@@ -9,7 +9,7 @@ use lua::rt;
 use lua::{Key, Value};
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 /// A table key as conversion sees it
@@ -34,8 +34,8 @@ pub enum Kind<'a, D> {
     Typed(ModValue),
 }
 
-/// Dynamic values upstream's mods come as: Lua values (the importer's data,
-/// the translated program) and the mod parser's closure values
+/// Dynamic values upstream's mods come as: Lua values (the importer's data)
+/// and the mod parser's closure values
 pub trait Dyn: Clone {
     fn kind(&self) -> Kind<'_, Self>;
     /// `t.k`, nil for non-tables
@@ -48,11 +48,6 @@ pub trait Dyn: Clone {
     fn len_pairs(&self) -> usize;
     /// Entries in `pairs` order
     fn entries(&self) -> Vec<(DKey, Self)>;
-    /// The Lua value, kept for tags whose evaluation needs it
-    fn lua(&self) -> Option<&Value> {
-        None
-    }
-
     fn is_nil(&self) -> bool {
         matches!(self.kind(), Kind::Nil)
     }
@@ -144,10 +139,6 @@ impl Dyn for Value {
                 .collect(),
             _ => vec![],
         }
-    }
-
-    fn lua(&self) -> Option<&Value> {
-        Some(self)
     }
 }
 
@@ -305,23 +296,15 @@ pub fn check_fields<D: Dyn>(t: &D, what: &str, known: &[&str]) -> Result<(), Str
     Ok(())
 }
 
-/// Lua values of tags whose evaluation needs the translated program
+/// Converts mods, tags and values
 #[derive(Default)]
-pub struct Originals {
-    pub item_conditions: HashMap<*const ItemCondition, Value>,
-}
-
-/// Converts mods, tags and values. With `originals`, the Lua value of
-/// every `ItemCondition` tag is kept there.
-#[derive(Default)]
-pub struct Converter<'o> {
-    pub originals: Option<&'o RefCell<Originals>>,
+pub struct Converter {
     /// Mods as templates, whose value may be nil until it is set (the mods
     /// of the skills' data); a nil value converts to NaN
     pub templates: bool,
 }
 
-impl Converter<'_> {
+impl Converter {
     /// A mod's flags. A few of upstream's skill mods pass a tag where the
     /// flags go; upstream fails on the queries of such a mod, and as
     /// templates they take flags no query has, so queries skip them.
@@ -664,11 +647,6 @@ impl Converter<'_> {
                     name_cond: opt_text("nameCond")?,
                     neg: flag(&g("neg")),
                 });
-                if let (Some(o), Some(lv)) = (self.originals, v.lua()) {
-                    o.borrow_mut()
-                        .item_conditions
-                        .insert(Arc::as_ptr(&ic), lv.clone());
-                }
                 TagKind::ItemCondition(ic)
             }
             "SocketedIn" => {

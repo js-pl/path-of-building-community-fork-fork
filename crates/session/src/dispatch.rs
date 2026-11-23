@@ -1,45 +1,17 @@
 //! The engine API's commands, each answered by the typed engine where it
-//! is ported, else by the translated session (with the `translation`
-//! feature) or with a "not ported" error.
-//!
-//! The translation follows lazily: requests the typed engine answered that
-//! change the build are queued and replayed on the translated session
-//! before it answers anything. A command only the translation has that
-//! changes the build leaves the typed build behind; until the next typed
-//! load, the translation answers everything.
+//! is ported, else with a "not ported" error.
 
-#[cfg(feature = "translation")]
-use crate::Session;
-#[cfg(feature = "translation")]
-use crate::paired::{READ_ONLY, outlives_build};
 use crate::typed::{NOT_PORTED, TypedData, TypedSession, UPSTREAM_ERROR};
 use serde_json::{Value as J, json};
 
-/// Which implementation answers the commands both have
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Prefer {
-    Translated,
-    Typed,
-}
-
-/// A build session answering JSON requests, as [`Session::request`]
+/// A build session answering JSON requests, as `Session::request` does
 pub struct Dispatcher<'d> {
-    /// The translation, if this session falls back to it
-    #[cfg(feature = "translation")]
-    translated: Option<Session>,
-    data: Option<&'d TypedData>,
-    prefer: Prefer,
+    data: &'d TypedData,
     typed: Option<TypedSession<'d>>,
-    /// Requests the typed engine answered that the translation has not seen
-    #[cfg(feature = "translation")]
-    pending: Vec<String>,
-    /// Why the typed engine last gave a request to the translation
+    /// Why the typed engine last did not answer a request
     pub typed_error: Option<String>,
-    /// Each request the typed engine preferred gave to the translation
-    /// while it held the build or loading one: the command and why
-    pub fallbacks: Vec<(String, String)>,
     /// Whether the typed sessions still know the shared item lists: not
-    /// once the translation held a build
+    /// once a reference session held a build ([`crate::Paired`])
     shared_known: bool,
     /// Whether the typed engine answered the last request
     pub typed_answered: bool,
@@ -64,49 +36,18 @@ fn ok(v: J) -> String {
 }
 
 impl<'d> Dispatcher<'d> {
-    #[cfg(feature = "translation")]
-    pub fn new(translated: Session, data: Option<&'d TypedData>, prefer: Prefer) -> Dispatcher<'d> {
-        Dispatcher {
-            translated: Some(translated),
-            data,
-            prefer,
-            typed: None,
-            shared_known: true,
-            pending: Vec::new(),
-            typed_error: None,
-            fallbacks: Vec::new(),
-            typed_answered: false,
-            record_replays: false,
-            replays: Vec::new(),
-        }
-    }
-
     /// A session on the typed engine alone: commands it does not have are
     /// "not ported" errors. No build is open until one is loaded.
     pub fn typed(data: &'d TypedData) -> Dispatcher<'d> {
         Dispatcher {
-            #[cfg(feature = "translation")]
-            translated: None,
-            data: Some(data),
-            prefer: Prefer::Typed,
+            data,
             typed: None,
             shared_known: true,
-            #[cfg(feature = "translation")]
-            pending: Vec::new(),
             typed_error: None,
-            fallbacks: Vec::new(),
             typed_answered: false,
             record_replays: false,
             replays: Vec::new(),
         }
-    }
-
-    /// The translated session; panics on a session without one
-    #[cfg(feature = "translation")]
-    pub fn translated(&self) -> &Session {
-        self.translated
-            .as_ref()
-            .expect("a dispatcher on the typed engine alone")
     }
 
     /// Leaves the build to a reference session: the typed engine holds no
@@ -139,113 +80,25 @@ impl<'d> Dispatcher<'d> {
         self.typed.is_some()
     }
 
-    /// Whether commands the typed engine does not have go to the
-    /// translation
-    pub fn has_translation(&self) -> bool {
-        #[cfg(feature = "translation")]
-        return self.translated.is_some();
-        #[cfg(not(feature = "translation"))]
-        false
-    }
-
-    /// Answers a request on the translation, whatever is preferred. A save
-    /// the typed engine answered just before a save asked of the
-    /// translation is the same save: it is not replayed, so both have
-    /// saved (and re-parsed their items) as often. So is a gem slot's
-    /// list asked again just after, whose calculations leave selections
-    /// on the gems.
-    #[cfg(feature = "translation")]
-    pub fn translated_request(&mut self, json: &str) -> Result<String, String> {
-        let is_save = |r: &str| {
-            serde_json::from_str::<J>(r)
-                .ok()
-                .is_some_and(|r| matches!(r["cmd"].as_str(), Some("saveXml" | "saveCode")))
-        };
-        let is_gem_list = |r: &str| {
-            serde_json::from_str::<J>(r)
-                .ok()
-                .is_some_and(|r| r["cmd"] == "gemList" && !r["group"].is_null())
-        };
-        if (is_save(json) && self.pending.last().is_some_and(|p| is_save(p)))
-            || (is_gem_list(json) && self.pending.last().is_some_and(|p| p == json))
-        {
-            self.pending.pop();
-        }
-        self.sync()?
-            .map_or_else(|| self.translated().request(json), Ok)
-    }
-
-    /// Answers one JSON request, as [`Session::request`] does
+    /// Answers one JSON request, as `Session::request` does
     pub fn request(&mut self, json: &str) -> Result<String, String> {
-        let cmd = serde_json::from_str::<J>(json)
-            .ok()
-            .and_then(|r| r["cmd"].as_str().map(String::from))
-            .unwrap_or_default();
-        let load = cmd == "loadXml" || cmd == "loadCode" || cmd == "newBuild";
-        let held = self.typed.is_some();
-        if !self.has_translation() || held || load {
-            self.typed_error = None;
-        }
+        self.typed_error = None;
         self.typed_answered = false;
         if let Some(r) = self.typed_request(json) {
             self.typed_answered = true;
             return Ok(r);
         }
-        if (held || load) && self.prefer == Prefer::Typed && self.has_translation() {
-            let why = self
-                .typed_error
-                .clone()
-                .unwrap_or_else(|| format!("{cmd}: not typed"));
-            self.fallbacks.push((cmd, why));
-        }
-        self.sync()?.map_or_else(|| self.fallback(json), Ok)
-    }
-
-    /// Replays the queued requests on the translation; an error response
-    /// stops it, the rest stays queued
-    #[cfg(feature = "translation")]
-    fn sync(&mut self) -> Result<Option<String>, String> {
-        let Some(translated) = &self.translated else {
-            return Ok(None);
-        };
-        while let Some(req) = self.pending.first() {
-            let r = translated.request(req)?;
-            if r.starts_with("{\"error\"") {
-                return Ok(Some(r));
-            }
-            self.pending.remove(0);
-        }
-        Ok(None)
-    }
-
-    #[cfg(not(feature = "translation"))]
-    fn sync(&mut self) -> Result<Option<String>, String> {
-        Ok(None)
-    }
-
-    fn fallback(&mut self, json: &str) -> Result<String, String> {
-        let req = serde_json::from_str::<J>(json).unwrap_or_default();
-        let cmd = req["cmd"].as_str().map(String::from);
-        #[cfg(feature = "translation")]
-        if let Some(translated) = &self.translated {
-            // A gem slot's list leaves its calculations' selections on the
-            // gems
-            let gem_slot = cmd.as_deref() == Some("gemList") && !req["group"].is_null();
-            if gem_slot || !cmd.as_deref().is_some_and(|c| READ_ONLY.contains(&c)) {
-                self.typed = None;
-                self.shared_known = false;
-            }
-            return translated.request(json);
-        }
+        let cmd = serde_json::from_str::<J>(json)
+            .ok()
+            .and_then(|r| r["cmd"].as_str().map(String::from));
         Ok(self.not_ported(cmd.as_deref().unwrap_or("?")))
     }
 
-    /// The error of a command the typed engine did not answer, on a
-    /// session without the translation
+    /// The error of a command the typed engine did not answer
     fn not_ported(&self, cmd: &str) -> String {
         let msg = match &self.typed_error {
             Some(e) => format!("{cmd}: {e}"),
-            None if self.typed.is_none() && self.data.is_some() => {
+            None if self.typed.is_none() => {
                 format!("{cmd}: no build is open")
             }
             None => format!("{NOT_PORTED}: {cmd}"),
@@ -255,10 +108,7 @@ impl<'d> Dispatcher<'d> {
 
     /// The typed engine's answer, where it has one
     fn typed_request(&mut self, json: &str) -> Option<String> {
-        if self.prefer != Prefer::Typed {
-            return None;
-        }
-        let data = self.data?;
+        let data = self.data;
         let req: J = serde_json::from_str(json).ok()?;
         let name = req["name"].as_str();
         // main:OnFrame gives input to the front popup alone
@@ -760,8 +610,7 @@ impl<'d> Dispatcher<'d> {
         }
     }
 
-    /// A view of the typed build; one it cannot give comes from the
-    /// translation, with the reason kept
+    /// A view of the typed build; why it cannot give one is kept
     fn view(&mut self, r: crate::typed::Result<J>) -> Option<String> {
         match r {
             Ok(v) => Some(ok(v)),
@@ -773,59 +622,35 @@ impl<'d> Dispatcher<'d> {
         }
     }
 
-    /// A request that changes the typed build: queued for the translation.
-    /// A typed edit that fails leaves the build to the translation.
+    /// A request that changes the typed build, recorded for a reference
+    /// session with `record_replays`. A typed edit that fails leaves the
+    /// build as far as the edit got.
     fn edit(
         &mut self,
         json: &str,
         f: impl FnOnce(&mut TypedSession<'d>) -> crate::typed::Result<J>,
     ) -> Option<String> {
-        // What the translation replays, as the build was before
+        // What a reference replays, as the build was before
         let replay = serde_json::from_str::<J>(json)
             .ok()
-            .and_then(|req| self.typed.as_ref()?.translation_replay(&req));
+            .and_then(|req| self.typed.as_ref()?.reference_replay(&req));
         let r = f(self.typed.as_mut()?);
         match r {
-            // The translation fails the same way, before changing the build
+            // Upstream fails the same way, before changing the build
             Err(e) if e.starts_with(UPSTREAM_ERROR) => Some(upstream_error(&e)),
             Ok(v) => {
-                #[cfg(feature = "translation")]
-                if self.translated.is_some()
-                    && let Some(r) = &replay
-                {
-                    self.pending.push(r.to_string());
-                }
                 if self.record_replays
-                    && let Some(r) = &replay
+                    && let Some(r) = replay
                 {
                     self.replays.push(Replay::Edit(r.to_string()));
                 }
-                let _ = &replay;
-                let _ = json;
                 Some(ok(v))
             }
             Err(e) => {
-                // Without the translation the build stays, as far as the
-                // edit got
-                if self.has_translation() {
-                    self.typed = None;
-                    self.shared_known = false;
-                }
                 self.typed_error = Some(e);
                 None
             }
         }
-    }
-
-    /// The translation's shared item list and item sets
-    fn translated_shared(&mut self) -> Option<J> {
-        #[cfg(feature = "translation")]
-        if self.translated.is_some() {
-            let r = self.translated_request(r#"{"cmd":"sharedLists"}"#).ok()?;
-            let v: J = serde_json::from_str(&r).ok()?;
-            return Some(v["ok"].clone());
-        }
-        None
     }
 
     fn load(
@@ -860,36 +685,19 @@ impl<'d> Dispatcher<'d> {
                     s.keep_popups(prev);
                     s.keep_shared(prev);
                 } else if !self.shared_known {
-                    // The translation held the builds since: its lists
-                    match self.translated_shared().map(|v| s.set_shared(&v)) {
-                        Some(Ok(())) => self.shared_known = true,
-                        _ => s.forget_shared(),
-                    }
+                    // A reference session held the builds since: their
+                    // lists, until it gives them (`set_shared`)
+                    s.forget_shared();
                 }
                 self.typed = Some(s);
-                // A load replaces whatever the queued requests did to the
-                // build; the popups and the shared lists outlive it, so
-                // requests that may have changed them reach the translation
-                #[cfg(feature = "translation")]
-                if self.translated.is_some() {
-                    if self.pending.iter().any(|r| outlives_build(r)) {
-                        let _ = self.sync();
-                    }
-                    self.pending = vec![json.to_string()];
-                }
                 if self.record_replays {
                     self.replays.push(Replay::Load(json.to_string()));
                 }
-                let _ = json;
                 Some(ok(json!([])))
             }
             Err(e) => {
-                // Without the translation the open build stays, so a load
-                // can be retried once missing data files are added
-                if self.has_translation() {
-                    self.typed = None;
-                    self.shared_known = false;
-                }
+                // The open build stays, so a load can be retried once
+                // missing data files are added
                 self.typed_error = Some(e);
                 None
             }
@@ -905,7 +713,7 @@ fn view(error: &mut Option<String>, r: crate::typed::Result<J>) -> Option<String
     }
 }
 
-/// The error response the translation gives, of an [`UPSTREAM_ERROR`]
+/// The error response upstream gives, of an [`UPSTREAM_ERROR`]
 fn upstream_error(e: &str) -> String {
     json!({ "error": &e[UPSTREAM_ERROR.len()..] }).to_string()
 }

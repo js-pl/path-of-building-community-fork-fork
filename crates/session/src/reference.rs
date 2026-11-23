@@ -1,69 +1,30 @@
 //! [`Session`]: upstream's build session behind the engine API's JSON
 //! requests, as a reference for the typed engine: upstream on the oracle's
-//! LuaJIT (`oracle/session.lua`, in a process of its own) or, with the
-//! `translation` feature, upstream's translated program in this process.
+//! LuaJIT (`oracle/session.lua`, in a process of its own).
 
-#[cfg(feature = "translation")]
-use lua::Value;
-#[cfg(feature = "translation")]
-use lua::rt::{self, first};
 use std::cell::RefCell;
-#[cfg(feature = "translation")]
-use std::rc::Rc;
-#[cfg(feature = "translation")]
-use upstream::host::Host;
 
 /// A running build session.
 pub struct Session {
-    pub(crate) inner: Inner,
-}
-
-pub(crate) enum Inner {
-    #[cfg(feature = "translation")]
-    Translated { host: Rc<Host>, handle: Value },
-    /// `oracle/session.lua`: the same session on upstream on LuaJIT, in a
-    /// process of its own
-    #[cfg(not(target_arch = "wasm32"))]
-    Oracle(RefCell<oracle::Process>),
+    process: RefCell<oracle::Process>,
 }
 
 impl Session {
-    /// The same session on the oracle (`oracle/session.lua` on upstream at
+    /// The session on the oracle (`oracle/session.lua` on upstream at
     /// `src`, on the LuaJIT `oracle/setup.sh` builds), with an empty build
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn oracle(src: &std::path::Path) -> Result<Session, String> {
         Ok(Session {
-            inner: Inner::Oracle(RefCell::new(oracle::Process::start(src)?)),
+            process: RefCell::new(oracle::Process::start(src)?),
         })
     }
 
     /// Answers one JSON request with a JSON response: `{"ok": ...}` or
     /// `{"error": "..."}`. `Err` only when the request could not be run.
     pub fn request(&self, json: &str) -> Result<String, String> {
-        match &self.inner {
-            #[cfg(feature = "translation")]
-            Inner::Translated { handle, .. } => {
-                let r = rt::call(handle, &[Value::Str(json.as_bytes().into())])
-                    .map_err(|e| crate::translated::describe(&e))?;
-                Ok(String::from_utf8_lossy(lua::to_string(&first(r)).as_bytes()).into_owned())
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            Inner::Oracle(p) => p.borrow_mut().request(json),
-        }
-    }
-
-    /// The translated program's host; `None` on the oracle
-    #[cfg(feature = "translation")]
-    pub fn host(&self) -> Option<&Rc<Host>> {
-        match &self.inner {
-            Inner::Translated { host, .. } => Some(host),
-            #[cfg(not(target_arch = "wasm32"))]
-            Inner::Oracle(_) => None,
-        }
+        self.process.borrow_mut().request(json)
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 mod oracle {
     use std::io::{BufRead, BufReader, Write};
     use std::path::{Path, PathBuf};

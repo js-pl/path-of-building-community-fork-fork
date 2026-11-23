@@ -159,10 +159,10 @@ impl<'d> TypedSession<'d> {
         self.refresh_item_popups();
     }
 
-    /// What the translation replays of a request the typed session ran:
+    /// What a reference session replays of a request the typed session ran:
     /// the request, nothing (what it cannot do: the file system, leaving
     /// the build, the help file), or the closing of its popup
-    pub fn translation_replay(&self, req: &J) -> Option<J> {
+    pub fn reference_replay(&self, req: &J) -> Option<J> {
         let click = req["click"].as_bool() == Some(true);
         let top = self.editor.popups.first();
         match (req["cmd"].as_str(), req["path"].as_str()) {

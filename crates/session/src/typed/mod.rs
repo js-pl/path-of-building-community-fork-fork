@@ -1,7 +1,7 @@
 //! The engine API on the typed engine: a build loaded with
 //! `engine::build`, calculated with `engine::calcs`, and the commands
-//! ported so far answered from it with the JSON the translated session
-//! (`oracle/api.lua`) gives. [`crate::Engine`] picks per command.
+//! ported so far answered from it with the JSON upstream's session
+//! (`oracle/api.lua`) gives.
 
 mod build_controls;
 mod calcs;
@@ -69,11 +69,11 @@ use std::collections::HashMap;
 
 pub use sidebar::Controls;
 
-/// A command the typed engine cannot answer yet; the caller falls back
-/// to the translation
+/// A command the typed engine cannot answer yet: the dispatcher's
+/// error
 pub const NOT_PORTED: &str = "not ported";
 
-/// Starts an error the translation answers the same request with: the
+/// Starts an error upstream answers the same request with: the
 /// dispatcher answers it as the request's error, keeping the typed build
 pub const UPSTREAM_ERROR: &str = "upstream error: ";
 
@@ -249,7 +249,7 @@ impl TypedData {
     }
 }
 
-/// What the translated session's UI state holds that the build does not:
+/// What upstream's UI state holds that the build does not:
 /// open popups, the unsaved flag and the output revision
 #[derive(Clone, Debug)]
 pub struct Ui {
@@ -297,7 +297,7 @@ pub struct TypedSession<'d> {
     /// Items added since the slots' lists were last populated, which
     /// those lists (`slot.items`) do not offer yet
     unlisted_items: Vec<f64>,
-    /// The shared item list and item sets (`None`: the translation's)
+    /// The shared item list and item sets (`None`: a reference session's)
     shared: Option<shared_lists::SharedLists>,
     /// The shared item list's selection
     shared_sel: shared_lists::ListSel,
@@ -521,7 +521,7 @@ fn array_len<'a>(keys: impl Iterator<Item = &'a String>) -> Option<usize> {
     (n > 0 && !(max > 10 && max > n * 2)).then_some(max)
 }
 
-/// An actor's output as the translated session writes it: gems and items
+/// An actor's output as upstream's session writes it: gems and items
 /// by name
 fn output(out: &engine::calcs::Output) -> J {
     object(

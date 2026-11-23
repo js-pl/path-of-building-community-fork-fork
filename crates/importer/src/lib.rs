@@ -5,7 +5,6 @@
 //! `Data.lua` does on top of them is ported in the engine.
 
 pub mod eval;
-pub mod luagen;
 pub mod mod_parser;
 pub mod portgen;
 

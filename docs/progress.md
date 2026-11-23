@@ -6,10 +6,10 @@ again. The design is in `docs/design.md` (phase 7); this file is the state.
 ## Handoff
 
 The typed engine answers the whole engine API the web app and the tests use,
-and upstream itself is the reference: the translation is being deleted in
-the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
-(1 to 7 merged; 8, the deletion itself, is next: the owner confirmed it on
-2026-11-15). To pick the work up:
+and upstream itself is the only reference: the translation of upstream's
+program is deleted (the sub-steps of
+[drop-translation.md](drop-translation.md#step-4-in-sub-steps)). To pick
+the work up:
 
 1. `git submodule update --init --depth 50` (the upstream submodule) and
    `oracle/setup.sh` (LuaJIT and its rocks into `.oracle/`, for every test
@@ -19,11 +19,9 @@ the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
    `tests/oracle`), the variant families (`oracle_variants`), calculator
    overrides (`calculator`), items, trees and the game data (`item`,
    `tree`, `game_data`), the mod parser and the data tables.
-3. `SESSION_REFERENCE=oracle cargo test --release -p session --test typed`
-   runs the session test against upstream's own session
-   (`oracle/session.lua`), as CI does; `SESSION_PHASES=calcs,tree` limits
-   it to some of its 16 phases. Without `SESSION_REFERENCE` it compares
-   with the translation, *until sub-step 8*.
+3. `cargo test --release -p session --test typed` runs the session test
+   against upstream's own session (`oracle/session.lua`), as CI does;
+   `SESSION_PHASES=calcs,tree` limits it to some of its 16 phases.
 4. Upstream to sync with: the `sync` skill (`.claude/skills/sync/SKILL.md`).
 
 ## State
@@ -36,12 +34,11 @@ the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
   `initEnv`, `perform` with breakdowns, triggers and mirages, Full DPS, the
   sidebar and the Calcs tab, tooltips, node, item, gem and anoint power,
   party, notes, and the item, skill, tree and config sets. The shipped
-  wasm module (2 MB gzipped) holds no translation and no Lua interpreter.
+  wasm module (2 MB gzipped) holds no Lua interpreter.
 - **Reference.** The oracle only: `tests/oracle` (whole builds, mod parser,
   data) and the live `oracle/session.lua` (sessions of edits, variant
   builds, calculator overrides, upstream's tables), see
-  `oracle/README.md`. No equivalence test uses the translation any more;
-  the session test's local default does until sub-step 8. Retired tests
+  `oracle/README.md`. Retired tests
   and the argument for each are in
   [drop-translation.md](drop-translation.md#retired-tests).
 - **Known upstream quirks** the tests compare around: answers in `pairs`
@@ -54,8 +51,8 @@ the sub-steps of [drop-translation.md](drop-translation.md#step-4-in-sub-steps)
 - **Not ported**: see [Not ported yet](#not-ported-yet). Each case is a
   `not ported: ...` error, which the tests count as a skip or, in the
   session test, fail on unless listed in `KNOWN_FALLBACKS` (today only
-  cases where upstream itself fails, and one alignment of the
-  translation's shared state).
+  cases where upstream itself fails, and one alignment of upstream's
+  shared state on a fresh oracle session).
 
 ## History
 
@@ -501,7 +498,7 @@ What remains for the full migration, in order:
    `clearInputText` leaves `actor.modDB`). `party_controls_match`
    changes them at random on party builds (about 260 edits) and compares
    the tab, sidebar, outputs, a control's tooltip and the saved file.
-   Downloading a linked build stays on the translation. The Tree tab's
+   Downloading a linked build is not ported. The Tree tab's
    controls that open no popup are typed (`typed/tree_tab.rs`): the
    search (saved as `TreeView`'s `searchStr`; one other than the saved
    leaves the build unsaved, as `Build:OnFrame` counts
@@ -568,7 +565,7 @@ What remains for the full migration, in order:
    keystone, from the tree or the legion keystones; an Abyss ascendancy
    notable, the legion node; a protected notable, the tree's) are
    `AddNodeTooltip(..., returnEarly)` of the node's data. The trade URL
-   stays on the translation, and so does Militant Faith's item while a devotion variant is Any (upstream picks
+   is not ported, and neither is Militant Faith's item while a devotion variant is Any (upstream picks
    one at random). Against the oracle, a row tooltip's node names and the
    results list are compared unordered (the `pairs` order of the tree
    data's string keys orders the radius, and with it the order weights
@@ -649,17 +646,18 @@ What remains for the full migration, in order:
    and change nothing (`tab_controls_behind_a_popup_fail`); the web UI's
    popups cover the tabs and always offer Cancel (`closePopup`).
 
-   A typed error starting with `UPSTREAM_ERROR` is one the translation
-   answers the same request with (`no node <id>` of `clickNode`,
+   A typed error starting with `UPSTREAM_ERROR` is one upstream answers
+   the same request with (`no node <id>` of `clickNode`,
    `nodePath` and `nodeTooltip`): the dispatcher answers it as the
    request's error and keeps the typed build.
 
-   The dispatcher records each request the typed engine gave to the
-   translation while it held the build (`Dispatcher::fallbacks`, with
-   the command and why); `typed_session_matches_translated` prints them
+   The session test records each request the typed engine gave to the
+   reference while it held the build (`Paired::fallbacks`, with the
+   command and why); `typed_session_matches_oracle` prints them
    per phase and fails on any not in its `KNOWN_FALLBACKS`.
 
-   Still on the translation, before it can be dropped:
+   Left to the translation until it was dropped, so `not ported` now (the
+   rest of each area is typed):
    - Read-only views: `controls` of other tabs (also `party.*`).
    - Tooltips in the cases above that fall back.
    - Items and crafting: the item editor's enchant, anoint, corrupt,
@@ -803,7 +801,7 @@ What remains for the full migration, in order:
      first group in a slot of the set used), Craft item... and Create
      custom... (Edit Item Text, empty without an item), and the Manage...
      buttons' descriptions. Trade for these items and Buy similar query
-     the trade site and stay on the translation. Porting them needs
+     the trade site and are not ported. Porting them needs
      network access from the session (upstream's `launch:DownloadPage`,
      asynchronous, with `TradeQueryRateLimiter`'s rate limits and the
      POESESSID the user gives) and the trade API: `api/trade/data/static`
@@ -834,8 +832,8 @@ What remains for the full migration, in order:
      Changes (Cancel, Don't Save, which reports it closed, and Save,
      which saves and reports it closed), and the loadouts' Help >> shows
      the help file's Loadouts section (`help.txt`, which upstream's About
-     popup shows). The translated session cannot do these (file access,
-     leaving the build): the dispatcher replays none of them on it, and
+     popup shows). Upstream's session cannot do these (file access,
+     leaving the build): `session::Paired` replays none of them on it, and
      Save Changes' buttons as the popup's closing. Before that, Manage
      Spectres...: the Spectre Library (`session::typed::spectre_library`,
      `spectre_library_match`) with the build's spectres and all spectres
@@ -867,8 +865,8 @@ What remains for the full migration, in order:
      gets a socket of its colour per gem of the groups socketed in it,
      linked by group, then its abyssal ones) and the imbued support's
      label, box and clear button (`session::typed::skills_sockets`,
-     `skills_sockets_match`); choosing an imbued support by name stays on
-     the translation.
+     `skills_sockets_match`); choosing an imbued support by name is not
+     ported.
      The shown group's gem slots (`session::typed::gem_slots`,
      `skills_gem_slots_match`): the slots the tab has made so far (it
      makes them as groups need them and keeps them), their texts and
@@ -1188,6 +1186,14 @@ What the engine and the session answer `not ported: ...` for, by area
   list, a few edits on groups or trees no longer in their lists, party
   imports that are not plain PathOfBuilding builds, loadouts whose sets
   are not numbered 1 to n.
+- **Left to the translation until it was deleted** (the shipped engine has
+  answered them `not ported` since sub-step 7; the session test leaves
+  them to the oracle through `session::Paired`): `controls` of other tabs,
+  downloading a linked build, the trade URL, Trade for these items and
+  Buy similar (network access), Militant Faith's item while a devotion
+  variant is Any, choosing a gem or an imbued support by name
+  (`GemSelectControl`), the gem slots' quality and enabled boxes'
+  tooltips, the slot after a group's last gem.
 - **Where upstream fails too** (`(upstream fails)`): rebuilding cluster
   subgraphs that shared an id; an enemy level without a monster accuracy.
 
@@ -1234,30 +1240,25 @@ trigger, or a source skill the templates lack).
 
 ## Next
 
-The rest of [the deletion](drop-translation.md#step-4-in-sub-steps)
-(sub-steps 5 to 8), then the sync to upstream's 3.30 (the `sync` skill:
+The sync to upstream's 3.30 (the `sync` skill:
 upstream `dev` is ahead with the 3.30 trees and flask mods), and the open
 work of phase 5 in `docs/design.md` (compare, character import, trade).
 
 ## Shipping the typed engine to the browser
 
-`crates/wasm` and `crates/session` have a `translation` cargo feature, off
-by default in `wasm` (the browser ships the typed engine) and on in
-`session` (the CLI and the tests). Built with it
-(`web/scripts/build-wasm.mjs --translation`), the module holds upstream's
-translated program (`crates/upstream`, the Lua runtime, `lua/session.lua`)
-as the fallback of commands the typed engine does not have yet. Built
-without it (`web/scripts/build-wasm.mjs`, `cargo build -p wasm`), neither
-the translation nor the Lua interpreter is linked, and those commands are `not ported: <cmd>` errors
-(`Dispatcher::typed`, `wasm::has_translation` is 0); a `newBuild` or a
-`loadXml`/`loadCode` opens a build on the typed engine, and the browser
-frontend works for everything the typed session answers (sidebar,
-outputs, Calcs tab and breakdowns, tree edits and geometry, skills,
-items and the item editor, configuration, class drop-downs, undo, save,
-node power): the dispatcher's typed commands are the same in both
-builds. The module opens a new build on start (the typed `newBuild`); its
-file matches the translation's also after a skill is added (the `new`
-phase of `typed_session_matches_translated`).
+The browser ships the typed engine alone (`web/scripts/build-wasm.mjs`,
+`cargo build -p wasm`): no Lua interpreter is linked, and commands the
+typed engine does not have are `not ported: <cmd>` errors
+(`Dispatcher::typed`); a `newBuild` or a `loadXml`/`loadCode` opens a
+build on the typed engine, and the browser frontend works for everything
+the typed session answers (sidebar, outputs, Calcs tab and breakdowns,
+tree edits and geometry, skills, items and the item editor,
+configuration, class drop-downs, undo, save, node power). The module
+opens a new build on start (the typed `newBuild`); its file matches
+upstream's also after a skill is added (the `new` phase of
+`typed_session_matches_oracle`). Until sub-step 7 a `translation` cargo
+feature linked upstream's translated program as the fallback of the
+other commands.
 
 Data no longer goes through Lua at load. `pob bundle <out>` ships the
 typed engine's data in `engine::codec`'s binary form (`session::bundle`):
@@ -1270,13 +1271,7 @@ look-up table (`typed/timeless/<Name>.bin`, upstream's zlib stream, 0.9 to
 them and retries (`session::bundle::decode_timeless`). `tests/bundle.rs`
 in `equivalence` loads a build with each of the 11 jewels on the data
 read from a bundle, adding the files each asks for, and gets the same
-sidebar, outputs and tree as on the data made from source. With
-`pob bundle <out> --lua [build.xml ...]`, the bundle also holds the Lua
-data files the translation reads starting up and loading the given builds,
-and every tree version's Lua data, for an engine built with the
-translation (`build-data.mjs --translation`). `pob serve` answers with
-the typed engine alone too; `--typed` adds the translation as the
-fallback, `--translated` answers everything with the translation.
+sidebar, outputs and tree as on the data made from source. `pob serve` answers with the typed engine alone too.
 
 The frontend takes `not ported` answers as such
 (`isNotPorted` in `web/src/engine/client.ts`, `web/src/ui/NotPorted.tsx`): an edit the engine
@@ -1331,8 +1326,7 @@ the tests align these:
   Cry, Intimidating Cry, Chain Hook, Cleave of Rage, Rage and Blind
   (`canSupport or hasGlobalEffect`) unless they were calculated before.
   The typed engine has the flags as after every skill's first calculation
-  (`engine::data`); `typed_session_matches_translated` primes the
-  translation (`Host::look_up_skill_stats`), `game_data` compares with
+  (`engine::data`); `game_data` compares with
   upstream after the lookups, and
   `vaal_global_effect_matches_after_the_first_calculation` shows the fresh
   process's difference.
@@ -1455,15 +1449,11 @@ the tests align these:
 - Equivalence tests take about 5 minutes each (`cargo test --release -p
   equivalence --test <name>`); `CALCS_FILTER=<substring>` limits the builds
   (`fn-` for the skill variants, whose ids are `fn-<skill>-<part>-<template>`)
-- The translated program keeps about 12 MB of every build it loads (the
-  cycle collector does not free it; not found yet what holds it), next to
-  the 1.6 GB it starts with: a test over hundreds of builds runs them in
-  processes of their own, as `perform.rs` does (`run_builds`), or runs out
-  of memory on CI's 16 GB
+- A test over hundreds of builds runs them in shards, processes of their
+  own with an oracle session each (`testkit::run_shards`)
 - Missing ports return errors starting with `not ported`; the tests count
   them as skips and print the reasons, the quickest list of what to do next
 - Run `cargo fmt --all` last, then `cargo clippy --all-targets -- -D
   warnings` and `sync/check.py`, as CI does
-- Never write into `upstream/PathOfBuilding/src`: it rebuilds the
-  translated crate (about 15 minutes)
+- Never write into `upstream/PathOfBuilding/src`: it is the reference
 - Update `sync/manifest.toml` with every newly ported file

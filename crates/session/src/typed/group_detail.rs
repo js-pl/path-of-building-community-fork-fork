@@ -207,8 +207,8 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `control` of one of the controls; without a group shown their
-    /// handlers fail upstream after the control changed, which is left to
-    /// the translation
+    /// handlers fail upstream after the control changed, which is not
+    /// ported
     pub fn group_detail_control(&mut self, req: &J) -> Result<J> {
         let path = req["path"].as_str().unwrap_or("");
         let Some(uid) = self

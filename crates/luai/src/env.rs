@@ -1,4 +1,4 @@
-//! The global environment of translated code and the parts of LuaJIT's
+//! The global environment of the importer's Lua and the parts of LuaJIT's
 //! standard library upstream uses, with the same semantics.
 
 use lua::pattern::{self, Repl};
@@ -10,7 +10,7 @@ use std::rc::Rc;
 /// Loads a module for `require` that is not loaded yet.
 pub type Loader = Box<dyn Fn(&Rc<Env>, &str) -> LResult<Value>>;
 
-/// Globals of a translated program (Lua's `_G`).
+/// Globals of a Lua program (Lua's `_G`).
 pub struct Env {
     pub globals: TableRef,
     /// `require` falls back to this for names not in `package.loaded`

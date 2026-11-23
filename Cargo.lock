@@ -65,7 +65,6 @@ name = "engine"
 version = "0.0.0"
 dependencies = [
  "lua",
- "luai",
  "rayon",
 ]
 
@@ -77,13 +76,11 @@ dependencies = [
  "gamedata",
  "importer",
  "lua",
- "luai",
  "mimalloc",
  "miniz_oxide",
  "serde_json",
  "session",
  "testkit",
- "upstream",
 ]
 
 [[package]]
@@ -255,11 +252,9 @@ dependencies = [
  "gamedata",
  "importer",
  "lua",
- "luai",
  "miniz_oxide",
  "serde_json",
  "testkit",
- "upstream",
 ]
 
 [[package]]
@@ -297,15 +292,6 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
-
-[[package]]
-name = "upstream"
-version = "0.0.0"
-dependencies = [
- "importer",
- "lua",
- "luai",
-]
 
 [[package]]
 name = "wasm"

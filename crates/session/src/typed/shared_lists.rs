@@ -3,8 +3,8 @@
 //! `SharedItemSetListControl`): lists that outlive the build, filled by
 //! dragging items and item sets onto them (`control` with `dragTo`), and
 //! dragged back onto the build's lists. A typed session hands them to the
-//! next build it loads; once the translation took over they are unknown
-//! (`None`), and the typed session leaves them to it.
+//! next build it loads; once a reference session took over they are
+//! unknown (`None`) until it gives them.
 //!
 //! In sync with upstream `a69391d6daaaea1aaf8054668a094aad88dd7eaa`.
 
@@ -158,7 +158,7 @@ impl<'d> TypedSession<'d> {
         Ok(json!({ "items": items, "sets": sets }))
     }
 
-    /// The shared lists the translation held (its `sharedLists`)
+    /// The shared lists a reference session held (its `sharedLists`)
     pub fn set_shared(&mut self, v: &J) -> Result<()> {
         let item = |v: &J| -> Result<Arc<Item>> {
             let mut item = self.item_from_raw(v["raw"].as_str().ok_or("no raw")?)?;
@@ -192,7 +192,7 @@ impl<'d> TypedSession<'d> {
         Ok(())
     }
 
-    /// The translation held the build: its shared lists are unknown
+    /// A reference session held the build: its shared lists are unknown
     pub fn forget_shared(&mut self) {
         self.shared = None;
     }
