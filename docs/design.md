@@ -129,6 +129,13 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   and are left as a later option.
 - **Frontend** (`web/`, Preact and Vite). Mirrors upstream's tabs and features,
   but uses web-native UI instead of copying the desktop UI pixel by pixel.
+- **The host** (decided in [agent.md](agent.md), being built). A second
+  way to run the app: `pob host`, a local native process, holds the builds
+  on the native engine, serves the web app on `127.0.0.1` and answers its
+  engine requests over a WebSocket, behind the same `call(cmd, args)` the
+  workers answer in `web/src/engine/client.ts`. It keeps the builds'
+  history and serves agents an MCP endpoint. The browser-only way,
+  engine in the workers, stays as it is.
 - **Build history** (`crates/history`, [history.md](history.md)). Every
   version of a build in a git repository of its own, written with the
   installed git; optional, without git nothing is recorded. Its git is
