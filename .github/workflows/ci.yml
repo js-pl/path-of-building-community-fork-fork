@@ -90,6 +90,7 @@ jobs:
             oracle: true
           - name: rest
             filter: 'not (test(=typed_session_matches_oracle) | binary(=oracle_variants) | binary(=calculator) | binary(=build_output) | binary(=bench) | binary(=mod_cache) | binary(=data) | binary(=item) | binary(=tree) | binary(=game_data))'
+            oracle: true
     name: test (${{ matrix.name }})
     env:
       TEST_SHARD_PARTITION: ${{ matrix.shards }}
