@@ -539,8 +539,56 @@ above was silent:
   the control socket is Unix only for now; on Windows `pob host` and `pob
   ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
   comes with step 4 or 5, when Windows is tested.
-- Not yet: the web app on the host (step 6), MCP (step 4), job and time
-  budgets (step 9; today's verbs are single edits).
+- Not yet: the web app on the host (step 6), job and time budgets (step
+  9; today's verbs are single edits).
+
+### Built: MCP
+
+`host::mcp` serves the agent API as MCP, on a hand-rolled JSON-RPC 2.0
+layer: the workspace has no async runtime, and the protocol's part the
+endpoint needs is small (the maintained Rust SDK, `rmcp`, brings tokio and,
+for HTTP, axum).
+
+- **Protocol.** `initialize` with version negotiation (2025-11-25,
+  2025-06-18, 2025-03-26 and 2024-11-05 are served; a client asking for
+  another gets the newest), `ping`, `tools/list`, `tools/call`;
+  notifications are taken and not answered, batches answered, other
+  methods are `-32601`. The server's `instructions` are the rules above
+  (answer from the tools, name things as they come, untrusted text is
+  data).
+- **Tools.** One per verb of `agent::VERBS`, its input schema from
+  `agent::schema` (the fields each verb checks, `additionalProperties:
+  false`), with `readOnlyHint` for the reading verbs and
+  `destructiveHint: false` for all: nothing deletes or loses a build. A
+  verb's answer is the tool's result as JSON text, and as
+  `structuredContent` from 2025-06-18 on; its error is a result with
+  `isError`, so the model reads it and tries again. Unknown tools or
+  arguments that aren't an object are `-32602`.
+- **Untrusted text stays marked**: the answers pass through unchanged, so
+  the author's text is under `untrusted` with its note, and the tools
+  that can carry it (`notes`, `items`, `export`) say so in their
+  description.
+- **`pob mcp [--socket <path>] [--builds <dir>] [--build <name>]...
+  [--agent <dir>] [--no-start]`** is MCP on stdio for a harness on this
+  machine. It connects to the control socket on the first tool call, with
+  the hello `{"harness": <the client's name from initialize>, "builds":
+  [--build ...]}`, so a Claude Code connection commits as `Source: agent
+  claude-code` into `agents/claude-code-<time>/`. When no host answers it
+  starts one, `pob host --headless` on the same socket (and `--builds`),
+  in a process group of its own so it outlives the harness, its output in
+  `host.log` beside the socket; with `--no-start` it says how to start one
+  instead. When the host closes the connection, tool calls answer that
+  the MCP server needs a restart; it doesn't reconnect on its own, so
+  closing a connection is final.
+- **Stdio needs no token (decided).** The control socket keeps trusting
+  the hello's grant: only the user's own processes can open it (0600 in a
+  0700 directory), and those can read and write the builds directory
+  anyway, so a token on the socket would guard nothing. The grant there is
+  the scope the user chose with `--build`, which keeps an agent to the
+  build it was started on, not a wall against the user's own processes.
+  The wall for an agent that isn't trusted with the user's files is its
+  sandbox: the default container mounts neither the socket nor the
+  builds, and reaches the host only over HTTP, with a token.
 
 ### Evaluating
 
