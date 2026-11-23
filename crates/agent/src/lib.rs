@@ -17,6 +17,7 @@
 //! answers are JSON values, so any transport (the control socket, MCP)
 //! can carry them.
 
+mod evaluate;
 pub mod grant;
 mod read;
 pub mod schema;
@@ -59,6 +60,10 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "search",
         "nodes, gems, uniques, bases or config options by name or text",
+    ),
+    (
+        "evaluate_item",
+        "an item (pasted text or an id from `items`) in a slot, evaluated exactly on a copy of the build, and the mod weights of the slot; changes nothing",
     ),
     ("history", "the build's last versions"),
     ("changes_since", "the changes after a version"),
@@ -189,6 +194,11 @@ impl<'d, S: Store> Agent<'d, S> {
         let build = req.get("build").and_then(J::as_str);
         match verb {
             "builds" => self.builds(grant),
+            "evaluate_item" => {
+                let id = grant.resolve(build)?;
+                let name = grant.api_name(&id);
+                self.evaluate_item(&id, name, req)
+            }
             "copy" => self.copy(grant, req),
             "import" => self.import(grant, req),
             "summary" | "tree" | "skills" | "items" | "config" | "notes" | "export" | "search"

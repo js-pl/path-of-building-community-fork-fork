@@ -680,7 +680,7 @@ fn custom_mods(s: &mut Dispatcher) -> R<Vec<(String, String)>> {
 
 /// The lines of an item the engine understood, as it reads them; how many
 /// it didn't
-fn engine_lines(item: &Item) -> (Vec<String>, usize) {
+pub(crate) fn engine_lines(item: &Item) -> (Vec<String>, usize) {
     let mut lines = Vec::new();
     let mut unparsed = 0;
     let groups: [(&str, &Vec<ModLine>); 5] = [
