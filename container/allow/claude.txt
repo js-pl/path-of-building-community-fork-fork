@@ -1,0 +1,9 @@
+# Claude Code: its API and its login (claude.ai and the Console).
+# Telemetry, error reports and updates are off in the container
+# (CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, DISABLE_AUTOUPDATER), so their
+# hosts aren't here. More with `pob agent claude --allow <host>`.
+api.anthropic.com
+claude.ai
+claude.com
+platform.claude.com
+console.anthropic.com

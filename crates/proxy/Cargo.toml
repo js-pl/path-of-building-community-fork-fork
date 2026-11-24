@@ -1,0 +1,13 @@
+# Self-contained (nothing from the workspace), so `pob agent` can build it
+# alone in the default container's build stage
+[package]
+name = "proxy"
+description = "pob-proxy: the default agent container's way out, an HTTPS allowlist and the route to the host's MCP endpoint"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "pob-proxy"
+path = "src/main.rs"
