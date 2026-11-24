@@ -50,7 +50,7 @@ cd web
 npm install
 npm run build:wasm   # public/engine.wasm, the typed engine
 npm run build:data   # public/data, generated from the submodule, never committed
-npm run build:art    # public/art, the tree's sprite sheets from the submodule, never committed (optional)
+npm run build:art    # public/art, the tree's sprite sheets from the submodule, never committed (npm run build runs it too)
 npm run dev
 npm test             # the wasm engine against the native one, `pob serve` (cargo build --release -p cli first)
 ```
@@ -59,7 +59,7 @@ The web app on `pob host`, with the builds and their history on disk and
 agents beside you (see [docs/agent.md](docs/agent.md)):
 
 ```sh
-(cd web && npm install && npm run build)   # web/dist; build:art first for the tree's art
+(cd web && npm install && npm run build)   # web/dist, with the tree's art when the submodule is checked out
 cargo run --release -p cli -- host          # serves it on 127.0.0.1:8730 and opens the browser
 target/release/pob agents install --build <build>   # Claude Code or Codex beside you
 ```

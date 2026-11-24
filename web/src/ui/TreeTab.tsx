@@ -69,6 +69,8 @@ export function TreeTab({ act, rev }: TabProps) {
   const [art, setArt] = useState<Art | null>(null);
   // Counts the art's sheets as they load
   const [artTick, setArtTick] = useState(0);
+  // No art for this version: old trees, or a web app built without build:art
+  const [artMissing, setArtMissing] = useState(false);
   const [hover, setHover] = useState<{ node: TreeNode; x: number; y: number; r: number } | null>(null);
   const [tip, setTip] = useState<{ id: number; lines: TooltipLine[] } | null>(null);
   const [path, setPath] = useState<Set<number>>(new Set());
@@ -118,7 +120,12 @@ export function TreeTab({ act, rev }: TabProps) {
   useEffect(() => {
     if (!version) return;
     let stale = false;
-    loadArt(version, () => setArtTick((t) => t + 1)).then((a) => !stale && setArt(a));
+    setArtMissing(false);
+    loadArt(version, () => setArtTick((t) => t + 1)).then((a) => {
+      if (stale) return;
+      setArt(a);
+      setArtMissing(!a);
+    });
     return () => {
       stale = true;
     };
@@ -453,6 +460,14 @@ export function TreeTab({ act, rev }: TabProps) {
           <span class="spinner" /> {tree ? "Calculating node power" : "Loading tree"}
         </div>
         {power ? <PowerLegend combined={power.combined} /> : null}
+        {artMissing ? (
+          <div class="art-missing" title="The web app was built without the tree's art (npm run build:art), or this tree version has none">
+            No tree art for {version?.replace(/_/g, ".")}: showing plain nodes
+            <button class="ghost small" title="Hide" onClick={() => setArtMissing(false)}>
+              ✕
+            </button>
+          </div>
+        ) : null}
       </div>
       {showTip ? <FloatingTooltip lines={tip!.lines} x={hover!.x} y={hover!.y} gap={hover!.r} /> : null}
       {mastery ? (
