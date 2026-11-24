@@ -340,7 +340,7 @@ pub fn input_schema(verb: &str) -> Option<J> {
             }),
             &[],
         ),
-        "undo" => (json!({ "build": build(), "expect": expect() }), &[]),
+        "undo" | "redo" => (json!({ "build": build(), "expect": expect() }), &[]),
         "restore" => (
             json!({
                 "build": build(),

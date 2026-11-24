@@ -108,6 +108,10 @@ pub const VERBS: &[(&str, &str)] = &[
     ("select_set", "the active tree, skill, item or config set"),
     ("apply", "several changes as one step"),
     ("undo", "undoes the build's last step"),
+    (
+        "redo",
+        "applies again the step the last undo took back; any new change clears what can be redone",
+    ),
     ("restore", "a version from the history, as a new version"),
     ("copy", "copies a build into the agent directory"),
     (
@@ -125,11 +129,15 @@ struct Open<'d> {
     version: u64,
     /// The steps that can be undone, oldest first
     undo: Vec<Undo>,
+    /// The steps undone that can be applied again, the last undone last;
+    /// each holds the XML with the step. Any new change clears it.
+    redo: Vec<Undo>,
     /// Each change since the build was opened
     changes: Vec<Change>,
 }
 
-/// A step that can be undone: the XML before it, its label and who made it
+/// A step that can be undone: the XML before it (or, to redo, with it),
+/// its label and who made it
 struct Undo {
     xml: String,
     label: String,
@@ -314,6 +322,7 @@ impl<'d, S: Store> Agent<'d, S> {
                     xml,
                     version: 0,
                     undo: Vec::new(),
+                    redo: Vec::new(),
                     changes: Vec::new(),
                 },
             );

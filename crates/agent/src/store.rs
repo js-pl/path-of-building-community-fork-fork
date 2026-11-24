@@ -44,6 +44,8 @@ pub struct Step {
     pub agent: String,
     /// A restore of an earlier version
     pub restore: bool,
+    /// A step undone before, applied again
+    pub redo: bool,
     pub trailers: Vec<(String, String)>,
 }
 
@@ -107,6 +109,8 @@ impl MemStore {
     fn push(&mut self, id: &BuildId, xml: &str, step: &Step) -> Option<String> {
         let source = if step.restore {
             "restore".to_string()
+        } else if step.redo {
+            "redo".to_string()
         } else {
             format!("agent {}", step.agent)
         };
@@ -171,6 +175,7 @@ impl Store for MemStore {
             label: label.into(),
             agent: String::new(),
             restore: false,
+            redo: false,
             trailers: Vec::new(),
         };
         // Committed at once: memory has nothing to coalesce

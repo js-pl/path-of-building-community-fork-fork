@@ -455,6 +455,132 @@ fn author_text_only_where_marked(d: &'static TypedData) {
     assert!(!trusted(&x).contains(MARK));
 }
 
+/// The build's XML as the session saves it
+fn xml_of(a: &mut Agent<MemStore>) -> String {
+    let r = a.engine(&BuildId::user("RF"), &json!({ "cmd": "saveXml" }));
+    r["ok"]["xml"].as_str().unwrap().to_string()
+}
+
+/// A UI command (the engine API) on RF
+fn ui(a: &mut Agent<MemStore>, req: J) -> J {
+    let r = a.engine(&BuildId::user("RF"), &req);
+    assert!(r.get("error").is_none(), "{req}: {r}");
+    r["ok"].clone()
+}
+
+/// Undo and redo mirror each other across sources: a redo applies the
+/// step the last undo took back, whoever made it, as a new version with
+/// its label; several undos give several redos; a new change clears them
+fn undo_and_redo_across_sources(d: &'static TypedData) {
+    let mut a = agent(d, corpus(BUILD));
+    let g = grant();
+    let id = BuildId::user("RF");
+    let x0 = xml_of(&mut a);
+    let step = ok(&mut a, &g, json!({ "verb": "allocate", "nodes": [36634] }));
+    let agent_label = step["label"].as_str().unwrap().to_string();
+    let x1 = xml_of(&mut a);
+    ui(
+        &mut a,
+        json!({ "cmd": "control", "path": "build.characterLevel", "text": "90" }),
+    );
+    let x2 = xml_of(&mut a);
+    assert_ne!(x1, x2);
+    assert!(err(&mut a, &g, json!({ "verb": "redo" })).contains("nothing to redo"));
+
+    // The UI undoes the user's edit, the agent its own step
+    ui(&mut a, json!({ "cmd": "undo" }));
+    assert_eq!(xml_of(&mut a), x1);
+    ok(&mut a, &g, json!({ "verb": "undo" }));
+    assert_eq!(xml_of(&mut a), x0);
+    let s = a.steps(&id).unwrap();
+    let redo: Vec<&str> = s["redo"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["source"].as_str().unwrap())
+        .collect();
+    // The last undone first
+    assert_eq!(redo, ["agent test", "user"], "{s}");
+
+    // The UI redoes the agent's step, the agent the user's edit
+    let r = ui(&mut a, json!({ "cmd": "redo" }));
+    assert_eq!(r["label"], format!("redo {agent_label}"), "{r}");
+    assert_eq!(xml_of(&mut a), x1);
+    let log = a.store().log(&id, 1).unwrap();
+    assert_eq!(log[0].source, "redo");
+    assert_eq!(log[0].label, agent_label);
+    assert!(
+        log[0]
+            .trailers
+            .contains(&("Redone-By".to_string(), "user".to_string())),
+        "{:?}",
+        log[0]
+    );
+    let r = ok(&mut a, &g, json!({ "verb": "redo" }));
+    assert!(
+        r["label"]
+            .as_str()
+            .unwrap()
+            .starts_with("redo build.characterLevel"),
+        "{r}"
+    );
+    assert_eq!(xml_of(&mut a), x2);
+    assert!(err(&mut a, &g, json!({ "verb": "redo" })).contains("nothing to redo"));
+    // Undone again, a redone step is its maker's
+    let s = a.steps(&id).unwrap();
+    assert_eq!(s["steps"][0]["source"], "user", "{s}");
+    assert_eq!(s["steps"][1]["source"], "agent test", "{s}");
+
+    // Any new change clears what can be redone: the UI's, an agent's, a restore
+    for clear in ["ui", "agent", "restore"] {
+        ok(&mut a, &g, json!({ "verb": "undo" }));
+        assert_eq!(a.steps(&id).unwrap()["redo"].as_array().unwrap().len(), 1);
+        match clear {
+            "ui" => {
+                ui(
+                    &mut a,
+                    json!({ "cmd": "control", "path": "build.characterLevel", "text": "80" }),
+                );
+            }
+            "agent" => {
+                ok(&mut a, &g, json!({ "verb": "set_level", "level": 70 }));
+            }
+            _ => {
+                let v = a
+                    .store()
+                    .log(&id, 50)
+                    .unwrap()
+                    .last()
+                    .unwrap()
+                    .version
+                    .clone();
+                ok(&mut a, &g, json!({ "verb": "restore", "version": v }));
+            }
+        }
+        assert!(
+            err(&mut a, &g, json!({ "verb": "redo" })).contains("nothing to redo"),
+            "{clear}"
+        );
+    }
+
+    // `changes_since` and the events name the redos
+    let c = ok(&mut a, &g, json!({ "verb": "changes_since", "version": 0 }));
+    let labels: Vec<&str> = c["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["label"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        labels.iter().filter(|l| l.starts_with("redo ")).count(),
+        2,
+        "{c}"
+    );
+    let events = a.take_events();
+    assert_eq!(events.len(), labels.len());
+    assert!(events.windows(2).all(|w| w[0].version + 1 == w[1].version));
+}
+
 #[test]
 fn verbs() {
     let d = data();
@@ -465,4 +591,5 @@ fn verbs() {
     items_and_config(d);
     agent_directories(d);
     author_text_only_where_marked(d);
+    undo_and_redo_across_sources(d);
 }

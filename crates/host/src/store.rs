@@ -102,6 +102,8 @@ impl FsStore {
     fn save(&mut self, id: &BuildId, xml: &str, step: &Step) -> Result<Option<String>> {
         let source = if step.restore {
             Source::Restore
+        } else if step.redo {
+            Source::Redo
         } else {
             Source::Agent(step.agent.clone())
         };

@@ -152,6 +152,7 @@ fn without_git_the_files_are_still_written() {
         label: "import".into(),
         agent: "t".into(),
         restore: false,
+        redo: false,
         trailers: vec![],
     };
     let id = BuildId::agent("a", "x");
