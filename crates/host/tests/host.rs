@@ -72,6 +72,7 @@ fn host_on_the_control_socket() {
 
     let store = FsStore::new(&builds, Some(git.clone()));
     let s = socket.clone();
+    let rf = builds.join("RF");
     let store = serve(d, store, &socket, move || {
         let mut c = local::Client::connect(
             &s,
@@ -86,7 +87,7 @@ fn host_on_the_control_socket() {
         // Committed before the answer came
         let log = std::process::Command::new("git")
             .args(["-C"])
-            .arg(s.parent().unwrap().parent().unwrap().join("builds/RF"))
+            .arg(&rf)
             .args(["log", "-1", "--format=%h %s%n%b"])
             .output()
             .unwrap();
