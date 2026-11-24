@@ -1281,7 +1281,7 @@ Each one a PR, as usual:
    #197); the Windows named pipe came with step 5.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
    Linux, macOS and Windows; the control socket's named pipe on Windows.
-   Done (#207, #200, #212); tested on Linux, macOS and Windows not yet.
+   Done (#207, #200, #215); tested on Linux, macOS and Windows not yet.
 6. The web app on the host: the host serves it, the WebSocket transport in
    `client.ts`, change events, the undo list with sources, the history
    with restore, the agent directories with keep and clean. Done
