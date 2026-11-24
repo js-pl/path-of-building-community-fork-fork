@@ -10,6 +10,7 @@ publish.workspace = true
 [dependencies]
 agent = { path = "../agent" }
 history = { path = "../history" }
+settings = { path = "../settings" }
 session = { path = "../session", default-features = false }
 serde_json.workspace = true
 # TLS for MCP over HTTP off loopback, with ring for tokens' randomness and hashes

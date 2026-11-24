@@ -13,6 +13,7 @@ import { ImportTab, loadFromHash } from "./ui/ImportTab";
 import { PopupView } from "./ui/Popup";
 import { HistoryTab } from "./ui/HistoryTab";
 import { AgentsTab } from "./ui/AgentsTab";
+import { OptionsDialog } from "./ui/OptionsDialog";
 import type { SetControl } from "./ui/Control";
 
 export const engine = new Engine();
@@ -44,6 +45,7 @@ export function App() {
   }, [notice]);
   const [rev, setRev] = useState(0);
   const [tab, setTab] = useState<Tab>("Tree");
+  const [options, setOptions] = useState(false);
   const [busy, setBusy] = useState(false);
   // Only a slow edit shows the busy bar, so quick ones never flicker
   const [showBusy, setShowBusy] = useState(false);
@@ -126,7 +128,8 @@ export function App() {
       <header class="topbar">
         <span class="title" title={state.name}>
           {state.name}
-          {state.unsaved ? <span class="unsaved" title="Unsaved changes" /> : null}
+          {/* On the host every edit is saved at once */}
+          {state.unsaved && !engine.hosted ? <span class="unsaved" title="Unsaved changes" /> : null}
         </span>
         <nav class="tabs" role="tablist">
           {tabs.map((t) => (
@@ -135,6 +138,11 @@ export function App() {
             </button>
           ))}
         </nav>
+        {engine.hosted ? (
+          <button class="ghost options-button" onClick={() => setOptions(true)}>
+            Options
+          </button>
+        ) : null}
         <div class={"busy-bar" + (showBusy ? " shown" : "")} aria-hidden={!showBusy} />
       </header>
       <aside class="sidebar">
@@ -171,6 +179,7 @@ export function App() {
         {tab === "Agents" ? <AgentsTab {...props} /> : null}
       </main>
       {state.popups.length ? <PopupView popup={state.popups[0]} act={act} /> : null}
+      {options ? <OptionsDialog onClose={() => setOptions(false)} /> : null}
     </div>
   );
 }

@@ -8,7 +8,7 @@
 //
 // Needs Playwright with Chromium and git; not part of `npm test`.
 import { spawn, execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, copyFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -29,6 +29,7 @@ copyFileSync(join(root, "corpus/generated/gen-0003.xml"), join(builds, "RF/build
 
 const host = spawn(pob, ["host", "--builds", builds, "--socket", socket, "--listen", "none", "--web", "127.0.0.1:0", "--app", join(web, "dist"), "--build", "RF", "--no-open"], {
   stdio: ["ignore", "ignore", "pipe"],
+  env: { ...process.env, POB_SETTINGS: join(dir, "settings.json") },
 });
 let log = "";
 const url = await new Promise((resolve, reject) => {
@@ -88,6 +89,23 @@ try {
   await page.getByRole("tab", { name: "Agents" }).click();
   await page.getByRole("button", { name: "Keep" }).click();
   await page.getByText("Kept as try.").waitFor({ timeout: 30_000 });
+
+  // Options: the history's git settings, saved to the settings file
+  await page.getByRole("button", { name: "Options" }).click();
+  const dialog = page.getByRole("dialog", { name: "Options" });
+  await dialog.getByText("The host keeps a history now.").waitFor();
+  await page.waitForTimeout(300);
+  if (process.env.SHOTS) await page.screenshot({ path: join(process.env.SHOTS, "options.png") });
+  await dialog.getByLabel("Git config file:").fill("/tmp/pob-gitconfig");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await dialog.waitFor({ state: "detached" });
+  const saved = JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"));
+  assert.equal(saved.history.gitConfig, "/tmp/pob-gitconfig");
+  if (process.env.SHOTS) {
+    await page.getByRole("tab", { name: "History" }).click();
+    await page.locator(".history-tab .versions tr").first().waitFor();
+    await page.screenshot({ path: join(process.env.SHOTS, "history.png") });
+  }
   console.log("ok: the UI and an agent on one build on the host");
 } finally {
   await browser.close();
