@@ -219,7 +219,7 @@ fn author_text_stays_out(d: &'static TypedData) {
         json!({ "verb": "assumptions", "stat": "Life", "limit": 100 }),
         json!({ "verb": "best", "generator": "supports", "candidates": 20 }),
         json!({ "verb": "best", "generator": "gem_levels" }),
-        json!({ "verb": "improve", "generators": ["masteries", "config"], "steps": 1 }),
+        json!({ "verb": "improve", "generators": ["masteries"], "steps": 1 }),
     ] {
         let v = ok(&mut a, &g, req.clone());
         assert!(!v.to_string().to_uppercase().contains(MARK), "{req}: {v}");
@@ -249,6 +249,8 @@ fn check_rows(d: &'static TypedData, r: &J, keys: &[&str], check: usize) {
     let rows = r["rows"].as_array().unwrap();
     let mut last = (true, f64::INFINITY);
     for row in rows {
+        // No search changes the configuration
+        assert!(!row["apply"].to_string().contains("set_config"), "{row}");
         let feasible = row.get("breaks").is_none();
         let gain = row["gain"].as_f64().unwrap();
         assert!(
@@ -278,7 +280,7 @@ fn best_matches_the_engine(d: &'static TypedData) {
     let r = ok(
         &mut a,
         &g,
-        json!({ "verb": "best", "generator": "config", "stats": ["FullDPS", "TotalEHP"] }),
+        json!({ "verb": "best", "generator": "gem_levels", "stats": ["FullDPS", "TotalEHP"] }),
     );
     assert_eq!(
         r["search"]["evaluated"], r["search"]["moves_possible"],
@@ -419,7 +421,7 @@ fn improve_proposes_steps(d: &'static TypedData) {
         &g,
         json!({
             "verb": "improve",
-            "generators": ["tree", "config"],
+            "generators": ["tree", "masteries"],
             "constraints": [{ "points": 4 }, { "keep": "TotalEHP" }],
             "steps": 2, "depth": 2, "candidates": 6,
             "stats": ["FullDPS", "TotalEHP"],

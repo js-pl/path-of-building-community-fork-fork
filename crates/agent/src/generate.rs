@@ -41,8 +41,10 @@ pub(crate) const GENERATORS: &[(&str, &str)] = &[
         "items_remove",
         "empties each slot of the active set that holds an item, one at a time: what each item is worth, the weakest (least lost) first",
     ),
-    ("config", "each other bandit and pantheon choice"),
 ];
+
+/// Why no generator changes the configuration
+pub(crate) const NO_CONFIG: &str = "the configuration is no move: it sets up the conditions the numbers assume (the enemy, buffs, charges), and changing it makes any build look stronger without changing the build; no search changes it. `assumptions` with a `stat` shows how much a number depends on it";
 
 /// Not generated yet, with where they come
 pub(crate) const NOT_YET: &str = "anoints, uniques, crafts and rares have no generator yet; evaluate_item evaluates a pasted item and its slot's mod weights";
@@ -97,7 +99,7 @@ pub(crate) fn generate(
         "supports" => supports(names, s, o),
         "gem_levels" => gem_levels(s),
         "items_remove" => items_remove(s),
-        "config" => config(s),
+        "config" => Err(NO_CONFIG.into()),
         k => Err(format!(
             "no generator {:?}; the generators: {}",
             crate::text::clean(k, 60, false),
@@ -341,37 +343,5 @@ fn items_remove(s: &mut Dispatcher) -> R<Generated> {
         moves,
         possible,
         how: "each equipped slot of the active item set emptied, one at a time, all evaluated exactly: a row's change is what that item adds, so the first rows are the weakest items, the upgrades to look at first; evaluate_item gives a slot's mod weights and checks a replacement".into(),
-    })
-}
-
-fn config(s: &mut Dispatcher) -> R<Generated> {
-    let config = cmd(s, json!({ "cmd": "config" }))?;
-    let mut moves = Vec::new();
-    for v in config["sections"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .flat_map(|sec| sec["vars"].as_array().into_iter().flatten())
-    {
-        let var = v["var"].as_str().unwrap_or_default();
-        if !["bandit", "pantheonMajorGod", "pantheonMinorGod"].contains(&var) {
-            continue;
-        }
-        let sel = v["sel"].as_u64().unwrap_or(1) as usize;
-        for (i, c) in v["list"].as_array().into_iter().flatten().enumerate() {
-            if i + 1 == sel {
-                continue;
-            }
-            moves.push(Move {
-                changes: vec![json!({ "verb": "set_config", "option": var, "value": crate::text::plain(c.as_str().unwrap_or_default()) })],
-                estimate: None,
-            });
-        }
-    }
-    let possible = moves.len();
-    Ok(Generated {
-        moves,
-        possible,
-        how: "each other bandit, major god and minor god choice, all evaluated exactly".into(),
     })
 }

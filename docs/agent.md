@@ -800,7 +800,6 @@ over what the engine can already rank:
 | anoints | every anoint | `compare::anoint_power` |
 | uniques | every unique per slot, and jewels | `compare` item power (`ItemDBControl`) |
 | crafts | bench mods, eldritch implicits, enchants on the items you have | `item_add_modifier`, `engine::item_craft` |
-| config | pantheon, bandit, flask choice | config |
 | rares | what each stat is worth per slot (the mod weights below); pasted items | the port of `GenerateModWeights` |
 
 The verbs (none changes the build; the agent applies what the user wants):
@@ -951,14 +950,14 @@ changes as `apply` takes them.
 
 ```
 {"verb": "best", "build"?, "generator": "tree" | "tree_remove" | "masteries" | "supports"
-   | "gem_levels" | "items_remove" | "config", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
+   | "gem_levels" | "items_remove", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
  "depth"?: 3, "candidates"?: 40, "group"?, "gem"?}
 → {"objective", "constraints", "stats", "base", "base_breaks", "rows": [{"apply": [...],
    "changes": "label", "values", "change", "gain", "points"?, "estimate"?, "breaks"?}],
    "search": {"moves_possible", "evaluated", "feasible", "better", "how", "effort",
    "failed"}, "claim", "exact", "not_yet"}
 
-{"verb": "improve", "build"?, "generators"?: ["masteries", "config"], "objective"?,
+{"verb": "improve", "build"?, "generators"?: ["masteries"], "objective"?,
  "constraints"?, "stats"?, "steps"?: 3, "depth"?, "candidates"?, "group"?, "gem"?}
 → {"steps": [{"step", "apply", "changes", "values", "change", "gain",
    "moves_evaluated", "generated"}], "final": {...}, "apply": {"verb": "apply",
@@ -987,12 +986,20 @@ changes as `apply` takes them.
   knows in place of each support of a group), `gem_levels` (each gem a
   level higher, or at 20 quality), `items_remove` (each equipped slot of
   the active item set emptied: what each item adds, so the first rows are
-  the weakest items, or one that costs more than it gives) and `config`
-  (bandit and pantheon). The
+  the weakest items, or one that costs more than it gives). The
   tree's two rank by node power (`engine::power`, the misc calculator) and
   keep the best `candidates`; the others keep all, up to `candidates` for
   `supports`. Every move kept is evaluated exactly. Not yet: anoints,
   uniques, crafts and rares.
+- **The configuration is never a move** (decided by the owner). It sets
+  up the conditions the numbers assume (the enemy, buffs, charges,
+  bandit, pantheon), and any build can be made to look overpowered by
+  editing it, so no generator changes it and no search proposes a
+  `set_config`; `best` and `improve` refuse a `config` generator and say
+  why. How much a number rests on it is `assumptions`'s answer, a reading
+  verb. `eval` still evaluates the variants an agent writes, a
+  `set_config` among them, since those are the agent's questions rather
+  than a search's.
 - **Truthful about the search.** `search` counts the moves possible, those
   evaluated, those that hold the constraints and those that are better.
   `claim` says "the best single move of its kind" only when every move the
