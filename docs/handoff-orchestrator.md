@@ -58,7 +58,9 @@ Both sessions stopped on the 5-hour usage limit at about 17:30 UTC
 (reset 21:10 UTC). Step 9 was waiting for CI on #212 before squash
 merging it. Next, it was to rebase `agent-respec` (respec search, keystone
 constraints) onto main and open its PR. Send each session "continue"
-after the reset.
+after the reset. At 22:00 UTC step 9 was running again. It found main's
+`windows` CI job red since #218/#219: `web.rs` used a Unix socket pair.
+It is fixing that in #221 before merging #212.
 
 If any of these is unmerged when you start, check its PR and nudge the
 session, or take the work over.
