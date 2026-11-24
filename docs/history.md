@@ -32,8 +32,9 @@ history comes before any verb that changes a build. It is built as
 - **Identity.** Commits carry the user's git identity; when git has none,
   the repository gets `Path of Building <pob@localhost>` in its own config.
 - **Commits.** The message's subject is the undo step's label, followed by
-  trailers: `Source: user`, `Source: agent <connection>` or
-  `Source: restore`, then the step's own (`Full DPS: +3.1%`). An unchanged
+  trailers: `Source: user`, `Source: agent <connection>`,
+  `Source: restore` or `Source: redo` (a step undone before, applied
+  again), then the step's own (`Full DPS: +3.1%`, `Redone-By: user`). An unchanged
   build makes no commit.
 - **When** (`Recorder`): an agent's step is committed before the call
   returns; the user's edits are coalesced, committed once 10 seconds pass

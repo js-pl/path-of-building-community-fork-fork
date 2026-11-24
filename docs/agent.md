@@ -346,6 +346,8 @@ keeps the damage small and the text from reading like instructions:
   and what it changed (`agent: allocate Heart of Thunder, Full DPS +3.1%`).
   A multi-step tool call (a respec) is still one step. The UI lists the
   steps with their source, and undo works on them like on the user's own.
+  Redo mirrors it: it applies again the step the last undo took back,
+  whoever made it, and any new change clears what can be redone.
 - **Conflicts.** An agent edit can carry the version it was planned on. If
   the user changed the build since, the host refuses it and the agent looks
   again. That's optimistic concurrency, which is enough for one user and
@@ -487,6 +489,16 @@ above was silent:
   byte as saved), as a new commit; the last 100 steps are kept in memory,
   older versions through `history` and `restore`, which commits an old
   version on top (`Source: restore`).
+- **Redo** (decided by the owner) applies again the step the last undo
+  took back, whoever made it: the XML with the step, as a new commit at
+  once with the step's own label, `Source: redo` and a `Redone-By`
+  trailer (`user`, `agent <name>`); several undos give several redos, the
+  last undone first. Any new change, the UI's, an agent's or a restore,
+  clears the redo list; a UI command that changes nothing doesn't. The
+  change it makes (in `changes_since` and the change events) is labelled
+  `redo <label>`, by whoever redid it; undone again, the step is its
+  maker's. The `redo` verb, the UI's `redo` command and the History tab's
+  Redo button all do it; the app has no undo or redo key.
 - **Names.** Nodes as `Name #id`; changes take an id, `#id`, `Name #id`
   or a name only one node has. Items by slot and base (`Helmet: Hubris
   Circlet`) with the lines the engine parsed; a line it didn't is counted
@@ -602,9 +614,10 @@ above was silent:
   `clean`, `connections`, `disconnect`, `revoke`.
 - **The History tab** (on the host only): every change since the host
   opened the build, newest first, with who made it (`you`, the agent's
-  connection), and an undo button naming the step it takes back
-  (`steps`: the undo stack and the changes; an undo takes its step off
-  the stack, so it isn't undone twice). Below, the build's git log
+  connection), an undo button naming the step it takes back and a redo
+  button naming the step it applies again (`steps`: the undo stack, the
+  redo list and the changes; an undo moves its step from the one to the
+  other, a redo back). Below, the build's git log
   (`history`: label, source, trailers, time) with a restore per version:
   `restore` commits the version on top at once (`Source: restore`),
   after the user's waiting edits, so it can be undone too; a version
