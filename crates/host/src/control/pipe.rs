@@ -14,8 +14,8 @@ use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::path::Path;
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_ACCESS_DENIED, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED, GetLastError, HANDLE,
-    INVALID_HANDLE_VALUE, LocalFree,
+    CloseHandle, ERROR_ACCESS_DENIED, ERROR_NO_DATA, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED,
+    GetLastError, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
@@ -182,11 +182,24 @@ impl Listener {
 
     /// Waits for the next client: its end of the pipe
     pub fn accept(&mut self) -> std::io::Result<File> {
-        let h = self.next.as_raw_handle() as HANDLE;
-        if unsafe { ConnectNamedPipe(h, std::ptr::null_mut()) } == 0 {
-            let e = unsafe { GetLastError() };
-            if e != ERROR_PIPE_CONNECTED {
-                return Err(std::io::Error::from_raw_os_error(e as i32));
+        loop {
+            let h = self.next.as_raw_handle() as HANDLE;
+            if unsafe { ConnectNamedPipe(h, std::ptr::null_mut()) } != 0 {
+                break;
+            }
+            match unsafe { GetLastError() } {
+                ERROR_PIPE_CONNECTED => break,
+                // A client came and went before it was accepted (a probe
+                // whether a host runs): the instance is reused
+                ERROR_NO_DATA => {
+                    unsafe { DisconnectNamedPipe(h) };
+                }
+                // Anything else: a fresh instance, so one broken instance
+                // never stops the host from answering
+                e => {
+                    self.next = Self::instance(&self.name, &self.sd, false)?;
+                    return Err(std::io::Error::from_raw_os_error(e as i32));
+                }
             }
         }
         // The next instance before this one is handed out, so the pipe
@@ -238,8 +251,13 @@ pub fn accept(
     registry: std::sync::Arc<Registry>,
 ) {
     loop {
-        let Ok(stream) = listener.accept() else {
-            continue;
+        let stream = match listener.accept() {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("pob host: the control pipe: {e}");
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                continue;
+            }
         };
         let calls = calls.clone();
         let registry = registry.clone();
