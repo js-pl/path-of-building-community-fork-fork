@@ -40,6 +40,9 @@ children` from the old orchestrator, or `list_sessions` and the tag
 - **Step 9** (`session_01W1dkjwuZXqXY31hE5ZJ6qg`): `dominating`, `front`,
   combination and respec search, jobs with progress and cancelling. It
   has no config moves (the owner's decision, see below).
+- The platform-agnostic local transport is finished (#218): `host::local`
+  is the only per-OS code for the host, and CI runs the host and CLI
+  tests on Windows.
 - **Step 5 follow-ups** (`session_01W1dkjxba54CFtrTR4pqy83`), each its own
   PR:
   1. WSL mirrored networking mode in `pob agent`.
@@ -131,7 +134,7 @@ Not part of the oracle or GUI cleanup: no GUI Lua remains in the app.
 
 - **Remote branches the owner still has to delete:**
   ```bash
-  git push origin --delete windows-named-pipe agent-best agent-eval agents-install-2 drop-translation-delete
+  git push origin --delete windows-named-pipe windows-pipe agent-container pob-agent-run transport-agnostic agent-best agent-eval agents-install-2 drop-translation-delete
   ```
 - **Older branches ahead of main with no merged PR head.** Investigate
   them before suggesting deletion:
