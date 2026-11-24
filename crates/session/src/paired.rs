@@ -5,43 +5,10 @@
 //! request the typed engine does not answer goes to the reference, which
 //! then holds the build until the next load.
 
-use crate::dispatch::Replay;
+use crate::dispatch::{READ_ONLY, Replay};
 use crate::typed::TypedData;
 use crate::{Dispatcher, Session};
 use serde_json::{Value as J, json};
-
-/// Commands of the reference session that leave the build as it is
-pub(crate) const READ_ONLY: &[&str] = &[
-    "state",
-    "outputs",
-    "controls",
-    "tree",
-    "treeState",
-    "nodePath",
-    "nodeTooltip",
-    "masteryOptions",
-    "treeSpecs",
-    "sharedLists",
-    "powerStats",
-    "nodePower",
-    "skills",
-    "copySocketGroup",
-    "gemList",
-    "socketGroupTooltip",
-    "items",
-    "itemTooltip",
-    "previewItem",
-    "itemDb",
-    "displayItem",
-    "controlTooltip",
-    "config",
-    "calcs",
-    "breakdown",
-    "party",
-    "notes",
-    "saveXml",
-    "saveCode",
-];
 
 /// Whether a request may change what outlives the build: a popup (opened
 /// by a click, used or closed) or the shared item lists

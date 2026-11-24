@@ -123,6 +123,8 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run build
+      # The engine client's transports (workers, or the host's WebSocket)
+      - run: npm run test:client
 
   # The browser engine gives the same results as the native typed engine
   # (`pob serve`)
@@ -144,6 +146,12 @@ jobs:
       - run: node web/scripts/build-wasm.mjs
       - run: node web/scripts/build-data.mjs
       - run: node --test web/tests/*.test.mjs
+      # The web app on `pob host`, with an agent's edit made by `pob ctl`
+      - run: npm ci && npm run build
+        working-directory: web
+      - run: npm install --no-save playwright@1.63.0 && npx playwright install --with-deps chromium
+        working-directory: web
+      - run: node web/tests/host-smoke.mjs
       - run: sccache --show-stats
 
   # The generator reproduces corpus/generated, and upstream reproduces

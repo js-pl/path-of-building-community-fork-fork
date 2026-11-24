@@ -18,9 +18,11 @@ See `docs/design.md` before making architectural decisions.
     `docs/settings.md`
   - `agent` (the agent API: build-level verbs on the session, grants,
     agent directories, author text kept apart; no I/O), see `docs/agent.md`
-  - `host` (`pob host --headless`: the builds directory with its history,
-    the control socket `pob ctl` and `pob mcp` call, and the agent API as
-    MCP on stdio and over HTTP with tokens), see `docs/agent.md`
+  - `host` (`pob host`: the builds directory with its history, the
+    control socket `pob ctl` and `pob mcp` call, the agent API as MCP on
+    stdio and over HTTP with tokens, and, without `--headless`, the web
+    app with its WebSocket for the engine API and change events), see
+    `docs/agent.md`
   - `importer` (reads upstream's data and ModParser tables at build time),
     `gamedata` (the engine's typed game data from the importer's tables, in
     `engine::codec`'s binary form)

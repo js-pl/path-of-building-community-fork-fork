@@ -4,6 +4,40 @@
 use crate::typed::{NOT_PORTED, TypedData, TypedSession, UPSTREAM_ERROR};
 use serde_json::{Value as J, json};
 
+/// Commands that leave the build as it is (the reference session's and
+/// the typed engine's alike); a host needs no `saveXml` after them
+pub const READ_ONLY: &[&str] = &[
+    "state",
+    "outputs",
+    "controls",
+    "tree",
+    "treeState",
+    "nodePath",
+    "nodeTooltip",
+    "masteryOptions",
+    "treeSpecs",
+    "sharedLists",
+    "powerStats",
+    "nodePower",
+    "skills",
+    "copySocketGroup",
+    "gemList",
+    "socketGroupTooltip",
+    "items",
+    "itemTooltip",
+    "previewItem",
+    "itemDb",
+    "displayItem",
+    "controlTooltip",
+    "config",
+    "calcs",
+    "breakdown",
+    "party",
+    "notes",
+    "saveXml",
+    "saveCode",
+];
+
 /// A build session answering JSON requests, as `Session::request` does
 pub struct Dispatcher<'d> {
     data: &'d TypedData,

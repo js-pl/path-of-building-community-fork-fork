@@ -72,6 +72,9 @@ pub trait Store {
     /// Saves a build's new version and commits it before returning; the
     /// version, or `None` without a history
     fn commit(&mut self, id: &BuildId, xml: &str, step: &Step) -> Result<Option<String>>;
+    /// Saves the user's edit of a build; its commit may wait, coalesced
+    /// with the user's next edits
+    fn user_edit(&mut self, id: &BuildId, xml: &str, label: &str) -> Result<()>;
     /// The last `n` versions, newest first; empty without a history
     fn log(&self, id: &BuildId, n: usize) -> Result<Vec<Entry>>;
     /// The build's XML at a version
@@ -102,16 +105,20 @@ impl MemStore {
     }
 
     fn push(&mut self, id: &BuildId, xml: &str, step: &Step) -> Option<String> {
-        let list = self.builds.entry(id.clone()).or_default();
-        if list.last().is_some_and(|(_, x)| x == xml) {
-            return None;
-        }
-        let version = format!("v{}", list.len() + 1);
         let source = if step.restore {
             "restore".to_string()
         } else {
             format!("agent {}", step.agent)
         };
+        self.push_as(id, xml, step, source)
+    }
+
+    fn push_as(&mut self, id: &BuildId, xml: &str, step: &Step, source: String) -> Option<String> {
+        let list = self.builds.entry(id.clone()).or_default();
+        if list.last().is_some_and(|(_, x)| x == xml) {
+            return None;
+        }
+        let version = format!("v{}", list.len() + 1);
         let entry = Entry {
             version: version.clone(),
             time: 0,
@@ -154,6 +161,21 @@ impl Store for MemStore {
             return Err(format!("no build {}", id.name));
         }
         Ok(self.push(id, xml, step))
+    }
+
+    fn user_edit(&mut self, id: &BuildId, xml: &str, label: &str) -> Result<()> {
+        if !self.builds.contains_key(id) {
+            return Err(format!("no build {}", id.name));
+        }
+        let step = Step {
+            label: label.into(),
+            agent: String::new(),
+            restore: false,
+            trailers: Vec::new(),
+        };
+        // Committed at once: memory has nothing to coalesce
+        self.push_as(id, xml, &step, "user".into());
+        Ok(())
     }
 
     fn log(&self, id: &BuildId, n: usize) -> Result<Vec<Entry>> {

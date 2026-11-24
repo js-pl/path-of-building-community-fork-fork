@@ -1,8 +1,8 @@
 //! `pob host`: owns the builds, on disk with their history, and answers
 //! the agent API for the user's own processes on the control socket. See
 //! `docs/agent.md`, "What runs where". It serves the agent API as MCP
-//! ([`mcp`]); the web app's WebSocket (step 6) comes later, so
-//! `--headless` is what there is.
+//! ([`mcp`]), and serves the web app with its WebSocket ([`web`], [`ui`])
+//! unless `--headless`.
 
 pub mod connections;
 pub mod control;
@@ -10,6 +10,9 @@ pub mod http;
 pub mod mcp;
 pub mod store;
 pub mod tokens;
+pub mod ui;
+pub mod web;
+pub mod ws;
 
 pub use store::FsStore;
 
