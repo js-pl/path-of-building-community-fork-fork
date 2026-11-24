@@ -581,6 +581,157 @@ fn undo_and_redo_across_sources(d: &'static TypedData) {
     assert!(events.windows(2).all(|w| w[0].version + 1 == w[1].version));
 }
 
+/// A grant to two builds addresses each; with one build open at a time,
+/// the idle one closes and opens again with its version and changes, and
+/// a build a client shows stays open
+fn several_builds(d: &'static TypedData) {
+    let mut a = agent(d, corpus(BUILD));
+    let g = grant().with_build("Other");
+    let (rf, other) = (BuildId::user("RF"), BuildId::user("Other"));
+    let r = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "allocate", "nodes": [36634], "build": "RF" }),
+    );
+    assert_eq!(r["version"], 1);
+    let s = ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    assert_eq!(s["build"], "Other", "{s}");
+    a.take_events();
+    a.set_max_open(1);
+    ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    assert_eq!(a.open_builds(), std::slice::from_ref(&other));
+    let b = ok(&mut a, &g, json!({ "verb": "builds" }));
+    assert_eq!(b["builds"][0]["version"], 1, "{b}");
+    // Opened again: the version goes on, the changes are kept, the undo
+    // list is gone (the history has it)
+    let c = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "changes_since", "version": 0, "build": "RF" }),
+    );
+    assert_eq!(c["changes"].as_array().unwrap().len(), 1, "{c}");
+    assert_eq!(a.open_builds(), std::slice::from_ref(&rf));
+    let r = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "set_level", "level": 80, "build": "RF", "expect": 1 }),
+    );
+    assert_eq!(r["version"], 2, "{r}");
+    let events = a.take_events();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].build, rf);
+    // A build shown stays open
+    a.set_shown([rf.clone()]);
+    ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    let mut open = a.open_builds();
+    open.sort();
+    assert_eq!(open, [other, rf]);
+}
+
+fn view(build: BuildId, tab: &str, selection: Option<J>) -> agent::ui::UiView {
+    agent::ui::UiView {
+        build,
+        tab: Some(tab.into()),
+        selection,
+        age: 1,
+        clients: 1,
+    }
+}
+
+/// `ui_context` within the grant, the author's text only under
+/// `untrusted`; the UI's build moves no request
+fn ui_context(d: &'static TypedData) {
+    let mut a = agent(d, hostile());
+    let g = grant();
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ui"], false, "{r}");
+    // A node
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Tree",
+        Some(json!({ "node": 36634 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["build"], "RF", "{r}");
+    assert_eq!(r["tab"], "Tree");
+    let node = r["selection"]["node"].as_str().unwrap();
+    assert!(node.ends_with(" #36634"), "{r}");
+    assert_eq!(r["selection"]["allocated"], false, "{r}");
+    // An item by slot and base; its name only under untrusted
+    let items = ok(&mut a, &g, json!({ "verb": "items" }));
+    let bow = items["equipped"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["slot"] == "Weapon 1")
+        .unwrap()
+        .clone();
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Items",
+        Some(json!({ "item": bow["id"] })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["item"], bow["item"], "{r}");
+    assert_eq!(r["selection"]["equipped"], true);
+    assert!(
+        r["untrusted"]["item_name"].as_str().unwrap().contains(MARK),
+        "{r}"
+    );
+    assert!(!trusted(&r).contains(MARK), "{r}");
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Items",
+        Some(json!({ "slot": "Weapon 1" })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["item"], bow["item"], "{r}");
+    // A socket group; its label only under untrusted
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Skills",
+        Some(json!({ "group": 1 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["group"], 1, "{r}");
+    assert!(r["selection"]["gems"].is_array(), "{r}");
+    assert!(!trusted(&r).contains(MARK), "{r}");
+    // A build outside the grant: not even its name, and requests naming
+    // no build stay on the grant's first
+    a.set_ui(Some(view(
+        BuildId::user("Other"),
+        "Tree",
+        Some(json!({ "node": 36634 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["build"], J::Null, "{r}");
+    assert!(
+        r.get("selection").is_none() && r.get("tab").is_none(),
+        "{r}"
+    );
+    assert_eq!(ok(&mut a, &g, json!({ "verb": "summary" }))["build"], "RF");
+    assert_eq!(ok(&mut a, &g, json!({ "verb": "builds" }))["default"], "RF");
+    // Within the grant too: the UI's build is told of, but requests
+    // naming no build stay on the grant's first (the UI moves no grant)
+    let g2 = grant().with_build("Other");
+    assert_eq!(
+        ok(&mut a, &g2, json!({ "verb": "ui_context" }))["build"],
+        "Other"
+    );
+    assert_eq!(ok(&mut a, &g2, json!({ "verb": "summary" }))["build"], "RF");
+    assert_eq!(
+        ok(&mut a, &g2, json!({ "verb": "builds" }))["default"],
+        "RF"
+    );
+    // A selection a client can't send
+    assert_eq!(agent::ui::selection(&json!({ "node": "x" })), None);
+    assert_eq!(agent::ui::selection(&json!({ "path": "/etc" })), None);
+    assert_eq!(
+        agent::ui::selection(&json!({ "group": 2, "gem": 1, "x": 1 })),
+        Some(json!({ "group": 2, "gem": 1 }))
+    );
+}
+
 #[test]
 fn verbs() {
     let d = data();
@@ -592,4 +743,6 @@ fn verbs() {
     agent_directories(d);
     author_text_only_where_marked(d);
     undo_and_redo_across_sources(d);
+    several_builds(d);
+    ui_context(d);
 }

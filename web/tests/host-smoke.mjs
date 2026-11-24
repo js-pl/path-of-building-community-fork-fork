@@ -45,7 +45,8 @@ const ctl = (...args) => JSON.parse(execFileSync(pob, ["ctl", "--socket", socket
 
 const browser = await chromium.launch();
 try {
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   page.on("pageerror", (e) => console.error("page:", e.message));
   await page.goto(url);
   const sidebar = page.locator("aside.sidebar");
@@ -102,6 +103,36 @@ try {
   await page.getByRole("tab", { name: "Agents" }).click();
   await page.getByRole("button", { name: "Keep" }).click();
   await page.getByText("Kept as try.").waitFor({ timeout: 30_000 });
+
+  // Several builds: the picker shows another build in this page, and a
+  // second page shows one of its own; an edit names its build
+  const picker = page.getByLabel("Build");
+  await page.waitForFunction(() => [...document.querySelectorAll(".build-picker option")].some((o) => o.textContent === "try"), null, { timeout: 30_000 });
+  await picker.selectOption("try");
+  await page.waitForFunction(() => document.querySelector(".build-picker select")?.value === "try", null, { timeout: 30_000 });
+  const second = await context.newPage();
+  await second.goto(new URL("/?build=RF", url).href);
+  await second.waitForFunction(() => document.querySelector(".build-picker select")?.value === "RF", null, { timeout: 120_000 });
+  const tryEdit = JSON.parse(execFileSync(pob, ["ctl", "--socket", socket, "--build", "try", "--json", "set_level", "level=42"], { encoding: "utf8" })).ok;
+  assert.equal(tryEdit.version, 1, JSON.stringify(tryEdit));
+  assert.equal(await second.locator(".build-picker select").inputValue(), "RF");
+  await second.close();
+  await picker.selectOption("RF");
+  await page.waitForFunction(() => document.querySelector(".build-picker select")?.value === "RF", null, { timeout: 30_000 });
+  console.log("several builds: the picker and a second page");
+
+  // ui_context: the tab and the socket group the page shows
+  await page.getByRole("tab", { name: "Skills" }).click();
+  let ui;
+  for (let i = 0; i < 50; i++) {
+    ui = ctl("ui_context");
+    if (ui.tab === "Skills") break;
+    await page.waitForTimeout(200);
+  }
+  assert.equal(ui.build, "RF", JSON.stringify(ui));
+  assert.equal(ui.tab, "Skills", JSON.stringify(ui));
+  assert.equal(ui.selection?.group, 1, JSON.stringify(ui));
+  console.log("ui_context: the page's tab and group");
 
   // Options: the history's git settings, saved to the settings file
   await page.getByRole("button", { name: "Options" }).click();

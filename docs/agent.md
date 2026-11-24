@@ -8,11 +8,16 @@ which reshaped `session::dispatch`, is done. Step 3, the verbs
 (`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
 done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
-install` ([below](#built-mcp)), is done. Step 6, the web app on the
-host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the mod
-weights and `evaluate_item` ([below](#built-evaluate_item)), is done. Step
-8, `eval`, `assumptions`, objectives, constraints, the generators, `best`
-and `improve` ([below](#built-eval-and-assumptions)), is done. Step 9 is
+install` ([below](#built-mcp)), is done. Step 5, the default container
+and `pob agent` ([below](#built-the-default-container)) with the
+control socket's named pipe on Windows, is done. Step 6, the web app on
+the host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the
+mod weights and `evaluate_item` ([below](#built-evaluate_item)), is done.
+Step 8, `eval`, `assumptions`, objectives, constraints, the generators,
+`best` and `improve` ([below](#built-eval-and-assumptions)), is done.
+Step 7, several open builds ([below](#built-several-open-builds)) and
+`ui_context` with the default build
+([below](#built-ui_context-and-the-default-build)), is done. Step 9 is
 being built: jobs, `front` and `dominating`
 ([below](#built-jobs-front-and-dominating)) are done.
 
@@ -215,7 +220,7 @@ marked untrusted.
 3. **Tokens and grants** (new): an HTTP client's token names the builds it
    may read and edit, plus its agent directory. `pob agent` and `pob
    agents token --build <build>` make one; the default is the build the UI
-   shows. A stdio client gets the same kind of grant, chosen by
+   shows when the token is minted, fixed in it. A stdio client gets the same kind of grant, chosen by
    `pob mcp --build`. The UI lists connected agents and revokes one at
    once.
 4. **Change events** (new): the host tells every client when a build
@@ -280,15 +285,21 @@ can reach.
   user can open, and the web app is served on `127.0.0.1` as elsewhere.
 - **The default container** runs on Podman machine, in WSL 2. The agent
   and proxy containers are the same Linux images as everywhere.
-- **Reaching the host.** In WSL's mirrored networking mode (Windows 11
-  22H2 and later), WSL shares the host's `127.0.0.1`, so the endpoint can
-  stay on loopback. As far as we know NAT is still WSL's default and
-  mirrored is opted into in `.wslconfig`; to be checked against
-  Microsoft's current docs. In NAT mode the proxy reaches the host
-  through `host.containers.internal`, which lands on the WSL virtual
-  adapter, so the endpoint listens on that adapter's address only, never
-  on all interfaces. `pob agent` detects the mode and sets the endpoint
-  up accordingly. Both modes need testing before Windows is called
+- **Reaching the host.** NAT is WSL's default networking mode; mirrored
+  (Windows 11 22H2 and later) is opted into with `networkingMode=mirrored`
+  in `.wslconfig`'s `[wsl2]` section (checked November 2026: Microsoft
+  Learn, [Accessing network applications with
+  WSL](https://learn.microsoft.com/en-us/windows/wsl/networking), "by
+  default, WSL uses a NAT based architecture"; and the [WSL September 2023
+  update](https://devblogs.microsoft.com/commandline/windows-subsystem-for-linux-september-2023-update/),
+  where any other value means NAT). So `pob agent` is built for NAT: the
+  Windows side of the WSL adapter is the podman machine's default
+  gateway, and `pob agent` forwards a port on that address only (never
+  all interfaces) to the endpoint on `127.0.0.1`; the proxy routes to it.
+  `host.containers.internal` isn't used: on Windows it doesn't reliably
+  name the host. With mirrored mode on, `pob agent` stops and says so
+  (`--no-container` still works); supporting it is a later step. Both
+  need testing on a real Windows machine before Windows is called
   supported.
 - **The terminal.** `pob agent claude` works from Windows Terminal or
   PowerShell.
@@ -358,7 +369,8 @@ keeps the damage small and the text from reading like instructions:
   looking at: the build, the tab, the selected or hovered node, item, gem
   or socket group. "Why is this node bad?" then needs no ids.
 - **Several builds.** The host can hold several open builds. Tools take an
-  optional build and default to the one the UI shows.
+  optional build and default to the grant's first; a grant made without
+  a build gets the one the UI shows when it is made, fixed from then on.
 
 ## Build history
 
@@ -556,7 +568,19 @@ above was silent:
   (`nodes='["Heart of Thunder"]'`), else strings. Each call is a new
   connection, so builds made in an agent directory are reached again with
   `--agent <dir>`. Without a verb it lists them.
-- **Windows: a named pipe** (`host::control::pipe`, step 5), by default
+- **One local transport** (`host::local`): the host, `pob ctl` and `pob
+  mcp` reach each other through it alone, with the same API on every
+  platform (`listen`, `Listener::accept`, `serve`, `answers`, `admin`,
+  `Client`), a Unix socket (`local::unix`) or a named pipe
+  (`local::pipe`) behind it. The rest of the platform differences live
+  there too (the data directory's base, files only the user reads, a
+  detached host, the browser's command), so nothing else in the host,
+  `pob ctl` or `pob mcp` has a per-OS path. The `interprocess` crate was
+  the alternative; the two backends are small, std plus `windows-sys`,
+  and keep the DACL in our hands. The host's, MCP's and the transport's
+  tests are the same on Linux and Windows (`tests/local.rs`), and CI
+  runs them on both.
+- **Windows: a named pipe** (`host::local::pipe`, step 5), by default
   `\\.\pipe\path-of-building-fork-fork-<user>-control` (`--socket` takes
   another `\\.\pipe\<name>`). Its security descriptor is
   `O:<user>D:P(A;;GA;;;<user>)`: the user's SID alone has access, the
@@ -567,7 +591,8 @@ above was silent:
   impersonation), so a pipe squatted by another user is refused, not
   talked to. The same lines and hellos as the Unix socket; `pob mcp`
   starts a host in a process group of its own with no console, its log
-  in the data directory. CI builds and tests it on `windows-latest`.
+  in the data directory. CI builds it and runs the host and `pob` tests on
+  `windows-latest` (about 5 minutes).
 - Jobs: the searches run on threads of their own, and a call waiting for
   one is answered when it is done without holding the engine thread
   ([below](#built-jobs-front-and-dominating)). The web app on the host is
@@ -648,14 +673,93 @@ above was silent:
   the settings file (`settings`, `setSettings`), with the git they give
   (or why none) and whether the running host keeps a history. They take
   effect when the host starts again.
-- Not in step 6: `ui_context` and several open builds in one client
-  (step 7); a token's default build is still none, not the build the UI
-  shows.
+- Not in step 6: `ui_context`, several open builds and the default
+  build, which step 7 added ([below](#built-several-open-builds)).
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),
   `web/tests/host-smoke.mjs` (Playwright on `pob host` while `pob ctl`
   edits, in CI's wasm job).
+
+### Built: several open builds
+
+Step 7's first part:
+
+- **Sessions.** The host's agent API keeps a session per build it
+  opened, at most 8 at once (`agent::MAX_OPEN`, `Agent::set_max_open`).
+  When one more opens, the build used least recently that no UI client
+  shows is closed: the user's edits waiting to be committed are
+  committed then (`Store::closed`, `Recorder::close`), its session and
+  undo list go, and its version and changes stay, so `version`,
+  `expect` and `changes_since` go on when it opens again; undo past
+  that is `history` and `restore`. A build a client shows stays open;
+  one no client shows any more closes at once if more than the cap are
+  open.
+- **The UI.** Each client of the host shows one build. The build's name
+  in the top bar is a picker of the user's builds (`builds`, `open`);
+  the link beside it opens the build in a new page, `/?build=<name>`, so
+  several builds can be open side by side. Change events name their
+  build, and a client re-renders only on its own build's.
+- **Agents** with a grant to several builds name each with `build`; the
+  events and `changes_since` keep them apart.
+- Tests: `several_builds` in `crates/agent/tests/verbs.rs`,
+  `several_open_builds` in `crates/host/tests/web.rs`, and the picker
+  and a second page in `web/tests/host-smoke.mjs`.
+
+### Built: `ui_context` and the default build
+
+Step 7's second part:
+
+```
+{"verb": "ui_context"}
+→ {"ui": true, "build": "RF", "tab": "Tree", "version": 4, "clients": 1,
+   "reported": "2 s ago", "selection": {"node": "Heart of Thunder #36634",
+   "kind": "Notable", "allocated": false}, "untrusted"?: {...}, "names": "..."}
+   | {"ui": true, "build": null, "note": "the UI shows a build this connection wasn't granted"}
+   | {"ui": false, "note": "no UI shows a build now"}
+```
+
+- **What the UI reports.** Each client sends `{"host": "context",
+  "args": {"tab", "selection"}}`, debounced (300 ms, and only when it
+  changed): the tab when it is picked, the node hovered last on the
+  Tree tab, the item selected on Items (`{"item": id}`; `{"slot": name}`
+  is taken too), the socket group selected on Skills (`{"group": n,
+  "gem"?: n}`). Ids only: the host keeps a tab of the UI's own and a
+  selection of those shapes (`agent::ui::selection`), and drops
+  anything else. Showing another build clears the selection.
+- **"The build the UI shows"** is the build of the client the user used
+  last (the one that sent a message last), else of the client heard
+  from last; none without a client.
+- **The answer** names things as the other verbs do: a node `Name #id`
+  with its kind and whether it is allocated; an item by slot and base
+  with the engine's lines (`items`' fields) and whether it is equipped;
+  a group as `skills` gives it, with whether it is the main one. The
+  author's text (the item's name, the group's label) only under
+  `untrusted`. A build outside the caller's grant is not named, nor is
+  its tab or selection.
+- **The UI moves no grant (decided by the owner: the builds an agent
+  may edit are chosen when its session or token is made).**
+  `ui_context` reports what the UI shows, but a request naming no build
+  goes to the grant's first build whatever the UI shows, and nothing
+  the UI does widens a grant or moves it to another build.
+- **The default grant.** `pob mcp` without
+  `--build` says `"ui_build": true` in its hello, and the host grants the
+  user's build the UI shows at that moment (none when no UI shows one,
+  or it shows an agent's build). `pob agents token` without `--build`
+  asks a running host (`{"admin": "ui_build"}`) and mints the token
+  with that build, and says so, as does `pob agent` without `--build`
+  for the token of its run; without a host or a UI the token has
+  only its agent directory, as before. Switching builds in the UI later
+  widens no grant: an agent reaches another build only when the user
+  grants it (`--build`, a new token).
+- Tests: `ui_context` in `crates/agent/tests/verbs.rs` (each selection,
+  the author's text under `untrusted` only, a build outside the grant,
+  requests naming no build staying on the grant's first), `ui_context_and_the_default_build` in
+  `crates/host/tests/web.rs` (the reports, the hellos with and without
+  `ui_build`, the admin request), and the Skills tab's context in
+  `web/tests/host-smoke.mjs`.
+- Not yet: the Calcs tab's selection and the Config tab's options as
+  selections; a hovered item or gem (only the selected ones).
 
 ### Built: MCP
 
@@ -725,8 +829,9 @@ for HTTP, axum).
   connection (`--name`, `http` by default: its commits' `Source: agent
   <name>`), its builds and its agent directory (`<name>-<time>` unless
   `--agent`), fixed when minted; every session made with it shares them.
-  There is no UI yet, so no default build: a token without `--build` has
-  only its agent directory. The tokens file (`tokens.json` in the data
+  A token without `--build` gets the build the UI shows when it is minted
+  (step 7, [below](#built-ui_context-and-the-default-build)), or only its
+  agent directory when no UI shows one. The tokens file (`tokens.json` in the data
   directory, `POB_TOKENS`, `--tokens`) keeps each token's SHA-256, never
   the token, written whole with mode 0600 and moved into place. The host
   reads it on every request, so `pob agents revoke <id>` is refused from
@@ -776,6 +881,113 @@ pob agents token --build RF --name claude
 claude mcp add --transport http pob http://127.0.0.1:8731/mcp \
   --header "Authorization: Bearer pob_..."
 ```
+
+### Built: the default container
+
+Step 5: `container/` (the Containerfile and the allowlists), `crates/proxy`
+(`pob-proxy`) and `pob agent` (`crates/cli/src/container.rs`). Decided
+where the design above was silent:
+
+- **Two images from one Containerfile**, `pob-agent:<tag>` (`--target
+  agent`) and `pob-proxy:<tag>` (`--target proxy`), built locally with
+  Podman from the build context `pob` carries (the Containerfile, the
+  allowlists, the proxy's source), so an installed `pob` needs no
+  checkout. The tag is a hash of that context: a `pob` with other pinned
+  versions builds its own images, and otherwise nothing is rebuilt until
+  `--rebuild` (which pulls the bases again and ignores the cache). The
+  agent image is `node:24-trixie-slim` with Claude Code 2.1.330 and Codex
+  0.171.0 pinned, git, ripgrep, python3, curl and jq; the harness runs as
+  the image's `node` user (uid 1000), with its updater and nonessential
+  traffic off (`DISABLE_AUTOUPDATER`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). The proxy image is
+  `pob-proxy` on `debian:trixie-slim`, as uid 65534.
+- **The agent container:** `--read-only`, `--cap-drop all`,
+  `no-new-privileges`, Podman's default seccomp profile, `/tmp` a 1 GB
+  tmpfs, `--memory 4g --cpus 2 --pids-limit 512`. Two named volumes and
+  nothing else: `pob-login-<harness>` on the home directory (the login
+  and the harness's settings, kept across runs; `--reset-login` removes
+  it) and `pob-scratch-<harness>` on `/work`. No host path is mounted.
+- **The network:** a network per run, `pob-agent-<pid>`, `--internal`
+  (no route out) and without DNS (its resolver would have no upstream;
+  the agent needs none, as the proxy resolves names). The proxy is on it
+  and on Podman's default network; the agent finds it as `pob-proxy`
+  through `--add-host`. The harness's `HTTPS_PROXY` is
+  `http://pob-proxy:3128`; its MCP endpoint is
+  `http://pob-proxy:8731/mcp`.
+- **`pob-proxy`** (std only, a thread per connection, 256 at a time)
+  answers `CONNECT host:port` for the hosts of the harness's allowlist
+  (`/etc/pob-proxy/<harness>.txt`, plus `--allow <host>` from `pob
+  agent`), nothing else. Plain HTTP requests, other hosts and ports, and
+  names that resolve only to internal addresses (loopback, private,
+  link-local, CGNAT, unique local) get a 403, which it logs. An entry is
+  `host`, `host:port` (443 by default) or `*.domain`. The lists name the
+  API and login hosts: `api.anthropic.com`, `claude.ai`, `claude.com`,
+  `platform.claude.com` and `console.anthropic.com` for Claude Code;
+  `api.openai.com`, `auth.openai.com` and `chatgpt.com` for Codex. Its
+  route (`--route 0.0.0.0:8731=<upstream>`) passes bytes to the host's
+  endpoint, which checks the token, so a route to it carries no more
+  than the token does.
+- **The route to the host, per platform.**
+  - On Linux, `pob agent` listens on a Unix socket in
+    `$XDG_RUNTIME_DIR/pob-agent-<pid>/`, mounted into the proxy alone,
+    and forwards it to `127.0.0.1:8731`. That avoids
+    `host.containers.internal`, which rootless bridge networks don't
+    reliably route to the host's loopback. The proxy runs with
+    `label=disable`, because SELinux would refuse its connection to a
+    socket of a process outside. It runs only `pob-proxy`, never the
+    agent's code.
+  - On macOS, the route is to `host.containers.internal:8731`, which the
+    podman machine's gvproxy maps to the Mac's loopback.
+  - On Windows (WSL NAT), see [Windows](#windows).
+- **The token:** `pob agent` mints one for the run, named after the
+  harness (`claude-code` or `codex`, the commits' `Source: agent <name>`)
+  with the builds of `--build` and a new agent directory (or `--agent`).
+  It passes the token to the container in `POB_TOKEN`, from its own
+  environment, so the token is on no command line. Claude Code gets
+  `--mcp-config` with an `Authorization` header, which the container's
+  shell fills from `POB_TOKEN`. Codex gets `-c
+  mcp_servers.pob.url=...` and `bearer_token_env_var="POB_TOKEN"`. The
+  token is **revoked when `pob agent` ends** (decided), and the host
+  closes its sessions. If `pob agent` is killed, its token stays until
+  `pob agents revoke`; `pob agents tokens` lists it.
+- **The host:** `pob agent` starts one when none answers on the control
+  socket (as `pob mcp` does), waits for its MCP endpoint (`--endpoint`,
+  `127.0.0.1:8731` by default), and says so if the host stops or serves
+  no MCP over HTTP.
+- **`--no-container`** runs the harness in this terminal with `pob mcp`
+  on stdio (`claude --mcp-config` or `codex -c mcp_servers.pob.*`), after
+  saying it is not sandboxed. `--exec -- <command>` runs a command in the
+  container instead of the harness (a shell, or the smoke test).
+  Arguments after `--` otherwise go to the harness.
+- **Podman only** for now (`POB_PODMAN` names another binary). Without
+  Podman, `pob agent` says how to install it or to use `--no-container`.
+- Not built yet: `--clean` (removing the agent directory when the run
+  ends: the host cleans up only from the UI's Agents tab so far, so it
+  needs `pob agents clean` on the control socket first); the Agents tab's
+  "unsandboxed" mark for `--no-container` connections; Docker; WSL's
+  mirrored mode; changing the defaults in the host's config (today they
+  are fixed, except `--allow`).
+
+The commands, on each platform:
+
+```sh
+# Linux: Podman (rootless) from the distribution
+pob agent claude --build RF            # or: pob agent codex --build RF
+# macOS: Podman Desktop or `brew install podman`, then once:
+podman machine init && podman machine start
+pob agent claude --build RF
+# Windows (PowerShell or Windows Terminal): Podman for Windows on WSL 2
+# (NAT, WSL's default), then once:
+podman machine init; podman machine start
+pob agent claude --build RF
+# anywhere: the harness here, unsandboxed
+pob agent claude --build RF --no-container
+```
+
+The first run builds the images (a few minutes). Logging in is the
+harness's own, inside the container: Claude Code prints a URL and takes
+the code back; Codex logs in with `codex login --device-auth` (run `pob
+agent codex --exec -- codex login --device-auth` once).
 
 ### Evaluating
 
@@ -1248,7 +1460,19 @@ starts: read GGG's developer docs and terms from the source.
 - **The default container:** from inside it, the host's files and the
   control socket are absent, the root filesystem is read-only, and every
   host but the agent endpoint and the harness's allowlist is unreachable;
-  on Linux, macOS and Windows, there in both WSL networking modes.
+  on Linux, macOS and Windows, there in both WSL networking modes. Built
+  for Linux: `container/smoke.sh` (the images, and from inside: not root,
+  no capabilities, a read-only root filesystem, the harnesses installed,
+  HTTPS to an allowed host and nowhere else, no route out) and
+  `container/smoke-agent.sh` (`pob agent --exec` end to end: MCP through
+  the route with the token, another token refused, no host files, the
+  token revoked after), both on CI's `container` job (Ubuntu's rootless
+  Podman). The proxy's allowlist, CONNECT parsing and route have unit
+  tests (`crates/proxy`), as do `pob agent`'s arguments, harness configs,
+  `.wslconfig` reading and the token's lifecycle (`crates/cli`). macOS
+  and Windows are untested: by hand, run `container/smoke.sh` and
+  `container/smoke-agent.sh target/release/pob` there (Git Bash or WSL on
+  Windows for the scripts) and `pob agent claude --build <b>`.
 - **End to end:** Playwright drives the web app on a host while a script
   runs `pob ctl`; the agent's edit shows in the tree, the sidebar and the
   undo list.
@@ -1271,12 +1495,14 @@ Each one a PR, as usual:
    agents install`: any harness works on a build. Done (#194, #196,
    #197); the Windows named pipe came with step 5.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
-   Linux, macOS and Windows.
+   Linux, macOS and Windows; the control socket's named pipe on Windows.
+   Done (#207, #200, #215); tested on Linux, macOS and Windows not yet.
 6. The web app on the host: the host serves it, the WebSocket transport in
    `client.ts`, change events, the undo list with sources, the history
    with restore, the agent directories with keep and clean. Done
    ([below](#built-the-web-app-on-the-host)).
-7. `ui_context` and several open builds.
+7. `ui_context` and several open builds. Done
+   ([below](#built-several-open-builds)).
 8. `eval`, `assumptions`, objectives, constraints, the generators, `best`
    and `improve`. Done (#204, #208), except the anoint, unique, craft and
    rare generators.
@@ -1305,13 +1531,20 @@ Each one a PR, as usual:
 - `core.bin` is never published.
 - Trade and prices are deferred.
 - `pob agent` uses the default Podman container; `--no-container` is the
-  explicit override.
+  explicit override. Its token is for the run alone, revoked when it ends.
 - The backup push is optional, off by default.
 - The host is a second way to run the app, recorded in design.md.
 - Cloud sessions are deferred.
 
 ## Questions for the owner
 
-- **WSL's default networking mode.** The Windows section assumes NAT is
-  still the default and mirrored is opt-in; to be checked against
-  Microsoft's current docs before step 5's Windows work.
+- **WSL's mirrored mode.** NAT is WSL's default (answered, see
+  [Windows](#windows)); `pob agent` supports NAT and stops on mirrored.
+  Worth supporting mirrored, and how much Windows testing (a real
+  machine, or a Windows runner with nested virtualisation) is wanted
+  before Windows is called supported?
+- **The harnesses' hosts.** The allowlists hold the API and login hosts
+  only; MCP servers of the user's own, web fetches and package installs
+  in the container are refused unless `--allow`ed. Is that the default
+  wanted, or should the lists grow (e.g. npm and PyPI for the agent's
+  scripts)?

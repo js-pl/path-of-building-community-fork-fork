@@ -191,19 +191,7 @@ impl Tokens {
             &json!({ "tokens": all.iter().map(Token::file_json).collect::<Vec<_>>() }),
         )
         .map_err(|e| e.to_string())?;
-        let mut o = std::fs::OpenOptions::new();
-        o.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            o.mode(0o600);
-        }
-        {
-            use std::io::Write;
-            let mut f = o.open(&tmp).map_err(err)?;
-            f.write_all(text.as_bytes()).map_err(err)?;
-            f.sync_all().map_err(err)?;
-        }
+        crate::local::write_private(&tmp, text.as_bytes()).map_err(err)?;
         std::fs::rename(&tmp, &self.path).map_err(err)
     }
 }

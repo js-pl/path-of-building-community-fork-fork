@@ -81,6 +81,9 @@ pub trait Store {
     fn log(&self, id: &BuildId, n: usize) -> Result<Vec<Entry>>;
     /// The build's XML at a version
     fn read_version(&self, id: &BuildId, version: &str) -> Result<String>;
+    /// The build's session closed while idle: commit what waits (the
+    /// user's coalesced edits) and let go of what is kept for it
+    fn closed(&mut self, _id: &BuildId) {}
 }
 
 /// A store in memory, with a history of its own

@@ -4,7 +4,6 @@
 //! told of each change in order, `changes_since` agrees with the events,
 //! and the history has the user's coalesced edits and the agent's steps
 //! apart.
-#![cfg(unix)]
 
 use agent::Grant;
 use history::Git;
@@ -532,5 +531,239 @@ fn agent_directories_and_connections() {
     assert_eq!(saved.history.git_config, "/x/gitconfig");
     let a = host_req(&mut h, &out, "setSettings", json!({ "enabled": "maybe" }));
     assert!(a.get("error").is_some(), "{a}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The frames a client was sent, as JSON
+fn frames(out: &mpsc::Receiver<host::ws::Out>) -> Vec<J> {
+    let mut v = Vec::new();
+    while let Ok(o) = out.try_recv() {
+        if let host::ws::Out::Text(t) = o {
+            v.push(serde_json::from_str(&t).unwrap());
+        }
+    }
+    v
+}
+
+#[test]
+fn several_open_builds() {
+    let Some(git) = Git::find() else {
+        eprintln!("no git: skipped");
+        return;
+    };
+    let dir = temp("several");
+    let builds = dir.join("builds");
+    for (name, file) in [("RF", "gen-0003.xml"), ("Other", "gen-0004.xml")] {
+        let xml = std::fs::read_to_string(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../corpus/generated")
+                .join(file),
+        )
+        .unwrap();
+        std::fs::create_dir_all(builds.join(name)).unwrap();
+        std::fs::write(builds.join(name).join("build.xml"), &xml).unwrap();
+    }
+    let mut store = FsStore::new(&builds, Some(git));
+    // The user's edits wait to be committed until their build closes
+    store.set_quiet(Duration::from_secs(3600));
+    let mut h = Host::new(data(), store);
+    h.default_build = Some("RF".into());
+    h.agent.set_max_open(1);
+    let (tx1, out1) = mpsc::channel();
+    let (tx2, out2) = mpsc::channel();
+    h.handle(Msg::Open {
+        client: 1,
+        out: tx1,
+    });
+    h.handle(Msg::Open {
+        client: 2,
+        out: tx2,
+    });
+    frames(&out1);
+    frames(&out2);
+
+    // The second client shows another build; both stay open
+    h.handle(Msg::Ui {
+        client: 2,
+        text: json!({ "id": 1, "host": "open", "args": { "build": "Other" } }).to_string(),
+    });
+    let f = frames(&out2);
+    assert!(
+        f.iter()
+            .any(|v| v["event"] == "open" && v["build"] == "Other"),
+        "{f:?}"
+    );
+    let mut open = h.agent.open_builds();
+    open.sort();
+    assert_eq!(
+        open,
+        [agent::BuildId::user("Other"), agent::BuildId::user("RF")]
+    );
+
+    // An edit in each client is on its own build; every client hears of
+    // both, each change naming its build
+    h.handle(Msg::Ui {
+        client: 2,
+        text: json!({ "id": 2, "req": { "cmd": "control", "path": "build.characterLevel", "text": "70" } }).to_string(),
+    });
+    let grant = Grant::new("claude", "claude-1")
+        .with_build("RF")
+        .with_build("Other");
+    let r = agent_call_h(
+        &mut h,
+        &grant,
+        json!({ "verb": "set_level", "level": 90, "build": "RF" }),
+    );
+    assert_eq!(r["ok"]["version"], 1, "{r}");
+    let r = agent_call_h(
+        &mut h,
+        &grant,
+        json!({ "verb": "set_level", "level": 80, "build": "Other" }),
+    );
+    assert_eq!(r["ok"]["version"], 2, "{r}");
+    let changes: Vec<(String, u64, String)> = frames(&out1)
+        .into_iter()
+        .filter(|v| v["event"] == "change")
+        .map(|v| {
+            (
+                v["build"].as_str().unwrap().to_string(),
+                v["version"].as_u64().unwrap(),
+                v["source"].as_str().unwrap().to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        changes,
+        [
+            ("Other".to_string(), 1, "user".to_string()),
+            ("RF".to_string(), 1, "agent claude".to_string()),
+            ("Other".to_string(), 2, "agent claude".to_string()),
+        ]
+    );
+
+    // Once no client shows it, an idle build closes when another opens,
+    // and the user's waiting edits are committed then
+    h.handle(Msg::Ui {
+        client: 2,
+        text: json!({ "id": 3, "req": { "cmd": "control", "path": "build.characterLevel", "text": "75" } }).to_string(),
+    });
+    assert!(h.agent.store().is_pending(&agent::BuildId::user("Other")));
+    h.handle(Msg::Close { client: 2 });
+    agent_call_h(&mut h, &grant, json!({ "verb": "summary", "build": "RF" }));
+    assert_eq!(h.agent.open_builds(), [agent::BuildId::user("RF")]);
+    let log = git_log(&builds.join("Other"));
+    assert!(log[0].ends_with("|user"), "{log:?}");
+    // Opened again, its version goes on
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "builds" }));
+    assert_eq!(r["ok"]["builds"][1]["version"], 3, "{r}");
+    let r = agent_call_h(
+        &mut h,
+        &grant,
+        json!({ "verb": "set_level", "level": 85, "build": "Other", "expect": 3 }),
+    );
+    assert_eq!(r["ok"]["version"], 4, "{r}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// An agent API call straight through the engine thread's messages
+fn agent_call_h(h: &mut Host, grant: &Grant, req: J) -> J {
+    let (tx, rx) = mpsc::channel();
+    h.handle(Msg::Agent(Call {
+        grant: grant.clone(),
+        line: req.to_string(),
+        reply: tx,
+    }));
+    serde_json::from_str(&rx.recv().unwrap()).unwrap()
+}
+
+#[test]
+fn ui_context_and_the_default_build() {
+    let dir = temp("context");
+    let builds = dir.join("builds");
+    let xml = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/generated/gen-0003.xml"),
+    )
+    .unwrap();
+    for name in ["RF", "Other"] {
+        std::fs::create_dir_all(builds.join(name)).unwrap();
+        std::fs::write(builds.join(name).join("build.xml"), &xml).unwrap();
+    }
+    let mut h = Host::new(data(), FsStore::new(&builds, None));
+    h.default_build = Some("RF".into());
+    let registry = std::sync::Arc::new(host::connections::Registry::default());
+    h.registry = Some(registry.clone());
+    let grant = Grant::new("claude", "claude-1")
+        .with_build("RF")
+        .with_build("Other");
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["ui"], false, "{r}");
+
+    // A client reports its tab and what is hovered: ids only
+    let (tx, out) = mpsc::channel();
+    h.handle(Msg::Open { client: 1, out: tx });
+    let a = host_req(
+        &mut h,
+        &out,
+        "context",
+        json!({ "tab": "Tree", "selection": { "node": 36634, "text": "ignored" } }),
+    );
+    assert!(a.get("error").is_none(), "{a}");
+    assert_eq!(registry.ui_build().as_deref(), Some("RF"));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["build"], "RF", "{r}");
+    assert_eq!(r["ok"]["tab"], "Tree");
+    assert!(
+        r["ok"]["selection"]["node"]
+            .as_str()
+            .unwrap()
+            .ends_with("#36634"),
+        "{r}"
+    );
+    // A tab the UI hasn't is dropped
+    host_req(&mut h, &out, "context", json!({ "tab": "<b>x</b>" }));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["tab"], J::Null, "{r}");
+
+    // Another build shown: the selection goes; requests naming no build
+    // stay on the grant's first
+    host_req(&mut h, &out, "open", json!({ "build": "Other" }));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["build"], "Other", "{r}");
+    assert_eq!(r["ok"]["selection"], J::Null, "{r}");
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "summary" }));
+    assert_eq!(r["ok"]["build"], "RF", "{r}");
+
+    // A hello asking for the UI's build is granted it, fixed then
+    let (calls, _rx) = mpsc::channel();
+    let grant_for = |hello: J| -> J {
+        let (mine, theirs) = std::os::unix::net::UnixStream::pair().unwrap();
+        let reg = registry.clone();
+        let calls = calls.clone();
+        let t = std::thread::spawn(move || {
+            let _ = host::control::connection_in(theirs, calls, 0, Some((&reg, Box::new(|| {}))));
+        });
+        let mut w = mine.try_clone().unwrap();
+        writeln!(w, "{hello}").unwrap();
+        let line = host::control::read_line(&mut BufReader::new(mine))
+            .unwrap()
+            .unwrap();
+        drop(w);
+        t.join().unwrap();
+        serde_json::from_str(&line).unwrap()
+    };
+    let a =
+        grant_for(json!({ "hello": { "harness": "claude-code", "builds": [], "ui_build": true } }));
+    assert_eq!(a["ok"]["builds"], json!(["Other"]), "{a}");
+    let a = grant_for(
+        json!({ "hello": { "harness": "claude-code", "builds": ["RF"], "ui_build": true } }),
+    );
+    assert_eq!(a["ok"]["builds"], json!(["RF"]), "{a}");
+    let a = grant_for(json!({ "hello": { "harness": "ctl", "builds": [] } }));
+    assert_eq!(a["ok"]["builds"], json!([]), "{a}");
+    let a = grant_for(json!({ "admin": "ui_build" }));
+    assert_eq!(a["ok"]["build"], "Other", "{a}");
+    // No client: no UI build
+    h.handle(Msg::Close { client: 1 });
+    assert_eq!(registry.ui_build(), None);
     let _ = std::fs::remove_dir_all(&dir);
 }

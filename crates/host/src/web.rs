@@ -312,15 +312,7 @@ pub fn listen(addr: &str) -> Result<(TcpListener, u16), String> {
 
 /// Opens a link in the user's browser
 pub fn open_browser(url: &str) -> Result<(), String> {
-    let mut cmd = if cfg!(target_os = "macos") {
-        std::process::Command::new("open")
-    } else if cfg!(windows) {
-        let mut c = std::process::Command::new("cmd");
-        c.args(["/c", "start", ""]);
-        c
-    } else {
-        std::process::Command::new("xdg-open")
-    };
+    let mut cmd = crate::local::open_command();
     cmd.arg(url)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())

@@ -5,6 +5,7 @@
 // unique and rare templates.
 
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { reportContext } from "./context";
 import type { TabProps } from "../app";
 import { engine } from "../app";
 import type { DisplayItem, Item, Items, TooltipLine } from "../engine/types";
@@ -37,6 +38,7 @@ export function ItemsTab({ act, rev, setControl }: TabProps) {
     engine.call<Items>("items").then(setItems);
   }, [rev]);
 
+  useEffect(() => reportContext({ selection: selected === null ? null : { item: selected } }), [selected]);
   useEffect(() => {
     if (selected === null) return setTip(null);
     engine

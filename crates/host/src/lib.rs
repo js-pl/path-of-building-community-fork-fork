@@ -7,6 +7,7 @@
 pub mod connections;
 pub mod control;
 pub mod http;
+pub mod local;
 pub mod mcp;
 pub mod store;
 pub mod tokens;
@@ -23,23 +24,10 @@ pub const BUILDS_ENV: &str = "POB_BUILDS";
 /// The variable that names another control socket
 pub const SOCKET_ENV: &str = "POB_SOCKET";
 
-/// The app's data directory: `%LOCALAPPDATA%` on Windows,
-/// `~/Library/Application Support` on macOS, `$XDG_DATA_HOME` or
-/// `~/.local/share` elsewhere, each with `path-of-building-fork-fork/`
+/// The app's data directory: [`local::data_base`] with
+/// `path-of-building-fork-fork/`
 pub fn data_dir() -> Option<PathBuf> {
-    let var = |v: &str| {
-        std::env::var_os(v)
-            .filter(|p| !p.is_empty())
-            .map(PathBuf::from)
-    };
-    let base = if cfg!(windows) {
-        var("LOCALAPPDATA")
-    } else if cfg!(target_os = "macos") {
-        var("HOME").map(|h| h.join("Library").join("Application Support"))
-    } else {
-        var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| h.join(".local").join("share")))
-    };
-    base.map(|b| b.join("path-of-building-fork-fork"))
+    local::data_base().map(|b| b.join("path-of-building-fork-fork"))
 }
 
 /// The builds directory: `POB_BUILDS`, else `builds/` in [`data_dir`]
@@ -50,14 +38,11 @@ pub fn default_builds() -> Option<PathBuf> {
         .or_else(|| data_dir().map(|d| d.join("builds")))
 }
 
-/// The control socket: `POB_SOCKET`, else `control.sock` in [`data_dir`]
-/// (on Windows a named pipe, `\\.\pipe\path-of-building-fork-fork-<user>-control`)
+/// The control socket: `POB_SOCKET`, else [`local::default_socket`]
+/// (`control.sock` in [`data_dir`], a named pipe on Windows)
 pub fn default_socket() -> Option<PathBuf> {
-    let var = std::env::var_os(SOCKET_ENV)
+    std::env::var_os(SOCKET_ENV)
         .filter(|p| !p.is_empty())
-        .map(PathBuf::from);
-    #[cfg(windows)]
-    return var.or_else(|| Some(PathBuf::from(control::pipe::default_name())));
-    #[cfg(not(windows))]
-    var.or_else(|| data_dir().map(|d| d.join("control.sock")))
+        .map(PathBuf::from)
+        .or_else(|| data_dir().map(|d| local::default_socket(&d)))
 }

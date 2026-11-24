@@ -1,6 +1,6 @@
 //! The control socket: the user's own processes (`pob ctl`, later `pob
-//! mcp`) call the agent API on it. A Unix socket (a named pipe on
-//! Windows, [`pipe`]) only the user can open;
+//! mcp`) call the agent API on it, over [`crate::local`]: a Unix socket
+//! (a named pipe on Windows) only the user can open;
 //! one JSON line per request and per answer.
 //!
 //! A connection's first line is its hello, which fixes its grant:
@@ -13,7 +13,9 @@
 //! ```
 //!
 //! `agent` reuses an agent directory; without it the connection gets a new
-//! one, `<harness>-<time>`. The socket is the user's (only they can open
+//! one, `<harness>-<time>`. `"ui_build": true` with no `builds` grants the
+//! user's build the UI shows when the connection is made (none when no UI
+//! shows one); the grant stays that build when the UI shows another. The socket is the user's (only they can open
 //! it), so a hello may name any of the user's builds; no request after it
 //! changes the grant.
 
@@ -105,10 +107,13 @@ fn admin(req: &J, registry: &Registry) -> J {
             None => json!({ "error": "disconnect takes a connection's id" }),
         };
     }
+    if req == "ui_build" {
+        return json!({ "ok": { "build": registry.ui_build() } });
+    }
     if let Some(t) = req.get("revoked").and_then(J::as_str) {
         return json!({ "ok": { "closed": registry.disconnect_token(t) } });
     }
-    json!({ "error": "admin is \"connections\", {\"disconnect\": <id>} or {\"revoked\": <token id>}" })
+    json!({ "error": "admin is \"connections\", \"ui_build\", {\"disconnect\": <id>} or {\"revoked\": <token id>}" })
 }
 
 /// Serves one connection, listed in `registry` (with how to close it)
@@ -130,8 +135,18 @@ pub fn connection_in(
         writeln!(stream.get_mut(), "{}", admin(req, reg))?;
         return Ok(());
     }
-    let grant = match hello.and_then(|h| grant_of(&h, now)) {
-        Ok(g) => g,
+    let ui_build = |h: &J| h["hello"]["ui_build"] == true;
+    let grant = match hello.and_then(|h| grant_of(&h, now).map(|g| (g, ui_build(&h)))) {
+        Ok((mut g, ui)) => {
+            // Fixed now: the build the UI shows as the connection is made
+            if ui
+                && g.builds.is_empty()
+                && let Some(b) = registry.as_ref().and_then(|(r, _)| r.ui_build())
+            {
+                g = g.with_build(b);
+            }
+            g
+        }
         Err(e) => {
             writeln!(stream.get_mut(), "{}", json!({ "error": e }))?;
             return Ok(());
@@ -197,131 +212,6 @@ pub fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs() as i64)
-}
-
-#[cfg(windows)]
-pub use pipe as local;
-/// The control socket of this platform: [`unix`] or [`pipe`], each with
-/// `listen`, `accept`, `answers`, `admin` and `Client`
-#[cfg(unix)]
-pub use unix as local;
-
-#[cfg(windows)]
-pub mod pipe;
-
-#[cfg(unix)]
-pub mod unix {
-    //! The control socket on Unix: a socket file in a directory only the
-    //! user can enter, itself only the user's
-
-    use super::*;
-    use std::os::unix::fs::PermissionsExt;
-    use std::os::unix::net::{UnixListener, UnixStream};
-    use std::path::Path;
-
-    /// Listens at `path`. A socket left by a host that is gone is
-    /// replaced; one a running host answers on is an error.
-    pub fn listen(path: &Path) -> Result<UnixListener, String> {
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
-        }
-        if path.exists() {
-            if UnixStream::connect(path).is_ok() {
-                return Err(format!("a host is running already on {}", path.display()));
-            }
-            std::fs::remove_file(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        }
-        let l = UnixListener::bind(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-            .map_err(|e| format!("{}: {e}", path.display()))?;
-        Ok(l)
-    }
-
-    /// Accepts connections on a thread of their own each, passing their
-    /// calls to `calls` and listing them in `registry`
-    pub fn accept(
-        listener: UnixListener,
-        calls: mpsc::Sender<Call>,
-        registry: std::sync::Arc<Registry>,
-    ) {
-        for stream in listener.incoming() {
-            let Ok(stream) = stream else { continue };
-            let calls = calls.clone();
-            let registry = registry.clone();
-            std::thread::spawn(move || {
-                let close: Closer = match stream.try_clone() {
-                    Ok(s) => Box::new(move || {
-                        let _ = s.shutdown(std::net::Shutdown::Both);
-                    }),
-                    Err(_) => Box::new(|| {}),
-                };
-                let _ = connection_in(stream, calls, now(), Some((&registry, close)));
-            });
-        }
-    }
-
-    /// Whether a host answers on `path`
-    pub fn answers(path: &Path) -> bool {
-        UnixStream::connect(path).is_ok()
-    }
-
-    /// An `admin` request to the host on `path`
-    pub fn admin(path: &Path, req: J) -> Result<J, String> {
-        let s =
-            UnixStream::connect(path).map_err(|e| format!("no host on {}: {e}", path.display()))?;
-        let mut w = s.try_clone().map_err(|e| e.to_string())?;
-        writeln!(w, "{}", json!({ "admin": req })).map_err(|e| e.to_string())?;
-        let line = read_line(&mut BufReader::new(s))
-            .map_err(|e| e.to_string())?
-            .ok_or("the host closed the connection")?;
-        let v: J = serde_json::from_str(&line).map_err(|e| e.to_string())?;
-        match v.get("error") {
-            Some(e) => Err(e.as_str().unwrap_or_default().to_string()),
-            None => Ok(v["ok"].clone()),
-        }
-    }
-
-    /// A client of the control socket
-    pub struct Client {
-        reader: BufReader<UnixStream>,
-        writer: UnixStream,
-        /// The hello's answer
-        pub hello: J,
-    }
-
-    impl Client {
-        /// Connects and says hello
-        pub fn connect(path: &Path, hello: &J) -> Result<Client, String> {
-            let s = UnixStream::connect(path).map_err(|e| {
-                format!(
-                    "no host on {}: {e} (start one with `pob host --headless`)",
-                    path.display()
-                )
-            })?;
-            let writer = s.try_clone().map_err(|e| e.to_string())?;
-            let mut c = Client {
-                reader: BufReader::new(s),
-                writer,
-                hello: J::Null,
-            };
-            let h = c.call(hello)?;
-            if let Some(e) = h.get("error") {
-                return Err(e.as_str().unwrap_or_default().to_string());
-            }
-            c.hello = h["ok"].clone();
-            Ok(c)
-        }
-
-        /// One request's answer, `{"ok": ...}` or `{"error": ...}`
-        pub fn call(&mut self, req: &J) -> Result<J, String> {
-            writeln!(self.writer, "{req}").map_err(|e| e.to_string())?;
-            let line = read_line(&mut self.reader)
-                .map_err(|e| e.to_string())?
-                .ok_or("the host closed the connection")?;
-            serde_json::from_str(&line).map_err(|e| e.to_string())
-        }
-    }
 }
 
 #[cfg(test)]

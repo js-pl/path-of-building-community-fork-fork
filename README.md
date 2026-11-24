@@ -64,6 +64,12 @@ cargo run --release -p cli -- host          # serves it on 127.0.0.1:8730 and op
 target/release/pob agents install --build <build>   # Claude Code or Codex beside you
 ```
 
+The build's name in the top bar picks another of your builds; the link
+beside it opens the build in a page of its own, so several can be open.
+Without `--build`, `pob mcp` and `pob agents token` are granted the build
+the UI shows when they connect or are minted, fixed from then on; an
+agent's `ui_context` tells it what you are looking at.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Contains a port of code from Path of Building

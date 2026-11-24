@@ -8,13 +8,17 @@
 //! user before it says hello, so it never talks to a pipe someone else
 //! squatted on.
 
-use super::*;
+use crate::connections::{Closer, Registry};
+use crate::control::{Call, connection_in, now, read_line};
+use serde_json::{Value as J, json};
 use std::fs::File;
+use std::io::{BufReader, Write};
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use windows_sys::Win32::Foundation::{
     CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_ACCESS_DENIED, ERROR_NO_DATA,
     ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
@@ -146,6 +150,9 @@ impl Drop for Descriptor {
     }
 }
 
+/// A connection's stream
+pub type Stream = File;
+
 /// A named pipe the host listens on: the instance waiting for the next
 /// client, and how to make more
 pub struct Listener {
@@ -276,7 +283,7 @@ fn closer(done: Arc<AtomicBool>) -> Closer {
 
 /// Accepts connections on a thread of their own each, passing their
 /// calls to `calls` and listing them in `registry`
-pub fn accept(
+pub fn serve(
     mut listener: Listener,
     calls: mpsc::Sender<Call>,
     registry: std::sync::Arc<Registry>,

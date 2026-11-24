@@ -111,7 +111,8 @@ jobs:
           name: tests
       - run: cargo nextest run --profile ci --archive-file tests.tar.zst --workspace-remap . -E '${{ matrix.filter }}'
 
-  # The host on Windows: the control socket as a named pipe, MCP over HTTP
+  # The host, `pob ctl` and `pob mcp` on Windows: the same tests as on Linux,
+  # over the named pipe
   windows:
     runs-on: windows-latest
     steps:
@@ -126,16 +127,24 @@ jobs:
           submodules: true
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy -p host -p cli --all-targets -- -D warnings
-      - run: cargo test --release -p host
+      - run: cargo test --release -p host -p cli
 
   # The default agent container: its images built with Podman, its
   # defaults checked from inside
   container:
     runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - run: podman --version
       - run: container/smoke.sh
+      - run: cargo build --release -p cli
+      - run: container/smoke-agent.sh target/release/pob
 
   web:
     runs-on: ubuntu-latest

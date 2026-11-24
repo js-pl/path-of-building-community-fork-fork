@@ -2,6 +2,7 @@
 // tab edits them
 
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { reportContext } from "./context";
 import type { TabProps } from "../app";
 import { engine } from "../app";
 import type { Gem, Skills, TooltipLine } from "../engine/types";
@@ -15,6 +16,7 @@ let gemListCache: Promise<GemInfo[]> | null = null;
 export function SkillsTab({ act, rev }: TabProps) {
   const [skills, setSkills] = useState<Skills | null>(null);
   const [sel, setSel] = useState(1);
+  useEffect(() => reportContext({ selection: { group: sel } }), [sel]);
   const [gems, setGems] = useState<GemInfo[]>([]);
   const [tip, setTip] = useState<TooltipLine[] | null>(null);
   const [paste, setPaste] = useState("");
