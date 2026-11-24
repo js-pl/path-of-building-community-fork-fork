@@ -326,7 +326,7 @@ pub fn input_schema(verb: &str) -> Option<J> {
                     "type": "array",
                     "minItems": 1,
                     "items": { "type": "string", "enum": generators },
-                    "description": format!("the generators each step takes moves from; default masteries and config; tree needs a points constraint. {about}"),
+                    "description": format!("the generators each step takes moves from; default masteries; tree needs a points constraint. {about}"),
                 });
                 props["steps"] = json!({ "type": "integer", "minimum": 1, "maximum": 10, "description": "the most steps; default 3" });
                 (props, &[])

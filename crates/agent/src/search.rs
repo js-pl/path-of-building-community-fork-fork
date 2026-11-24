@@ -39,7 +39,7 @@ pub(crate) const IMPROVE_FIELDS: &[&str] = &[
 ];
 
 /// `improve`'s generators when none are named
-const IMPROVE_DEFAULT: &[&str] = &["masteries", "config"];
+const IMPROVE_DEFAULT: &[&str] = &["masteries"];
 
 /// A score better than another by more than rounding
 const EPS: f64 = 1e-9;
@@ -254,6 +254,9 @@ impl<'d, S: Store> Agent<'d, S> {
             Some(_) => return Err("generators is a list of generator names".into()),
         };
         for k in &kinds {
+            if k == "config" {
+                return Err(crate::generate::NO_CONFIG.into());
+            }
             if !GENERATORS.iter().any(|(g, _)| g == k) {
                 return Err(format!(
                     "no generator {:?}; the generators: {}",
