@@ -1122,7 +1122,7 @@ Each one a PR, as usual:
    with restore, the agent directories with keep and clean.
 7. `ui_context` and several open builds.
 8. `eval`, `assumptions`, objectives, constraints, the generators, `best`
-   and `improve`. Done (#202, #203), except the anoint, unique, craft and
+   and `improve`. Done (#204, #205), except the anoint, unique, craft and
    rare generators.
 9. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
