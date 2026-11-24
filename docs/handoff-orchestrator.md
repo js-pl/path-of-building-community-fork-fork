@@ -26,7 +26,8 @@ read it.
 
 ## State of the agent plan (docs/agent.md "Steps")
 
-Done: steps 1, 2, 3, 4, 5, 6, 7, 8 and 10, plus redo (#213) and "no
+Done: steps 1 to 10 (step 9 as #212 jobs/front/dominating, #221 a
+Windows test fix, #222 respec and keystone constraints), plus redo (#213) and "no
 search changes the config" (#216). Step 7 landed as #217 (several open
 builds) and #219 (`ui_context`, and a default grant fixed when the token
 or session is created, as the owner decided).
@@ -37,9 +38,6 @@ Still in flight when this was written. Check with `list_sessions
 children` from the old orchestrator, or `list_sessions` and the tag
 `agent-plan`:
 
-- **Step 9** (`session_01W1dkjwuZXqXY31hE5ZJ6qg`): `dominating`, `front`,
-  combination and respec search, jobs with progress and cancelling. It
-  has no config moves (the owner's decision, see below).
 - The platform-agnostic local transport is finished (#218): `host::local`
   is the only per-OS code for the host, and CI runs the host and CLI
   tests on Windows.
@@ -54,13 +52,9 @@ children` from the old orchestrator, or `list_sessions` and the tag
   Afterwards, remove the two answered questions from agent.md's
   "Questions for the owner".
 
-Both sessions stopped on the 5-hour usage limit at about 17:30 UTC
-(reset 21:10 UTC). Step 9 was waiting for CI on #212 before squash
-merging it. Next, it was to rebase `agent-respec` (respec search, keystone
-constraints) onto main and open its PR. Send each session "continue"
-after the reset. At 22:00 UTC step 9 was running again. It found main's
-`windows` CI job red since #218/#219: `web.rs` used a Unix socket pair.
-It is fixing that in #221 before merging #212.
+The step 5 session stopped on the 5-hour usage limit at about 17:30 UTC
+(reset 21:10 UTC), and had sent nothing since as of 22:30 UTC. It may
+need a "continue".
 
 If any of these is unmerged when you start, check its PR and nudge the
 session, or take the work over.
@@ -142,7 +136,7 @@ Not part of the oracle or GUI cleanup: no GUI Lua remains in the app.
 
 - **Remote branches the owner still has to delete:**
   ```bash
-  git push origin --delete windows-named-pipe windows-pipe agent-container pob-agent-run transport-agnostic agent-best agent-eval agents-install-2 drop-translation-delete
+  git push origin --delete agent-front-jobs agent-respec agent-respec-2 windows-named-pipe windows-pipe agent-container pob-agent-run transport-agnostic agent-best agent-eval agents-install-2 drop-translation-delete
   ```
 - **Older branches ahead of main with no merged PR head.** Investigate
   them before suggesting deletion:
@@ -168,6 +162,15 @@ Not part of the oracle or GUI cleanup: no GUI Lua remains in the app.
   - testing on real macOS and Windows machines.
 - **Not built in step 7:** Calcs and Config selections in `ui_context`,
   hovered items or gems, and a flag for the cap on open builds.
-- **Not built in step 8:** the anoint, unique, craft and rare generators.
+- **Not built in steps 8 and 9:**
+  - the anoint, unique, craft and rare generators, which need a `craft`
+    (or anoint) verb so that each move is an `apply` change;
+  - flags such as immunities as constraints;
+  - repairs by crafting;
+  - MCP progress notifications, since the HTTP endpoint has no SSE;
+  - a UI view of jobs (the host requests exist).
+- **Owner question from step 9:** should a `craft` verb, anoints first, be
+  next, to unlock the item generators? Watch the timing asserts in
+  `crates/agent/tests/front.rs` for flakes on slow runners.
 - The old orchestrator's scheduled check-in
   (`trig_01GNVRTZ4u7HJeGUW6M1cNFw`) is deleted with this handoff.
