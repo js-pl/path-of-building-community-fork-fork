@@ -19,8 +19,8 @@ See `docs/design.md` before making architectural decisions.
   - `agent` (the agent API: build-level verbs on the session, grants,
     agent directories, author text kept apart; no I/O), see `docs/agent.md`
   - `host` (`pob host`: the builds directory with its history, the
-    control socket `pob ctl` and `pob mcp` call (a named pipe on
-    Windows), the agent API as MCP on stdio and over HTTP with tokens,
+    control socket `pob ctl` and `pob mcp` call (a Unix socket or, on
+    Windows, a named pipe, behind the one platform layer `host::local`), the agent API as MCP on stdio and over HTTP with tokens,
     and, without `--headless`, the web app with its WebSocket for the
     engine API and change events), see `docs/agent.md`
   - `proxy` (`pob-proxy`, the default agent container's way out: an HTTPS

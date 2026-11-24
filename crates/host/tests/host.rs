@@ -1,15 +1,14 @@
 //! The host on a builds directory with git: a client on the control socket
 //! edits a build, each step is committed before its answer, and a host
 //! started again reads the saved build.
-#![cfg(unix)]
 
 use agent::{Agent, BuildId, Store};
 use history::Git;
 use host::FsStore;
-use host::control::{self, unix};
+use host::control;
+use host::local;
 use serde_json::json;
 use session::typed::TypedData;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
@@ -32,13 +31,17 @@ fn serve(
     socket: &Path,
     client: impl FnOnce() + Send + 'static,
 ) -> FsStore {
-    let listener = unix::listen(socket).unwrap();
-    let mode = std::fs::metadata(socket).unwrap().permissions().mode() & 0o777;
-    assert_eq!(mode, 0o600);
+    let mut listener = local::listen(socket).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(socket).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
     let (tx, rx) = mpsc::channel();
     // One connection, then the senders are gone and `answer` returns
     std::thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let stream = listener.accept().unwrap();
         let _ = control::connection(stream, tx, 0);
     });
     let c = std::thread::spawn(client);
@@ -65,12 +68,12 @@ fn host_on_the_control_socket() {
     .unwrap();
     std::fs::create_dir_all(builds.join("RF")).unwrap();
     std::fs::write(builds.join("RF/build.xml"), &xml).unwrap();
-    let socket = dir.join("run/control.sock");
+    let socket = local::endpoint_in(&dir.join("run"), "control.sock");
 
     let store = FsStore::new(&builds, Some(git.clone()));
     let s = socket.clone();
     let store = serve(d, store, &socket, move || {
-        let mut c = unix::Client::connect(
+        let mut c = local::Client::connect(
             &s,
             &json!({ "hello": { "harness": "ctl", "builds": ["RF"], "agent": "mine" } }),
         )
@@ -112,7 +115,7 @@ fn host_on_the_control_socket() {
     let store = FsStore::new(&builds, Some(git));
     let s = socket.clone();
     serve(d, store, &socket, move || {
-        let mut c = unix::Client::connect(
+        let mut c = local::Client::connect(
             &s,
             &json!({ "hello": { "harness": "ctl", "builds": ["RF"] } }),
         )

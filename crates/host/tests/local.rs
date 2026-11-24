@@ -1,28 +1,25 @@
-//! The control socket on Windows, a named pipe: a client says hello and
-//! calls a verb; a second host can't take the pipe; a name that isn't a
-//! pipe is refused.
-#![cfg(windows)]
+//! The local transport, the same on every platform (a Unix socket, a
+//! named pipe on Windows): a client says hello and calls a verb, two
+//! clients at once, the admin hellos, a disconnected client is closed and
+//! the other untouched; a second host can't take the socket.
 
 use host::connections::Registry;
-use host::control::pipe;
+use host::local;
 use serde_json::{Value as J, json};
-use std::path::PathBuf;
 use std::sync::{Arc, mpsc};
 
 #[test]
-fn control_pipe() {
-    let path = PathBuf::from(format!(
-        r"\\.\pipe\pob-test-{}-{}",
-        std::process::id(),
-        host::control::now()
-    ));
-    let listener = pipe::listen(&path).unwrap();
-    let again = pipe::listen(&path).err().unwrap();
+fn local_transport() {
+    let dir = std::env::temp_dir().join(format!("pob-local-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let path = local::endpoint_in(&dir, "control.sock");
+    let listener = local::listen(&path).unwrap();
+    let again = local::listen(&path).err().unwrap();
     assert!(again.contains("running already"), "{again}");
     let (tx, rx) = mpsc::channel::<host::control::Call>();
     let registry = Arc::new(Registry::default());
     let reg = registry.clone();
-    std::thread::spawn(move || pipe::accept(listener, tx, reg));
+    std::thread::spawn(move || local::serve(listener, tx, reg));
     // The engine's side: echoes each call's grant
     std::thread::spawn(move || {
         for c in rx {
@@ -33,21 +30,21 @@ fn control_pipe() {
     });
 
     let hello = json!({ "hello": { "harness": "ctl", "builds": ["RF"] } });
-    let mut c = pipe::Client::connect(&path, &hello).unwrap();
+    let mut c = local::Client::connect(&path, &hello).unwrap();
     assert_eq!(c.hello["connection"], "ctl");
     let a = c.call(&json!({ "verb": "summary" })).unwrap();
     assert_eq!(a["ok"]["builds"], json!(["RF"]));
     // Two clients at once
-    let mut d = pipe::Client::connect(&path, &hello).unwrap();
+    let mut d = local::Client::connect(&path, &hello).unwrap();
     assert!(d.call(&json!({ "verb": "tree" })).unwrap()["ok"].is_object());
-    assert!(pipe::answers(&path));
-    let list = pipe::admin(&path, json!("connections")).unwrap();
+    assert!(local::answers(&path));
+    let list = local::admin(&path, json!("connections")).unwrap();
     let n = list["connections"].as_array().unwrap().len();
     assert_eq!(n, 2, "{list}");
 
     // Disconnecting one closes it
     let id = list["connections"][0]["id"].as_u64().unwrap();
-    let closed = pipe::admin(&path, json!({ "disconnect": id })).unwrap();
+    let closed = local::admin(&path, json!({ "disconnect": id })).unwrap();
     assert_eq!(closed["closed"], J::Bool(true));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     let closed_c = loop {
@@ -61,5 +58,7 @@ fn control_pipe() {
     // The other client is untouched
     assert!(d.call(&json!({ "verb": "tree" })).unwrap()["ok"].is_object());
 
-    assert!(pipe::listen(&PathBuf::from(r"C:\control.sock")).is_err());
+    // On Windows the control socket is a pipe, nothing else
+    #[cfg(windows)]
+    assert!(local::listen(&std::path::PathBuf::from(r"C:\control.sock")).is_err());
 }

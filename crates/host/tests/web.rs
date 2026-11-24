@@ -4,7 +4,6 @@
 //! told of each change in order, `changes_since` agrees with the events,
 //! and the history has the user's coalesced edits and the agent's steps
 //! apart.
-#![cfg(unix)]
 
 use agent::Grant;
 use history::Git;

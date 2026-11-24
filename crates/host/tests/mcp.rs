@@ -1,12 +1,12 @@
 //! MCP clients on the host: `pob mcp`'s stdio relay over the control
 //! socket, through initialize, the tools, a read and an edit that commits;
 //! a grant reaches no other build.
-#![cfg(unix)]
 
 use agent::Agent;
 use history::Git;
 use host::FsStore;
-use host::control::{self, unix};
+use host::control;
+use host::local;
 use serde_json::{Value as J, json};
 use session::typed::TypedData;
 use std::path::{Path, PathBuf};
@@ -57,11 +57,11 @@ fn mcp_on_stdio() {
     let git = Git::find();
     let dir = temp("stdio");
     let builds = builds(&dir);
-    let socket = dir.join("run/control.sock");
-    let listener = unix::listen(&socket).unwrap();
+    let socket = local::endpoint_in(&dir.join("run"), "control.sock");
+    let mut listener = local::listen(&socket).unwrap();
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let (stream, _) = listener.accept().unwrap();
+        let stream = listener.accept().unwrap();
         let _ = control::connection(stream, tx, 0);
     });
 
@@ -98,7 +98,7 @@ fn mcp_on_stdio() {
         let mut out = Vec::new();
         host::mcp::stdio(input.as_bytes(), &mut out, |harness: &str| {
             let hello = json!({ "hello": { "harness": harness, "builds": ["RF"] } });
-            let mut c = unix::Client::connect(&s, &hello)?;
+            let mut c = local::Client::connect(&s, &hello)?;
             assert_eq!(c.hello["connection"], "claude-code");
             Ok(Box::new(move |req: &J| c.call(req)) as host::mcp::Relay)
         })
