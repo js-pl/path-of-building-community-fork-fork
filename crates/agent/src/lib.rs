@@ -81,7 +81,7 @@ pub const VERBS: &[(&str, &str)] = &[
     ),
     (
         "best",
-        "one generator's moves (tree, tree_remove, masteries, supports, gem_levels, config), each evaluated exactly and ranked by an objective under constraints; says how much it searched; changes nothing",
+        "one generator's moves (tree, tree_remove, masteries, supports, gem_levels, items_remove, config), each evaluated exactly and ranked by an objective under constraints; says how much it searched; changes nothing",
     ),
     (
         "improve",
