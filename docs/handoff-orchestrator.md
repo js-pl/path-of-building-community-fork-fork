@@ -26,8 +26,10 @@ read it.
 
 ## State of the agent plan (docs/agent.md "Steps")
 
-Done: steps 1, 2, 3, 4, 5, 6, 8 and 10, plus redo (#213) and "no search
-changes the config" (#216). Step 7's several open builds landed as #217.
+Done: steps 1, 2, 3, 4, 5, 6, 7, 8 and 10, plus redo (#213) and "no
+search changes the config" (#216). Step 7 landed as #217 (several open
+builds) and #219 (`ui_context`, and a default grant fixed when the token
+or session is created, as the owner decided).
 Step 11 (trade and prices, cloud sessions, an agent in the browser, a
 desktop app) is deferred and not to be started unless the owner asks.
 
@@ -35,10 +37,6 @@ Still in flight when this was written. Check with `list_sessions
 children` from the old orchestrator, or `list_sessions` and the tag
 `agent-plan`:
 
-- **Step 7** (`session_01W1dkjtpx88ZbytpNdujPc4`): finishing `ui_context`
-  and its docs. The owner decided that a token's builds, and `pob mcp`
-  without `--build`, are fixed at token or session start. They don't
-  follow the build open in the UI.
 - **Step 9** (`session_01W1dkjwuZXqXY31hE5ZJ6qg`): `dominating`, `front`,
   combination and respec search, jobs with progress and cancelling. It
   has no config moves (the owner's decision, see below).
@@ -157,6 +155,8 @@ Not part of the oracle or GUI cleanup: no GUI Lua remains in the app.
   - Docker support;
   - configurable container limits;
   - testing on real macOS and Windows machines.
+- **Not built in step 7:** Calcs and Config selections in `ui_context`,
+  hovered items or gems, and a flag for the cap on open builds.
 - **Not built in step 8:** the anoint, unique, craft and rare generators.
 - The old orchestrator's scheduled check-in
   (`trig_01GNVRTZ4u7HJeGUW6M1cNFw`) is deleted with this handoff.
