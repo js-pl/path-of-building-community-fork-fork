@@ -4,7 +4,10 @@
 // masteries' icons. Trees without sprites at zoom 0.3835 (before 3.19) get
 // no art; the tree view then draws plain shapes.
 //
-//   node scripts/build-art.mjs [version...]   (default: every tree version)
+//   node scripts/build-art.mjs [--if-present] [version...]   (default: every tree version)
+//
+// `npm run build` runs it with --if-present, so a built web app has the art
+// whenever the submodule is checked out.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -99,11 +102,20 @@ function build(version) {
   return true;
 }
 
-const versions = process.argv.slice(2).length
-  ? process.argv.slice(2)
+// --if-present (npm run build): without the submodule, warn and go on
+const args = process.argv.slice(2);
+const ifPresent = args.includes("--if-present");
+const asked = args.filter((a) => !a.startsWith("--"));
+if (!existsSync(treeData)) {
+  const msg = `${treeData} is missing: run git submodule update --init (the tree gets no art)`;
+  if (!ifPresent) throw new Error(msg);
+  console.warn(`build-art: ${msg}`);
+  process.exit(0);
+}
+const versions = asked.length
+  ? asked
   : readdirSync(treeData, { withFileTypes: true })
       .filter((d) => d.isDirectory() && existsSync(join(treeData, d.name, "tree.lua")))
       .map((d) => d.name);
-if (!existsSync(treeData)) throw new Error(`${treeData} is missing: run git submodule update --init`);
 const done = versions.filter(build);
 console.log(`public/art written for ${done.length} tree versions (${done.join(", ")})`);

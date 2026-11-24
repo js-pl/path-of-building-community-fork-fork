@@ -142,6 +142,7 @@ dependencies = [
  "rustls",
  "serde_json",
  "session",
+ "settings",
  "windows-sys 0.61.2",
 ]
 

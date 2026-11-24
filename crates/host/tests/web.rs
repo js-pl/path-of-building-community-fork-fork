@@ -466,5 +466,27 @@ fn agent_directories_and_connections() {
     assert!(h.tokens.as_ref().unwrap().find(&secret).unwrap().is_none());
     let a = host_req(&mut h, &out, "revoke", json!({ "token": token.id }));
     assert!(a.get("error").is_some(), "{a}");
+
+    // Options: the history's settings, in the settings file
+    let file = dir.join("conf/settings.json");
+    h.settings = Some(file.clone());
+    let a = host_req(&mut h, &out, "settings", json!({}));
+    assert_eq!(a["ok"]["enabled"], true, "{a}");
+    assert_eq!(a["ok"]["active"], true, "{a}");
+    let a = host_req(
+        &mut h,
+        &out,
+        "setSettings",
+        json!({ "enabled": false, "gitConfig": " /x/gitconfig " }),
+    );
+    assert_eq!(a["ok"]["enabled"], false, "{a}");
+    assert_eq!(a["ok"]["found"]["ok"], "off", "{a}");
+    // Until the host starts again
+    assert_eq!(a["ok"]["active"], true, "{a}");
+    let saved = settings::Settings::load(&file).unwrap();
+    assert!(!saved.history.enabled);
+    assert_eq!(saved.history.git_config, "/x/gitconfig");
+    let a = host_req(&mut h, &out, "setSettings", json!({ "enabled": "maybe" }));
+    assert!(a.get("error").is_some(), "{a}");
     let _ = std::fs::remove_dir_all(&dir);
 }

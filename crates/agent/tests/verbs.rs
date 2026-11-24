@@ -323,7 +323,7 @@ fn items_and_config(d: &'static TypedData) {
     );
     assert_eq!(
         r["label"].as_str().unwrap().split(',').next().unwrap(),
-        "empty Helmet"
+        "empty Helmet (was Hubris Circlet)"
     );
     assert!(
         err(

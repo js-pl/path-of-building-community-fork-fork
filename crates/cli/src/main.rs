@@ -432,7 +432,7 @@ fn host_cmd(args: &[String]) {
         .unwrap_or_else(|| die(format!("no data directory; set {}", host::BUILDS_ENV)));
     let socket = socket_path(&flags);
     let http = http_endpoint(&flags);
-    let (_, settings) = load_settings();
+    let (settings_path, settings) = load_settings();
     let git = match settings.history.git() {
         Ok(g) => g,
         Err(e) => {
@@ -450,7 +450,7 @@ fn host_cmd(args: &[String]) {
         Some(web_app(&flags))
     };
     let tokens = tokens_path(&flags);
-    serve_host(builds, socket, git, http, web, tokens);
+    serve_host(builds, socket, git, http, web, tokens, settings_path);
 }
 
 /// The web app as the flags ask for it: where its bundle is, the address
@@ -563,6 +563,7 @@ fn serve_host(
     http: Option<HttpEndpoint>,
     web: Option<WebApp>,
     tokens: PathBuf,
+    settings: PathBuf,
 ) {
     let listener = host::control::local::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
@@ -586,6 +587,7 @@ fn serve_host(
     let mut h = host::ui::Host::new(data, store);
     h.registry = Some(listed);
     h.tokens = Some(host::tokens::Tokens::new(tokens));
+    h.settings = Some(settings);
     if let Some(w) = web {
         h.default_build = w.build.clone();
         let key = host::web::new_key().unwrap_or_else(|e| die(e));
