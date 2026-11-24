@@ -132,10 +132,18 @@ jobs:
   # defaults checked from inside
   container:
     runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - run: podman --version
       - run: container/smoke.sh
+      - run: cargo build --release -p cli
+      - run: container/smoke-agent.sh target/release/pob
 
   web:
     runs-on: ubuntu-latest

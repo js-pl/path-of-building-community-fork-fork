@@ -50,11 +50,20 @@
 //!                               install [--build <name>]...
 //!                                                      adds `pob mcp` to the harnesses
 //!                                                      found (Claude Code, Codex)
+//!   pob agent claude|codex [--build <name>]... [--agent <dir>] [--allow <host>]...
+//!           [--rebuild] [--reset-login] [--no-container] [--exec] [-- <args>...]
+//!                             the harness in the default Podman container, attached to
+//!                             this terminal: starts a host if none runs, mints a token
+//!                             for the builds named (revoked when it ends), builds the
+//!                             images, starts the proxy; --no-container runs the harness
+//!                             here with `pob mcp`, unsandboxed; --exec runs the command
+//!                             after `--` in the container instead of the harness
 
 #[cfg(not(target_arch = "wasm32"))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+mod container;
 mod install;
 
 use session::Dispatcher;
@@ -257,6 +266,7 @@ fn main() {
         Some("ctl") => ctl(&args[1..]),
         Some("mcp") => mcp(&args[1..]),
         Some("agents") => agents(&args[1..]),
+        Some("agent") => agent_cmd(&args[1..]),
         _ => usage(),
     }
 }
@@ -273,7 +283,9 @@ fn usage() -> ! {
          pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...\n       \
          pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]\n       \
          pob agents token [--build <name>]... [--name <n>] [--agent <dir>] [--url <url>] | tokens | \
-         revoke <id> | connections | disconnect <id> | install [--build <name>]...   [--tokens <file>] [--socket <path>] [--json]",
+         revoke <id> | connections | disconnect <id> | install [--build <name>]...   [--tokens <file>] [--socket <path>] [--json]\n       \
+         pob agent claude|codex [--build <name>]... [--agent <dir>] [--allow <host>]... [--rebuild] \
+         [--reset-login] [--no-container] [--exec] [-- <harness args or, with --exec, a command>]",
     )
 }
 
@@ -956,7 +968,7 @@ fn start_host(
         .spawn()
         .map_err(|e| format!("starting a host: {e} (start one with `pob host --headless`)"))?;
     eprintln!(
-        "pob mcp: started a host (pid {}), its log in {}",
+        "pob: started a host (pid {}), its log in {}",
         child.id(),
         log_path.display()
     );
@@ -1002,4 +1014,485 @@ fn text(v: &serde_json::Value, indent: usize) -> String {
         v => out.push_str(&format!("{pad}{}\n", scalar(v))),
     }
     out
+}
+
+/// Revokes the token `pob agent` minted when the run ends, however it ends
+/// short of the process being killed
+struct TokenGuard {
+    tokens: host::tokens::Tokens,
+    id: String,
+    socket: PathBuf,
+}
+
+impl Drop for TokenGuard {
+    fn drop(&mut self) {
+        match self.tokens.revoke(&self.id) {
+            Ok(_) => {
+                let _ = admin(&self.socket, serde_json::json!({ "revoked": self.id }));
+                eprintln!("pob agent: token {} revoked", self.id);
+            }
+            Err(e) => eprintln!(
+                "pob agent: token {} not revoked: {e} (`pob agents revoke {}`)",
+                self.id, self.id
+            ),
+        }
+    }
+}
+
+/// Removes the run's proxy container and network when it ends
+struct Cleanup {
+    podman: PathBuf,
+    proxy: String,
+    network: String,
+    dir: Option<PathBuf>,
+}
+
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let quiet = |args: &[&str]| {
+            let _ = std::process::Command::new(&self.podman)
+                .args(args)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+        };
+        quiet(&["rm", "-f", "-t", "0", &self.proxy]);
+        quiet(&["network", "rm", "-f", &self.network]);
+        if let Some(d) = &self.dir {
+            let _ = std::fs::remove_dir_all(d);
+        }
+    }
+}
+
+/// `podman <args>`, its output on success, else its error
+fn podman_out(podman: &Path, args: &[String]) -> Result<String, String> {
+    let out = std::process::Command::new(podman)
+        .args(args)
+        .output()
+        .map_err(|e| format!("{}: {e}", podman.display()))?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    } else {
+        Err(format!(
+            "podman {}: {}",
+            args.first().map_or("", |a| a.as_str()),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ))
+    }
+}
+
+/// Copies bytes both ways between a connection and the host's endpoint
+fn forward_to(
+    endpoint: std::net::SocketAddr,
+    mut a: impl std::io::Read + std::io::Write + Send + 'static,
+    a2: impl std::io::Read + std::io::Write + Send + 'static,
+) {
+    let Ok(mut b) = std::net::TcpStream::connect(endpoint) else {
+        return;
+    };
+    let Ok(mut b2) = b.try_clone() else { return };
+    let mut a2 = a2;
+    let t = std::thread::spawn(move || {
+        let _ = std::io::copy(&mut a2, &mut b2);
+        let _ = b2.shutdown(std::net::Shutdown::Write);
+    });
+    let _ = std::io::copy(&mut b, &mut a);
+    drop(a);
+    let _ = t.join();
+}
+
+/// The route's listener in this process, forwarding to `endpoint`: a Unix
+/// socket in `dir` (Linux), or a TCP port on `ip` (Windows); the port
+fn start_forwarder(
+    route: &container::Route,
+    dir: Option<&Path>,
+    endpoint: std::net::SocketAddr,
+) -> Result<u16, String> {
+    match route {
+        container::Route::HostAlias => Ok(endpoint.port()),
+        #[cfg(unix)]
+        container::Route::Unix => {
+            use std::os::unix::fs::PermissionsExt;
+            let dir = dir.ok_or("no directory for the route's socket")?;
+            let path = dir.join("mcp.sock");
+            let l = std::os::unix::net::UnixListener::bind(&path)
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            // The proxy runs as another uid in its user namespace; what the
+            // socket reaches is the endpoint on loopback, which needs a token
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o666))
+                .map_err(|e| e.to_string())?;
+            std::thread::spawn(move || {
+                for c in l.incoming().flatten() {
+                    std::thread::spawn(move || {
+                        if let Ok(c2) = c.try_clone() {
+                            forward_to(endpoint, c, c2);
+                        }
+                    });
+                }
+            });
+            Ok(0)
+        }
+        #[cfg(not(unix))]
+        container::Route::Unix => Err(format!(
+            "a Unix socket route needs Unix ({:?})",
+            dir.map(|d| d.display().to_string())
+        )),
+        container::Route::Gateway(ip) => {
+            let l = std::net::TcpListener::bind((*ip, 0)).map_err(|e| format!("{ip}: {e}"))?;
+            let port = l.local_addr().map_err(|e| e.to_string())?.port();
+            std::thread::spawn(move || {
+                for c in l.incoming().flatten() {
+                    std::thread::spawn(move || {
+                        if let Ok(c2) = c.try_clone() {
+                            forward_to(endpoint, c, c2);
+                        }
+                    });
+                }
+            });
+            Ok(port)
+        }
+    }
+}
+
+/// The route for this platform; on Windows from the podman machine's view
+fn platform_route(podman: &Path) -> Result<container::Route, String> {
+    if cfg!(target_os = "macos") {
+        return Ok(container::Route::HostAlias);
+    }
+    if !cfg!(windows) {
+        return Ok(container::Route::Unix);
+    }
+    let home = std::env::var_os("USERPROFILE").map(PathBuf::from);
+    let wslconfig = home
+        .map(|h| h.join(".wslconfig"))
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .unwrap_or_default();
+    if container::wsl_mirrored(&wslconfig) {
+        return Err(
+            "WSL's mirrored networking (networkingMode=mirrored in .wslconfig) isn't supported \
+             by `pob agent` yet; WSL's default, NAT, is. Use --no-container, or NAT"
+                .into(),
+        );
+    }
+    let routes = podman_out(
+        podman,
+        &["machine", "ssh", "ip route show default"].map(String::from),
+    )?;
+    container::default_gateway(&routes)
+        .map(container::Route::Gateway)
+        .ok_or_else(|| format!("no default gateway in the podman machine: {routes}"))
+}
+
+/// `pob agent <harness>`: the harness in the default container, with the
+/// host's MCP endpoint and a token for the builds named
+fn agent_cmd(args: &[String]) {
+    use container::Harness;
+    let Some((harness, args)) = args.split_first() else {
+        usage()
+    };
+    let harness = Harness::parse(harness).unwrap_or_else(|| {
+        die(format!(
+            "pob agent: {harness}: the harnesses are claude and codex"
+        ))
+    });
+    // The harness's own arguments come after `--`
+    let (args, extra) = match args.iter().position(|a| a == "--") {
+        Some(i) => (&args[..i], &args[i + 1..]),
+        None => (args, &[][..]),
+    };
+    let (flags, rest) = flags(
+        args,
+        &[
+            "--build",
+            "--agent",
+            "--allow",
+            "--socket",
+            "--builds",
+            "--tokens",
+            "--endpoint",
+        ],
+        &["--no-container", "--rebuild", "--reset-login", "--exec"],
+    );
+    if !rest.is_empty() {
+        usage();
+    }
+    let builds: Vec<&str> = flags
+        .iter()
+        .filter(|(f, _)| *f == "--build")
+        .map(|(_, v)| *v)
+        .collect();
+    let socket = socket_path(&flags);
+
+    if flag(&flags, "--no-container").is_some() {
+        let exe = std::env::current_exe().unwrap_or_else(|e| die(format!("where pob is: {e}")));
+        let mut mcp_flags = Vec::new();
+        for (f, v) in &flags {
+            if matches!(*f, "--build" | "--builds" | "--socket" | "--agent") {
+                mcp_flags.extend([f.to_string(), v.to_string()]);
+            }
+        }
+        let line = install::command_line(&exe, &mcp_flags);
+        let cmd = harness.local_command(&line, extra);
+        eprintln!(
+            "pob agent: {} in this terminal, not sandboxed: it runs as you, with your files",
+            harness.name()
+        );
+        let status = std::process::Command::new(&cmd[0])
+            .args(&cmd[1..])
+            .status()
+            .unwrap_or_else(|e| die(format!("{}: {e}", cmd[0])));
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    let podman = std::env::var_os("POB_PODMAN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("podman"));
+    if podman_out(&podman, &["--version".into()]).is_err() {
+        die(
+            "pob agent: no Podman. Install it (https://podman.io/docs/installation; on macOS and \
+             Windows then `podman machine init` and `podman machine start`), or run the harness \
+             here, unsandboxed, with --no-container",
+        );
+    }
+    let route = platform_route(&podman).unwrap_or_else(|e| die(format!("pob agent: {e}")));
+
+    // The host, and its MCP endpoint over HTTP
+    let endpoint: std::net::SocketAddr = flag(&flags, "--endpoint")
+        .unwrap_or(host::http::DEFAULT_LISTEN)
+        .parse()
+        .unwrap_or_else(|_| die("pob agent: --endpoint is an address, 127.0.0.1:8731"));
+    let mut started = None;
+    if !socket_answers(&socket) {
+        started = Some(start_host(&socket, flag(&flags, "--builds")).unwrap_or_else(|e| die(e)));
+    }
+    let deadline = Instant::now() + std::time::Duration::from_secs(30);
+    while std::net::TcpStream::connect(endpoint).is_err() {
+        if let Some((child, log)) = &mut started
+            && let Ok(Some(status)) = child.try_wait()
+        {
+            let tail = std::fs::read_to_string(&*log).unwrap_or_default();
+            die(format!(
+                "pob agent: the host stopped ({status}): {} (its log: {})",
+                tail.lines().last().unwrap_or_default(),
+                log.display()
+            ));
+        }
+        if Instant::now() > deadline {
+            die(format!(
+                "pob agent: no MCP endpoint on {endpoint}: the host serves MCP over HTTP there \
+                 unless started with --listen"
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    // A token for this run alone
+    let tokens = host::tokens::Tokens::new(tokens_path(&flags));
+    let now = host::control::now();
+    let dir = flag(&flags, "--agent")
+        .map(String::from)
+        .unwrap_or_else(|| agent::agent_dir_name(harness.connection(), now));
+    let mut grant = agent::Grant::new(harness.connection().to_string(), dir);
+    for b in &builds {
+        if *b == "agents" {
+            die("agents is not a build");
+        }
+        grant = grant.with_build(*b);
+    }
+    let command = if flag(&flags, "--exec").is_some() {
+        if extra.is_empty() {
+            die("pob agent --exec: the command goes after --");
+        }
+        extra.to_vec()
+    } else {
+        harness.container_command(extra)
+    };
+    let (token, entry) = tokens.mint(&grant, now).unwrap_or_else(|e| die(e));
+    // Everything after the token returns here, so its guards run
+    let run = || -> Result<i32, String> {
+        let _token = TokenGuard {
+            tokens: host::tokens::Tokens::new(tokens_path(&flags)),
+            id: entry.id.clone(),
+            socket: socket.clone(),
+        };
+
+        // The images, built here from the context `pob` ships
+        let tag = container::context_tag();
+        let (agent_image, proxy_image) = (format!("pob-agent:{tag}"), format!("pob-proxy:{tag}"));
+        let rebuild = flag(&flags, "--rebuild").is_some();
+        let exists = |image: &str| {
+            podman_out(&podman, &["image".into(), "exists".into(), image.into()]).is_ok()
+        };
+        if rebuild || !exists(&agent_image) || !exists(&proxy_image) {
+            let ctx =
+                std::env::temp_dir().join(format!("pob-agent-context-{}", std::process::id()));
+            for (path, text) in container::CONTEXT {
+                let p = ctx.join(path);
+                std::fs::create_dir_all(p.parent().unwrap()).map_err(|e| e.to_string())?;
+                std::fs::write(&p, text).map_err(|e| e.to_string())?;
+            }
+            for (target, image) in [("proxy", &proxy_image), ("agent", &agent_image)] {
+                eprintln!("pob agent: building {image}");
+                let mut cmd = std::process::Command::new(&podman);
+                cmd.args(["build", "--target", target, "-t", image]);
+                if rebuild {
+                    cmd.args(["--pull=always", "--no-cache"]);
+                }
+                let ok = cmd.arg(&ctx).status().is_ok_and(|s| s.success());
+                if !ok {
+                    let _ = std::fs::remove_dir_all(&ctx);
+                    return Err(format!("building {image} failed"));
+                }
+            }
+            let _ = std::fs::remove_dir_all(&ctx);
+        }
+
+        let names = container::Names::new(harness, &std::process::id().to_string());
+        if flag(&flags, "--reset-login").is_some() {
+            let _ = podman_out(
+                &podman,
+                &[
+                    "volume".into(),
+                    "rm".into(),
+                    "-f".into(),
+                    names.login.clone(),
+                ],
+            );
+            eprintln!(
+                "pob agent: removed {}'s login ({})",
+                harness.name(),
+                names.login
+            );
+        }
+
+        // The route's end in this process
+        let route_dir = match route {
+            container::Route::Unix => {
+                let base = std::env::var_os("XDG_RUNTIME_DIR")
+                    .map(PathBuf::from)
+                    .or_else(host::data_dir)
+                    .unwrap_or_else(std::env::temp_dir);
+                let d = base.join(format!("pob-agent-{}", std::process::id()));
+                std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(&d, std::fs::Permissions::from_mode(0o755));
+                }
+                Some(d)
+            }
+            _ => None,
+        };
+        let _cleanup = Cleanup {
+            podman: podman.clone(),
+            proxy: names.proxy.clone(),
+            network: names.network.clone(),
+            dir: route_dir.clone(),
+        };
+        let port = start_forwarder(&route, route_dir.as_deref(), endpoint)
+            .map_err(|e| format!("the route to the host: {e}"))?;
+
+        // The network, the proxy, the harness
+        let step = |args: Vec<String>| podman_out(&podman, &args);
+        step(
+            [
+                "network",
+                "create",
+                "--internal",
+                "--disable-dns",
+                &names.network,
+            ]
+            .map(String::from)
+            .to_vec(),
+        )?;
+        let allow: Vec<String> = flags
+            .iter()
+            .filter(|(f, _)| *f == "--allow")
+            .map(|(_, v)| v.to_string())
+            .collect();
+        let dir_s = route_dir.as_ref().map(|d| d.display().to_string());
+        step(container::proxy_args(
+            &names,
+            &proxy_image,
+            harness,
+            &route,
+            port,
+            dir_s.as_deref(),
+            &allow,
+        ))?;
+        step(
+            ["network", "connect", "podman", &names.proxy]
+                .map(String::from)
+                .to_vec(),
+        )?;
+        let ip = step(vec![
+            "inspect".into(),
+            "-f".into(),
+            format!(
+                "{{{{(index .NetworkSettings.Networks \"{}\").IPAddress}}}}",
+                names.network
+            ),
+            names.proxy.clone(),
+        ])?;
+        let tty = std::io::IsTerminal::is_terminal(&std::io::stdin());
+        eprintln!(
+            "pob agent: {} in the container, on {} (token {}, agent directory {})",
+            harness.name(),
+            if entry.builds.is_empty() {
+                "no build of yours".to_string()
+            } else {
+                entry.builds.join(", ")
+            },
+            entry.id,
+            entry.agent
+        );
+        let status = std::process::Command::new(&podman)
+            .args(container::agent_args(
+                &names,
+                &agent_image,
+                &ip,
+                tty,
+                &command,
+            ))
+            .env("POB_TOKEN", &token)
+            .status()
+            .map_err(|e| format!("{}: {e}", podman.display()))?;
+        Ok(status.code().unwrap_or(1))
+    };
+    let code = run().unwrap_or_else(|e| {
+        eprintln!("pob agent: {e}");
+        1
+    });
+    std::process::exit(code);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `pob agent`'s token: minted for the run, revoked when its guard goes
+    #[test]
+    fn token_lifecycle() {
+        let dir = std::env::temp_dir().join(format!("pob-agent-token-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("tokens.json");
+        let tokens = host::tokens::Tokens::new(&file);
+        let grant = agent::Grant::new("claude-code".to_string(), "claude-code-x".to_string())
+            .with_build("RF");
+        let (token, entry) = tokens.mint(&grant, 0).unwrap();
+        let other = tokens.mint(&grant, 0).unwrap().1;
+        assert!(token.starts_with(host::tokens::PREFIX));
+        assert_eq!(tokens.list().unwrap().len(), 2);
+        {
+            let _guard = TokenGuard {
+                tokens: host::tokens::Tokens::new(&file),
+                id: entry.id.clone(),
+                socket: dir.join("no-host.sock"),
+            };
+        }
+        let left: Vec<String> = tokens.list().unwrap().into_iter().map(|t| t.id).collect();
+        assert_eq!(left, [other.id]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }
