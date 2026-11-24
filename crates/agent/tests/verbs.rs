@@ -628,6 +628,114 @@ fn several_builds(d: &'static TypedData) {
     assert_eq!(open, [other, rf]);
 }
 
+fn view(build: BuildId, tab: &str, selection: Option<J>) -> agent::ui::UiView {
+    agent::ui::UiView {
+        build,
+        tab: Some(tab.into()),
+        selection,
+        age: 1,
+        clients: 1,
+    }
+}
+
+/// `ui_context` within the grant, the author's text only under
+/// `untrusted`, and requests naming no build going to the UI's
+fn ui_context(d: &'static TypedData) {
+    let mut a = agent(d, hostile());
+    let g = grant();
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ui"], false, "{r}");
+    // A node
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Tree",
+        Some(json!({ "node": 36634 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["build"], "RF", "{r}");
+    assert_eq!(r["tab"], "Tree");
+    let node = r["selection"]["node"].as_str().unwrap();
+    assert!(node.ends_with(" #36634"), "{r}");
+    assert_eq!(r["selection"]["allocated"], false, "{r}");
+    // An item by slot and base; its name only under untrusted
+    let items = ok(&mut a, &g, json!({ "verb": "items" }));
+    let bow = items["equipped"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["slot"] == "Weapon 1")
+        .unwrap()
+        .clone();
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Items",
+        Some(json!({ "item": bow["id"] })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["item"], bow["item"], "{r}");
+    assert_eq!(r["selection"]["equipped"], true);
+    assert!(
+        r["untrusted"]["item_name"].as_str().unwrap().contains(MARK),
+        "{r}"
+    );
+    assert!(!trusted(&r).contains(MARK), "{r}");
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Items",
+        Some(json!({ "slot": "Weapon 1" })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["item"], bow["item"], "{r}");
+    // A socket group; its label only under untrusted
+    a.set_ui(Some(view(
+        BuildId::user("RF"),
+        "Skills",
+        Some(json!({ "group": 1 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["selection"]["group"], 1, "{r}");
+    assert!(r["selection"]["gems"].is_array(), "{r}");
+    assert!(!trusted(&r).contains(MARK), "{r}");
+    // A build outside the grant: not even its name, and requests naming
+    // no build stay on the grant's first
+    a.set_ui(Some(view(
+        BuildId::user("Other"),
+        "Tree",
+        Some(json!({ "node": 36634 })),
+    )));
+    let r = ok(&mut a, &g, json!({ "verb": "ui_context" }));
+    assert_eq!(r["build"], J::Null, "{r}");
+    assert!(
+        r.get("selection").is_none() && r.get("tab").is_none(),
+        "{r}"
+    );
+    assert_eq!(ok(&mut a, &g, json!({ "verb": "summary" }))["build"], "RF");
+    assert_eq!(ok(&mut a, &g, json!({ "verb": "builds" }))["default"], "RF");
+    // Within the grant: requests naming no build go to the UI's
+    let g2 = grant().with_build("Other");
+    assert_eq!(
+        ok(&mut a, &g2, json!({ "verb": "summary" }))["build"],
+        "Other"
+    );
+    assert_eq!(
+        ok(&mut a, &g2, json!({ "verb": "builds" }))["default"],
+        "Other"
+    );
+    let r = ok(&mut a, &g2, json!({ "verb": "set_level", "level": 77 }));
+    assert_eq!(r["build"], "Other", "{r}");
+    assert_eq!(
+        ok(&mut a, &g2, json!({ "verb": "summary", "build": "RF" }))["build"],
+        "RF"
+    );
+    // A selection a client can't send
+    assert_eq!(agent::ui::selection(&json!({ "node": "x" })), None);
+    assert_eq!(agent::ui::selection(&json!({ "path": "/etc" })), None);
+    assert_eq!(
+        agent::ui::selection(&json!({ "group": 2, "gem": 1, "x": 1 })),
+        Some(json!({ "group": 2, "gem": 1 }))
+    );
+}
+
 #[test]
 fn verbs() {
     let d = data();
@@ -640,4 +748,5 @@ fn verbs() {
     author_text_only_where_marked(d);
     undo_and_redo_across_sources(d);
     several_builds(d);
+    ui_context(d);
 }

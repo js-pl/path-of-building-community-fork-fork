@@ -24,9 +24,22 @@ struct Entry {
 #[derive(Default)]
 pub struct Registry {
     inner: Mutex<(u64, BTreeMap<u64, Entry>)>,
+    /// The user's build the UI shows, which a connection asking for the
+    /// UI's build is granted when it is made
+    ui_build: Mutex<Option<String>>,
 }
 
 impl Registry {
+    /// The user's build the UI shows now, if any
+    pub fn ui_build(&self) -> Option<String> {
+        self.ui_build.lock().unwrap().clone()
+    }
+
+    /// Notes the user's build the UI shows
+    pub fn set_ui_build(&self, build: Option<String>) {
+        *self.ui_build.lock().unwrap() = build;
+    }
+
     /// Adds a connection: `kind` is `socket` or `http`, `token` the id of
     /// the token it came with; its id
     pub fn add(

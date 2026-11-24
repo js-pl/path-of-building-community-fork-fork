@@ -15,6 +15,7 @@ import { HistoryTab } from "./ui/HistoryTab";
 import { AgentsTab } from "./ui/AgentsTab";
 import { OptionsDialog } from "./ui/OptionsDialog";
 import { BuildPicker } from "./ui/BuildPicker";
+import { reportContext } from "./ui/context";
 import type { SetControl } from "./ui/Control";
 
 export const engine = new Engine();
@@ -46,6 +47,13 @@ export function App() {
   }, [notice]);
   const [rev, setRev] = useState(0);
   const [tab, setTab] = useState<Tab>("Tree");
+  // Reported before the new tab renders, so the tab's own selection
+  // follows it
+  const pickTab = (t: Tab) => {
+    reportContext({ tab: t });
+    setTab(t);
+  };
+  useEffect(() => reportContext({ tab }), []);
   const [options, setOptions] = useState(false);
   const [busy, setBusy] = useState(false);
   // Only a slow edit shows the busy bar, so quick ones never flicker
@@ -139,7 +147,7 @@ export function App() {
         </span>
         <nav class="tabs" role="tablist">
           {tabs.map((t) => (
-            <button key={t} role="tab" aria-selected={t === tab} class={t === tab ? "active" : ""} onClick={() => setTab(t)}>
+            <button key={t} role="tab" aria-selected={t === tab} class={t === tab ? "active" : ""} onClick={() => pickTab(t)}>
               {t}
             </button>
           ))}

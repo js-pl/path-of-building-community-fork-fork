@@ -66,6 +66,9 @@ target/release/pob agents install --build <build>   # Claude Code or Codex besid
 
 The build's name in the top bar picks another of your builds; the link
 beside it opens the build in a page of its own, so several can be open.
+Without `--build`, `pob mcp` and `pob agents token` are granted the build
+the UI shows when they connect or are minted, and an agent's
+`ui_context` tells it what you are looking at.
 
 ## License
 

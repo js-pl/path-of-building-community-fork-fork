@@ -17,6 +17,7 @@ pub const READING: &[&str] = &[
     "search",
     "history",
     "changes_since",
+    "ui_context",
     "evaluate_item",
     "eval",
     "assumptions",
@@ -25,12 +26,12 @@ pub const READING: &[&str] = &[
 ];
 
 /// The verbs whose answers can carry the author's text under `untrusted`
-pub const UNTRUSTED_TEXT: &[&str] = &["notes", "items", "export", "evaluate_item"];
+pub const UNTRUSTED_TEXT: &[&str] = &["notes", "items", "export", "evaluate_item", "ui_context"];
 
 fn build() -> J {
     json!({
         "type": "string",
-        "description": "a build of the grant by name, or agent/<name> in the agent directory; default: the grant's first build",
+        "description": "a build of the grant by name, or agent/<name> in the agent directory; default: the build the UI shows when the grant has it, else the grant's first",
     })
 }
 
@@ -221,7 +222,7 @@ const CHANGES: &[&str] = &[
 /// verb this module doesn't describe yet
 pub fn input_schema(verb: &str) -> Option<J> {
     let (props, required): (J, &[&str]) = match verb {
-        "builds" => (json!({}), &[]),
+        "builds" | "ui_context" => (json!({}), &[]),
         "summary" | "tree" | "skills" | "config" | "notes" => (json!({ "build": build() }), &[]),
         "items" => (
             json!({

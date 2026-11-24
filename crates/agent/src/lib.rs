@@ -29,6 +29,7 @@ pub mod schema;
 mod search;
 pub mod store;
 pub mod text;
+pub mod ui;
 mod write;
 
 pub use grant::{AGENT_PREFIX, Grant, agent_dir_name};
@@ -89,6 +90,10 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "improve",
         "greedy improvement by an objective under constraints: steps of the generators' best moves, each evaluated exactly, proposed as one `apply`; changes nothing",
+    ),
+    (
+        "ui_context",
+        "what the user is looking at in the UI: the build, the tab and the node, item or socket group selected or hovered",
     ),
     ("history", "the build's last versions"),
     ("changes_since", "the changes after a version"),
@@ -179,6 +184,8 @@ pub struct Agent<'d, S: Store> {
     max_open: usize,
     /// The builds a client shows, which stay open
     shown: BTreeSet<BuildId>,
+    /// What the UI shows, as the host reports it
+    ui: Option<ui::UiView>,
     names: Names,
     /// The changes not yet taken by [`Agent::take_events`]
     events: Vec<Event>,
@@ -248,6 +255,7 @@ impl<'d, S: Store> Agent<'d, S> {
             clock: 0,
             max_open: MAX_OPEN,
             shown: BTreeSet::new(),
+            ui: None,
             names: Names::default(),
             events: Vec::new(),
         }
@@ -289,9 +297,25 @@ impl<'d, S: Store> Agent<'d, S> {
         if !VERBS.iter().any(|(v, _)| *v == verb) {
             return Err(format!("no verb {verb:?}; the verbs: {}", verb_names()));
         }
+        // A request naming no build goes to the one the UI shows, when the
+        // grant covers it
+        let with_default;
+        let req = match self.default_build(grant) {
+            Some(b)
+                if req.get("build").is_none_or(J::is_null)
+                    && !matches!(verb, "builds" | "ui_context" | "import") =>
+            {
+                let mut r = req.clone();
+                r["build"] = json!(b);
+                with_default = r;
+                &with_default
+            }
+            _ => req,
+        };
         let build = req.get("build").and_then(J::as_str);
         match verb {
             "builds" => self.builds(grant),
+            "ui_context" => self.ui_context(grant, req),
             "evaluate_item" => {
                 let id = grant.resolve(build)?;
                 let name = grant.api_name(&id);
@@ -441,7 +465,7 @@ impl<'d, S: Store> Agent<'d, S> {
         }
         Ok(json!({
             "builds": out,
-            "default": grant.builds.first(),
+            "default": self.default_build(grant).or_else(|| grant.builds.first().cloned()),
             "agent_directory": grant.dir,
         }))
     }

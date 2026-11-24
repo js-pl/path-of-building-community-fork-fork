@@ -15,6 +15,9 @@ the host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the
 mod weights and `evaluate_item` ([below](#built-evaluate_item)), is done.
 Step 8, `eval`, `assumptions`, objectives, constraints, the generators,
 `best` and `improve` ([below](#built-eval-and-assumptions)), is done.
+Step 7, several open builds ([below](#built-several-open-builds)) and
+`ui_context` with the default build
+([below](#built-ui_context-and-the-default-build)), is done.
 
 ## The question
 
@@ -652,9 +655,8 @@ above was silent:
   the settings file (`settings`, `setSettings`), with the git they give
   (or why none) and whether the running host keeps a history. They take
   effect when the host starts again.
-- Not in step 6: `ui_context` and several open builds (step 7,
-  [below](#built-several-open-builds)); a token's default build is
-  still none, not the build the UI shows.
+- Not in step 6: `ui_context`, several open builds and the default
+  build, which step 7 added ([below](#built-several-open-builds)).
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),
@@ -685,6 +687,60 @@ Step 7's first part:
 - Tests: `several_builds` in `crates/agent/tests/verbs.rs`,
   `several_open_builds` in `crates/host/tests/web.rs`, and the picker
   and a second page in `web/tests/host-smoke.mjs`.
+
+### Built: `ui_context` and the default build
+
+Step 7's second part:
+
+```
+{"verb": "ui_context"}
+→ {"ui": true, "build": "RF", "tab": "Tree", "version": 4, "clients": 1,
+   "reported": "2 s ago", "selection": {"node": "Heart of Thunder #36634",
+   "kind": "Notable", "allocated": false}, "untrusted"?: {...}, "names": "..."}
+   | {"ui": true, "build": null, "note": "the UI shows a build this connection wasn't granted"}
+   | {"ui": false, "note": "no UI shows a build now"}
+```
+
+- **What the UI reports.** Each client sends `{"host": "context",
+  "args": {"tab", "selection"}}`, debounced (300 ms, and only when it
+  changed): the tab when it is picked, the node hovered last on the
+  Tree tab, the item selected on Items (`{"item": id}`; `{"slot": name}`
+  is taken too), the socket group selected on Skills (`{"group": n,
+  "gem"?: n}`). Ids only: the host keeps a tab of the UI's own and a
+  selection of those shapes (`agent::ui::selection`), and drops
+  anything else. Showing another build clears the selection.
+- **"The build the UI shows"** is the build of the client the user used
+  last (the one that sent a message last), else of the client heard
+  from last; none without a client.
+- **The answer** names things as the other verbs do: a node `Name #id`
+  with its kind and whether it is allocated; an item by slot and base
+  with the engine's lines (`items`' fields) and whether it is equipped;
+  a group as `skills` gives it, with whether it is the main one. The
+  author's text (the item's name, the group's label) only under
+  `untrusted`. A build outside the caller's grant is not named, nor is
+  its tab or selection.
+- **Requests naming no build** go to the build the UI shows when the
+  grant covers it (a user's build it names, or one in its agent
+  directory), else to the grant's first build as before; `builds` gives
+  that as `default`. The grant itself doesn't change.
+- **The default grant (decided: fixed when the connection is made or
+  the token minted, never following the UI).** `pob mcp` without
+  `--build` says `"ui_build": true` in its hello, and the host grants the
+  user's build the UI shows at that moment (none when no UI shows one,
+  or it shows an agent's build). `pob agents token` without `--build`
+  asks a running host (`{"admin": "ui_build"}`) and mints the token
+  with that build, and says so; without a host or a UI the token has
+  only its agent directory, as before. Switching builds in the UI later
+  widens no grant: an agent reaches another build only when the user
+  grants it (`--build`, a new token).
+- Tests: `ui_context` in `crates/agent/tests/verbs.rs` (each selection,
+  the author's text under `untrusted` only, a build outside the grant,
+  requests naming no build), `ui_context_and_the_default_build` in
+  `crates/host/tests/web.rs` (the reports, the hellos with and without
+  `ui_build`, the admin request), and the Skills tab's context in
+  `web/tests/host-smoke.mjs`.
+- Not yet: the Calcs tab's selection and the Config tab's options as
+  selections; a hovered item or gem (only the selected ones).
 
 ### Built: MCP
 
@@ -754,8 +810,9 @@ for HTTP, axum).
   connection (`--name`, `http` by default: its commits' `Source: agent
   <name>`), its builds and its agent directory (`<name>-<time>` unless
   `--agent`), fixed when minted; every session made with it shares them.
-  There is no UI yet, so no default build: a token without `--build` has
-  only its agent directory. The tokens file (`tokens.json` in the data
+  A token without `--build` gets the build the UI shows when it is minted
+  (step 7, [below](#built-ui_context-and-the-default-build)), or only its
+  agent directory when no UI shows one. The tokens file (`tokens.json` in the data
   directory, `POB_TOKENS`, `--tokens`) keeps each token's SHA-256, never
   the token, written whole with mode 0600 and moved into place. The host
   reads it on every request, so `pob agents revoke <id>` is refused from
@@ -1331,7 +1388,8 @@ Each one a PR, as usual:
    `client.ts`, change events, the undo list with sources, the history
    with restore, the agent directories with keep and clean. Done
    ([below](#built-the-web-app-on-the-host)).
-7. `ui_context` and several open builds.
+7. `ui_context` and several open builds. Done
+   ([below](#built-several-open-builds)).
 8. `eval`, `assumptions`, objectives, constraints, the generators, `best`
    and `improve`. Done (#204, #208), except the anoint, unique, craft and
    rare generators.

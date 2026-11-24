@@ -30,7 +30,7 @@ use session::Dispatcher;
 use session::typed::TypedData;
 use std::collections::BTreeMap;
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// What the engine thread is asked
 pub enum Msg {
@@ -58,6 +58,11 @@ pub fn forward(calls: mpsc::Receiver<Call>, to: mpsc::Sender<Msg>) {
 struct Client {
     out: mpsc::Sender<Out>,
     build: Option<BuildId>,
+    /// The tab and selection it last reported (`context`)
+    tab: Option<String>,
+    selection: Option<J>,
+    /// When it last sent anything
+    seen: Instant,
 }
 
 /// The engine thread's state: the agent API on the builds, and the web
@@ -66,6 +71,8 @@ pub struct Host<'d> {
     pub agent: Agent<'d, FsStore>,
     data: &'d TypedData,
     clients: BTreeMap<u64, Client>,
+    /// The client the user used last: its build is the one "the UI shows"
+    active: Option<u64>,
     /// The build a client opens first, by name
     pub default_build: Option<String>,
     /// The agents' connections, for the UI's list
@@ -107,6 +114,7 @@ impl<'d> Host<'d> {
             agent: Agent::new(data, store),
             data,
             clients: BTreeMap::new(),
+            active: None,
             default_build: None,
             registry: None,
             tokens: None,
@@ -136,12 +144,23 @@ impl<'d> Host<'d> {
     pub fn handle(&mut self, m: Msg) {
         match m {
             Msg::Agent(c) => {
+                self.agent.set_ui(self.ui_view());
                 let answer = self.agent.call_str(&c.grant, &c.line);
                 // The answer first, then the events, as for the UI's own
                 let _ = c.reply.send(answer);
             }
             Msg::Open { client, out } => {
-                self.clients.insert(client, Client { out, build: None });
+                self.clients.insert(
+                    client,
+                    Client {
+                        out,
+                        build: None,
+                        tab: None,
+                        selection: None,
+                        seen: Instant::now(),
+                    },
+                );
+                self.active = Some(client);
                 let hello = match self.initial_build() {
                     Ok(id) => {
                         let version = self.agent.version(&id).unwrap_or_default();
@@ -161,11 +180,18 @@ impl<'d> Host<'d> {
                 self.send(client, &hello);
             }
             Msg::Ui { client, text } => {
+                if let Some(c) = self.clients.get_mut(&client) {
+                    c.seen = Instant::now();
+                    self.active = Some(client);
+                }
                 let answer = self.ui(client, &text);
                 self.send(client, &answer);
             }
             Msg::Close { client } => {
                 self.clients.remove(&client);
+                if self.active == Some(client) {
+                    self.active = None;
+                }
             }
             Msg::Stop => {}
         }
@@ -176,7 +202,40 @@ impl<'d> Host<'d> {
             .filter_map(|c| c.build.clone())
             .collect();
         self.agent.set_shown(shown);
+        // What the UI shows, for `ui_context`, requests naming no build
+        // and hellos asking for the UI's build
+        let view = self.ui_view();
+        if let Some(r) = &self.registry {
+            r.set_ui_build(
+                view.as_ref()
+                    .filter(|v| v.build.owner == Owner::User)
+                    .map(|v| v.build.name.clone()),
+            );
+        }
+        self.agent.set_ui(view);
         self.broadcast();
+    }
+
+    /// What the UI shows: the build, tab and selection of the client used
+    /// last, else of the one heard from last
+    pub fn ui_view(&self) -> Option<agent::ui::UiView> {
+        let (_, c) = self
+            .active
+            .and_then(|k| self.clients.get_key_value(&k))
+            .filter(|(_, c)| c.build.is_some())
+            .or_else(|| {
+                self.clients
+                    .iter()
+                    .filter(|(_, c)| c.build.is_some())
+                    .max_by_key(|(_, c)| c.seen)
+            })?;
+        Some(agent::ui::UiView {
+            build: c.build.clone()?,
+            tab: c.tab.clone(),
+            selection: c.selection.clone(),
+            age: c.seen.elapsed().as_secs(),
+            clients: self.clients.len(),
+        })
     }
 
     fn send(&self, client: u64, v: &J) {
@@ -309,6 +368,20 @@ impl<'d> Host<'d> {
                 json!({ "builds": list, "current": ui_name(&build) })
             }
             "steps" => self.agent.steps(&build)?,
+            "context" => {
+                // What the user looks at, for `ui_context`: ids only, the
+                // agent API names them
+                let tab = req["tab"]
+                    .as_str()
+                    .filter(|t| agent::ui::TABS.contains(t))
+                    .map(String::from);
+                let selection = agent::ui::selection(&req["selection"]);
+                if let Some(c) = self.clients.get_mut(&client) {
+                    c.tab = tab;
+                    c.selection = selection;
+                }
+                json!({})
+            }
             "history" => {
                 let n = req["n"].as_u64().unwrap_or(50).min(500) as usize;
                 let store = self.agent.store();
@@ -486,6 +559,9 @@ impl<'d> Host<'d> {
     fn open(&mut self, client: u64, id: BuildId) -> R<()> {
         let version = self.agent.version(&id)?;
         if let Some(c) = self.clients.get_mut(&client) {
+            if c.build.as_ref() != Some(&id) {
+                c.selection = None;
+            }
             c.build = Some(id.clone());
         }
         self.send(
