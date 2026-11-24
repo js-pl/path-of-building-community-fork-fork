@@ -8,7 +8,6 @@ use agent::{Agent, BuildId, Grant, MemStore, Store};
 use serde_json::{Value as J, json};
 use session::Dispatcher;
 use session::typed::TypedData;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -84,36 +83,29 @@ fn check_rows(d: &'static TypedData, r: &J, keys: &[&str], check: usize) {
     }
 }
 
-/// The config moves combined every way, evaluated by `eval`: the front
-/// the search must find
+/// Every set of up to 2 of the slots emptied, evaluated by `eval`: the
+/// front the search must find
 fn exhaustive_front(a: &mut Agent<MemStore>, g: &Grant) -> (Vec<Vec<f64>>, usize) {
     let singles = ok(
         a,
         g,
-        json!({ "verb": "best", "generator": "config", "limit": 100 }),
+        json!({ "verb": "best", "generator": "items_remove", "limit": 100 }),
     );
-    let mut by_option: BTreeMap<String, Vec<J>> = BTreeMap::new();
-    for row in singles["rows"].as_array().unwrap() {
-        let c = row["apply"][0].clone();
-        by_option
-            .entry(c["option"].as_str().unwrap().to_string())
-            .or_default()
-            .push(c);
-    }
-    let mut combos: Vec<Vec<J>> = vec![Vec::new()];
-    for moves in by_option.values() {
-        let mut next = Vec::new();
-        for c in &combos {
-            next.push(c.clone());
-            for m in moves {
-                let mut c = c.clone();
-                c.push(m.clone());
-                next.push(c);
-            }
+    let moves: Vec<J> = singles["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["apply"][0].clone())
+        .collect();
+    let n = moves.len();
+    assert!((4..=40).contains(&n), "{singles}");
+    let mut combos: Vec<Vec<J>> = Vec::new();
+    for i in 0..n {
+        combos.push(vec![moves[i].clone()]);
+        for j in i + 1..n {
+            combos.push(vec![moves[i].clone(), moves[j].clone()]);
         }
-        combos = next;
     }
-    combos.retain(|c| !c.is_empty());
     let n = combos.len();
     let mut points: Vec<Vec<f64>> = Vec::new();
     for chunk in combos.chunks(500) {
@@ -139,8 +131,8 @@ fn front_is_exhaustive_on_small_sets(d: &'static TypedData) {
     let g = grant();
     let (want, combos) = exhaustive_front(&mut a, &g);
     let req = json!({
-        "verb": "front", "generators": ["config"], "objectives": ["FullDPS", "TotalEHP"],
-        "combine": 3, "beam": 100, "limit": 50, "seconds": 300, "wait": 120,
+        "verb": "front", "generators": ["items_remove"], "objectives": ["FullDPS", "TotalEHP"],
+        "combine": 2, "beam": 100, "limit": 50, "seconds": 300, "wait": 120,
     });
     let r = ok(&mut a, &g, req.clone());
     assert_eq!(r["job"]["status"], "done", "{r}");
@@ -187,7 +179,7 @@ fn dominating_beats_the_build(d: &'static TypedData) {
         &mut a,
         &g,
         json!({
-            "verb": "dominating", "generators": ["masteries", "gem_levels", "config"],
+            "verb": "dominating", "generators": ["masteries", "gem_levels"],
             "objectives": ["FullDPS", "TotalEHP"], "combine": 2, "beam": 6, "wait": 120,
         }),
     );
@@ -218,7 +210,7 @@ fn dominating_beats_the_build(d: &'static TypedData) {
         &mut a,
         &g,
         json!({
-            "verb": "dominating", "generators": ["config"], "combine": 1,
+            "verb": "dominating", "generators": ["gem_levels"], "combine": 1,
             "constraints": [{ "stat": "Life", "min": 1e9 }], "wait": 120,
         }),
     );
@@ -227,9 +219,18 @@ fn dominating_beats_the_build(d: &'static TypedData) {
     // One objective is no front
     let e = a.call(
         &g,
-        &json!({ "verb": "front", "objectives": ["FullDPS"], "generators": ["config"] }),
+        &json!({ "verb": "front", "objectives": ["FullDPS"], "generators": ["gem_levels"] }),
     );
     assert!(e["error"].as_str().unwrap().contains("two or more"), "{e}");
+    // The configuration is never a search move
+    let e = a.call(
+        &g,
+        &json!({ "verb": "dominating", "generators": ["config"] }),
+    );
+    assert!(
+        e["error"].as_str().unwrap().contains("never a search move"),
+        "{e}"
+    );
 }
 
 /// A tree search with a minimum life: every row holds it in the engine's
@@ -329,8 +330,7 @@ fn submit_and_poll(d: &'static TypedData) {
     a.background_jobs();
     let g = grant();
     let (tx, rx) = std::sync::mpsc::channel();
-    let req =
-        json!({ "verb": "front", "generators": ["config"], "combine": 2, "beam": 4, "wait": 60 });
+    let req = json!({ "verb": "front", "generators": ["gem_levels"], "combine": 2, "beam": 4, "wait": 60 });
     let t = tx.clone();
     a.submit(&g, &req.to_string(), move |s| t.send(s).unwrap());
     // Answered at once while the job runs
@@ -364,7 +364,7 @@ fn author_text_stays_out(d: &'static TypedData) {
     let mut a = agent(d, xml);
     let g = grant();
     for verb in ["front", "dominating"] {
-        let req = json!({ "verb": verb, "generators": ["supports", "config"], "candidates": 20, "combine": 2, "beam": 4, "wait": 120 });
+        let req = json!({ "verb": verb, "generators": ["supports", "gem_levels"], "candidates": 20, "combine": 2, "beam": 4, "wait": 120 });
         let v = ok(&mut a, &g, req.clone());
         assert!(!v.to_string().to_uppercase().contains(MARK), "{req}: {v}");
     }

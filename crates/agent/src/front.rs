@@ -49,8 +49,12 @@ pub(crate) const FIELDS: &[&str] = &[
 ];
 
 /// The generators when none are named
-pub(crate) const DEFAULT_GENERATORS: &[&str] =
-    &["tree", "masteries", "supports", "gem_levels", "config"];
+pub(crate) const DEFAULT_GENERATORS: &[&str] = &["tree", "masteries", "supports", "gem_levels"];
+
+/// Generators a search never takes: the configuration sets up the
+/// environment the numbers are for, and any build looks better under a
+/// friendlier one
+pub(crate) const NOT_SEARCHED: &[&str] = &["config"];
 /// The objectives when none are named
 const DEFAULT_OBJECTIVES: &[&str] = &["FullDPS", "TotalEHP"];
 /// The most moves a candidate combines, and the default
@@ -212,6 +216,11 @@ pub(crate) fn generators_of(req: &J, default: &[&str]) -> R<Vec<String>> {
         Some(_) => return Err("generators is a list of generator names".into()),
     };
     for k in &kinds {
+        if NOT_SEARCHED.contains(&k.as_str()) {
+            return Err(format!(
+                "{k} is never a search move: the configuration sets up the environment the numbers are for, and any build looks better under a friendlier one; `assumptions` shows what it changes"
+            ));
+        }
         if !GENERATORS.iter().any(|(g, _)| g == k) {
             return Err(format!(
                 "no generator {:?}; the generators: {}",
@@ -632,7 +641,8 @@ fn run(
         .copied()
         .filter(|&i| search.all[i].feasible())
         .collect();
-    pruned |= feasible.len() < singles.len();
+    // Candidates that break a constraint are not extended
+    pruned |= spec.combine > 1 && feasible.len() < singles.len();
     search.sort(&mut feasible);
     let pool_size = (spec.beam * 2).clamp(8, MAX_POOL);
     let pool: Vec<usize> = feasible
@@ -640,9 +650,10 @@ fn run(
         .take(pool_size)
         .map(|&i| search.all[i].moves[0])
         .collect();
-    pruned |= feasible.len() > pool.len();
     let mut beam = search.select(&feasible, spec.beam);
-    pruned |= feasible.len() > beam.len();
+    // The beam leaves candidates out only when a round follows
+    pruned |= spec.combine > 1 && feasible.len() > beam.len();
+    pruned |= spec.combine > 1 && feasible.len() > pool.len();
     let mut stop = format!("combined up to {} moves, as asked", spec.combine);
     for size in 2..=spec.combine {
         if budget.stopped() {
@@ -680,14 +691,14 @@ fn run(
             .copied()
             .filter(|&i| search.all[i].feasible())
             .collect();
-        pruned |= new.len() < made.len();
+        pruned |= size < spec.combine && new.len() < made.len();
         rounds.push(json!({ "moves": size, "evaluated": made.len(), "feasible": new.len() }));
         if new.is_empty() {
             stop = format!("no combination of {size} moves holds the constraints");
             break;
         }
         beam = search.select(&new, spec.beam);
-        pruned |= new.len() > beam.len();
+        pruned |= size < spec.combine && new.len() > beam.len();
     }
     // Repairs: the candidates that break a constraint but no feasible one
     // dominates, each with the cheapest single move that holds what it
@@ -752,7 +763,6 @@ fn run(
         let made = search.evaluate(sets);
         repaired = made.iter().filter(|&&i| search.all[i].feasible()).count();
         rounds.push(json!({ "repairs": made.len(), "feasible": repaired }));
-        pruned |= made.len() > repaired;
     }
     let stopped = budget.why();
     if let Some(why) = stopped {

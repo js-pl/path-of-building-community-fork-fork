@@ -1031,7 +1031,8 @@ changes as `apply` takes them.
   and `moves`. Default Full DPS and EHP; when the tree is searched without
   a `{"points": n}` constraint, the points added are added as a cost, with
   a note, since every allocation adds some.
-- **The search.** The generators' moves (those of `best`, deduplicated)
+- **The search.** The generators' moves (those of `best` but `config`,
+  deduplicated)
   are each evaluated exactly. Then a beam search: each round extends each
   of the beam's candidates (`beam`, the best of the last round by
   non-dominated sorting, ties by the sum of the stat objectives' relative
@@ -1053,8 +1054,9 @@ changes as `apply` takes them.
   those that no other of them dominates first (`on_front`). `claim`
   calls the rows the exact front, or says nothing dominates, only when the
   search left nothing out (`complete`): every generator kept all its
-  moves, the pool and the beam dropped none, every candidate held the
-  constraints, and the budget wasn't hit; otherwise they are the best
+  moves, the pool and the beam dropped none before a round that would
+  have extended them, every candidate extended held the constraints, and
+  the budget wasn't hit; otherwise they are the best
   found, and the claim says what wasn't evaluated. Every row's numbers
   are an exact evaluation. Searches are deterministic: the same build
   gives the same rows with any `threads`, unless the budget stops them.
@@ -1080,10 +1082,16 @@ changes as `apply` takes them.
   `cancel_job` list and cancel them. Without it (wasm, a caller whose
   data isn't `'static`), a job runs to its end within the call, within its
   budget.
-- Measured on 4 threads, `gen-0003`: the default `front` (150 single
-  moves of the five generators, combinations of up to 3 by a beam of 12,
-  593 candidates) in 16 s; config alone, exhaustive (179 combinations of
-  15 moves), in under 3 s.
+- **Never the configuration.** `config` is no generator of these
+  searches (the owner's decision): the configuration sets up the
+  environment the numbers are for, and any build looks better under a
+  friendlier one. Asked for, it is refused; `assumptions` shows what the
+  configuration changes.
+- Measured on 4 threads, `gen-0003`: the default `front` (135 single
+  moves of tree, masteries, supports and gem_levels, combinations of up to
+  3 by a beam of 12, 562 candidates) in 14 s, as is `dominating` (38 of
+  them dominate the build); `items_remove` alone, exhaustive at 2 moves
+  (153 combinations of 17), in 2 s.
 - Not yet: MCP progress notifications (the HTTP endpoint has no SSE
   stream), the UI's view of jobs, the respec search and constraints on
   keystones and flags (next).

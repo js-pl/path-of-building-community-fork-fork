@@ -101,12 +101,13 @@ fn job_fields() -> J {
 }
 
 fn generators(what: &str) -> J {
-    let names: Vec<&str> = crate::generate::GENERATORS
-        .iter()
-        .map(|(g, _)| *g)
-        .collect();
-    let about = crate::generate::GENERATORS
-        .iter()
+    let searched = || {
+        crate::generate::GENERATORS
+            .iter()
+            .filter(|(g, _)| !crate::front::NOT_SEARCHED.contains(g))
+    };
+    let names: Vec<&str> = searched().map(|(g, _)| *g).collect();
+    let about = searched()
         .map(|(g, d)| format!("{g}: {d}"))
         .collect::<Vec<_>>()
         .join("; ");
