@@ -101,11 +101,7 @@ fn job_fields() -> J {
 }
 
 fn generators(what: &str) -> J {
-    let searched = || {
-        crate::generate::GENERATORS
-            .iter()
-            .filter(|(g, _)| !crate::front::NOT_SEARCHED.contains(g))
-    };
+    let searched = || crate::generate::GENERATORS.iter();
     let names: Vec<&str> = searched().map(|(g, _)| *g).collect();
     let about = searched()
         .map(|(g, d)| format!("{g}: {d}"))
@@ -357,7 +353,7 @@ pub fn input_schema(verb: &str) -> Option<J> {
                     "type": "array",
                     "minItems": 1,
                     "items": { "type": "string", "enum": generators },
-                    "description": format!("the generators each step takes moves from; default masteries and config; tree needs a points constraint. {about}"),
+                    "description": format!("the generators each step takes moves from; default masteries; tree needs a points constraint. {about}"),
                 });
                 props["steps"] = json!({ "type": "integer", "minimum": 1, "maximum": 10, "description": "the most steps; default 3" });
                 (props, &[])
@@ -417,7 +413,7 @@ pub fn input_schema(verb: &str) -> Option<J> {
             }),
             &[],
         ),
-        "undo" => (json!({ "build": build(), "expect": expect() }), &[]),
+        "undo" | "redo" => (json!({ "build": build(), "expect": expect() }), &[]),
         "restore" => (
             json!({
                 "build": build(),

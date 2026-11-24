@@ -75,14 +75,27 @@ try {
   const steps = page.locator(".history-tab .steps li");
   await steps.first().waitFor();
   assert.deepEqual(await page.locator(".history-tab .steps .source").allInnerTexts(), ["you", "ctl"]);
+  const changesShown = (n) =>
+    page.waitForFunction((n) => document.querySelectorAll(".history-tab .steps li").length === n, n, { timeout: 30_000 });
+
+  // Redo the agent's step the undo took back, then undo it again
+  await page.getByRole("button", { name: /^Redo/ }).click();
+  await changesShown(3);
+  const redone = ctl("changes_since", "version=2").changes[0];
+  assert.ok(redone.label.startsWith("redo allocate"), JSON.stringify(redone));
+  await page.getByRole("button", { name: /^Undo/ }).click();
+  await changesShown(4);
+
   page.once("dialog", (d) => d.accept());
   const restoreButtons = page.getByRole("button", { name: "Restore" });
   await restoreButtons.first().waitFor();
-  // The agent's version, which the undo took back
+  // The newest commit, the redone step, which the undo (still waiting to
+  // be committed) took back: a new change, so nothing is left to redo
   await restoreButtons.first().click();
-  await page.waitForFunction(() => document.querySelectorAll(".history-tab .steps li").length === 3, null, { timeout: 30_000 });
-  const last = ctl("changes_since", "version=2").changes[0];
+  await changesShown(5);
+  const last = ctl("changes_since", "version=4").changes[0];
   assert.ok(last.label.startsWith("restore "), JSON.stringify(last));
+  assert.equal(await page.getByRole("button", { name: /^Redo/ }).count(), 0);
 
   // The agents tab: an agent's copy, kept among the user's builds
   ctl("copy", "name=try");

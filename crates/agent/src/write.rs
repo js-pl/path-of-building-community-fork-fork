@@ -34,6 +34,17 @@ const CHANGES: &[(&str, &[&str])] = &[
     ("select_set", &["kind", "id"]),
 ];
 
+/// What kind of commit a change makes
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Kind {
+    /// A step: an agent's, committed at once, or the user's, coalesced
+    Step,
+    /// An earlier version from the history, committed at once
+    Restore,
+    /// A step undone before, applied again, committed at once
+    Redo,
+}
+
 /// An item's text cap
 pub(crate) const ITEM_CAP: usize = 20_000;
 /// Changes in one `apply`
@@ -52,6 +63,10 @@ impl<'d, S: Store> Agent<'d, S> {
             "undo" => {
                 check_fields(req, &["build", "expect"])?;
                 self.undo(Who::Agent(grant), id, name, expect)
+            }
+            "redo" => {
+                check_fields(req, &["build", "expect"])?;
+                self.redo(Who::Agent(grant), id, name, expect)
             }
             "restore" => {
                 check_fields(req, &["build", "expect", "version"])?;
@@ -136,12 +151,22 @@ impl<'d, S: Store> Agent<'d, S> {
                 }
             }
             let label = clean(&labels.join("; "), LABEL_CAP, false);
-            agent.finish(Who::Agent(grant), id, name, o, before, label, done, false)
+            agent.finish(
+                Who::Agent(grant),
+                id,
+                name,
+                o,
+                before,
+                label,
+                done,
+                Kind::Step,
+            )
         })
     }
 
-    /// Saves and commits a changed build, and answers: an agent's step and
-    /// a restore are committed at once, the user's edits are coalesced
+    /// Saves and commits a changed build, and answers: an agent's step, a
+    /// restore and a redo are committed at once, the user's edits are
+    /// coalesced. A new change clears what can be redone.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn finish(
         &mut self,
@@ -152,7 +177,7 @@ impl<'d, S: Store> Agent<'d, S> {
         before: Vec<Option<f64>>,
         label: String,
         done: Vec<J>,
-        restore: bool,
+        kind: Kind,
     ) -> R<J> {
         let xml = save(&mut o.session)?;
         if xml == o.xml {
@@ -165,22 +190,27 @@ impl<'d, S: Store> Agent<'d, S> {
             }));
         }
         let after = stats(&mut o.session)?;
-        let (changed, trailers) = diff(&before, &after);
-        let full = match trailers.first() {
-            Some((k, v)) => format!("{label}, {k} {v}"),
-            None => label.clone(),
+        let (changed, mut trailers) = diff(&before, &after);
+        let full = match (kind, trailers.first()) {
+            // A redo keeps the step's own label, which has its stats
+            (Kind::Redo, _) | (_, None) => label.clone(),
+            (_, Some((k, v))) => format!("{label}, {k} {v}"),
         };
+        if kind == Kind::Redo {
+            trailers.push(("Redone-By".into(), who.source()));
+        }
         let step = Step {
             label: full.clone(),
             agent: match who {
                 Who::Agent(g) => g.connection.clone(),
                 Who::User => "user".into(),
             },
-            restore,
+            restore: kind == Kind::Restore,
+            redo: kind == Kind::Redo,
             trailers,
         };
         let saved = match who {
-            Who::User if !restore => self.store.user_edit(id, &xml, &full).map(|()| None),
+            Who::User if kind == Kind::Step => self.store.user_edit(id, &xml, &full).map(|()| None),
             _ => self.store.commit(id, &xml, &step),
         };
         let commit = match saved {
@@ -201,10 +231,16 @@ impl<'d, S: Store> Agent<'d, S> {
         if o.undo.len() > UNDO_DEPTH {
             o.undo.remove(0);
         }
+        // A new change; undo and redo put back what they keep
+        o.redo.clear();
         o.version += 1;
+        let shown = match kind {
+            Kind::Redo => format!("redo {full}"),
+            _ => full.clone(),
+        };
         let change = Change {
             version: o.version,
-            label: full.clone(),
+            label: shown.clone(),
             source: who.source(),
             commit: commit.clone(),
         };
@@ -220,7 +256,7 @@ impl<'d, S: Store> Agent<'d, S> {
             "build": name,
             "version": o.version,
             "commit": commit.as_deref().map(short),
-            "label": full,
+            "label": shown,
             "changed": changed,
             "done": done,
         }))
@@ -247,6 +283,8 @@ impl<'d, S: Store> Agent<'d, S> {
                 reload(o)?;
                 return Err(e);
             }
+            let with_step = o.xml.clone();
+            let redo = std::mem::take(&mut o.redo);
             let r = agent.finish(
                 who,
                 id,
@@ -255,11 +293,66 @@ impl<'d, S: Store> Agent<'d, S> {
                 before,
                 format!("undo {}", step.label),
                 vec![],
-                false,
+                Kind::Step,
             );
-            // The undone step isn't a step to undo
+            o.redo = redo;
             if r.as_ref().is_ok_and(|v| v.get("unchanged").is_none()) {
+                // The undone step isn't a step to undo, but one to redo
                 o.undo.pop();
+                o.redo.push(Undo {
+                    xml: with_step,
+                    label: step.label,
+                    source: step.source,
+                });
+            } else if r.is_err() {
+                o.undo.push(step);
+            }
+            r
+        })
+    }
+
+    /// Applies again the step the last undo took back, as a new version
+    /// with that step's label (`Source: redo`); whoever made the step
+    pub(crate) fn redo(
+        &mut self,
+        who: Who,
+        id: &BuildId,
+        name: String,
+        expect: Option<u64>,
+    ) -> R<J> {
+        self.with_open(id, |agent, o| {
+            check_version(o, expect)?;
+            let Some(step) = o.redo.pop() else {
+                return Err("nothing to redo: no undo since the last change".into());
+            };
+            let before = stats(&mut o.session)?;
+            if let Err(e) = load(&mut o.session, &step.xml, &id.name) {
+                o.redo.push(step);
+                reload(o)?;
+                return Err(e);
+            }
+            let redo = std::mem::take(&mut o.redo);
+            let r = agent.finish(
+                who,
+                id,
+                name,
+                o,
+                before,
+                step.label.clone(),
+                vec![],
+                Kind::Redo,
+            );
+            o.redo = redo;
+            match &r {
+                Ok(v) if v.get("unchanged").is_none() => {
+                    // Undone again, it is the step as its maker made it
+                    if let Some(u) = o.undo.last_mut() {
+                        u.label = step.label;
+                        u.source = step.source;
+                    }
+                }
+                Ok(_) => {}
+                Err(_) => o.redo.push(step),
             }
             r
         })
@@ -282,7 +375,7 @@ impl<'d, S: Store> Agent<'d, S> {
                 return Err(format!("version {version}: {e}"));
             }
             let label = format!("restore {}", short(version));
-            agent.finish(who, id, name, o, before, label, vec![], true)
+            agent.finish(who, id, name, o, before, label, vec![], Kind::Restore)
         })
     }
 
@@ -333,6 +426,7 @@ impl<'d, S: Store> Agent<'d, S> {
             label,
             agent: grant.connection.clone(),
             restore: false,
+            redo: false,
             trailers: Vec::new(),
         };
         let commit = self.store.create(to, xml, &step)?;

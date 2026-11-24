@@ -119,6 +119,8 @@ pub enum Source {
     Agent(String),
     /// A restore of an earlier version
     Restore,
+    /// A step undone before, applied again
+    Redo,
     /// A source this version doesn't know, as written
     Other(String),
 }
@@ -128,6 +130,7 @@ impl Source {
         match s.split_once(' ') {
             _ if s == "user" => Source::User,
             _ if s == "restore" => Source::Restore,
+            _ if s == "redo" => Source::Redo,
             Some(("agent", name)) => Source::Agent(name.to_string()),
             _ if s == "agent" => Source::Agent(String::new()),
             _ => Source::Other(s.to_string()),
@@ -142,6 +145,7 @@ impl fmt::Display for Source {
             Source::Agent(n) if n.is_empty() => f.write_str("agent"),
             Source::Agent(n) => write!(f, "agent {n}"),
             Source::Restore => f.write_str("restore"),
+            Source::Redo => f.write_str("redo"),
             Source::Other(s) => f.write_str(s),
         }
     }

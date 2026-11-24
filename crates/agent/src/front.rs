@@ -51,10 +51,6 @@ pub(crate) const FIELDS: &[&str] = &[
 /// The generators when none are named
 pub(crate) const DEFAULT_GENERATORS: &[&str] = &["tree", "masteries", "supports", "gem_levels"];
 
-/// Generators a search never takes: the configuration sets up the
-/// environment the numbers are for, and any build looks better under a
-/// friendlier one
-pub(crate) const NOT_SEARCHED: &[&str] = &["config"];
 /// The objectives when none are named
 const DEFAULT_OBJECTIVES: &[&str] = &["FullDPS", "TotalEHP"];
 /// The most moves a candidate combines, and the default
@@ -216,10 +212,8 @@ pub(crate) fn generators_of(req: &J, default: &[&str]) -> R<Vec<String>> {
         Some(_) => return Err("generators is a list of generator names".into()),
     };
     for k in &kinds {
-        if NOT_SEARCHED.contains(&k.as_str()) {
-            return Err(format!(
-                "{k} is never a search move: the configuration sets up the environment the numbers are for, and any build looks better under a friendlier one; `assumptions` shows what it changes"
-            ));
+        if k == "config" {
+            return Err(crate::generate::NO_CONFIG.into());
         }
         if !GENERATORS.iter().any(|(g, _)| g == k) {
             return Err(format!(

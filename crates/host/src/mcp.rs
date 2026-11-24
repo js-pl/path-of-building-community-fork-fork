@@ -68,7 +68,7 @@ pub fn tools() -> Vec<J> {
                 "annotations": {
                     "readOnlyHint": reading,
                     "destructiveHint": false,
-                    "idempotentHint": reading || !matches!(*verb, "undo" | "apply" | "add_item" | "add_group" | "copy" | "import"),
+                    "idempotentHint": reading || !matches!(*verb, "undo" | "redo" | "apply" | "add_item" | "add_group" | "copy" | "import"),
                     "openWorldHint": false,
                 },
             })

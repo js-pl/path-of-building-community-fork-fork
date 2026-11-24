@@ -294,6 +294,50 @@ fn ui_client(port: u16, key: String, msgs: mpsc::Sender<Msg>, xml: String, build
     assert!(xml_at(&builds, "HEAD~1").contains("36634"));
     assert!(!restored.contains("36634"));
 
+    // Undo the restore and redo it: the redo is committed at once, after
+    // the user's undo, with the restore's label and `Source: redo`
+    ui.send(&json!({ "id": 13, "req": { "cmd": "undo" } }).to_string())
+        .unwrap();
+    assert!(ui.recv().unwrap().get("error").is_none());
+    let e = ui.recv().unwrap();
+    assert_eq!(
+        (e["version"].as_u64(), e["source"].as_str()),
+        (Some(5), Some("user")),
+        "{e}"
+    );
+    other.recv().unwrap();
+    ui.send(&json!({ "id": 14, "host": "steps", "args": {} }).to_string())
+        .unwrap();
+    let a = ui.recv().unwrap();
+    assert!(
+        a["ok"]["redo"][0]["label"]
+            .as_str()
+            .unwrap()
+            .starts_with("restore "),
+        "{a}"
+    );
+    ui.send(&json!({ "id": 15, "req": { "cmd": "redo" } }).to_string())
+        .unwrap();
+    assert!(ui.recv().unwrap().get("error").is_none());
+    let e = ui.recv().unwrap();
+    assert_eq!(e["version"], 6, "{e}");
+    assert!(
+        e["label"].as_str().unwrap().starts_with("redo restore "),
+        "{e}"
+    );
+    other.recv().unwrap();
+    let log = git_log(&builds.join("RF"));
+    assert_eq!(log.len(), 7, "{log:?}");
+    assert!(
+        log[0].starts_with("restore ") && log[0].ends_with("|redo"),
+        "{log:?}"
+    );
+    assert!(
+        log[1].starts_with("undo restore ") && log[1].ends_with("|user"),
+        "{log:?}"
+    );
+    assert_eq!(xml_at(&builds, "HEAD"), restored);
+
     // The UI's file is the session's build
     ui.send(&json!({ "id": 5, "req": { "cmd": "saveXml" } }).to_string())
         .unwrap();

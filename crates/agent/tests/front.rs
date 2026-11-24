@@ -227,10 +227,7 @@ fn dominating_beats_the_build(d: &'static TypedData) {
         &g,
         &json!({ "verb": "dominating", "generators": ["config"] }),
     );
-    assert!(
-        e["error"].as_str().unwrap().contains("never a search move"),
-        "{e}"
-    );
+    assert!(e["error"].as_str().unwrap().contains("no move"), "{e}");
 }
 
 /// A tree search with a minimum life: every row holds it in the engine's

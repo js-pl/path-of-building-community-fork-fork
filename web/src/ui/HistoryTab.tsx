@@ -11,6 +11,8 @@ type Steps = {
   version: number;
   // What `undo` takes back, newest first
   steps: { label: string; source: string }[];
+  // What `redo` applies again, next first; any new change clears it
+  redo: { label: string; source: string }[];
   // Every change since the host opened the build, newest first
   changes: { version: number; label: string; source: string; commit?: string | null }[];
 };
@@ -82,6 +84,11 @@ export function HistoryTab({ act, rev }: TabProps) {
           ) : (
             <span class="muted">Nothing to undo since the build was opened; restore a version below.</span>
           )}
+          {steps && steps.redo.length ? (
+            <button onClick={() => act("redo")}>
+              Redo “{steps.redo[0].label}” <SourceBadge source={steps.redo[0].source} />
+            </button>
+          ) : null}
         </div>
       </section>
       <section>

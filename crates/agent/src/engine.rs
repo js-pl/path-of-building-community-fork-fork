@@ -19,7 +19,8 @@ pub const OPENS_A_BUILD: &[&str] = &["loadXml", "loadCode", "newBuild"];
 impl<'d, S: Store> Agent<'d, S> {
     /// Answers the UI's engine API request `{"cmd": ...}` on a build:
     /// the session's answer, `{"ok": ...}` or `{"error": "..."}`. `undo`
-    /// undoes the build's last step, whoever made it.
+    /// undoes the build's last step, whoever made it, and `redo` applies
+    /// the last undone step again.
     pub fn engine(&mut self, id: &BuildId, req: &J) -> J {
         match self.engine_answer(id, req) {
             Ok(v) => v,
@@ -33,6 +34,10 @@ impl<'d, S: Store> Agent<'d, S> {
             .ok_or("a request names its command: {\"cmd\": ...}")?;
         if c == "undo" {
             let r = self.undo(Who::User, id, id.name.clone(), None)?;
+            return Ok(json!({ "ok": r }));
+        }
+        if c == "redo" {
+            let r = self.redo(Who::User, id, id.name.clone(), None)?;
             return Ok(json!({ "ok": r }));
         }
         if OPENS_A_BUILD.contains(&c) {
@@ -72,7 +77,7 @@ impl<'d, S: Store> Agent<'d, S> {
                 before,
                 label,
                 vec![],
-                false,
+                crate::write::Kind::Step,
             )?;
             Ok(answer)
         })
@@ -88,12 +93,19 @@ impl<'d, S: Store> Agent<'d, S> {
     }
 
     /// A build's version, its undo list (the steps `undo` takes back,
-    /// newest first) and every change since it was opened (newest
-    /// first), each with its label and who made it
+    /// newest first), its redo list (the steps `redo` applies again, next
+    /// first) and every change since it was opened (newest first), each
+    /// with its label and who made it
     pub fn steps(&mut self, id: &BuildId) -> R<J> {
         let o = self.open(id)?;
         let steps: Vec<J> = o
             .undo
+            .iter()
+            .rev()
+            .map(|u| json!({ "label": u.label, "source": u.source }))
+            .collect();
+        let redo: Vec<J> = o
+            .redo
             .iter()
             .rev()
             .map(|u| json!({ "label": u.label, "source": u.source }))
@@ -111,7 +123,13 @@ impl<'d, S: Store> Agent<'d, S> {
                 })
             })
             .collect();
-        Ok(json!({ "build": id.name, "version": o.version, "steps": steps, "changes": changes }))
+        Ok(json!({
+            "build": id.name,
+            "version": o.version,
+            "steps": steps,
+            "redo": redo,
+            "changes": changes,
+        }))
     }
 
     /// A build's version, opening it

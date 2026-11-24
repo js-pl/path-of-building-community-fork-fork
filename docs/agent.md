@@ -348,6 +348,8 @@ keeps the damage small and the text from reading like instructions:
   and what it changed (`agent: allocate Heart of Thunder, Full DPS +3.1%`).
   A multi-step tool call (a respec) is still one step. The UI lists the
   steps with their source, and undo works on them like on the user's own.
+  Redo mirrors it: it applies again the step the last undo took back,
+  whoever made it, and any new change clears what can be redone.
 - **Conflicts.** An agent edit can carry the version it was planned on. If
   the user changed the build since, the host refuses it and the agent looks
   again. That's optimistic concurrency, which is enough for one user and
@@ -489,6 +491,16 @@ above was silent:
   byte as saved), as a new commit; the last 100 steps are kept in memory,
   older versions through `history` and `restore`, which commits an old
   version on top (`Source: restore`).
+- **Redo** (decided by the owner) applies again the step the last undo
+  took back, whoever made it: the XML with the step, as a new commit at
+  once with the step's own label, `Source: redo` and a `Redone-By`
+  trailer (`user`, `agent <name>`); several undos give several redos, the
+  last undone first. Any new change, the UI's, an agent's or a restore,
+  clears the redo list; a UI command that changes nothing doesn't. The
+  change it makes (in `changes_since` and the change events) is labelled
+  `redo <label>`, by whoever redid it; undone again, the step is its
+  maker's. The `redo` verb, the UI's `redo` command and the History tab's
+  Redo button all do it; the app has no undo or redo key.
 - **Names.** Nodes as `Name #id`; changes take an id, `#id`, `Name #id`
   or a name only one node has. Items by slot and base (`Helmet: Hubris
   Circlet`) with the lines the engine parsed; a line it didn't is counted
@@ -544,13 +556,22 @@ above was silent:
   (`nodes='["Heart of Thunder"]'`), else strings. Each call is a new
   connection, so builds made in an agent directory are reached again with
   `--agent <dir>`. Without a verb it lists them.
-- **Windows: not yet.** Rust's standard library has no named pipes, so
-  the control socket is Unix only for now; on Windows `pob host` and `pob
-  ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
-  comes with step 4 or 5, when Windows is tested.
+- **Windows: a named pipe** (`host::control::pipe`, step 5), by default
+  `\\.\pipe\path-of-building-fork-fork-<user>-control` (`--socket` takes
+  another `\\.\pipe\<name>`). Its security descriptor is
+  `O:<user>D:P(A;;GA;;;<user>)`: the user's SID alone has access, the
+  equivalent of 0600, and remote clients are rejected. The host makes the
+  first instance with `FILE_FLAG_FIRST_PIPE_INSTANCE`, so it never joins
+  a pipe someone else made, and a client checks that the pipe's owner is
+  the current user before it says hello (with identification-only
+  impersonation), so a pipe squatted by another user is refused, not
+  talked to. The same lines and hellos as the Unix socket; `pob mcp`
+  starts a host in a process group of its own with no console, its log
+  in the data directory. CI builds and tests it on `windows-latest`.
 - Jobs: the searches run on threads of their own, and a call waiting for
   one is answered when it is done without holding the engine thread
-  ([below](#built-jobs-front-and-dominating)). The web app on the host is [below](#built-the-web-app-on-the-host).
+  ([below](#built-jobs-front-and-dominating)). The web app on the host is
+  [below](#built-the-web-app-on-the-host).
 
 ### Built: the web app on the host
 
@@ -597,9 +618,10 @@ above was silent:
   `clean`, `connections`, `disconnect`, `revoke`.
 - **The History tab** (on the host only): every change since the host
   opened the build, newest first, with who made it (`you`, the agent's
-  connection), and an undo button naming the step it takes back
-  (`steps`: the undo stack and the changes; an undo takes its step off
-  the stack, so it isn't undone twice). Below, the build's git log
+  connection), an undo button naming the step it takes back and a redo
+  button naming the step it applies again (`steps`: the undo stack, the
+  redo list and the changes; an undo moves its step from the one to the
+  other, a redo back). Below, the build's git log
   (`history`: label, source, trailers, time) with a restore per version:
   `restore` commits the version on top at once (`Source: restore`),
   after the user's waiting edits, so it can be undone too; a version
@@ -795,7 +817,6 @@ over what the engine can already rank:
 | anoints | every anoint | `compare::anoint_power` |
 | uniques | every unique per slot, and jewels | `compare` item power (`ItemDBControl`) |
 | crafts | bench mods, eldritch implicits, enchants on the items you have | `item_add_modifier`, `engine::item_craft` |
-| config | pantheon, bandit, flask choice | config |
 | rares | what each stat is worth per slot (the mod weights below); pasted items | the port of `GenerateModWeights` |
 
 The verbs (none changes the build; the agent applies what the user wants):
@@ -946,14 +967,14 @@ changes as `apply` takes them.
 
 ```
 {"verb": "best", "build"?, "generator": "tree" | "tree_remove" | "masteries" | "supports"
-   | "gem_levels" | "items_remove" | "config", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
+   | "gem_levels" | "items_remove", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
  "depth"?: 3, "candidates"?: 40, "group"?, "gem"?}
 → {"objective", "constraints", "stats", "base", "base_breaks", "rows": [{"apply": [...],
    "changes": "label", "values", "change", "gain", "points"?, "estimate"?, "breaks"?}],
    "search": {"moves_possible", "evaluated", "feasible", "better", "how", "effort",
    "failed"}, "claim", "exact", "not_yet"}
 
-{"verb": "improve", "build"?, "generators"?: ["masteries", "config"], "objective"?,
+{"verb": "improve", "build"?, "generators"?: ["masteries"], "objective"?,
  "constraints"?, "stats"?, "steps"?: 3, "depth"?, "candidates"?, "group"?, "gem"?}
 → {"steps": [{"step", "apply", "changes", "values", "change", "gain",
    "moves_evaluated", "generated"}], "final": {...}, "apply": {"verb": "apply",
@@ -982,12 +1003,20 @@ changes as `apply` takes them.
   knows in place of each support of a group), `gem_levels` (each gem a
   level higher, or at 20 quality), `items_remove` (each equipped slot of
   the active item set emptied: what each item adds, so the first rows are
-  the weakest items, or one that costs more than it gives) and `config`
-  (bandit and pantheon). The
+  the weakest items, or one that costs more than it gives). The
   tree's two rank by node power (`engine::power`, the misc calculator) and
   keep the best `candidates`; the others keep all, up to `candidates` for
   `supports`. Every move kept is evaluated exactly. Not yet: anoints,
   uniques, crafts and rares.
+- **The configuration is never a move** (decided by the owner). It sets
+  up the conditions the numbers assume (the enemy, buffs, charges,
+  bandit, pantheon), and any build can be made to look overpowered by
+  editing it, so no generator changes it and no search proposes a
+  `set_config`; `best` and `improve` refuse a `config` generator and say
+  why. How much a number rests on it is `assumptions`'s answer, a reading
+  verb. `eval` still evaluates the variants an agent writes, a
+  `set_config` among them, since those are the agent's questions rather
+  than a search's.
 - **Truthful about the search.** `search` counts the moves possible, those
   evaluated, those that hold the constraints and those that are better.
   `claim` says "the best single move of its kind" only when every move the
@@ -1236,11 +1265,11 @@ Each one a PR, as usual:
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
-   socket and `pob ctl`. Done (#191, #193), except the
-   Windows named pipe.
+   socket and `pob ctl`. Done (#191, #193); the Windows named pipe
+   came with step 5.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
    agents install`: any harness works on a build. Done (#194, #196,
-   #197), except the Windows named pipe, which `pob mcp` needs there too.
+   #197); the Windows named pipe came with step 5.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
    Linux, macOS and Windows.
 6. The web app on the host: the host serves it, the WebSocket transport in
