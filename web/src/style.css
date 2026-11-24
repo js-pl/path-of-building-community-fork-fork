@@ -983,3 +983,56 @@ label.inline {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The host's history tab */
+.history-tab {
+  padding: 16px;
+  display: grid;
+  gap: 24px;
+  max-width: 960px;
+}
+.history-tab h3 {
+  margin: 0 0 4px;
+}
+.history-tab .steps {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+.history-tab .steps li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  background: var(--panel2);
+}
+.history-tab .steps li.latest {
+  outline: 1px solid var(--border-strong);
+}
+.history-tab .versions {
+  border-collapse: collapse;
+  width: 100%;
+}
+.history-tab .versions td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: baseline;
+}
+.history-tab .versions td.label {
+  width: 100%;
+}
+.source {
+  font-size: 0.8em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: var(--panel3);
+  color: var(--muted);
+}
+.source-agent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

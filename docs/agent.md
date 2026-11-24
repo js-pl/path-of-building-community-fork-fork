@@ -585,7 +585,17 @@ above was silent:
   made them (the answer carries the build's `version`, so a client skips
   its own). They are the entries of `changes_since`. The UI re-renders on
   a change it didn't make. Host requests (`{"id", "host", "args"}`):
-  `builds`, `open`.
+  `builds`, `open`, `steps`, `history`, `restore`.
+- **The History tab** (on the host only): every change since the host
+  opened the build, newest first, with who made it (`you`, the agent's
+  connection), and an undo button naming the step it takes back
+  (`steps`: the undo stack and the changes; an undo takes its step off
+  the stack, so it isn't undone twice). Below, the build's git log
+  (`history`: label, source, trailers, time) with a restore per version:
+  `restore` commits the version on top at once (`Source: restore`),
+  after the user's waiting edits, so it can be undone too; a version
+  equal to the build changes nothing and says so. Whether the user's
+  latest edits still wait to be committed is shown.
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),

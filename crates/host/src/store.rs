@@ -251,6 +251,11 @@ impl FsStore {
         out
     }
 
+    /// Whether the user's edits of a build wait to be committed
+    pub fn is_pending(&self, id: &BuildId) -> bool {
+        self.recorders.get(id).is_some_and(Recorder::is_pending)
+    }
+
     /// Commits a build's waiting edits now and forgets its recorder (its
     /// directory is moved, say)
     pub fn release(&mut self, id: &BuildId) -> Result<()> {

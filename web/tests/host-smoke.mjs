@@ -68,6 +68,20 @@ try {
     ["agent ctl", "user"],
     JSON.stringify(changes),
   );
+
+  // The history tab: the changes with who made them, and a restore
+  await page.getByRole("tab", { name: "History" }).click();
+  const steps = page.locator(".history-tab .steps li");
+  await steps.first().waitFor();
+  assert.deepEqual(await page.locator(".history-tab .steps .source").allInnerTexts(), ["you", "ctl"]);
+  page.once("dialog", (d) => d.accept());
+  const restoreButtons = page.getByRole("button", { name: "Restore" });
+  await restoreButtons.first().waitFor();
+  // The agent's version, which the undo took back
+  await restoreButtons.first().click();
+  await page.waitForFunction(() => document.querySelectorAll(".history-tab .steps li").length === 3, null, { timeout: 30_000 });
+  const last = ctl("changes_since", "version=2").changes[0];
+  assert.ok(last.label.startsWith("restore "), JSON.stringify(last));
   console.log("ok: the UI and an agent on one build on the host");
 } finally {
   await browser.close();
