@@ -51,9 +51,13 @@ pub fn default_builds() -> Option<PathBuf> {
 }
 
 /// The control socket: `POB_SOCKET`, else `control.sock` in [`data_dir`]
+/// (on Windows a named pipe, `\\.\pipe\path-of-building-fork-fork-<user>-control`)
 pub fn default_socket() -> Option<PathBuf> {
-    std::env::var_os(SOCKET_ENV)
+    let var = std::env::var_os(SOCKET_ENV)
         .filter(|p| !p.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| data_dir().map(|d| d.join("control.sock")))
+        .map(PathBuf::from);
+    #[cfg(windows)]
+    return var.or_else(|| Some(PathBuf::from(control::pipe::default_name())));
+    #[cfg(not(windows))]
+    var.or_else(|| data_dir().map(|d| d.join("control.sock")))
 }
