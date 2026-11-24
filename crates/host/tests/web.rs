@@ -736,7 +736,10 @@ fn ui_context_and_the_default_build() {
     // A hello asking for the UI's build is granted it, fixed then
     let (calls, _rx) = mpsc::channel();
     let grant_for = |hello: J| -> J {
-        let (mine, theirs) = std::os::unix::net::UnixStream::pair().unwrap();
+        // A connected pair on every platform
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let mine = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (theirs, _) = listener.accept().unwrap();
         let reg = registry.clone();
         let calls = calls.clone();
         let t = std::thread::spawn(move || {
