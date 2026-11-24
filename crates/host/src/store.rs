@@ -283,6 +283,85 @@ impl FsStore {
         rec.flush().map(|_| ()).map_err(|e| e.to_string())
     }
 
+    /// The agent directories, by name, sorted
+    pub fn agent_dirs(&self) -> Result<Vec<String>> {
+        let dir = self.root.join(AGENTS_DIR);
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(format!("{}: {e}", dir.display())),
+        };
+        let mut names: Vec<String> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        Ok(names)
+    }
+
+    /// The bytes a build's directory holds, its history with it
+    pub fn size(&self, id: &BuildId) -> Result<u64> {
+        Ok(dir_size(&self.dir(id)?))
+    }
+
+    /// Keeps an agent's build: moves its repository, with its history,
+    /// among the user's builds as `name`, or the next free `name (2)`
+    pub fn keep(&mut self, from: &BuildId, name: &str) -> Result<BuildId> {
+        if from.owner == Owner::User {
+            return Err(format!("{} is a build of yours already", from.name));
+        }
+        let src = self.dir(from)?;
+        if !src.join(BUILD_FILE).is_file() {
+            return Err(format!("no build {}", from.name));
+        }
+        let base = history::dir_name(name);
+        let mut pick = base.clone();
+        let mut k = 2;
+        while reserved(&pick) || self.dir(&BuildId::user(pick.clone()))?.exists() {
+            pick = format!("{base} ({k})");
+            k += 1;
+        }
+        let to = BuildId::user(pick);
+        self.release(from)?;
+        let dest = self.dir(&to)?;
+        std::fs::rename(&src, &dest).map_err(|e| format!("{}: {e}", src.display()))?;
+        Ok(to)
+    }
+
+    /// Cleans up an agent directory: moves it, with what is left in it,
+    /// into `trash/`, which only the user empties; where it went
+    pub fn clean(&mut self, dir: &str) -> Result<PathBuf> {
+        let owner = Owner::Agent(dir.to_string());
+        let probe = BuildId {
+            owner: owner.clone(),
+            name: "x".into(),
+        };
+        let src = self.dir(&probe)?.parent().unwrap().to_path_buf();
+        if !src.is_dir() {
+            return Err(format!("no agent directory {dir}"));
+        }
+        let gone: Vec<BuildId> = self
+            .recorders
+            .keys()
+            .filter(|id| id.owner == owner)
+            .cloned()
+            .collect();
+        for id in gone {
+            self.release(&id)?;
+        }
+        let trash = self.root.join(TRASH_DIR);
+        std::fs::create_dir_all(&trash).map_err(|e| format!("{}: {e}", trash.display()))?;
+        let mut dest = trash.join(dir);
+        let mut k = 2;
+        while dest.exists() {
+            dest = trash.join(format!("{dir} ({k})"));
+            k += 1;
+        }
+        std::fs::rename(&src, &dest).map_err(|e| format!("{}: {e}", src.display()))?;
+        Ok(dest)
+    }
+
     /// Commits whatever the recorders hold; the host stops
     pub fn close(&mut self) {
         for (_, r) in self.recorders.drain() {
@@ -294,4 +373,20 @@ impl FsStore {
     pub fn build_repo(&mut self, id: &BuildId) -> Result<Option<BuildRepo>> {
         self.repo(id)
     }
+}
+
+/// The bytes under a directory
+fn dir_size(p: &Path) -> u64 {
+    let Ok(m) = std::fs::symlink_metadata(p) else {
+        return 0;
+    };
+    if !m.is_dir() {
+        return m.len();
+    }
+    std::fs::read_dir(p)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .map(|e| dir_size(&e.path()))
+        .sum()
 }

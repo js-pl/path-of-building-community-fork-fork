@@ -68,6 +68,10 @@ pub struct Host<'d> {
     clients: BTreeMap<u64, Client>,
     /// The build a client opens first, by name
     pub default_build: Option<String>,
+    /// The agents' connections, for the UI's list
+    pub registry: Option<std::sync::Arc<crate::connections::Registry>>,
+    /// The tokens, for the UI's revoke
+    pub tokens: Option<crate::tokens::Tokens>,
 }
 
 type R<T> = Result<T, String>;
@@ -102,6 +106,8 @@ impl<'d> Host<'d> {
             data,
             clients: BTreeMap::new(),
             default_build: None,
+            registry: None,
+            tokens: None,
         }
     }
 
@@ -324,6 +330,55 @@ impl<'d> Host<'d> {
                 }
                 a["ok"].clone()
             }
+            "agents" => self.agent_dirs()?,
+            "keep" => {
+                let from = parse_name(req["build"].as_str().ok_or("keep names a build")?)?;
+                if from.owner == Owner::User {
+                    return Err("keep takes a build of an agent directory".into());
+                }
+                let name = req["name"].as_str().unwrap_or(&from.name).to_string();
+                self.agent.close(&from);
+                let to = self.agent.store_mut().keep(&from, &name)?;
+                self.moved(|b| *b == from, Some(&to))?;
+                json!({ "build": ui_name(&to) })
+            }
+            "clean" => {
+                let dirs = match req["dir"].as_str() {
+                    Some(d) => vec![d.to_string()],
+                    None => self.agent.store().agent_dirs()?,
+                };
+                let mut moved = Vec::new();
+                for d in dirs {
+                    for name in self.agent.store().list(&Owner::Agent(d.clone()))? {
+                        self.agent.close(&BuildId::agent(d.clone(), name));
+                    }
+                    let to = self.agent.store_mut().clean(&d)?;
+                    let owner = Owner::Agent(d.clone());
+                    self.moved(|b| b.owner == owner, None)?;
+                    moved.push(json!({ "dir": d, "trash": to.display().to_string() }));
+                }
+                json!({ "cleaned": moved })
+            }
+            "connections" => match &self.registry {
+                Some(r) => json!({ "connections": r.list() }),
+                None => json!({ "connections": [] }),
+            },
+            "disconnect" => {
+                let id = req["id"]
+                    .as_u64()
+                    .ok_or("disconnect takes a connection's id")?;
+                let r = self.registry.as_ref().ok_or("no connections")?;
+                json!({ "closed": r.disconnect(id) })
+            }
+            "revoke" => {
+                let t = req["token"].as_str().ok_or("revoke takes a token's id")?;
+                let tokens = self.tokens.as_ref().ok_or("no tokens on this host")?;
+                if !tokens.revoke(t)? {
+                    return Err(format!("no token {t}"));
+                }
+                let closed = self.registry.as_ref().map_or(0, |r| r.disconnect_token(t));
+                json!({ "revoked": t, "closed": closed })
+            }
             "open" => {
                 let name = req["build"].as_str().ok_or("open names a build")?;
                 let id = parse_name(name)?;
@@ -336,6 +391,43 @@ impl<'d> Host<'d> {
             other => return Err(format!("no host request {other:?}")),
         };
         Ok(json!({ "ok": ok }))
+    }
+
+    /// The agent directories with their builds and sizes
+    fn agent_dirs(&mut self) -> R<J> {
+        let store = self.agent.store();
+        let mut dirs = Vec::new();
+        for d in store.agent_dirs()? {
+            let mut builds = Vec::new();
+            let mut total = 0;
+            for name in store.list(&Owner::Agent(d.clone()))? {
+                let id = BuildId::agent(d.clone(), name.clone());
+                let size = store.size(&id)?;
+                total += size;
+                builds.push(json!({ "name": name, "build": ui_name(&id), "size": size }));
+            }
+            dirs.push(json!({ "dir": d, "builds": builds, "size": total }));
+        }
+        Ok(json!({ "dirs": dirs }))
+    }
+
+    /// Clients that showed a build that moved show it where it went, or
+    /// the first build
+    fn moved(&mut self, gone: impl Fn(&BuildId) -> bool, to: Option<&BuildId>) -> R<()> {
+        let showing: Vec<u64> = self
+            .clients
+            .iter()
+            .filter(|(_, c)| c.build.as_ref().is_some_and(&gone))
+            .map(|(k, _)| *k)
+            .collect();
+        for k in showing {
+            let id = match to {
+                Some(t) => t.clone(),
+                None => self.initial_build()?,
+            };
+            self.open(k, id)?;
+        }
+        Ok(())
     }
 
     /// Shows a build in a client

@@ -1036,3 +1036,6 @@ label.inline {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.agents-tab .agent-dir {
+  margin: 8px 0 16px;
+}
