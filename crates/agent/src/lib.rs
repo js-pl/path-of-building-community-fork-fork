@@ -37,12 +37,15 @@ pub use store::{BuildId, Entry, MemStore, Owner, Step, Store};
 use serde_json::{Value as J, json};
 use session::Dispatcher;
 use session::typed::TypedData;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A request's cap, in bytes
 pub const MAX_REQUEST: usize = 8 << 20;
 /// Undo steps kept in memory per build; older ones are in the history
 pub const UNDO_DEPTH: usize = 100;
+/// Builds kept open at once by default; the least recently used one no
+/// client shows is closed when another opens
+pub const MAX_OPEN: usize = 8;
 
 /// The verbs, for help and for transports that list them
 pub const VERBS: &[(&str, &str)] = &[
@@ -127,6 +130,15 @@ struct Open<'d> {
     undo: Vec<Undo>,
     /// Each change since the build was opened
     changes: Vec<Change>,
+    /// When it was last used, by [`Agent`]'s clock
+    used: u64,
+}
+
+/// What is kept of a build closed while idle: its version and changes go
+/// on when it opens again; its session and undo list are gone
+struct Parked {
+    version: u64,
+    changes: Vec<Change>,
 }
 
 /// A step that can be undone: the XML before it, its label and who made it
@@ -151,6 +163,14 @@ pub struct Agent<'d, S: Store> {
     data: &'d TypedData,
     store: S,
     open: BTreeMap<BuildId, Open<'d>>,
+    /// Builds closed while idle
+    parked: BTreeMap<BuildId, Parked>,
+    /// Ticks on each use of an open build
+    clock: u64,
+    /// How many builds stay open at once
+    max_open: usize,
+    /// The builds a client shows, which stay open
+    shown: BTreeSet<BuildId>,
     names: Names,
     /// The changes not yet taken by [`Agent::take_events`]
     events: Vec<Event>,
@@ -216,6 +236,10 @@ impl<'d, S: Store> Agent<'d, S> {
             data,
             store,
             open: BTreeMap::new(),
+            parked: BTreeMap::new(),
+            clock: 0,
+            max_open: MAX_OPEN,
+            shown: BTreeSet::new(),
             names: Names::default(),
             events: Vec::new(),
         }
@@ -289,8 +313,11 @@ impl<'d, S: Store> Agent<'d, S> {
         }
     }
 
-    /// The build's open session, opened from the store when it is not
+    /// The build's open session, opened from the store when it is not.
+    /// Opening one may close the least recently used other build no
+    /// client shows ([`Agent::set_max_open`]).
     fn open(&mut self, id: &BuildId) -> R<&mut Open<'d>> {
+        self.clock += 1;
         if !self.open.contains_key(id) {
             let xml = self
                 .store
@@ -307,18 +334,80 @@ impl<'d, S: Store> Agent<'d, S> {
                 .as_str()
                 .map(String::from)
                 .unwrap_or(xml);
+            let parked = self.parked.remove(id);
             self.open.insert(
                 id.clone(),
                 Open {
                     session,
                     xml,
-                    version: 0,
+                    version: parked.as_ref().map_or(0, |p| p.version),
                     undo: Vec::new(),
-                    changes: Vec::new(),
+                    changes: parked.map(|p| p.changes).unwrap_or_default(),
+                    used: self.clock,
                 },
             );
+            self.close_idle(Some(id));
         }
-        Ok(self.open.get_mut(id).unwrap())
+        let o = self.open.get_mut(id).unwrap();
+        o.used = self.clock;
+        Ok(o)
+    }
+
+    /// Closes the least recently used builds no client shows while more
+    /// than the cap are open, keeping `keep`. Their waiting commits are
+    /// made ([`Store::closed`]); their versions and changes go on when
+    /// they open again, their undo lists don't.
+    fn close_idle(&mut self, keep: Option<&BuildId>) {
+        while self.open.len() > self.max_open {
+            let Some(idle) = self
+                .open
+                .iter()
+                .filter(|(k, _)| Some(*k) != keep && !self.shown.contains(*k))
+                .min_by_key(|(_, o)| o.used)
+                .map(|(k, _)| k.clone())
+            else {
+                break;
+            };
+            let o = self.open.remove(&idle).unwrap();
+            self.parked.insert(
+                idle.clone(),
+                Parked {
+                    version: o.version,
+                    changes: o.changes,
+                },
+            );
+            self.store.closed(&idle);
+        }
+    }
+
+    /// How many builds stay open at once, at least 1; others close when
+    /// idle
+    pub fn set_max_open(&mut self, n: usize) {
+        self.max_open = n.max(1);
+        self.close_idle(None);
+    }
+
+    /// The builds the UI's clients show: they stay open. Builds no longer
+    /// shown close if more than the cap are open.
+    pub fn set_shown(&mut self, shown: impl IntoIterator<Item = BuildId>) {
+        let shown: BTreeSet<BuildId> = shown.into_iter().collect();
+        if shown != self.shown {
+            self.shown = shown;
+            self.close_idle(None);
+        }
+    }
+
+    /// The builds open now
+    pub fn open_builds(&self) -> Vec<BuildId> {
+        self.open.keys().cloned().collect()
+    }
+
+    /// A build's version if it was opened, without opening it
+    fn known_version(&self, id: &BuildId) -> Option<u64> {
+        self.open
+            .get(id)
+            .map(|o| o.version)
+            .or_else(|| self.parked.get(id).map(|p| p.version))
     }
 
     fn builds(&mut self, grant: &Grant) -> R<J> {
@@ -330,7 +419,7 @@ impl<'d, S: Store> Agent<'d, S> {
                 "build": name,
                 "owner": "user",
                 "exists": exists,
-                "version": self.open.get(&id).map(|o| o.version),
+                "version": self.known_version(&id),
             }));
         }
         for name in self.store.list(&Owner::Agent(grant.dir.clone()))? {
@@ -338,7 +427,7 @@ impl<'d, S: Store> Agent<'d, S> {
             out.push(json!({
                 "build": grant.api_name(&id),
                 "owner": "agent",
-                "version": self.open.get(&id).map(|o| o.version),
+                "version": self.known_version(&id),
             }));
         }
         Ok(json!({

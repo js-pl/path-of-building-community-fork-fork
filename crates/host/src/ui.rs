@@ -169,6 +169,13 @@ impl<'d> Host<'d> {
             }
             Msg::Stop => {}
         }
+        // The builds the clients show stay open; others close when idle
+        let shown: Vec<BuildId> = self
+            .clients
+            .values()
+            .filter_map(|c| c.build.clone())
+            .collect();
+        self.agent.set_shown(shown);
         self.broadcast();
     }
 
