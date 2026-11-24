@@ -136,6 +136,10 @@ pub(crate) enum Constraint {
     NoNewWarnings,
     /// At most this many passive points more than the build's now
     Points(f64),
+    /// A keystone allocated
+    Keystone(String),
+    /// Every keystone allocated now still allocated
+    Keystones,
 }
 
 /// The constraint names a request takes
@@ -144,6 +148,7 @@ const NAMED: &[&str] = &[
     "requirements",
     "reservation",
     "no_new_warnings",
+    "keystones",
 ];
 
 impl Constraint {
@@ -164,8 +169,9 @@ impl Constraint {
                     "requirements" => Ok(Constraint::Requirements),
                     "reservation" => Ok(Constraint::Reservation),
                     "no_new_warnings" => Ok(Constraint::NoNewWarnings),
+                    "keystones" => Ok(Constraint::Keystones),
                     s => Err(format!(
-                        "no constraint {:?}; the named ones: {}, and {{\"stat\", \"min\"}}, {{\"stat\", \"max\"}}, {{\"keep\": stat}}, {{\"points\": n}}",
+                        "no constraint {:?}; the named ones: {}, and {{\"stat\", \"min\"}}, {{\"stat\", \"max\"}}, {{\"keep\": stat}}, {{\"points\": n}}, {{\"keystone\": name}}",
                         crate::text::clean(s, 60, false),
                         NAMED.join(", ")
                     )),
@@ -182,6 +188,10 @@ impl Constraint {
                         }
                         let k = k.as_str().ok_or("keep names a stat")?;
                         return Ok(Constraint::Keep(Stat::new(k, base)?));
+                    }
+                    if let Some(k) = o.get("keystone") {
+                        let k = k.as_str().filter(|k| o.len() == 1 && !k.is_empty()).ok_or("{\"keystone\": name} takes a keystone's name")?;
+                        return Ok(Constraint::Keystone(crate::text::clean(k, 60, false)));
                     }
                     if let Some(p) = num("points")? {
                         if o.len() > 1 || p < 0.0 {
@@ -256,6 +266,19 @@ impl Constraint {
                 let (b, v) = (base.points.unwrap_or(0.0), r.points.unwrap_or(0.0));
                 (v - b > *p).then(|| format!("{} more passive points than the {p} allowed", v - b))
             }
+            Constraint::Keystone(k) => {
+                (!has_keystone(r, k)).then(|| format!("{k} is not allocated"))
+            }
+            Constraint::Keystones => {
+                let lost: Vec<&str> = base
+                    .keystones
+                    .iter()
+                    .filter(|k| !r.keystones.contains(k))
+                    .map(String::as_str)
+                    .collect();
+                (!lost.is_empty())
+                    .then(|| format!("keystones no longer allocated: {}", lost.join(", ")))
+            }
         }
     }
 
@@ -282,6 +305,14 @@ impl Constraint {
             Constraint::Reservation => count(&|w| w.contains("reserved over 100%")),
             Constraint::NoNewWarnings => count(&|w| !base.warnings.contains(w)),
             Constraint::Points(p) => p - (r.points.unwrap_or(0.0) - base.points.unwrap_or(0.0)),
+            Constraint::Keystone(k) => -f64::from(u8::from(!has_keystone(r, k))),
+            Constraint::Keystones => {
+                -(base
+                    .keystones
+                    .iter()
+                    .filter(|k| !r.keystones.contains(k))
+                    .count() as f64)
+            }
         }
     }
 
@@ -296,8 +327,14 @@ impl Constraint {
             Constraint::Reservation => "reservation within 100%".into(),
             Constraint::NoNewWarnings => "no new warnings".into(),
             Constraint::Points(p) => format!("at most {p} more passive points"),
+            Constraint::Keystone(k) => format!("{k} allocated"),
+            Constraint::Keystones => "the keystones allocated now kept".into(),
         }
     }
+}
+
+fn has_keystone(r: &Outcome, k: &str) -> bool {
+    r.keystones.iter().any(|x| x.eq_ignore_ascii_case(k))
 }
 
 /// Everything a variant breaks

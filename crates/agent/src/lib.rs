@@ -27,6 +27,7 @@ mod goal;
 pub mod grant;
 pub mod jobs;
 mod read;
+mod respec;
 pub mod schema;
 mod search;
 pub mod store;
@@ -96,6 +97,10 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "dominating",
         "changes that are better than the build in at least one objective and worse in none, under constraints: the generators' moves and their combinations, each evaluated exactly; runs as a job with a time budget; changes nothing",
+    ),
+    (
+        "respec",
+        "local search on the tree at a fixed number of points: swaps of allocated nodes for better paths, each evaluated exactly, while an objective improves under constraints; runs as a job with a time budget; changes nothing",
     ),
     (
         "job",
@@ -280,6 +285,7 @@ impl<'d, S: Store> Agent<'d, S> {
     fn respond(&mut self, grant: &Grant, req: &J) -> jobs::Reply {
         let r = match req["verb"].as_str() {
             Some("front" | "dominating") => self.front_job(grant, req),
+            Some("respec") => self.respec_job(grant, req),
             Some("job") => self.job(grant, req),
             Some("cancel") => self.cancel(grant, req),
             _ => {

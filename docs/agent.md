@@ -12,9 +12,9 @@ install` ([below](#built-mcp)), is done. Step 6, the web app on the
 host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the mod
 weights and `evaluate_item` ([below](#built-evaluate_item)), is done. Step
 8, `eval`, `assumptions`, objectives, constraints, the generators, `best`
-and `improve` ([below](#built-eval-and-assumptions)), is done. Step 9 is
-being built: jobs, `front` and `dominating`
-([below](#built-jobs-front-and-dominating)) are done.
+and `improve` ([below](#built-eval-and-assumptions)), is done. Step 9, jobs,
+`front`, `dominating` and `respec`
+([below](#built-jobs-front-and-dominating)), is done.
 
 ## The question
 
@@ -972,8 +972,9 @@ changes as `apply` takes them.
   `no_new_warnings`, `{"stat", "min"}`, `{"stat", "max"}`, `{"keep":
   stat}` (no lower than now) and `{"points": n}` (at most n more passive
   points). Rows that break one come after those that don't, with what
-  they break; the build's own breaks are `base_breaks`. Not yet: flags to
-  keep (an immunity, a keystone), and repairing a broken candidate.
+  they break; the build's own breaks are `base_breaks`. Keystones to keep
+  and repairs came with step 9 ([below](#built-jobs-front-and-dominating));
+  not yet: flags to keep (an immunity).
 - **Generators** (`generate::GENERATORS`), each making single moves that
   step 9's searches can combine: `tree` (each node within `depth` points
   with its path), `tree_remove` (each allocated node with what depends on
@@ -1084,9 +1085,44 @@ changes as `apply` takes them.
   moves of the five generators, combinations of up to 3 by a beam of 12,
   593 candidates) in 16 s; config alone, exhaustive (179 combinations of
   15 moves), in under 3 s.
+- **`respec`**, the local search on the tree at a fixed number of points:
+
+  ```
+  {"verb": "respec", "build"?, "objective"?, "constraints"?, "stats"?, "points"?: 8,
+   "removals"?: 8, "candidates"?: 12, "depth"?: 3, "steps"?, "seconds"?, "wait"?,
+   "threads"?}
+  → {"objective", "constraints", "stats", "base", "base_breaks", "steps": [{"step",
+     "apply", "changes", "values", "change", "gain", "refunded", "swaps_evaluated"}],
+     "final": {..., "refunded", "points"}, "apply": {"verb": "apply", "changes",
+     "expect"}, "search": {"points", "removals", "additions", "depth",
+     "swaps_evaluated", "stop", "complete", "effort"}, "claim", "job", ...}
+  ```
+
+  Each step ranks the build as the steps so far made it: the `removals`
+  allocated nodes node power ranks least worth (`tree_remove`) and the
+  `candidates` best paths within `depth` (`tree`), and evaluates every
+  swap (one removed, with what depends on it, one path allocated) exactly.
+  It takes the best that improves the objective (scored against the
+  build, as `improve`), uses no more passive points than the build (a
+  `{"points": n}` constraint allows n more), refunds at most `points` of
+  the build's nodes in all, and holds the constraints; until no swap does,
+  `steps` are done, or the budget stops it. The claim calls it a local
+  optimum of these swaps, not a proven best tree. A job like the others;
+  `apply` makes the swaps one undo step. Measured on 4 threads, `gen-0003`
+  with the defaults: 4 swaps (8 nodes refunded) for Full DPS +48% at the
+  same points, stopping at step 5, in 18 s, about 3.5 s a step of 96
+  swaps.
+- **Keystones as constraints**: `"keystones"` (every keystone allocated
+  now stays allocated) and `{"keystone": name}` (allocated), for every
+  verb that takes constraints; each outcome now carries its allocated
+  nodes and keystones.
 - Not yet: MCP progress notifications (the HTTP endpoint has no SSE
-  stream), the UI's view of jobs, the respec search and constraints on
-  keystones and flags (next).
+  stream), the UI's view of jobs, flags as constraints (an ailment
+  immunity), repairs by crafts. The anoint generator needs a verb that
+  anoints an item (`craft`, not built) so its moves are changes `apply`
+  takes; uniques, crafts and rares need item moves of the same kind
+  (`add_item` with an item's text would quote the author's text in a
+  search's answer), so they wait for `craft` too.
 
 ### Answers sized for an LLM
 
@@ -1244,7 +1280,8 @@ Each one a PR, as usual:
    and `improve`. Done (#204, #208), except the anoint, unique, craft and
    rare generators.
 9. `dominating` and `front` with the combination and respec search; jobs
-   with progress and cancelling. Jobs, `front` and `dominating` done.
+   with progress and cancelling. Done (#212, #213), except the anoint,
+   unique, craft and rare generators, which need `craft`.
 10. The port of the mod weights with its oracle test; `evaluate_item`.
     Done (#189, #195).
 11. Later: trade and prices, cloud sessions, an agent in the browser, a

@@ -70,7 +70,7 @@ pub(crate) fn options(req: &J, objective: &Objective) -> R<Options> {
 
 /// The stats a search's table shows: those asked for, else the
 /// objective's and the constraints'
-fn search_stats(
+pub(crate) fn search_stats(
     req: &J,
     base: &engine::calculator::CalcOutput,
     objective: &Objective,

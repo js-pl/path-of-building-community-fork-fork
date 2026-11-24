@@ -24,6 +24,7 @@ pub const READING: &[&str] = &[
     "improve",
     "front",
     "dominating",
+    "respec",
     "job",
     "cancel",
 ];
@@ -78,7 +79,7 @@ fn constraints() -> J {
     json!({
         "type": "array",
         "maxItems": 30,
-        "description": "hard constraints: \"res_capped\", \"requirements\", \"reservation\", \"no_new_warnings\", {\"stat\": \"Life\", \"min\": 5000}, {\"stat\": ..., \"max\": ...}, {\"keep\": \"TotalEHP\"} (no lower than now), {\"points\": 5} (at most 5 more passive points)",
+        "description": "hard constraints: \"res_capped\", \"requirements\", \"reservation\", \"no_new_warnings\", {\"stat\": \"Life\", \"min\": 5000}, {\"stat\": ..., \"max\": ...}, {\"keep\": \"TotalEHP\"} (no lower than now), {\"points\": 5} (at most 5 more passive points), \"keystones\" (those allocated now kept), {\"keystone\": \"Iron Reflexes\"} (allocated)",
         "items": { "type": ["string", "object"] },
     })
 }
@@ -394,6 +395,29 @@ pub fn input_schema(verb: &str) -> Option<J> {
             }
             (props, &[])
         }
+        "respec" => {
+            let mut props = json!({
+                "build": build(),
+                "objective": objective(),
+                "constraints": constraints(),
+                "stats": stats(),
+                "points": { "type": "integer", "minimum": 1, "maximum": 60, "description": "the most allocated nodes refunded in all; default 8. The build uses no more points than now unless a {\"points\": n} constraint allows n more" },
+                "removals": { "type": "integer", "minimum": 1, "maximum": 40, "description": "the allocated nodes, least worth by node power, tried for removal each step; default 8" },
+                "steps": { "type": "integer", "minimum": 1, "maximum": 60, "description": "the most swaps; default `points`" },
+            });
+            for (k, v) in search_fields()
+                .as_object()
+                .unwrap()
+                .iter()
+                .chain(job_fields().as_object().unwrap())
+            {
+                if k != "group" && k != "gem" {
+                    props[k] = v.clone();
+                }
+            }
+            props["candidates"] = json!({ "type": "integer", "minimum": 1, "maximum": 40, "description": "the paths, best by node power, tried for allocation each step; default 12" });
+            (props, &[])
+        }
         "job" => (
             json!({
                 "job": { "type": "string", "description": "the job's id, as a search answered it; without it, the jobs of this connection's builds" },
@@ -505,6 +529,7 @@ mod tests {
             ("improve", crate::search::IMPROVE_FIELDS),
             ("front", crate::front::FIELDS),
             ("dominating", crate::front::FIELDS),
+            ("respec", crate::respec::FIELDS),
         ] {
             let s = input_schema(v).unwrap();
             let mut props: Vec<&str> = s["properties"]
