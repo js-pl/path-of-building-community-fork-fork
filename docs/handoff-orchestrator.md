@@ -54,6 +54,12 @@ children` from the old orchestrator, or `list_sessions` and the tag
   Afterwards, remove the two answered questions from agent.md's
   "Questions for the owner".
 
+Both sessions stopped on the 5-hour usage limit at about 17:30 UTC
+(reset 21:10 UTC). Step 9 was waiting for CI on #212 before squash
+merging it. Next, it was to rebase `agent-respec` (respec search, keystone
+constraints) onto main and open its PR. Send each session "continue"
+after the reset.
+
 If any of these is unmerged when you start, check its PR and nudge the
 session, or take the work over.
 
