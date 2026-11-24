@@ -9,8 +9,9 @@ which reshaped `session::dispatch`, is done. Step 3, the verbs
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
 done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
 install` ([below](#built-mcp)), is done. Step 10, the mod weights and
-`evaluate_item` ([below](#built-evaluate_item)), is done. Step 8 is being
-built: `eval` and `assumptions` are done ([below](#built-eval-and-assumptions)).
+`evaluate_item` ([below](#built-evaluate_item)), is done. Step 8, `eval`,
+`assumptions`, objectives, constraints, the generators, `best` and
+`improve` ([below](#built-eval-and-assumptions)), is done.
 
 ## The question
 
@@ -897,6 +898,68 @@ the build nor commits.
 - No time budget yet: a call runs to the end (500 variants take a few
   seconds); budgets and jobs are step 9's.
 
+### Built: objectives, constraints, the generators, `best` and `improve`
+
+`goal.rs`, `generate.rs` and `search.rs`; `eval` takes `objective` and
+`constraints` too (each row then has its `gain` and what it `breaks`).
+Neither `best` nor `improve` changes the build: rows carry `apply`, the
+changes as `apply` takes them.
+
+```
+{"verb": "best", "build"?, "generator": "tree" | "tree_remove" | "masteries" | "supports"
+   | "gem_levels" | "config", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
+ "depth"?: 3, "candidates"?: 40, "group"?, "gem"?}
+→ {"objective", "constraints", "stats", "base", "base_breaks", "rows": [{"apply": [...],
+   "changes": "label", "values", "change", "gain", "points"?, "estimate"?, "breaks"?}],
+   "search": {"moves_possible", "evaluated", "feasible", "better", "how", "effort",
+   "failed"}, "claim", "exact", "not_yet"}
+
+{"verb": "improve", "build"?, "generators"?: ["masteries", "config"], "objective"?,
+ "constraints"?, "stats"?, "steps"?: 3, "depth"?, "candidates"?, "group"?, "gem"?}
+→ {"steps": [{"step", "apply", "changes", "values", "change", "gain",
+   "moves_evaluated", "generated"}], "final": {...}, "apply": {"verb": "apply",
+   "changes": [...], "expect": <version>}, "search": {"generators",
+   "moves_evaluated", "stop", "effort"}, "claim", ...}
+```
+
+- **Objectives** are upstream's `WeightedRatioOutputs` over power stats
+  (`engine::mod_weights::weighted_ratio`): a preset (`default`, the trade
+  popup's Full DPS 1 and EHP 0.5; `dps`, `ehp`, `balanced`, `max_hit`,
+  `life`), a stat, or a list of `{"stat", "weight"}`; a negative weight
+  minimises. `gain` is the score less the build's own, so +0.1 is +10% of
+  a stat at weight 1. The tree is ranked by node power of the heaviest
+  stat.
+- **Constraints** are hard: `res_capped`, `requirements`, `reservation`,
+  `no_new_warnings`, `{"stat", "min"}`, `{"stat", "max"}`, `{"keep":
+  stat}` (no lower than now) and `{"points": n}` (at most n more passive
+  points). Rows that break one come after those that don't, with what
+  they break; the build's own breaks are `base_breaks`. Not yet: flags to
+  keep (an immunity, a keystone), and repairing a broken candidate.
+- **Generators** (`generate::GENERATORS`), each making single moves that
+  step 9's searches can combine: `tree` (each node within `depth` points
+  with its path), `tree_remove` (each allocated node with what depends on
+  it), `masteries` (every other effect of the allocated masteries and of
+  those next to an allocated node), `supports` (each support the engine
+  knows in place of each support of a group), `gem_levels` (each gem a
+  level higher, or at 20 quality) and `config` (bandit and pantheon). The
+  tree's two rank by node power (`engine::power`, the misc calculator) and
+  keep the best `candidates`; the others keep all, up to `candidates` for
+  `supports`. Every move kept is evaluated exactly. Not yet: anoints,
+  uniques, crafts and rares.
+- **Truthful about the search.** `search` counts the moves possible, those
+  evaluated, those that hold the constraints and those that are better.
+  `claim` says "the best single move of its kind" only when every move the
+  generator makes was evaluated, and otherwise that a better one may
+  exist; combinations aren't searched by `best`.
+- **`improve`** is greedy: each step evaluates the generators' moves on
+  the build as the steps before made it and takes the best that holds the
+  constraints and improves the score (scored and checked against the
+  build as it is), until no move does or `steps` are done. It proposes;
+  the agent applies `apply`, one undo step and one commit. `tree` needs a
+  `points` constraint, since every allocation scores. Local search at a
+  fixed number of points (swapping nodes) is step 9's, with
+  `dominating`, `front` and jobs.
+
 ### Answers sized for an LLM
 
 Every answer is short and self-describing: numbers with their deltas in
@@ -1049,7 +1112,8 @@ Each one a PR, as usual:
    with restore, the agent directories with keep and clean.
 7. `ui_context` and several open builds.
 8. `eval`, `assumptions`, objectives, constraints, the generators, `best`
-   and `improve`.
+   and `improve`. Done (#202, #203), except the anoint, unique, craft and
+   rare generators.
 9. `dominating` and `front` with the combination and respec search; jobs
    with progress and cancelling.
 10. The port of the mod weights with its oracle test; `evaluate_item`.
