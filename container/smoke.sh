@@ -14,6 +14,7 @@ ctx=$(mktemp -d)
 cleanup() {
     podman rm -f "pob-proxy-$tag" >/dev/null 2>&1 || true
     podman network rm -f "$net" >/dev/null 2>&1 || true
+    podman volume rm -f "pob-smoke-home-$$" "pob-smoke-work-$$" >/dev/null 2>&1 || true
     rm -rf "$ctx"
 }
 trap cleanup EXIT
@@ -27,7 +28,9 @@ cp -r "$root/crates/proxy/src" "$ctx/proxy/src"
 podman build -q --target proxy -t "pob-proxy:$tag" "$ctx"
 podman build -q --target agent -t "pob-agent:$tag" "$ctx"
 
-podman network create --internal "$net" >/dev/null
+# No DNS on the internal network: its resolver has no upstream, and the
+# agent needs none (the proxy resolves); the proxy is named with --add-host
+podman network create --internal --disable-dns "$net" >/dev/null
 podman run -d --name "pob-proxy-$tag" --network "$net" \
     --read-only --cap-drop all --security-opt no-new-privileges \
     --memory 256m --pids-limit 128 \
@@ -40,7 +43,7 @@ check() {
     # check <what> <shell test>: runs the test in the agent container
     if podman run --rm --network "$net" --add-host "pob-proxy:$ip" \
         --read-only --tmpfs /tmp:rw,nosuid,nodev,size=512m \
-        --mount type=tmpfs,destination=/work --mount type=tmpfs,destination=/home/node \
+        -v "pob-smoke-home-$$:/home/node" -v "pob-smoke-work-$$:/work" \
         --cap-drop all --security-opt no-new-privileges \
         --memory 4g --cpus 2 --pids-limit 512 \
         "pob-agent:$tag" sh -c "$2" >/dev/null 2>&1; then
@@ -58,7 +61,7 @@ check "Codex is installed" 'codex --version'
 check "HTTPS to an allowed host" \
     'code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 https://api.anthropic.com/) && [ "$code" != 000 ]'
 check "no HTTPS to another host" '! curl -sS -o /dev/null --max-time 20 https://example.com/'
-check "no plain HTTP" '! curl -sS -o /dev/null --max-time 20 http://api.anthropic.com/'
+check "no plain HTTP" '! curl -fsS -o /dev/null --max-time 20 http://api.anthropic.com/'
 check "no route out without the proxy" \
     '! curl -sS -o /dev/null --noproxy "*" --max-time 10 https://1.1.1.1/'
 podman logs "pob-proxy-$tag" 2>&1 | sed 's/^/proxy: /'
