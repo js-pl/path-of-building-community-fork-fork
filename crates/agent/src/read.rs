@@ -254,7 +254,7 @@ impl<'d, S: Store> Agent<'d, S> {
         Ok(v)
     }
 
-    fn skills_of(&mut self, s: &mut Dispatcher<'d>) -> R<J> {
+    pub(crate) fn skills_of(&mut self, s: &mut Dispatcher<'d>) -> R<J> {
         let skills = cmd(s, json!({ "cmd": "skills" }))?;
         let gems = self.gem_names(s)?;
         let groups: Vec<J> = skills["groups"]
@@ -717,7 +717,7 @@ pub(crate) fn engine_lines(item: &Item) -> (Vec<String>, usize) {
     (lines, unparsed)
 }
 
-fn describe_items(
+pub(crate) fn describe_items(
     data: &session::typed::TypedData,
     items: &J,
     uniques: &std::collections::HashSet<String>,

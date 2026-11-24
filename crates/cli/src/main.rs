@@ -668,6 +668,15 @@ fn agents(args: &[String]) {
                     grant = grant.with_build(*b);
                 }
             }
+            // Without --build, the build the UI shows now, fixed in the
+            // token; none when no UI shows one
+            let mut from_ui = false;
+            if grant.builds.is_empty()
+                && let Some(b) = ui_build(&socket_path(&flags))
+            {
+                grant = grant.with_build(b);
+                from_ui = true;
+            }
             let (token, entry) = tokens.mint(&grant, now).unwrap_or_else(|e| die(e));
             let url = flag(&flags, "--url").map(String::from).unwrap_or_else(|| {
                 format!("http://{}{}", host::http::DEFAULT_LISTEN, host::http::PATH)
@@ -684,7 +693,9 @@ fn agents(args: &[String]) {
                 "token {} for {} (agent directory {}), shown once; revoke it with `pob agents revoke {}`",
                 entry.id,
                 if entry.builds.is_empty() {
-                    "no build".to_string()
+                    "no build (no UI shows one; --build names one)".to_string()
+                } else if from_ui {
+                    format!("{}, the build the UI shows", entry.builds.join(", "))
                 } else {
                     entry.builds.join(", ")
                 },
@@ -788,6 +799,13 @@ fn install_cmd(flags: &[(&str, &str)]) {
     }
 }
 
+/// The user's build the UI of the host on `socket` shows, if any
+fn ui_build(socket: &Path) -> Option<String> {
+    admin(socket, serde_json::json!("ui_build"))
+        .ok()
+        .and_then(|v| v["build"].as_str().map(String::from))
+}
+
 fn admin(socket: &Path, req: serde_json::Value) -> Result<serde_json::Value, String> {
     host::control::local::admin(socket, req)
 }
@@ -871,6 +889,11 @@ fn mcp(args: &[String]) {
     let start = flag(&flags, "--no-start").is_none();
     let connect = move |harness: &str| -> Result<host::mcp::Relay, String> {
         let mut hello = serde_json::json!({ "hello": { "harness": harness, "builds": builds } });
+        // Without --build, the build the UI shows when the connection is
+        // made, fixed for the connection
+        if builds.is_empty() {
+            hello["hello"]["ui_build"] = serde_json::json!(true);
+        }
         if let Some(a) = &agent_dir {
             hello["hello"]["agent"] = serde_json::json!(a);
         }
@@ -1298,6 +1321,13 @@ fn agent_cmd(args: &[String]) {
             die("agents is not a build");
         }
         grant = grant.with_build(*b);
+    }
+    // Without --build, the build the UI shows now, fixed in the token
+    if grant.builds.is_empty()
+        && let Some(b) = ui_build(&socket)
+    {
+        eprintln!("pob agent: granted {b}, the build the UI shows (--build names another)");
+        grant = grant.with_build(b);
     }
     let command = if flag(&flags, "--exec").is_some() {
         if extra.is_empty() {

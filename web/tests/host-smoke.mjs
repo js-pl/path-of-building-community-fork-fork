@@ -121,6 +121,19 @@ try {
   await page.waitForFunction(() => document.querySelector(".build-picker select")?.value === "RF", null, { timeout: 30_000 });
   console.log("several builds: the picker and a second page");
 
+  // ui_context: the tab and the socket group the page shows
+  await page.getByRole("tab", { name: "Skills" }).click();
+  let ui;
+  for (let i = 0; i < 50; i++) {
+    ui = ctl("ui_context");
+    if (ui.tab === "Skills") break;
+    await page.waitForTimeout(200);
+  }
+  assert.equal(ui.build, "RF", JSON.stringify(ui));
+  assert.equal(ui.tab, "Skills", JSON.stringify(ui));
+  assert.equal(ui.selection?.group, 1, JSON.stringify(ui));
+  console.log("ui_context: the page's tab and group");
+
   // Options: the history's git settings, saved to the settings file
   await page.getByRole("button", { name: "Options" }).click();
   const dialog = page.getByRole("dialog", { name: "Options" });

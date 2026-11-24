@@ -12,6 +12,7 @@ import type { TabProps } from "../app";
 import { engine } from "../app";
 import type { NodePower, Tree, TreeNode, TreeState, TooltipLine } from "../engine/types";
 import { FloatingTooltip } from "./Tooltip";
+import { reportContext } from "./context";
 import { ColorText } from "./ColorText";
 import { type Art, asset, backgroundPattern, drawSprite, loadArt } from "./treeArt";
 
@@ -72,6 +73,10 @@ export function TreeTab({ act, rev }: TabProps) {
   // No art for this version: old trees, or a web app built without build:art
   const [artMissing, setArtMissing] = useState(false);
   const [hover, setHover] = useState<{ node: TreeNode; x: number; y: number; r: number } | null>(null);
+  // The node hovered last stays the tab's selection for the agents
+  useEffect(() => {
+    if (hover) reportContext({ selection: { node: hover.node.id } });
+  }, [hover?.node.id]);
   const [tip, setTip] = useState<{ id: number; lines: TooltipLine[] } | null>(null);
   const [path, setPath] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState("");

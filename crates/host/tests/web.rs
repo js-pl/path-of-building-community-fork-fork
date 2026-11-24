@@ -676,3 +676,95 @@ fn agent_call_h(h: &mut Host, grant: &Grant, req: J) -> J {
     }));
     serde_json::from_str(&rx.recv().unwrap()).unwrap()
 }
+
+#[test]
+fn ui_context_and_the_default_build() {
+    let dir = temp("context");
+    let builds = dir.join("builds");
+    let xml = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/generated/gen-0003.xml"),
+    )
+    .unwrap();
+    for name in ["RF", "Other"] {
+        std::fs::create_dir_all(builds.join(name)).unwrap();
+        std::fs::write(builds.join(name).join("build.xml"), &xml).unwrap();
+    }
+    let mut h = Host::new(data(), FsStore::new(&builds, None));
+    h.default_build = Some("RF".into());
+    let registry = std::sync::Arc::new(host::connections::Registry::default());
+    h.registry = Some(registry.clone());
+    let grant = Grant::new("claude", "claude-1")
+        .with_build("RF")
+        .with_build("Other");
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["ui"], false, "{r}");
+
+    // A client reports its tab and what is hovered: ids only
+    let (tx, out) = mpsc::channel();
+    h.handle(Msg::Open { client: 1, out: tx });
+    let a = host_req(
+        &mut h,
+        &out,
+        "context",
+        json!({ "tab": "Tree", "selection": { "node": 36634, "text": "ignored" } }),
+    );
+    assert!(a.get("error").is_none(), "{a}");
+    assert_eq!(registry.ui_build().as_deref(), Some("RF"));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["build"], "RF", "{r}");
+    assert_eq!(r["ok"]["tab"], "Tree");
+    assert!(
+        r["ok"]["selection"]["node"]
+            .as_str()
+            .unwrap()
+            .ends_with("#36634"),
+        "{r}"
+    );
+    // A tab the UI hasn't is dropped
+    host_req(&mut h, &out, "context", json!({ "tab": "<b>x</b>" }));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["tab"], J::Null, "{r}");
+
+    // Another build shown: the selection goes; requests naming no build
+    // stay on the grant's first
+    host_req(&mut h, &out, "open", json!({ "build": "Other" }));
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
+    assert_eq!(r["ok"]["build"], "Other", "{r}");
+    assert_eq!(r["ok"]["selection"], J::Null, "{r}");
+    let r = agent_call_h(&mut h, &grant, json!({ "verb": "summary" }));
+    assert_eq!(r["ok"]["build"], "RF", "{r}");
+
+    // A hello asking for the UI's build is granted it, fixed then
+    let (calls, _rx) = mpsc::channel();
+    let grant_for = |hello: J| -> J {
+        let (mine, theirs) = std::os::unix::net::UnixStream::pair().unwrap();
+        let reg = registry.clone();
+        let calls = calls.clone();
+        let t = std::thread::spawn(move || {
+            let _ = host::control::connection_in(theirs, calls, 0, Some((&reg, Box::new(|| {}))));
+        });
+        let mut w = mine.try_clone().unwrap();
+        writeln!(w, "{hello}").unwrap();
+        let line = host::control::read_line(&mut BufReader::new(mine))
+            .unwrap()
+            .unwrap();
+        drop(w);
+        t.join().unwrap();
+        serde_json::from_str(&line).unwrap()
+    };
+    let a =
+        grant_for(json!({ "hello": { "harness": "claude-code", "builds": [], "ui_build": true } }));
+    assert_eq!(a["ok"]["builds"], json!(["Other"]), "{a}");
+    let a = grant_for(
+        json!({ "hello": { "harness": "claude-code", "builds": ["RF"], "ui_build": true } }),
+    );
+    assert_eq!(a["ok"]["builds"], json!(["RF"]), "{a}");
+    let a = grant_for(json!({ "hello": { "harness": "ctl", "builds": [] } }));
+    assert_eq!(a["ok"]["builds"], json!([]), "{a}");
+    let a = grant_for(json!({ "admin": "ui_build" }));
+    assert_eq!(a["ok"]["build"], "Other", "{a}");
+    // No client: no UI build
+    h.handle(Msg::Close { client: 1 });
+    assert_eq!(registry.ui_build(), None);
+    let _ = std::fs::remove_dir_all(&dir);
+}

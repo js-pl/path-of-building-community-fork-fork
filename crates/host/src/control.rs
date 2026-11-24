@@ -13,7 +13,9 @@
 //! ```
 //!
 //! `agent` reuses an agent directory; without it the connection gets a new
-//! one, `<harness>-<time>`. The socket is the user's (only they can open
+//! one, `<harness>-<time>`. `"ui_build": true` with no `builds` grants the
+//! user's build the UI shows when the connection is made (none when no UI
+//! shows one); the grant stays that build when the UI shows another. The socket is the user's (only they can open
 //! it), so a hello may name any of the user's builds; no request after it
 //! changes the grant.
 
@@ -105,10 +107,13 @@ fn admin(req: &J, registry: &Registry) -> J {
             None => json!({ "error": "disconnect takes a connection's id" }),
         };
     }
+    if req == "ui_build" {
+        return json!({ "ok": { "build": registry.ui_build() } });
+    }
     if let Some(t) = req.get("revoked").and_then(J::as_str) {
         return json!({ "ok": { "closed": registry.disconnect_token(t) } });
     }
-    json!({ "error": "admin is \"connections\", {\"disconnect\": <id>} or {\"revoked\": <token id>}" })
+    json!({ "error": "admin is \"connections\", \"ui_build\", {\"disconnect\": <id>} or {\"revoked\": <token id>}" })
 }
 
 /// Serves one connection, listed in `registry` (with how to close it)
@@ -130,8 +135,18 @@ pub fn connection_in(
         writeln!(stream.get_mut(), "{}", admin(req, reg))?;
         return Ok(());
     }
-    let grant = match hello.and_then(|h| grant_of(&h, now)) {
-        Ok(g) => g,
+    let ui_build = |h: &J| h["hello"]["ui_build"] == true;
+    let grant = match hello.and_then(|h| grant_of(&h, now).map(|g| (g, ui_build(&h)))) {
+        Ok((mut g, ui)) => {
+            // Fixed now: the build the UI shows as the connection is made
+            if ui
+                && g.builds.is_empty()
+                && let Some(b) = registry.as_ref().and_then(|(r, _)| r.ui_build())
+            {
+                g = g.with_build(b);
+            }
+            g
+        }
         Err(e) => {
             writeln!(stream.get_mut(), "{}", json!({ "error": e }))?;
             return Ok(());

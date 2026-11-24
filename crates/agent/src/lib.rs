@@ -29,6 +29,7 @@ pub mod schema;
 mod search;
 pub mod store;
 pub mod text;
+pub mod ui;
 mod write;
 
 pub use grant::{AGENT_PREFIX, Grant, agent_dir_name};
@@ -89,6 +90,10 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "improve",
         "greedy improvement by an objective under constraints: steps of the generators' best moves, each evaluated exactly, proposed as one `apply`; changes nothing",
+    ),
+    (
+        "ui_context",
+        "what the user is looking at in the UI: the build, the tab and the node, item or socket group selected or hovered",
     ),
     ("history", "the build's last versions"),
     ("changes_since", "the changes after a version"),
@@ -179,6 +184,8 @@ pub struct Agent<'d, S: Store> {
     max_open: usize,
     /// The builds a client shows, which stay open
     shown: BTreeSet<BuildId>,
+    /// What the UI shows, as the host reports it
+    ui: Option<ui::UiView>,
     names: Names,
     /// The changes not yet taken by [`Agent::take_events`]
     events: Vec<Event>,
@@ -248,6 +255,7 @@ impl<'d, S: Store> Agent<'d, S> {
             clock: 0,
             max_open: MAX_OPEN,
             shown: BTreeSet::new(),
+            ui: None,
             names: Names::default(),
             events: Vec::new(),
         }
@@ -292,6 +300,7 @@ impl<'d, S: Store> Agent<'d, S> {
         let build = req.get("build").and_then(J::as_str);
         match verb {
             "builds" => self.builds(grant),
+            "ui_context" => self.ui_context(grant, req),
             "evaluate_item" => {
                 let id = grant.resolve(build)?;
                 let name = grant.api_name(&id);
