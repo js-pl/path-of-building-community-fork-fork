@@ -49,6 +49,17 @@ fn control_pipe() {
     let id = list["connections"][0]["id"].as_u64().unwrap();
     let closed = pipe::admin(&path, json!({ "disconnect": id })).unwrap();
     assert_eq!(closed["closed"], J::Bool(true));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let closed_c = loop {
+        let gone = c.call(&json!({ "verb": "summary" })).is_err();
+        if gone || std::time::Instant::now() > deadline {
+            break gone;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    assert!(closed_c, "the disconnected client still gets answers");
+    // The other client is untouched
+    assert!(d.call(&json!({ "verb": "tree" })).unwrap()["ok"].is_object());
 
     assert!(pipe::listen(&PathBuf::from(r"C:\control.sock")).is_err());
 }

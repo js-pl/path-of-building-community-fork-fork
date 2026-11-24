@@ -13,9 +13,11 @@ use std::fs::File;
 use std::os::windows::fs::OpenOptionsExt;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, RawHandle};
 use std::path::Path;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use windows_sys::Win32::Foundation::{
-    CloseHandle, ERROR_ACCESS_DENIED, ERROR_NO_DATA, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED,
-    GetLastError, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
+    CloseHandle, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_ACCESS_DENIED, ERROR_NO_DATA,
+    ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
 };
 use windows_sys::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
@@ -28,13 +30,15 @@ use windows_sys::Win32::Security::{
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, SECURITY_IDENTIFICATION,
 };
-use windows_sys::Win32::System::IO::CancelIoEx;
+use windows_sys::Win32::System::IO::CancelSynchronousIo;
 use windows_sys::Win32::System::Pipes::{
     ConnectNamedPipe, CreateNamedPipeW, DisconnectNamedPipe, PIPE_READMODE_BYTE,
     PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_UNLIMITED_INSTANCES, PIPE_WAIT,
     WaitNamedPipeW,
 };
-use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+use windows_sys::Win32::System::Threading::{
+    GetCurrentProcess, GetCurrentThread, OpenProcessToken,
+};
 
 /// Pipe names start with this
 pub const PREFIX: &str = r"\\.\pipe\";
@@ -233,14 +237,41 @@ pub fn listen(path: &Path) -> Result<Listener, String> {
     })
 }
 
-/// How to close a connection from another thread: its pending read is
-/// cancelled and the client disconnected
-fn closer(f: &File) -> Closer {
-    let h = f.as_raw_handle() as usize;
-    Box::new(move || unsafe {
-        DisconnectNamedPipe(h as HANDLE);
-        CancelIoEx(h as HANDLE, std::ptr::null());
+/// How to close a connection from another thread. The pipe's handle is
+/// synchronous, and Windows serialises synchronous I/O on a handle, so
+/// nothing else can be done to it while the connection's thread waits in
+/// a read (a `DisconnectNamedPipe` would wait as long). Instead the
+/// thread's I/O is cancelled, until the thread is done: its read fails,
+/// the connection ends and its handle is closed, which the client sees.
+/// The current thread is the connection's; `done` is set when it ends.
+fn closer(done: Arc<AtomicBool>) -> Closer {
+    let mut thread: HANDLE = std::ptr::null_mut();
+    let ok = unsafe {
+        DuplicateHandle(
+            GetCurrentProcess(),
+            GetCurrentThread(),
+            GetCurrentProcess(),
+            &mut thread,
+            0,
+            0,
+            DUPLICATE_SAME_ACCESS,
+        )
+    };
+    if ok == 0 {
+        return Box::new(|| {});
+    }
+    let thread = thread as usize;
+    Box::new(move || {
+        let done = done.clone();
+        std::thread::spawn(move || {
+            while !done.load(Ordering::SeqCst) {
+                unsafe { CancelSynchronousIo(thread as HANDLE) };
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+        });
     })
+    // The thread's handle is left open: one per connection, closed with
+    // the process (closing it here could race with the cancelling thread)
 }
 
 /// Accepts connections on a thread of their own each, passing their
@@ -262,8 +293,10 @@ pub fn accept(
         let calls = calls.clone();
         let registry = registry.clone();
         std::thread::spawn(move || {
-            let close = closer(&stream);
+            let done = Arc::new(AtomicBool::new(false));
+            let close = closer(done.clone());
             let _ = connection_in(&stream, calls, now(), Some((&registry, close)));
+            done.store(true, Ordering::SeqCst);
         });
     }
 }
