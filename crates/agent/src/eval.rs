@@ -20,7 +20,9 @@ use engine::power::{PowerStat, power_stats};
 use serde_json::{Value as J, json};
 use session::Dispatcher;
 use session::typed::TypedData;
-use std::time::Instant;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 
 /// Variants in one `eval`
 pub(crate) const MAX_VARIANTS: usize = 500;
@@ -78,6 +80,11 @@ impl Stat {
             points,
             power,
         })
+    }
+
+    /// Whether lower is better, as upstream's power stats say
+    pub fn lower_is_better(&self) -> bool {
+        self.power.as_ref().is_some_and(|p| p.negate)
     }
 
     /// The stat's value in an output; `None` when the engine has none
@@ -197,6 +204,9 @@ impl Outcome {
 pub(crate) struct Effort {
     pub evaluations: usize,
     pub failed: usize,
+    /// Variants left unevaluated when the budget ran out or the job was
+    /// cancelled
+    pub skipped: usize,
     pub threads: usize,
     pub seconds: f64,
 }
@@ -205,17 +215,81 @@ impl Effort {
     pub fn add(&mut self, o: Effort) {
         self.evaluations += o.evaluations;
         self.failed += o.failed;
+        self.skipped += o.skipped;
         self.threads = self.threads.max(o.threads);
         self.seconds += o.seconds;
     }
 
     pub fn json(&self) -> J {
-        json!({
+        let mut v = json!({
             "evaluations": self.evaluations,
             "failed": self.failed,
             "threads": self.threads,
             "seconds": (self.seconds * 100.0).round() / 100.0,
-        })
+        });
+        if self.skipped > 0 {
+            v["skipped"] = json!(self.skipped);
+        }
+        v
+    }
+}
+
+/// The error of a variant a stopped search didn't evaluate
+pub(crate) const SKIPPED: &str = "not evaluated: the search was stopped";
+
+/// When a search stops: a time budget, a cancel, and the evaluations done
+/// so far, which a job's progress reads. Clones share all three.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Budget {
+    cancel: Arc<AtomicBool>,
+    deadline: Option<Instant>,
+    done: Arc<AtomicUsize>,
+}
+
+impl Budget {
+    /// No limit
+    pub fn none() -> Budget {
+        Budget::default()
+    }
+
+    /// Stops `seconds` from now
+    pub fn seconds(seconds: f64) -> Budget {
+        Budget {
+            deadline: Some(Instant::now() + Duration::from_secs_f64(seconds)),
+            ..Budget::default()
+        }
+    }
+
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::Relaxed);
+    }
+
+    pub fn cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
+    }
+
+    pub fn out_of_time(&self) -> bool {
+        self.deadline.is_some_and(|d| Instant::now() >= d)
+    }
+
+    pub fn stopped(&self) -> bool {
+        self.cancelled() || self.out_of_time()
+    }
+
+    /// Why the search stopped, if it did
+    pub fn why(&self) -> Option<&'static str> {
+        if self.cancelled() {
+            Some("cancelled")
+        } else if self.out_of_time() {
+            Some("out of time")
+        } else {
+            None
+        }
+    }
+
+    /// The evaluations done so far
+    pub fn done(&self) -> usize {
+        self.done.load(Ordering::Relaxed)
     }
 }
 
@@ -241,6 +315,14 @@ impl<'d> Evaluator<'d> {
         Ok(Evaluator::of(agent.data, xml, agent.names.clone()))
     }
 
+    /// At most `n` threads
+    pub fn with_threads(mut self, n: Option<usize>) -> Evaluator<'d> {
+        if let Some(n) = n {
+            self.threads = self.threads.min(n.max(1));
+        }
+        self
+    }
+
     /// A build's saved XML
     pub fn of(data: &'d TypedData, xml: String, names: Names) -> Evaluator<'d> {
         let threads = match Threads::available() {
@@ -257,6 +339,16 @@ impl<'d> Evaluator<'d> {
 
     /// The build as it is (its outcome), and each variant's
     pub fn run(&self, variants: &[Vec<J>]) -> (R<Outcome>, Vec<R<Outcome>>, Effort) {
+        self.run_within(variants, &Budget::none())
+    }
+
+    /// As [`Evaluator::run`], until the budget stops it: variants not
+    /// begun by then are [`SKIPPED`]. The build itself is always evaluated.
+    pub fn run_within(
+        &self,
+        variants: &[Vec<J>],
+        budget: &Budget,
+    ) -> (R<Outcome>, Vec<R<Outcome>>, Effort) {
         let start = Instant::now();
         let all: Vec<&[J]> = std::iter::once(&[][..])
             .chain(variants.iter().map(Vec::as_slice))
@@ -277,8 +369,13 @@ impl<'d> Evaluator<'d> {
             (w..all.len())
                 .step_by(n)
                 .map(|i| {
+                    if i > 0 && budget.stopped() {
+                        return (i, Err(SKIPPED.to_string()));
+                    }
                     let mut s = base.clone();
-                    (i, evaluate(&mut names, &mut s, all[i]))
+                    let r = evaluate(&mut names, &mut s, all[i]);
+                    budget.done.fetch_add(1, Ordering::Relaxed);
+                    (i, r)
                 })
                 .collect()
         };
@@ -299,9 +396,14 @@ impl<'d> Evaluator<'d> {
             .map(|r| r.unwrap_or_else(|| Err("not evaluated".into())));
         let base = results.next().unwrap();
         let rest: Vec<R<Outcome>> = results.collect();
+        let skipped = rest
+            .iter()
+            .filter(|r| matches!(r, Err(e) if e == SKIPPED))
+            .count();
         let effort = Effort {
-            evaluations: all.len(),
-            failed: rest.iter().filter(|r| r.is_err()).count(),
+            evaluations: all.len() - skipped,
+            failed: rest.iter().filter(|r| r.is_err()).count() - skipped,
+            skipped,
             threads: n,
             seconds: start.elapsed().as_secs_f64(),
         };

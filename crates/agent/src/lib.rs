@@ -21,9 +21,11 @@ mod assume;
 pub mod engine;
 mod eval;
 mod evaluate;
+mod front;
 mod generate;
 mod goal;
 pub mod grant;
+pub mod jobs;
 mod read;
 pub mod schema;
 mod search;
@@ -90,6 +92,22 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "improve",
         "greedy improvement by an objective under constraints: steps of the generators' best moves, each evaluated exactly, proposed as one `apply`; changes nothing",
+    ),
+    (
+        "front",
+        "the Pareto front over two or more objectives under constraints: single moves of the generators and their combinations (a beam search), each evaluated exactly; runs as a job with a time budget; says how much it searched; changes nothing",
+    ),
+    (
+        "dominating",
+        "changes that are better than the build in at least one objective and worse in none, under constraints: the generators' moves and their combinations, each evaluated exactly; runs as a job with a time budget; changes nothing",
+    ),
+    (
+        "job",
+        "a search job's progress or answer, waited for up to `wait` seconds; without `job`, the jobs of this connection's builds",
+    ),
+    (
+        "cancel",
+        "stops a search job; its answer is the best found so far",
     ),
     (
         "ui_context",
@@ -189,6 +207,8 @@ pub struct Agent<'d, S: Store> {
     names: Names,
     /// The changes not yet taken by [`Agent::take_events`]
     events: Vec<Event>,
+    /// The search jobs
+    jobs: jobs::Jobs,
 }
 
 /// The names the engine knows, which answers quote; asked for once. Its
@@ -258,6 +278,7 @@ impl<'d, S: Store> Agent<'d, S> {
             ui: None,
             names: Names::default(),
             events: Vec::new(),
+            jobs: jobs::Jobs::default(),
         }
     }
 
@@ -269,25 +290,46 @@ impl<'d, S: Store> Agent<'d, S> {
         &mut self.store
     }
 
-    /// Answers a request as text, `{"ok": ...}` or `{"error": "..."}`
+    /// Answers a request as text, `{"ok": ...}` or `{"error": "..."}`;
+    /// a call that waits for a search job waits on this thread
     pub fn call_str(&mut self, grant: &Grant, request: &str) -> String {
+        let r = self.respond_str(grant, request);
+        self.block(r).to_string()
+    }
+
+    fn respond_str(&mut self, grant: &Grant, request: &str) -> jobs::Reply {
         if request.len() > MAX_REQUEST {
-            return json!({ "error": format!("a request is at most {MAX_REQUEST} bytes") })
-                .to_string();
+            return jobs::Reply::Now(
+                json!({ "error": format!("a request is at most {MAX_REQUEST} bytes") }),
+            );
         }
         match serde_json::from_str::<J>(request) {
-            Ok(req) => self.call(grant, &req).to_string(),
-            Err(e) => json!({ "error": format!("not JSON: {e}") }).to_string(),
+            Ok(req) => self.respond(grant, &req),
+            Err(e) => jobs::Reply::Now(json!({ "error": format!("not JSON: {e}") })),
         }
     }
 
     /// Answers a request, `{"verb": "...", ...}`: `{"ok": ...}` or
-    /// `{"error": "..."}`
+    /// `{"error": "..."}`; a call that waits for a search job waits on
+    /// this thread
     pub fn call(&mut self, grant: &Grant, request: &J) -> J {
-        match self.answer(grant, request) {
-            Ok(v) => json!({ "ok": v }),
-            Err(e) => json!({ "error": e }),
-        }
+        let r = self.respond(grant, request);
+        self.block(r)
+    }
+
+    fn respond(&mut self, grant: &Grant, req: &J) -> jobs::Reply {
+        let r = match req["verb"].as_str() {
+            Some("front" | "dominating") => self.front_job(grant, req),
+            Some("job") => self.job(grant, req),
+            Some("cancel") => self.cancel(grant, req),
+            _ => {
+                return jobs::Reply::Now(match self.answer(grant, req) {
+                    Ok(v) => json!({ "ok": v }),
+                    Err(e) => json!({ "error": e }),
+                });
+            }
+        };
+        r.unwrap_or_else(|e| jobs::Reply::Now(json!({ "error": e })))
     }
 
     fn answer(&mut self, grant: &Grant, req: &J) -> R<J> {
