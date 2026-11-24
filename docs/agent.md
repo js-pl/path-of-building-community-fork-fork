@@ -1543,7 +1543,7 @@ Each one a PR, as usual:
    and `improve`. Done (#204, #208), except the anoint, unique, craft and
    rare generators.
 9. `dominating` and `front` with the combination and respec search; jobs
-   with progress and cancelling. Done (#212, #213), except the anoint,
+   with progress and cancelling. Done (#212, #222), except the anoint,
    unique, craft and rare generators, which need `craft`.
 10. The port of the mod weights with its oracle test; `evaluate_item`.
     Done (#189, #195).
