@@ -581,6 +581,53 @@ fn undo_and_redo_across_sources(d: &'static TypedData) {
     assert!(events.windows(2).all(|w| w[0].version + 1 == w[1].version));
 }
 
+/// A grant to two builds addresses each; with one build open at a time,
+/// the idle one closes and opens again with its version and changes, and
+/// a build a client shows stays open
+fn several_builds(d: &'static TypedData) {
+    let mut a = agent(d, corpus(BUILD));
+    let g = grant().with_build("Other");
+    let (rf, other) = (BuildId::user("RF"), BuildId::user("Other"));
+    let r = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "allocate", "nodes": [36634], "build": "RF" }),
+    );
+    assert_eq!(r["version"], 1);
+    let s = ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    assert_eq!(s["build"], "Other", "{s}");
+    a.take_events();
+    a.set_max_open(1);
+    ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    assert_eq!(a.open_builds(), std::slice::from_ref(&other));
+    let b = ok(&mut a, &g, json!({ "verb": "builds" }));
+    assert_eq!(b["builds"][0]["version"], 1, "{b}");
+    // Opened again: the version goes on, the changes are kept, the undo
+    // list is gone (the history has it)
+    let c = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "changes_since", "version": 0, "build": "RF" }),
+    );
+    assert_eq!(c["changes"].as_array().unwrap().len(), 1, "{c}");
+    assert_eq!(a.open_builds(), std::slice::from_ref(&rf));
+    let r = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "set_level", "level": 80, "build": "RF", "expect": 1 }),
+    );
+    assert_eq!(r["version"], 2, "{r}");
+    let events = a.take_events();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].build, rf);
+    // A build shown stays open
+    a.set_shown([rf.clone()]);
+    ok(&mut a, &g, json!({ "verb": "summary", "build": "Other" }));
+    let mut open = a.open_builds();
+    open.sort();
+    assert_eq!(open, [other, rf]);
+}
+
 #[test]
 fn verbs() {
     let d = data();
@@ -592,4 +639,5 @@ fn verbs() {
     agent_directories(d);
     author_text_only_where_marked(d);
     undo_and_redo_across_sources(d);
+    several_builds(d);
 }

@@ -146,6 +146,7 @@ impl<'d, S: Store> Agent<'d, S> {
     /// and changes go with it
     pub fn close(&mut self, id: &BuildId) {
         self.open.remove(id);
+        self.parked.remove(id);
     }
 
     /// The changes made since the last call, oldest first: what a host

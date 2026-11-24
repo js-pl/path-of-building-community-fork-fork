@@ -14,6 +14,7 @@ import { PopupView } from "./ui/Popup";
 import { HistoryTab } from "./ui/HistoryTab";
 import { AgentsTab } from "./ui/AgentsTab";
 import { OptionsDialog } from "./ui/OptionsDialog";
+import { BuildPicker } from "./ui/BuildPicker";
 import type { SetControl } from "./ui/Control";
 
 export const engine = new Engine();
@@ -96,6 +97,11 @@ export function App() {
   useEffect(() => {
     (async () => {
       try {
+        // On the host, `?build=<name>` shows that build in this page
+        const asked = engine.hosted ? new URLSearchParams(location.search).get("build") : null;
+        if (asked && asked !== engine.hosted?.build) {
+          await engine.hosted!.host("open", { build: asked }).catch((e) => setError(String(e instanceof Error ? e.message : e)));
+        }
         if (await loadFromHash(engine)) {
           // On the host the code became a build of its own; a reload
           // mustn't make another
@@ -127,7 +133,7 @@ export function App() {
     <div class="app">
       <header class="topbar">
         <span class="title" title={state.name}>
-          {state.name}
+          {engine.hosted ? <BuildPicker rev={rev} onError={setError} /> : state.name}
           {/* On the host every edit is saved at once */}
           {state.unsaved && !engine.hosted ? <span class="unsaved" title="Unsaved changes" /> : null}
         </span>

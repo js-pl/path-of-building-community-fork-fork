@@ -236,6 +236,12 @@ impl Store for FsStore {
         let v = repo.resolve(version).map_err(|e| e.to_string())?;
         repo.read(&v).map_err(|e| e.to_string())
     }
+
+    fn closed(&mut self, id: &BuildId) {
+        if let Err(e) = self.release(id) {
+            eprintln!("pob host: {}: the history: {e}", id.name);
+        }
+    }
 }
 
 impl FsStore {

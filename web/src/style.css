@@ -266,6 +266,24 @@ input[type="search"] {
   text-overflow: ellipsis;
   color: var(--accent);
 }
+.build-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+}
+.build-picker select {
+  min-width: 0;
+  flex: 1;
+  font-weight: 600;
+  color: var(--accent);
+  text-overflow: ellipsis;
+}
+.build-picker a {
+  text-decoration: none;
+  padding: 2px 6px;
+}
 .unsaved {
   display: inline-block;
   width: 7px;
