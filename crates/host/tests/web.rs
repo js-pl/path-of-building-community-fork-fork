@@ -346,3 +346,125 @@ fn xml_at(builds: &std::path::Path, version: &str) -> String {
         .unwrap();
     String::from_utf8(out.stdout).unwrap()
 }
+
+/// A client's answer to a host request, straight through the engine
+/// thread's messages
+fn host_req(h: &mut Host, out: &mpsc::Receiver<host::ws::Out>, what: &str, args: J) -> J {
+    h.handle(Msg::Ui {
+        client: 1,
+        text: json!({ "id": 1, "host": what, "args": args }).to_string(),
+    });
+    loop {
+        let host::ws::Out::Text(t) = out.try_recv().unwrap() else {
+            continue;
+        };
+        let v: J = serde_json::from_str(&t).unwrap();
+        if v["id"] == 1 {
+            return v;
+        }
+    }
+}
+
+#[test]
+fn agent_directories_and_connections() {
+    let Some(git) = Git::find() else {
+        eprintln!("no git: skipped");
+        return;
+    };
+    let dir = temp("agents");
+    let builds = dir.join("builds");
+    let xml = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../corpus/generated/gen-0003.xml"),
+    )
+    .unwrap();
+    std::fs::create_dir_all(builds.join("RF")).unwrap();
+    std::fs::write(builds.join("RF/build.xml"), &xml).unwrap();
+    let mut h = Host::new(data(), FsStore::new(&builds, Some(git)));
+    h.default_build = Some("RF".into());
+    let registry = std::sync::Arc::new(host::connections::Registry::default());
+    h.registry = Some(registry.clone());
+    let (tx, out) = mpsc::channel();
+    h.handle(Msg::Open { client: 1, out: tx });
+
+    // An agent makes builds in its directory
+    let grant = Grant::new("claude", "claude-1").with_build("RF");
+    for name in ["try", "other"] {
+        let (rtx, rrx) = mpsc::channel();
+        h.handle(Msg::Agent(Call {
+            grant: grant.clone(),
+            line: json!({ "verb": "copy", "name": name }).to_string(),
+            reply: rtx,
+        }));
+        let r: J = serde_json::from_str(&rrx.recv().unwrap()).unwrap();
+        assert!(r.get("ok").is_some(), "{r}");
+    }
+    let a = host_req(&mut h, &out, "agents", json!({}));
+    let dirs = a["ok"]["dirs"].as_array().unwrap();
+    assert_eq!(dirs.len(), 1, "{a}");
+    assert_eq!(dirs[0]["dir"], "claude-1");
+    assert_eq!(dirs[0]["builds"][1]["build"], "agents/claude-1/try", "{a}");
+    assert!(dirs[0]["size"].as_u64().unwrap() > xml.len() as u64);
+
+    // Keep: the build and its history move among the user's builds; a
+    // taken name gets a number
+    let a = host_req(
+        &mut h,
+        &out,
+        "keep",
+        json!({ "build": "agents/claude-1/try", "name": "RF" }),
+    );
+    assert_eq!(a["ok"]["build"], "RF (2)", "{a}");
+    assert!(builds.join("RF (2)/.git").is_dir());
+    assert!(!builds.join("agents/claude-1/try").exists());
+    assert_eq!(git_log(&builds.join("RF (2)")).len(), 1);
+    // The agent no longer reaches it
+    let (rtx, rrx) = mpsc::channel();
+    h.handle(Msg::Agent(Call {
+        grant: grant.clone(),
+        line: json!({ "verb": "summary", "build": "agent/try" }).to_string(),
+        reply: rtx,
+    }));
+    let r: J = serde_json::from_str(&rrx.recv().unwrap()).unwrap();
+    assert!(r.get("error").is_some(), "{r}");
+
+    // Clean: the directory, with what's left in it, goes to the trash
+    let a = host_req(&mut h, &out, "clean", json!({ "dir": "claude-1" }));
+    assert_eq!(a["ok"]["cleaned"][0]["dir"], "claude-1", "{a}");
+    assert!(!builds.join("agents/claude-1").exists());
+    assert!(builds.join("trash/claude-1/other/.git").is_dir());
+    assert!(builds.join("RF (2)/build.xml").exists());
+    let a = host_req(&mut h, &out, "agents", json!({}));
+    assert_eq!(a["ok"]["dirs"], json!([]), "{a}");
+    // `trash` is no build
+    let a = host_req(&mut h, &out, "builds", json!({}));
+    assert_eq!(a["ok"]["builds"], json!(["RF", "RF (2)"]), "{a}");
+
+    // The connections, and closing one
+    let closed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let c = closed.clone();
+    let id = registry.add(
+        "socket",
+        &grant,
+        None,
+        Box::new(move || c.store(true, std::sync::atomic::Ordering::SeqCst)),
+    );
+    let a = host_req(&mut h, &out, "connections", json!({}));
+    assert_eq!(a["ok"]["connections"][0]["connection"], "claude", "{a}");
+    let a = host_req(&mut h, &out, "disconnect", json!({ "id": id }));
+    assert_eq!(a["ok"]["closed"], true, "{a}");
+    assert!(closed.load(std::sync::atomic::Ordering::SeqCst));
+    let a = host_req(&mut h, &out, "connections", json!({}));
+    assert_eq!(a["ok"]["connections"], json!([]), "{a}");
+
+    // Revoking a connection's token closes it, and the token is refused
+    let tokens = host::tokens::Tokens::new(dir.join("tokens.json"));
+    let (secret, token) = tokens.mint(&grant, 0).unwrap();
+    h.tokens = Some(tokens);
+    registry.add("http", &grant, Some(&token.id), Box::new(|| {}));
+    let a = host_req(&mut h, &out, "revoke", json!({ "token": token.id }));
+    assert_eq!(a["ok"]["closed"], 1, "{a}");
+    assert!(h.tokens.as_ref().unwrap().find(&secret).unwrap().is_none());
+    let a = host_req(&mut h, &out, "revoke", json!({ "token": token.id }));
+    assert!(a.get("error").is_some(), "{a}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -40,7 +40,7 @@ const url = await new Promise((resolve, reject) => {
   host.on("exit", (c) => reject(new Error(`pob host exited (${c}): ${log}`)));
 });
 
-const ctl = (...args) => JSON.parse(execFileSync(pob, ["ctl", "--socket", socket, "--build", "RF", "--json", ...args], { encoding: "utf8" })).ok;
+const ctl = (...args) => JSON.parse(execFileSync(pob, ["ctl", "--socket", socket, "--build", "RF", "--agent", "smoke", "--json", ...args], { encoding: "utf8" })).ok;
 
 const browser = await chromium.launch();
 try {
@@ -82,6 +82,12 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".history-tab .steps li").length === 3, null, { timeout: 30_000 });
   const last = ctl("changes_since", "version=2").changes[0];
   assert.ok(last.label.startsWith("restore "), JSON.stringify(last));
+
+  // The agents tab: an agent's copy, kept among the user's builds
+  ctl("copy", "name=try");
+  await page.getByRole("tab", { name: "Agents" }).click();
+  await page.getByRole("button", { name: "Keep" }).click();
+  await page.getByText("Kept as try.").waitFor({ timeout: 30_000 });
   console.log("ok: the UI and an agent on one build on the host");
 } finally {
   await browser.close();

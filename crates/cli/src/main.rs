@@ -449,7 +449,8 @@ fn host_cmd(args: &[String]) {
     } else {
         Some(web_app(&flags))
     };
-    serve_host(builds, socket, git, http, web);
+    let tokens = tokens_path(&flags);
+    serve_host(builds, socket, git, http, web, tokens);
 }
 
 /// The web app as the flags ask for it: where its bundle is, the address
@@ -562,6 +563,7 @@ fn serve_host(
     git: Option<history::Git>,
     http: Option<HttpEndpoint>,
     web: Option<WebApp>,
+    tokens: PathBuf,
 ) {
     let listener = host::control::unix::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
@@ -571,6 +573,7 @@ fn serve_host(
         let endpoint = host::http::Http::new(h.tokens, tx.clone(), registry.clone());
         std::thread::spawn(move || endpoint.serve(h.listener, h.tls));
     }
+    let listed = registry.clone();
     std::thread::spawn(move || host::control::unix::accept(listener, tx, registry));
     let to = msgs.clone();
     std::thread::spawn(move || host::ui::forward(rx, to));
@@ -582,6 +585,8 @@ fn serve_host(
         socket.display()
     );
     let mut h = host::ui::Host::new(data, store);
+    h.registry = Some(listed);
+    h.tokens = Some(host::tokens::Tokens::new(tokens));
     if let Some(w) = web {
         h.default_build = w.build.clone();
         let key = host::web::new_key().unwrap_or_else(|e| die(e));
@@ -607,6 +612,7 @@ fn serve_host(
     _: Option<history::Git>,
     _: Option<HttpEndpoint>,
     _: Option<WebApp>,
+    _: PathBuf,
 ) {
     die("pob host: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
 }

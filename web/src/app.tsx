@@ -12,6 +12,7 @@ import { PartyTab } from "./ui/PartyTab";
 import { ImportTab, loadFromHash } from "./ui/ImportTab";
 import { PopupView } from "./ui/Popup";
 import { HistoryTab } from "./ui/HistoryTab";
+import { AgentsTab } from "./ui/AgentsTab";
 import type { SetControl } from "./ui/Control";
 
 export const engine = new Engine();
@@ -27,7 +28,7 @@ export type TabProps = {
 
 const baseTabs = ["Import/Export", "Tree", "Skills", "Items", "Calcs", "Config", "Notes", "Party"] as const;
 // On the host, the build's undo list and history too
-const hostTabs = ["History"] as const;
+const hostTabs = ["History", "Agents"] as const;
 type Tab = (typeof baseTabs)[number] | (typeof hostTabs)[number];
 const tabs: readonly Tab[] = engine.hosted ? [...baseTabs, ...hostTabs] : baseTabs;
 
@@ -167,6 +168,7 @@ export function App() {
         {tab === "Notes" ? <NotesTab {...props} /> : null}
         {tab === "Party" ? <PartyTab {...props} /> : null}
         {tab === "History" ? <HistoryTab {...props} /> : null}
+        {tab === "Agents" ? <AgentsTab {...props} /> : null}
       </main>
       {state.popups.length ? <PopupView popup={state.popups[0]} act={act} /> : null}
     </div>
