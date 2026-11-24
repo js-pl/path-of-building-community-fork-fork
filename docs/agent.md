@@ -9,7 +9,8 @@ which reshaped `session::dispatch`, is done. Step 3, the verbs
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
 done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
 install` ([below](#built-mcp)), is done. Step 10, the mod weights and
-`evaluate_item` ([below](#built-evaluate_item)), is done.
+`evaluate_item` ([below](#built-evaluate_item)), is done. Step 8 is being
+built: `eval` and `assumptions` are done ([below](#built-eval-and-assumptions)).
 
 ## The question
 
@@ -456,8 +457,10 @@ above was silent:
   builds come from a `Store` (`list`, `read`, `create`, `commit`, `log`,
   `read_version`; nothing deletes or rewrites). The host implements it on
   the builds directory and `Recorder::agent_step`; `MemStore` keeps builds
-  in memory for tests. `Agent` isn't `Send` (the typed data isn't), so a
-  host runs it on one thread and passes it the connections' requests.
+  in memory for tests. A host runs `Agent` on one thread and passes it
+  the connections' requests; evaluations (`eval` and the verbs built on
+  it) run on threads of their own, each with a session of its own on the
+  shared typed data, which is `Sync`.
 - **Naming builds.** `build` is a user's build by its name, which the
   grant must list, or `agent/<name>` in the caller's own agent directory;
   without it, the grant's first build. A name outside both is refused
@@ -855,6 +858,54 @@ changes nothing and makes no commit:
   slot.
 - Not ported: Pearl of Tsoatha's weights (answered as `not_ported`), the
   talisman and scourge options, the trade query itself.
+
+### Built: `eval` and `assumptions`
+
+Reading verbs of `crates/agent` (`eval.rs`, `assume.rs`); neither changes
+the build nor commits.
+
+```
+{"verb": "eval", "build"?, "variants": [[change, ...] | {"changes": [...]} | change, ...],
+ "stats"?: ["FullDPS", "TotalEHP", ...]}
+→ {"stats": ["Full DPS", ...], "keys": ["FullDPS", ...], "base": [values],
+   "base_warnings": [...], "rows": [{"variant": 1, "changes": "allocate ... (3 points)",
+   "values": [...], "change": ["+14.9%", "", ...], "warnings_added"?, "warnings_resolved"?}
+   | {"variant": 2, "error": "..."}], "effort": {"evaluations", "failed", "threads",
+   "seconds"}, "exact": "..."}
+
+{"verb": "assumptions", "build"?, "stat"?: "FullDPS", "limit"?: 15}
+→ {"config": {section: ["label: value", ...]}, "defaults", "numbers": {"exact",
+   "estimate", "not_ported"}, with `stat`: "value", "changed_by": [{"option",
+   "label", "from", "to", "value", "change"}], "search": {"options_tried",
+   "change_it", "numbers_left_unset", "effort", "how"}}
+```
+
+- **The evaluator** (`eval::Evaluator`), which `assumptions`, `best` and
+  `improve` use too: each thread loads the build's saved XML into a
+  session of its own once and evaluates each of its variants on a clone
+  of it (`Dispatcher` is `Clone`), running the changes `apply` runs; so a
+  row's numbers are the engine's full calculation of the build `apply`
+  would make, which the tests check against a session loading the XML
+  `apply` commits. A variant that fails is a row with its `error`; the
+  others still run. Variants are independent and keep their order, so the
+  answer doesn't depend on the thread count. Measured on 4 threads:
+  about 185 variants a second (a clone is 1 ms, a change's calculation
+  about 20 ms, each thread's first load 85 ms).
+- **Variants**: up to 500, each up to 200 changes; the fields each change
+  takes are checked before anything runs, as for `apply`.
+- **Stats** are the engine's outputs by key (`FullDPS`, `TotalEHP`,
+  `FireResist`, `MinionLife`) or label, power stats read as upstream reads
+  them (Full DPS falls back to the combined DPS); default Full DPS, EHP and
+  the sidebar's change stats any variant changed, up to 8. Warnings are
+  `summary`'s; a row lists those it adds and resolves.
+- **`assumptions`** lists the options set, by section, and what is exact
+  or an estimate. With a `stat`, every option shown is changed alone on a
+  copy (a check box flipped, each other choice of a list, a number set
+  back to its default) and evaluated exactly; the options that change the
+  stat come sorted by how much, each with the `to` that `set_config`
+  takes. Numbers not set aren't tried, and the answer counts them.
+- No time budget yet: a call runs to the end (500 variants take a few
+  seconds); budgets and jobs are step 9's.
 
 ### Answers sized for an LLM
 

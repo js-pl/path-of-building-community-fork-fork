@@ -18,6 +18,8 @@ pub const READING: &[&str] = &[
     "history",
     "changes_since",
     "evaluate_item",
+    "eval",
+    "assumptions",
 ];
 
 /// The verbs whose answers can carry the author's text under `untrusted`
@@ -42,6 +44,16 @@ fn node() -> J {
     json!({
         "description": "a node's id, \"#id\", \"Name #id\" or a name only one node has",
         "type": ["integer", "string"],
+    })
+}
+
+fn stats() -> J {
+    json!({
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 12,
+        "items": { "type": "string" },
+        "description": "the stats to show, as the engine's outputs (FullDPS, TotalEHP, Life, EnergyShield, FireResist, ...); default Full DPS, EHP and the sidebar's stats that changed",
     })
 }
 
@@ -238,6 +250,28 @@ pub fn input_schema(verb: &str) -> Option<J> {
             }),
             &[],
         ),
+        "eval" => (
+            json!({
+                "build": build(),
+                "variants": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "description": "the variants, each a list of changes as `apply` takes them (or one change); each is evaluated on its own copy of the build",
+                    "items": { "type": ["array", "object"] },
+                },
+                "stats": stats(),
+            }),
+            &["variants"],
+        ),
+        "assumptions" => (
+            json!({
+                "build": build(),
+                "stat": { "type": "string", "description": "a stat (FullDPS, TotalEHP, Life, ...): adds the options that change it, each evaluated exactly" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "how many options to list; default 15" },
+            }),
+            &[],
+        ),
         "undo" => (json!({ "build": build(), "expect": expect() }), &[]),
         "restore" => (
             json!({
@@ -320,6 +354,22 @@ mod tests {
         props.sort();
         fields.sort();
         assert_eq!(props, fields);
+        for (v, fields) in [
+            ("eval", crate::eval::FIELDS),
+            ("assumptions", crate::assume::FIELDS),
+        ] {
+            let s = input_schema(v).unwrap();
+            let mut props: Vec<&str> = s["properties"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            let mut fields = fields.to_vec();
+            props.sort();
+            fields.sort();
+            assert_eq!(props, fields, "{v}");
+        }
         for v in READING.iter().chain(UNTRUSTED_TEXT).chain(CHANGES) {
             assert!(crate::VERBS.iter().any(|(n, _)| n == v), "{v}");
         }

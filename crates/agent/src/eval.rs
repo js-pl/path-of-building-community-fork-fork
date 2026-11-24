@@ -1,0 +1,451 @@
+//! `eval`: variants of a build, each a list of changes, evaluated exactly
+//! on copies of the build on all cores, as a short table. Nothing changes
+//! in the build. [`Evaluator`] is what `assumptions`, `best` and `improve`
+//! evaluate with.
+//!
+//! Each thread loads the build's saved XML into a session of its own once,
+//! and evaluates each of its variants on a clone of that session, with the
+//! changes `apply` runs: the numbers are the engine's full calculation, as
+//! the sidebar has them, of the build `apply` would make. Variants are
+//! independent of each other and of the order they run in, so the answers
+//! are the same with any thread count.
+
+use crate::read::{DIFF_STATS, warnings_of};
+use crate::text::{LINE_CAP, clean};
+use crate::write::{MAX_CHANGES, check_change, num, round};
+use crate::{Agent, BuildId, Names, Open, R, Store, check_fields, cmd, opt_u64};
+use engine::calculator::CalcOutput;
+use engine::parallel::Threads;
+use engine::power::{PowerStat, power_stats};
+use serde_json::{Value as J, json};
+use session::Dispatcher;
+use session::typed::TypedData;
+use std::time::Instant;
+
+/// Variants in one `eval`
+pub(crate) const MAX_VARIANTS: usize = 500;
+/// Stats in one table
+const MAX_STATS: usize = 12;
+/// The stats a table shows when none are asked for, at most
+const DEFAULT_STATS: usize = 8;
+
+/// What the numbers of a table are
+pub(crate) const EXACT: &str = "every value is the engine's full calculation (the sidebar's) of the build with the variant's changes, on a copy of the build; nothing was changed. They rest on the build's configuration, which `assumptions` lists";
+
+/// A stat a table shows: an output of the engine
+#[derive(Clone, Debug)]
+pub(crate) struct Stat {
+    pub key: String,
+    pub label: String,
+    /// In points (resistances, chances) rather than a ratio
+    pub points: bool,
+    /// A power stat, read as upstream's power and trade weights read it
+    power: Option<PowerStat>,
+}
+
+impl Stat {
+    /// A stat by its output key (`FullDPS`, `TotalEHP`, `FireResist`,
+    /// `MinionLife`), or by its label
+    pub fn new(name: &str, base: &CalcOutput) -> R<Stat> {
+        let diff = DIFF_STATS
+            .iter()
+            .find(|(k, l, _)| *k == name || l.eq_ignore_ascii_case(name));
+        let power = power_stats().into_iter().find(|p| {
+            p.stat.as_deref() == Some(name)
+                || (p.stat.is_some() && p.label.eq_ignore_ascii_case(name))
+        });
+        let key = match (diff, &power) {
+            (Some((k, _, _)), _) => k.to_string(),
+            (_, Some(p)) => p.stat.clone().unwrap_or_default(),
+            _ if base.num(name).is_some() => name.to_string(),
+            _ => {
+                return Err(format!(
+                    "no stat {:?}; a stat is an output of the engine, as FullDPS, TotalEHP, Life, EnergyShield, FireResist, PhysicalMaximumHitTaken or MovementSpeedMod",
+                    clean(name, 60, false)
+                ));
+            }
+        };
+        let power = power.filter(|p| p.stat.as_deref() == Some(key.as_str()));
+        let label = diff
+            .map(|(_, l, _)| l.to_string())
+            .or_else(|| power.as_ref().map(|p| p.label.clone()))
+            .unwrap_or_else(|| key.clone());
+        let points =
+            diff.is_some_and(|(_, _, p)| *p) || key.ends_with("Resist") || key.ends_with("Chance");
+        Ok(Stat {
+            key,
+            label,
+            points,
+            power,
+        })
+    }
+
+    /// The stat's value in an output; `None` when the engine has none
+    pub fn value(&self, out: &CalcOutput) -> Option<f64> {
+        match &self.power {
+            // Upstream's reading (Full DPS falls back to the combined DPS,
+            // minion stats are the minion's), without the transform:
+            // tables show the stat itself
+            Some(p) => {
+                let v = PowerStat {
+                    negate: false,
+                    ..p.clone()
+                }
+                .value(out);
+                let known = match self.key.strip_prefix("Minion") {
+                    Some(m) if !m.is_empty() => out.minion_num(m).is_some(),
+                    _ => out.num(&self.key).is_some() || self.key == "FullDPS",
+                };
+                known.then_some(v)
+            }
+            None => out.num(&self.key),
+        }
+    }
+
+    /// `+14.9%`, or `+3` for a stat in points; empty when unchanged
+    pub fn change(&self, base: Option<f64>, new: Option<f64>) -> String {
+        let (b, a) = (base.unwrap_or(0.0), new.unwrap_or(0.0));
+        if a == b || (a - b).abs() < 1e-9 * a.abs().max(b.abs()).max(1.0) {
+            return String::new();
+        }
+        if !a.is_finite() || !b.is_finite() {
+            return format!("{} → {}", num(b), num(a));
+        }
+        if self.points {
+            format!("{:+}", round(a - b))
+        } else if b != 0.0 {
+            format!("{:+.1}%", (a - b) / b.abs() * 100.0)
+        } else {
+            format!("{:+}", num(a - b))
+        }
+    }
+}
+
+/// The stats a request names, else `None`
+pub(crate) fn stats_of(req: &J, base: &CalcOutput) -> R<Option<Vec<Stat>>> {
+    match req.get("stats") {
+        None | Some(J::Null) => Ok(None),
+        Some(J::Array(list)) if !list.is_empty() && list.len() <= MAX_STATS => list
+            .iter()
+            .map(|s| {
+                Stat::new(
+                    s.as_str()
+                        .ok_or("stats is a list of stat names, as \"FullDPS\"")?,
+                    base,
+                )
+            })
+            .collect::<R<Vec<_>>>()
+            .map(Some),
+        Some(_) => Err(format!("stats is a list of 1 to {MAX_STATS} stat names")),
+    }
+}
+
+/// A variant as a request gives it: a list of changes, an object with
+/// `changes`, or one change
+pub(crate) fn variant_of(v: &J) -> R<Vec<J>> {
+    let changes = match v {
+        J::Array(list) => list.clone(),
+        J::Object(o) if o.contains_key("changes") => {
+            if o.keys().any(|k| k != "changes") {
+                return Err("a variant is a list of changes, or {\"changes\": [...]}".into());
+            }
+            o["changes"]
+                .as_array()
+                .ok_or("a variant's changes are a list")?
+                .clone()
+        }
+        J::Object(o) if o.contains_key("verb") => vec![v.clone()],
+        _ => {
+            return Err(
+                "a variant is a list of changes, each {\"verb\": ..., ...} as `apply` takes them"
+                    .into(),
+            );
+        }
+    };
+    if changes.len() > MAX_CHANGES {
+        return Err(format!("a variant has at most {MAX_CHANGES} changes"));
+    }
+    for c in &changes {
+        check_change(c)?;
+    }
+    Ok(changes)
+}
+
+/// A variant evaluated
+#[derive(Clone, Debug)]
+pub(crate) struct Outcome {
+    /// Each change's label
+    pub labels: Vec<String>,
+    pub out: CalcOutput,
+    pub warnings: Vec<String>,
+}
+
+impl Outcome {
+    pub fn label(&self) -> String {
+        if self.labels.is_empty() {
+            "the build as it is".into()
+        } else {
+            clean(&self.labels.join("; "), LINE_CAP, false)
+        }
+    }
+}
+
+/// How much an evaluation did
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Effort {
+    pub evaluations: usize,
+    pub failed: usize,
+    pub threads: usize,
+    pub seconds: f64,
+}
+
+impl Effort {
+    pub fn json(&self) -> J {
+        json!({
+            "evaluations": self.evaluations,
+            "failed": self.failed,
+            "threads": self.threads,
+            "seconds": (self.seconds * 100.0).round() / 100.0,
+        })
+    }
+}
+
+/// Evaluates variants of one version of a build on copies of it
+pub(crate) struct Evaluator<'d> {
+    data: &'d TypedData,
+    /// The build as saved
+    pub xml: String,
+    names: Names,
+    threads: usize,
+}
+
+impl<'d> Evaluator<'d> {
+    /// The build's open session as it is now
+    pub fn new<S: Store>(agent: &mut Agent<'d, S>, o: &mut Open<'d>) -> R<Evaluator<'d>> {
+        // Asked for here once, so the threads' copies have them
+        agent.names.gems(&mut o.session)?;
+        agent.names.uniques(&mut o.session)?;
+        let xml = cmd(&mut o.session, json!({ "cmd": "saveXml" }))?["xml"]
+            .as_str()
+            .ok_or("saveXml gave no XML")?
+            .to_string();
+        let threads = match Threads::available() {
+            Threads::Pool(n) => n,
+            _ => 1,
+        };
+        Ok(Evaluator {
+            data: agent.data,
+            xml,
+            names: agent.names.clone(),
+            threads,
+        })
+    }
+
+    /// The build as it is (its outcome), and each variant's
+    pub fn run(&self, variants: &[Vec<J>]) -> (R<Outcome>, Vec<R<Outcome>>, Effort) {
+        let start = Instant::now();
+        let all: Vec<&[J]> = std::iter::once(&[][..])
+            .chain(variants.iter().map(Vec::as_slice))
+            .collect();
+        let n = self.threads.clamp(1, all.len());
+        let work = |w: usize| -> Vec<(usize, R<Outcome>)> {
+            let mut names = self.names.clone();
+            let mut base = Dispatcher::typed(self.data);
+            if let Err(e) = cmd(
+                &mut base,
+                json!({ "cmd": "loadXml", "xml": self.xml, "name": "copy" }),
+            ) {
+                return (w..all.len())
+                    .step_by(n)
+                    .map(|i| (i, Err(e.clone())))
+                    .collect();
+            }
+            (w..all.len())
+                .step_by(n)
+                .map(|i| {
+                    let mut s = base.clone();
+                    (i, evaluate(&mut names, &mut s, all[i]))
+                })
+                .collect()
+        };
+        let threads = if n > 1 {
+            Threads::Pool(n)
+        } else {
+            Threads::Sequential
+        };
+        let mut results: Vec<Option<R<Outcome>>> = vec![None; all.len()];
+        for (i, r) in engine::parallel::map((0..n).collect(), threads, work)
+            .into_iter()
+            .flatten()
+        {
+            results[i] = Some(r);
+        }
+        let mut results = results
+            .into_iter()
+            .map(|r| r.unwrap_or_else(|| Err("not evaluated".into())));
+        let base = results.next().unwrap();
+        let rest: Vec<R<Outcome>> = results.collect();
+        let effort = Effort {
+            evaluations: all.len(),
+            failed: rest.iter().filter(|r| r.is_err()).count(),
+            threads: n,
+            seconds: start.elapsed().as_secs_f64(),
+        };
+        (base, rest, effort)
+    }
+}
+
+/// One variant on a session of its own
+fn evaluate(names: &mut Names, s: &mut Dispatcher, changes: &[J]) -> R<Outcome> {
+    let mut labels = Vec::new();
+    for c in changes {
+        let (label, _) = names.change(s, c).map_err(|e| {
+            let verb = c["verb"].as_str().unwrap_or("?");
+            clean(&format!("{verb}: {e}"), LINE_CAP, false)
+        })?;
+        labels.push(label);
+    }
+    let out = s.typed_output().ok_or("no build is open")?;
+    let state = cmd(s, json!({ "cmd": "state" }))?;
+    let outputs = cmd(s, json!({ "cmd": "outputs" }))?;
+    let gems = names.gems(s)?.clone();
+    let uniques = names.uniques(s)?.clone();
+    let warnings = warnings_of(&state, &outputs["player"], &gems, &uniques);
+    Ok(Outcome {
+        labels,
+        out,
+        warnings,
+    })
+}
+
+/// A table's columns: the stats asked for, else Full DPS, EHP and the
+/// stats of the sidebar's changes any variant changed
+pub(crate) fn columns(asked: Option<Vec<Stat>>, base: &Outcome, rows: &[R<Outcome>]) -> Vec<Stat> {
+    if let Some(s) = asked {
+        return s;
+    }
+    let mut out = Vec::new();
+    for (k, _, _) in DIFF_STATS {
+        let Ok(stat) = Stat::new(k, &base.out) else {
+            continue;
+        };
+        let b = stat.value(&base.out);
+        let changed = rows
+            .iter()
+            .flatten()
+            .any(|r| !stat.change(b, stat.value(&r.out)).is_empty());
+        if changed || *k == "FullDPS" || *k == "TotalEHP" {
+            out.push(stat);
+        }
+        if out.len() == DEFAULT_STATS {
+            break;
+        }
+    }
+    out
+}
+
+/// A value as tables give it: rounded, `null` when the engine has none
+pub(crate) fn value_json(v: Option<f64>) -> J {
+    match v {
+        Some(v) if v.is_finite() => json!((v * 100.0).round() / 100.0),
+        Some(v) => json!(if v > 0.0 { "inf" } else { "-inf" }),
+        None => J::Null,
+    }
+}
+
+/// A row of a table: the variant's values, their changes, the warnings it
+/// adds and the ones it resolves
+pub(crate) fn row(stats: &[Stat], base: &Outcome, r: &Outcome) -> serde_json::Map<String, J> {
+    let mut m = serde_json::Map::new();
+    m.insert("changes".into(), json!(r.label()));
+    m.insert(
+        "values".into(),
+        J::Array(stats.iter().map(|s| value_json(s.value(&r.out))).collect()),
+    );
+    m.insert(
+        "change".into(),
+        J::Array(
+            stats
+                .iter()
+                .map(|s| json!(s.change(s.value(&base.out), s.value(&r.out))))
+                .collect(),
+        ),
+    );
+    let added: Vec<&String> = r
+        .warnings
+        .iter()
+        .filter(|w| !base.warnings.contains(w))
+        .collect();
+    let resolved: Vec<&String> = base
+        .warnings
+        .iter()
+        .filter(|w| !r.warnings.contains(w))
+        .collect();
+    if !added.is_empty() {
+        m.insert("warnings_added".into(), json!(added));
+    }
+    if !resolved.is_empty() {
+        m.insert("warnings_resolved".into(), json!(resolved));
+    }
+    m
+}
+
+/// The fields `eval` takes
+pub(crate) const FIELDS: &[&str] = &["build", "variants", "stats"];
+
+impl<'d, S: Store> Agent<'d, S> {
+    pub(crate) fn eval(&mut self, id: &BuildId, name: String, req: &J) -> R<J> {
+        check_fields(req, FIELDS)?;
+        let list = req["variants"]
+            .as_array()
+            .ok_or("variants is a list of variants, each a list of changes")?;
+        if list.is_empty() || list.len() > MAX_VARIANTS {
+            return Err(format!("eval takes 1 to {MAX_VARIANTS} variants"));
+        }
+        let variants = list
+            .iter()
+            .enumerate()
+            .map(|(i, v)| variant_of(v).map_err(|e| format!("variant {}: {e}", i + 1)))
+            .collect::<R<Vec<_>>>()?;
+        self.with_open(id, |agent, o| {
+            let live = o.session.typed_output().ok_or("no build is open")?;
+            let asked = stats_of(req, &live)?;
+            let ev = Evaluator::new(agent, o)?;
+            let (base, rows, effort) = ev.run(&variants);
+            let base = base.map_err(|e| format!("the build can't be evaluated: {e}"))?;
+            let stats = columns(asked, &base, &rows);
+            let table: Vec<J> = rows
+                .iter()
+                .enumerate()
+                .map(|(i, r)| {
+                    let mut m = match r {
+                        Ok(r) => row(&stats, &base, r),
+                        Err(e) => {
+                            let mut m = serde_json::Map::new();
+                            m.insert("error".into(), json!(e));
+                            m
+                        }
+                    };
+                    m.insert("variant".into(), json!(i + 1));
+                    J::Object(m)
+                })
+                .collect();
+            Ok(json!({
+                "build": name,
+                "version": o.version,
+                "stats": stats.iter().map(|s| s.label.clone()).collect::<Vec<_>>(),
+                "keys": stats.iter().map(|s| s.key.clone()).collect::<Vec<_>>(),
+                "base": stats.iter().map(|s| value_json(s.value(&base.out))).collect::<Vec<_>>(),
+                "base_warnings": base.warnings,
+                "rows": table,
+                "effort": effort.json(),
+                "exact": EXACT,
+            }))
+        })
+    }
+}
+
+/// A request's `limit`, 1 to `max`
+pub(crate) fn limit(req: &J, default: u64, max: u64) -> R<usize> {
+    Ok(opt_u64(req, "limit")?.unwrap_or(default).clamp(1, max) as usize)
+}

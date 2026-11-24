@@ -254,41 +254,26 @@ impl Source {
 
     /// A tree version's passive tree, with the timeless jewels' keystones
     pub fn tree(&self, version: &str, parser: &ModParser, latest: bool) -> Result<PassiveTree> {
-        let mut im = importer::Importer::new(&self.src_dir);
-        let data = im
-            .load1(&format!("TreeData/{version}/tree"), vec![])
-            .map_err(|e| e.to_string())?;
-        let radii = engine::tree::jewel_radii(&self.data.get_str("jewelRadii"), version)?;
-        let mut tree = PassiveTree::new(version, &data, &radii, parser, latest)?;
-        let legion = im
-            .load1("Data/TimelessJewelData/LegionPassives", vec![])
-            .map_err(|e| e.to_string())?;
-        tree.add_legion_keystones(&legion, parser)?;
-        let tattoos = im
-            .load1("Data/TattooPassives", vec![])
-            .map_err(|e| e.to_string())?;
-        tree.add_tattoos(&tattoos, parser)?;
-        Ok(tree)
+        self.tree_loader()?.tree(version, parser, latest)
+    }
+
+    /// What loads the passive trees, free of the Lua state, so threads can
+    /// share it
+    pub fn tree_loader(&self) -> Result<TreeLoader> {
+        let radii = self.data.get_str("jewelRadii");
+        Ok(TreeLoader {
+            src_dir: self.src_dir.clone(),
+            radii: [
+                engine::tree::jewel_radii(&radii, "3_15")?,
+                engine::tree::jewel_radii(&radii, "3_16")?,
+            ],
+        })
     }
 
     /// The timeless jewels' data, their look-up tables read from the
     /// source directory when first needed
     pub fn timeless(&self, parser: &ModParser) -> Result<engine::timeless::Timeless> {
-        let mut im = importer::Importer::new(&self.src_dir);
-        let legion = im
-            .load1("Data/TimelessJewelData/LegionPassives", vec![])
-            .map_err(|e| e.to_string())?;
-        let mapping = im
-            .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
-            .map_err(|e| e.to_string())?;
-        let names = im
-            .load1("Data/TimelessJewelData/AbyssNotableNames", vec![])
-            .map_err(|e| e.to_string())?;
-        let src_dir = self.src_dir.clone();
-        let loader = move |name: &str| -> Option<Vec<u8>> {
-            miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
-        };
-        engine::timeless::Timeless::from_lua(&legion, &mapping, &names, parser, Box::new(loader))
+        timeless(&self.src_dir, parser)
     }
 
     pub fn global(&self, name: &str) -> Value {
@@ -369,6 +354,57 @@ impl Source {
 /// A timeless jewel's look-up table as upstream ships it, by its name
 /// without spaces (`LethalPride`): a zlib stream in `<name>.zip`, or split
 /// over `<name>.zip.part0`, `part1`, ...
+/// Loads the passive trees from upstream's source directory
+pub struct TreeLoader {
+    src_dir: PathBuf,
+    /// The jewel radii before 3.16 and since
+    radii: [Vec<(f64, f64)>; 2],
+}
+
+impl TreeLoader {
+    /// A tree version's passive tree, with the timeless jewels' keystones
+    pub fn tree(&self, version: &str, parser: &ModParser, latest: bool) -> Result<PassiveTree> {
+        let mut im = importer::Importer::new(&self.src_dir);
+        let data = im
+            .load1(&format!("TreeData/{version}/tree"), vec![])
+            .map_err(|e| e.to_string())?;
+        // As `engine::tree::jewel_radii` picks the set
+        let mut nums = version.split('_').filter_map(|p| p.parse::<u32>().ok());
+        let (major, minor) = (nums.next().unwrap_or(0), nums.next().unwrap_or(0));
+        let radii = &self.radii[usize::from(!(major <= 3 && minor <= 15))];
+        let mut tree = PassiveTree::new(version, &data, radii, parser, latest)?;
+        let legion = im
+            .load1("Data/TimelessJewelData/LegionPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        tree.add_legion_keystones(&legion, parser)?;
+        let tattoos = im
+            .load1("Data/TattooPassives", vec![])
+            .map_err(|e| e.to_string())?;
+        tree.add_tattoos(&tattoos, parser)?;
+        Ok(tree)
+    }
+}
+
+/// The timeless jewels' data from upstream's source directory, their
+/// look-up tables read when first needed
+pub fn timeless(src_dir: &Path, parser: &ModParser) -> Result<engine::timeless::Timeless> {
+    let mut im = importer::Importer::new(src_dir);
+    let legion = im
+        .load1("Data/TimelessJewelData/LegionPassives", vec![])
+        .map_err(|e| e.to_string())?;
+    let mapping = im
+        .load1("Data/TimelessJewelData/NodeIndexMapping", vec![])
+        .map_err(|e| e.to_string())?;
+    let names = im
+        .load1("Data/TimelessJewelData/AbyssNotableNames", vec![])
+        .map_err(|e| e.to_string())?;
+    let src_dir = src_dir.to_path_buf();
+    let loader = move |name: &str| -> Option<Vec<u8>> {
+        miniz_oxide::inflate::decompress_to_vec_zlib(&timeless_lut_packed(&src_dir, name)?).ok()
+    };
+    engine::timeless::Timeless::from_lua(&legion, &mapping, &names, parser, Box::new(loader))
+}
+
 pub fn timeless_lut_packed(src_dir: &Path, name: &str) -> Option<Vec<u8>> {
     let dir = src_dir.join("Data/TimelessJewelData");
     if let Ok(b) = std::fs::read(dir.join(format!("{name}.zip"))) {

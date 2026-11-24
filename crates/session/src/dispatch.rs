@@ -38,7 +38,9 @@ pub const READ_ONLY: &[&str] = &[
     "saveCode",
 ];
 
-/// A build session answering JSON requests, as `Session::request` does
+/// A build session answering JSON requests, as `Session::request` does.
+/// A clone is a session of its own in the same state.
+#[derive(Clone)]
 pub struct Dispatcher<'d> {
     data: &'d TypedData,
     typed: Option<TypedSession<'d>>,
@@ -117,6 +119,12 @@ impl<'d> Dispatcher<'d> {
     /// The typed engine's build, when it holds one
     pub fn typed_build(&self) -> Option<&engine::build::Build<'d>> {
         self.typed.as_ref().map(TypedSession::build)
+    }
+
+    /// The typed engine's sidebar calculation (`outputs`), as the engine
+    /// holds it, when it holds the build
+    pub fn typed_output(&self) -> Option<engine::calculator::CalcOutput> {
+        self.typed.as_ref().map(TypedSession::output)
     }
 
     /// Answers one JSON request, as `Session::request` does
