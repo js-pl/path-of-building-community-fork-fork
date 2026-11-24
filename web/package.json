@@ -9,7 +9,7 @@
     "build:data": "node scripts/build-data.mjs",
     "build:art": "node scripts/build-art.mjs",
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/build-art.mjs --if-present && tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
     "test:client": "node --test tests/client.test.mjs"
