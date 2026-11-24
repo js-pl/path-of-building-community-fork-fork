@@ -652,14 +652,39 @@ above was silent:
   the settings file (`settings`, `setSettings`), with the git they give
   (or why none) and whether the running host keeps a history. They take
   effect when the host starts again.
-- Not in step 6: `ui_context` and several open builds in one client
-  (step 7); a token's default build is still none, not the build the UI
-  shows.
+- Not in step 6: `ui_context` and several open builds (step 7,
+  [below](#built-several-open-builds)); a token's default build is
+  still none, not the build the UI shows.
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),
   `web/tests/host-smoke.mjs` (Playwright on `pob host` while `pob ctl`
   edits, in CI's wasm job).
+
+### Built: several open builds
+
+Step 7's first part:
+
+- **Sessions.** The host's agent API keeps a session per build it
+  opened, at most 8 at once (`agent::MAX_OPEN`, `Agent::set_max_open`).
+  When one more opens, the build used least recently that no UI client
+  shows is closed: the user's edits waiting to be committed are
+  committed then (`Store::closed`, `Recorder::close`), its session and
+  undo list go, and its version and changes stay, so `version`,
+  `expect` and `changes_since` go on when it opens again; undo past
+  that is `history` and `restore`. A build a client shows stays open;
+  one no client shows any more closes at once if more than the cap are
+  open.
+- **The UI.** Each client of the host shows one build. The build's name
+  in the top bar is a picker of the user's builds (`builds`, `open`);
+  the link beside it opens the build in a new page, `/?build=<name>`, so
+  several builds can be open side by side. Change events name their
+  build, and a client re-renders only on its own build's.
+- **Agents** with a grant to several builds name each with `build`; the
+  events and `changes_since` keep them apart.
+- Tests: `several_builds` in `crates/agent/tests/verbs.rs`,
+  `several_open_builds` in `crates/host/tests/web.rs`, and the picker
+  and a second page in `web/tests/host-smoke.mjs`.
 
 ### Built: MCP
 
