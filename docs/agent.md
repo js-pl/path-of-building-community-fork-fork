@@ -919,7 +919,10 @@ where the design above was silent:
   `host`, `host:port` (443 by default) or `*.domain`. The lists name the
   API and login hosts: `api.anthropic.com`, `claude.ai`, `claude.com`,
   `platform.claude.com` and `console.anthropic.com` for Claude Code;
-  `api.openai.com`, `auth.openai.com` and `chatgpt.com` for Codex. Its
+  `api.openai.com`, `auth.openai.com` and `chatgpt.com` for Codex. Both
+  also allow PyPI (`pypi.org`, `files.pythonhosted.org`), so the agent's
+  Python scripts can install packages (the owner's decision); npm, other
+  MCP servers and web fetches stay refused unless `--allow`ed. Its
   route (`--route 0.0.0.0:8731=<upstream>`) passes bytes to the host's
   endpoint, which checks the token, so a route to it carries no more
   than the token does.
@@ -1434,6 +1437,8 @@ Each one a PR, as usual:
 - Trade and prices are deferred.
 - `pob agent` uses the default Podman container; `--no-container` is the
   explicit override. Its token is for the run alone, revoked when it ends.
+- The default container's allowlists add PyPI to the harness's own hosts;
+  npm and anything else only with `--allow`.
 - The backup push is optional, off by default.
 - The host is a second way to run the app, recorded in design.md.
 - Cloud sessions are deferred.
@@ -1445,8 +1450,3 @@ Each one a PR, as usual:
   Worth supporting mirrored, and how much Windows testing (a real
   machine, or a Windows runner with nested virtualisation) is wanted
   before Windows is called supported?
-- **The harnesses' hosts.** The allowlists hold the API and login hosts
-  only; MCP servers of the user's own, web fetches and package installs
-  in the container are refused unless `--allow`ed. Is that the default
-  wanted, or should the lists grow (e.g. npm and PyPI for the agent's
-  scripts)?

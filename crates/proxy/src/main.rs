@@ -475,6 +475,10 @@ mod tests {
             let text = std::fs::read_to_string(format!("{p}{f}")).unwrap();
             let a = Allowlist::parse(&text).unwrap();
             assert!(!a.entries.is_empty(), "{f}");
+            // PyPI for the agent's Python, by default (decided); npm isn't
+            assert!(a.allows("pypi.org", 443), "{f}");
+            assert!(a.allows("files.pythonhosted.org", 443), "{f}");
+            assert!(!a.allows("registry.npmjs.org", 443), "{f}");
         }
     }
 

@@ -7,3 +7,6 @@ claude.ai
 claude.com
 platform.claude.com
 console.anthropic.com
+# Python packages for the agent's scripts (npm only with --allow)
+pypi.org
+files.pythonhosted.org

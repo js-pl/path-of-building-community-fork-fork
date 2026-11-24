@@ -61,6 +61,9 @@ check "Codex is installed" 'codex --version'
 check "HTTPS to an allowed host" \
     'code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 https://api.anthropic.com/) && [ "$code" != 000 ]'
 check "no HTTPS to another host" '! curl -sS -o /dev/null --max-time 20 https://example.com/'
+check "HTTPS to PyPI" \
+    'code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 https://pypi.org/simple/) && [ "$code" != 000 ]'
+check "no npm without --allow" '! curl -sS -o /dev/null --max-time 20 https://registry.npmjs.org/'
 check "no plain HTTP" '! curl -fsS -o /dev/null --max-time 20 http://api.anthropic.com/'
 check "no route out without the proxy" \
     '! curl -sS -o /dev/null --noproxy "*" --max-time 10 https://1.1.1.1/'
