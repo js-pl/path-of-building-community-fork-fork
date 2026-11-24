@@ -115,8 +115,9 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      # The corpus and upstream's files byte for byte, as on Linux
-      - run: git config --global core.autocrlf false
+      # The corpus and upstream's files byte for byte, as on Linux (--system:
+      # checkout runs git with a HOME of its own)
+      - run: git config --system core.autocrlf false
       - uses: actions/checkout@v4
         with:
           submodules: true
