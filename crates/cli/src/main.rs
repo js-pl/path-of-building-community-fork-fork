@@ -577,7 +577,7 @@ fn serve_host(
     tokens: PathBuf,
     settings: PathBuf,
 ) {
-    let listener = host::control::local::listen(&socket).unwrap_or_else(|e| die(e));
+    let listener = host::local::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
     let (msgs, inbox) = std::sync::mpsc::channel();
     let registry = std::sync::Arc::new(host::connections::Registry::default());
@@ -586,7 +586,7 @@ fn serve_host(
         std::thread::spawn(move || endpoint.serve(h.listener, h.tls));
     }
     let listed = registry.clone();
-    std::thread::spawn(move || host::control::local::accept(listener, tx, registry));
+    std::thread::spawn(move || host::local::serve(listener, tx, registry));
     let to = msgs.clone();
     std::thread::spawn(move || host::ui::forward(rx, to));
     let store = host::FsStore::new(&builds, git);
@@ -807,7 +807,7 @@ fn ui_build(socket: &Path) -> Option<String> {
 }
 
 fn admin(socket: &Path, req: serde_json::Value) -> Result<serde_json::Value, String> {
-    host::control::local::admin(socket, req)
+    host::local::admin(socket, req)
 }
 
 fn ctl(args: &[String]) {
@@ -865,7 +865,7 @@ fn call_host(
     hello: &serde_json::Value,
     req: &serde_json::Value,
 ) -> serde_json::Value {
-    let mut c = host::control::local::Client::connect(socket, hello).unwrap_or_else(|e| die(e));
+    let mut c = host::local::Client::connect(socket, hello).unwrap_or_else(|e| die(e));
     c.call(req).unwrap_or_else(|e| die(e))
 }
 
@@ -913,7 +913,7 @@ fn relay(
     start: bool,
     builds: Option<&str>,
 ) -> Result<host::mcp::Relay, String> {
-    use host::control::local::Client;
+    use host::local::Client;
     let client = match Client::connect(socket, hello) {
         Ok(c) => c,
         Err(e) if !start || socket_answers(socket) => return Err(e),
@@ -947,22 +947,17 @@ fn relay(
 
 /// Whether a host listens on `socket` (then a failed hello is its answer)
 fn socket_answers(socket: &Path) -> bool {
-    host::control::local::answers(socket)
+    host::local::answers(socket)
 }
 
 /// Starts `pob host --headless` on `socket`, on its own: its own process
-/// group, its output in `host.log` beside the socket (in the data
-/// directory on Windows, where the socket is a named pipe)
+/// group, its output in `host.log` beside the socket ([`host::local::beside`])
 fn start_host(
     socket: &Path,
     builds: Option<&str>,
 ) -> Result<(std::process::Child, PathBuf), String> {
     let exe = std::env::current_exe().map_err(|e| format!("starting a host: {e}"))?;
-    let dir = if cfg!(windows) {
-        host::data_dir().ok_or("no data directory (%LOCALAPPDATA%)")?
-    } else {
-        socket.parent().unwrap_or(Path::new(".")).to_path_buf()
-    };
+    let dir = host::local::beside(socket).ok_or("no data directory")?;
     let dir = dir.as_path();
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let log_path = dir.join("host.log");
@@ -979,14 +974,8 @@ fn start_host(
     cmd.stdin(std::process::Stdio::null())
         .stdout(log.try_clone().map_err(|e| e.to_string())?)
         .stderr(log);
-    #[cfg(unix)]
-    std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
-    // A process group of its own, without a console: it outlives the harness
-    #[cfg(windows)]
-    std::os::windows::process::CommandExt::creation_flags(
-        &mut cmd,
-        0x0000_0200 | 0x0800_0000, // CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
-    );
+    // It outlives the harness that started it
+    host::local::detach(&mut cmd);
     let child = cmd
         .spawn()
         .map_err(|e| format!("starting a host: {e} (start one with `pob host --headless`)"))?;

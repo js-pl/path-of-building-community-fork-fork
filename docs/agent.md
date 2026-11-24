@@ -566,7 +566,19 @@ above was silent:
   (`nodes='["Heart of Thunder"]'`), else strings. Each call is a new
   connection, so builds made in an agent directory are reached again with
   `--agent <dir>`. Without a verb it lists them.
-- **Windows: a named pipe** (`host::control::pipe`, step 5), by default
+- **One local transport** (`host::local`): the host, `pob ctl` and `pob
+  mcp` reach each other through it alone, with the same API on every
+  platform (`listen`, `Listener::accept`, `serve`, `answers`, `admin`,
+  `Client`), a Unix socket (`local::unix`) or a named pipe
+  (`local::pipe`) behind it. The rest of the platform differences live
+  there too (the data directory's base, files only the user reads, a
+  detached host, the browser's command), so nothing else in the host,
+  `pob ctl` or `pob mcp` has a per-OS path. The `interprocess` crate was
+  the alternative; the two backends are small, std plus `windows-sys`,
+  and keep the DACL in our hands. The host's, MCP's and the transport's
+  tests are the same on Linux and Windows (`tests/local.rs`), and CI
+  runs them on both.
+- **Windows: a named pipe** (`host::local::pipe`, step 5), by default
   `\\.\pipe\path-of-building-fork-fork-<user>-control` (`--socket` takes
   another `\\.\pipe\<name>`). Its security descriptor is
   `O:<user>D:P(A;;GA;;;<user>)`: the user's SID alone has access, the
@@ -577,7 +589,8 @@ above was silent:
   impersonation), so a pipe squatted by another user is refused, not
   talked to. The same lines and hellos as the Unix socket; `pob mcp`
   starts a host in a process group of its own with no console, its log
-  in the data directory. CI builds and tests it on `windows-latest`.
+  in the data directory. CI builds it and runs the host and `pob` tests on
+  `windows-latest` (about 5 minutes).
 - Not yet: job and time budgets (step 9; today's verbs are single
   edits). The web app on the host is [below](#built-the-web-app-on-the-host).
 
