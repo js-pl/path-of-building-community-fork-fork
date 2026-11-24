@@ -1,0 +1,5 @@
+# Codex: the OpenAI API, and ChatGPT's login and backend (a ChatGPT plan
+# runs on chatgpt.com). More with `pob agent codex --allow <host>`.
+api.openai.com
+auth.openai.com
+chatgpt.com

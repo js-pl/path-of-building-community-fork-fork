@@ -111,6 +111,15 @@ jobs:
           name: tests
       - run: cargo nextest run --profile ci --archive-file tests.tar.zst --workspace-remap . -E '${{ matrix.filter }}'
 
+  # The default agent container: its images built with Podman, its
+  # defaults checked from inside
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: podman --version
+      - run: container/smoke.sh
+
   web:
     runs-on: ubuntu-latest
     defaults:
