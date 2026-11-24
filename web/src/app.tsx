@@ -78,10 +78,22 @@ export function App() {
 
   const setControl: SetControl = useCallback((path, change) => void act("control", { path, ...change }), [act]);
 
+  // On the host, an agent's change, or another tab's, shows at once
+  useEffect(() => {
+    engine.hosted?.onEvent((e) => {
+      if (e.event === "change" && e.build !== engine.hosted?.build) return;
+      void refresh().catch((err) => setError(String(err instanceof Error ? err.message : err)));
+    });
+  }, [refresh]);
+
   useEffect(() => {
     (async () => {
       try {
-        if (!(await loadFromHash(engine))) await engine.call("state");
+        if (await loadFromHash(engine)) {
+          // On the host the code became a build of its own; a reload
+          // mustn't make another
+          if (engine.hosted) history.replaceState(null, "", location.pathname + location.search);
+        } else await engine.call("state");
         await refresh();
       } catch (e) {
         setError(String(e instanceof Error ? e.message : e));

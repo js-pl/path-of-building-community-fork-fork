@@ -19,12 +19,16 @@
 //!   pob settings [key [value]]
 //!                             the settings file (`POB_SETTINGS` picks another): all of
 //!                             it and the git it gives, one setting, or sets one
-//!   pob host --headless [--builds <dir>] [--socket <path>] [--listen <addr>|none]
+//!   pob host [--headless] [--builds <dir>] [--socket <path>] [--listen <addr>|none]
 //!           [--tls-cert <pem> --tls-key <pem>] [--tokens <file>]
+//!           [--web <addr>] [--app <dir>] [--build <name>] [--no-open]
 //!                             owns the builds in <dir> (`POB_BUILDS`) with their history
 //!                             and answers the agent API on the control socket
 //!                             (`POB_SOCKET`) and as MCP over HTTP with tokens (on
-//!                             127.0.0.1:8731 by default), see docs/agent.md
+//!                             127.0.0.1:8731 by default); unless --headless, serves the
+//!                             web app (the bundle in <dir>, `POB_APP`, web/dist by
+//!                             default) on 127.0.0.1:8730 and opens the browser, showing
+//!                             <name>; see docs/agent.md
 //!   pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json]
 //!           <verb> [key=value]... | <verb> '<json fields>'
 //!                             calls one agent API verb on a running host, with a grant
@@ -263,8 +267,9 @@ fn usage() -> ! {
          pob history <dir> commit <build.xml> [label] | log [n] | show <version> | \
          restore <version> | push <remote>\n       \
          pob settings [key [value]]\n       \
-         pob host --headless [--builds <dir>] [--socket <path>] [--listen <addr>|none] \
-         [--tls-cert <pem> --tls-key <pem>] [--tokens <file>]\n       \
+         pob host [--headless] [--builds <dir>] [--socket <path>] [--listen <addr>|none] \
+         [--tls-cert <pem> --tls-key <pem>] [--tokens <file>] [--web <addr>] [--app <dir>] \
+         [--build <name>] [--no-open]\n       \
          pob ctl [--socket <path>] [--build <name>]... [--agent <dir>] [--json] <verb> [key=value]...\n       \
          pob mcp [--socket <path>] [--builds <dir>] [--build <name>]... [--agent <dir>] [--no-start]\n       \
          pob agents token [--build <name>]... [--name <n>] [--agent <dir>] [--url <url>] | tokens | \
@@ -412,11 +417,14 @@ fn host_cmd(args: &[String]) {
             "--tls-cert",
             "--tls-key",
             "--tokens",
+            "--web",
+            "--app",
+            "--build",
         ],
-        &["--headless"],
+        &["--headless", "--no-open"],
     );
-    if !rest.is_empty() || flag(&flags, "--headless").is_none() {
-        die("pob host needs --headless for now: the web app on the host is a later step");
+    if !rest.is_empty() {
+        usage();
     }
     let builds = flag(&flags, "--builds")
         .map(PathBuf::from)
@@ -436,7 +444,46 @@ fn host_cmd(args: &[String]) {
         eprintln!("pob host: no history: builds are saved, their versions aren't");
     }
     std::fs::create_dir_all(&builds).unwrap_or_else(|e| die(format!("{}: {e}", builds.display())));
-    serve_host(builds, socket, git, http);
+    let web = if flag(&flags, "--headless").is_some() {
+        None
+    } else {
+        Some(web_app(&flags))
+    };
+    serve_host(builds, socket, git, http, web);
+}
+
+/// The web app as the flags ask for it: where its bundle is, the address
+/// (loopback only), the browser
+struct WebApp {
+    listener: std::net::TcpListener,
+    port: u16,
+    root: PathBuf,
+    open: bool,
+    build: Option<String>,
+}
+
+fn web_app(flags: &[(&str, &str)]) -> WebApp {
+    let root = flag(flags, "--app")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("POB_APP").map(PathBuf::from))
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../web/dist"));
+    if !root.join("index.html").is_file() {
+        die(format!(
+            "pob host: no web app in {} (build it with `npm run build` in web/, pass --app <dir>, \
+             or run `pob host --headless`)",
+            root.display()
+        ));
+    }
+    let addr = flag(flags, "--web").unwrap_or(host::web::DEFAULT_LISTEN);
+    let (listener, port) =
+        host::web::listen(addr).unwrap_or_else(|e| die(format!("pob host: {e}")));
+    WebApp {
+        listener,
+        port,
+        root,
+        open: flag(flags, "--no-open").is_none(),
+        build: flag(flags, "--build").map(String::from),
+    }
 }
 
 /// MCP over HTTP as the flags ask for it: the listener, TLS, the tokens
@@ -514,15 +561,19 @@ fn serve_host(
     socket: PathBuf,
     git: Option<history::Git>,
     http: Option<HttpEndpoint>,
+    web: Option<WebApp>,
 ) {
     let listener = host::control::unix::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
+    let (msgs, inbox) = std::sync::mpsc::channel();
     let registry = std::sync::Arc::new(host::connections::Registry::default());
     if let Some(h) = http {
         let endpoint = host::http::Http::new(h.tokens, tx.clone(), registry.clone());
         std::thread::spawn(move || endpoint.serve(h.listener, h.tls));
     }
     std::thread::spawn(move || host::control::unix::accept(listener, tx, registry));
+    let to = msgs.clone();
+    std::thread::spawn(move || host::ui::forward(rx, to));
     let store = host::FsStore::new(&builds, git);
     let data = data();
     eprintln!(
@@ -530,12 +581,33 @@ fn serve_host(
         builds.display(),
         socket.display()
     );
-    let mut agent = agent::Agent::new(data, store);
-    host::control::answer(&mut agent, rx);
+    let mut h = host::ui::Host::new(data, store);
+    if let Some(w) = web {
+        h.default_build = w.build.clone();
+        let key = host::web::new_key().unwrap_or_else(|e| die(e));
+        let app = host::web::Web::new(w.root, key, w.port, msgs);
+        let url = app.url();
+        std::thread::spawn(move || app.serve(w.listener));
+        eprintln!("pob host: the web app on {url}");
+        if w.open
+            && let Err(e) = host::web::open_browser(&url)
+        {
+            eprintln!("pob host: no browser opened ({e}): open the link above");
+        }
+    } else {
+        drop(msgs);
+    }
+    h.run(inbox);
 }
 
 #[cfg(not(unix))]
-fn serve_host(_: PathBuf, _: PathBuf, _: Option<history::Git>, _: Option<HttpEndpoint>) {
+fn serve_host(
+    _: PathBuf,
+    _: PathBuf,
+    _: Option<history::Git>,
+    _: Option<HttpEndpoint>,
+    _: Option<WebApp>,
+) {
     die("pob host: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
 }
 

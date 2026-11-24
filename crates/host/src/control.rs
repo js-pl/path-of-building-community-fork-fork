@@ -54,7 +54,7 @@ pub fn grant_of(hello: &J, now: i64) -> Result<Grant, String> {
     for b in h["builds"].as_array().into_iter().flatten() {
         let b = b.as_str().ok_or("builds is a list of build names")?;
         agent::grant::check_name(b)?;
-        if b == crate::store::AGENTS_DIR {
+        if crate::store::reserved(b) {
             return Err(format!("{b} is not a build"));
         }
         g = g.with_build(b);

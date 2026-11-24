@@ -127,7 +127,9 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   engine in the workers, stays as it is. Built so far: `pob host
   --headless` (`crates/host`), the builds and the agent API on a control
   socket for `pob ctl`, and as MCP: on stdio through `pob mcp`, and over
-  HTTP with tokens.
+  HTTP with tokens; `pob host` without `--headless` serves the web app,
+  which then uses the host's WebSocket instead of its workers, and every
+  change, the UI's or an agent's, reaches every client as a change event.
 - **Build history** (`crates/history`, [history.md](history.md)). Every
   version of a build in a git repository of its own, written with the
   installed git; optional, without git nothing is recorded. Its git is

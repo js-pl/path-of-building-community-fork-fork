@@ -541,8 +541,56 @@ above was silent:
   the control socket is Unix only for now; on Windows `pob host` and `pob
   ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
   comes with step 4 or 5, when Windows is tested.
-- Not yet: the web app on the host (step 6), job and time budgets (step
-  9; today's verbs are single edits).
+- Not yet: job and time budgets (step 9; today's verbs are single
+  edits). The web app on the host is [below](#built-the-web-app-on-the-host).
+
+### Built: the web app on the host
+
+`pob host` without `--headless` (step 6, first part):
+
+- **Serving.** The built `web/` bundle (`npm run build`; `--app <dir>`,
+  `POB_APP`, else `web/dist` of this checkout) on `127.0.0.1:8730`
+  (`--web <addr>`, loopback only), and the browser opened (`--no-open`
+  not). The UI shows `--build <name>`, else the user's build saved last,
+  else a new one. `index.html` is served with `<meta name="pob-host">`,
+  which makes `client.ts` pick its WebSocket transport (`HostTransport`)
+  instead of the workers; the browser-only app is unchanged. The bundle
+  needs no `engine.wasm` or `core.bin` there; the tree's art is served
+  when it was built.
+- **Guards.** Each launch makes a key; the host opens
+  `/?key=<key>`, answered with an HttpOnly, SameSite=Strict cookie and a
+  redirect to `/`. Every file and the WebSocket need the cookie, and the
+  WebSocket (`/ws`) the host's own `Origin` (`http://127.0.0.1:<port>`,
+  `localhost`, `[::1]`); no CORS headers. A hand-rolled RFC 6455 server
+  (`host::ws`: text, ping, close, fragments, messages capped like control
+  socket lines), on the thread-per-connection HTTP code of `host::http`.
+- **One build, one owner.** The host's session is the only copy: the
+  UI's engine API requests (`{"id", "req": {"cmd", ...}}`) run on the same
+  open session as the agents' verbs (`Agent::engine`), on the one engine
+  thread (`host::ui::Host`), whose messages now come from the control
+  socket, MCP and the WebSocket alike. A command outside
+  `session::dispatch::READ_ONLY` whose `saveXml` differs is one undo step
+  by the user (`Source: user`): `build.xml` is written at once and the
+  commit goes through `Recorder::user_edit`, coalesced (10 s), and
+  before the next agent step. Labels are the command's (`allocate #36634
+  (3 points)`, `build.characterLevel: 90`) with the stat change; free
+  text never goes in a label, which agents read. `undo` in the UI undoes
+  the build's last step, whoever made it. `loadXml`, `loadCode` and
+  `newBuild` open a new user build (`RF (2)` when the name is taken),
+  never replacing one; a `#build=` link does the same once.
+- **Change events.** `{"event": "change", "build", "version", "label",
+  "source", "commit"}`, `source` being `user` or `agent <connection>`,
+  sent to every client after each message the engine thread handles, so
+  they come in version order and after the answer to the request that
+  made them (the answer carries the build's `version`, so a client skips
+  its own). They are the entries of `changes_since`. The UI re-renders on
+  a change it didn't make. Host requests (`{"id", "host", "args"}`):
+  `builds`, `open`.
+- Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
+  an agent client on one build, the events' order, `changes_since`, the
+  history), `web/tests/client.test.mjs` (the transport switch),
+  `web/tests/host-smoke.mjs` (Playwright on `pob host` while `pob ctl`
+  edits, in CI's wasm job).
 
 ### Built: MCP
 

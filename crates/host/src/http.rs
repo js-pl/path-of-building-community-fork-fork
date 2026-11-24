@@ -116,9 +116,11 @@ pub struct Http {
 pub struct Request {
     pub method: String,
     pub path: String,
+    /// What follows `?` in the target
+    pub query: String,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
-    close: bool,
+    pub close: bool,
 }
 
 impl Request {
@@ -138,7 +140,7 @@ pub struct Response {
 }
 
 impl Response {
-    fn new(status: u16) -> Response {
+    pub fn new(status: u16) -> Response {
         Response {
             status,
             headers: Vec::new(),
@@ -146,14 +148,14 @@ impl Response {
         }
     }
 
-    fn json(status: u16, v: &J) -> Response {
+    pub fn json(status: u16, v: &J) -> Response {
         let mut r = Response::new(status);
         r.headers.push(("Content-Type", "application/json".into()));
         r.body = v.to_string().into_bytes();
         r
     }
 
-    fn text(status: u16, t: &str) -> Response {
+    pub fn text(status: u16, t: &str) -> Response {
         let mut r = Response::new(status);
         r.headers
             .push(("Content-Type", "text/plain; charset=utf-8".into()));
@@ -162,9 +164,11 @@ impl Response {
     }
 }
 
-fn reason(status: u16) -> &'static str {
+pub fn reason(status: u16) -> &'static str {
     match status {
+        101 => "Switching Protocols",
         200 => "OK",
+        303 => "See Other",
         202 => "Accepted",
         204 => "No Content",
         400 => "Bad Request",
@@ -227,6 +231,11 @@ pub fn read_request(r: &mut impl BufRead) -> std::io::Result<Option<Request>> {
     let mut req = Request {
         method: method.to_string(),
         path: target.split('?').next().unwrap_or("").to_string(),
+        query: target
+            .split_once('?')
+            .map(|(_, q)| q)
+            .unwrap_or("")
+            .to_string(),
         headers,
         body: Vec::new(),
         close: version == "HTTP/1.0",
@@ -271,7 +280,7 @@ pub fn read_request(r: &mut impl BufRead) -> std::io::Result<Option<Request>> {
     Ok(Some(req))
 }
 
-fn write_response(w: &mut impl Write, r: &Response, close: bool) -> std::io::Result<()> {
+pub fn write_response(w: &mut impl Write, r: &Response, close: bool) -> std::io::Result<()> {
     let mut head = format!("HTTP/1.1 {} {}\r\n", r.status, reason(r.status));
     for (k, v) in &r.headers {
         head.push_str(&format!("{k}: {v}\r\n"));
@@ -287,7 +296,7 @@ fn write_response(w: &mut impl Write, r: &Response, close: bool) -> std::io::Res
 }
 
 /// Whether a page's origin is on this machine
-fn local_origin(origin: &str) -> bool {
+pub fn local_origin(origin: &str) -> bool {
     let rest = origin
         .strip_prefix("http://")
         .or_else(|| origin.strip_prefix("https://"));

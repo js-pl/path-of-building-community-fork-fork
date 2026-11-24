@@ -6,8 +6,8 @@
 use crate::read::{DIFF_STATS, node_label, short};
 use crate::text::{LINE_CAP, NAME_CAP, clean, plain};
 use crate::{
-    Agent, BuildId, Change, Grant, Open, R, Step, Store, UNDO_DEPTH, check_fields, cmd, need_str,
-    opt_bool, opt_str, opt_u64,
+    Agent, BuildId, Change, Event, Grant, Open, R, Step, Store, UNDO_DEPTH, Undo, Who,
+    check_fields, cmd, need_str, opt_bool, opt_str, opt_u64,
 };
 use serde_json::{Value as J, json};
 use session::Dispatcher;
@@ -51,12 +51,12 @@ impl<'d, S: Store> Agent<'d, S> {
         match verb {
             "undo" => {
                 check_fields(req, &["build", "expect"])?;
-                self.undo(grant, id, name, expect)
+                self.undo(Who::Agent(grant), id, name, expect)
             }
             "restore" => {
                 check_fields(req, &["build", "expect", "version"])?;
                 let version = need_str(req, "version")?.to_string();
-                self.restore(grant, id, name, expect, &version)
+                self.restore(Who::Agent(grant), id, name, expect, &version)
             }
             "apply" => {
                 check_fields(req, &["build", "expect", "changes"])?;
@@ -136,15 +136,16 @@ impl<'d, S: Store> Agent<'d, S> {
                 }
             }
             let label = clean(&labels.join("; "), LABEL_CAP, false);
-            agent.finish(grant, id, name, o, before, label, done, false)
+            agent.finish(Who::Agent(grant), id, name, o, before, label, done, false)
         })
     }
 
-    /// Saves and commits a changed build, and answers
+    /// Saves and commits a changed build, and answers: an agent's step and
+    /// a restore are committed at once, the user's edits are coalesced
     #[allow(clippy::too_many_arguments)]
-    fn finish(
+    pub(crate) fn finish(
         &mut self,
-        grant: &Grant,
+        who: Who,
         id: &BuildId,
         name: String,
         o: &mut Open<'d>,
@@ -171,11 +172,18 @@ impl<'d, S: Store> Agent<'d, S> {
         };
         let step = Step {
             label: full.clone(),
-            agent: grant.connection.clone(),
+            agent: match who {
+                Who::Agent(g) => g.connection.clone(),
+                Who::User => "user".into(),
+            },
             restore,
             trailers,
         };
-        let commit = match self.store.commit(id, &xml, &step) {
+        let saved = match who {
+            Who::User if !restore => self.store.user_edit(id, &xml, &full).map(|()| None),
+            _ => self.store.commit(id, &xml, &step),
+        };
+        let commit = match saved {
             Ok(c) => c,
             Err(e) => {
                 reload(o)?;
@@ -185,17 +193,29 @@ impl<'d, S: Store> Agent<'d, S> {
             }
         };
         let prev = std::mem::replace(&mut o.xml, xml);
-        o.undo.push((prev, full.clone()));
+        o.undo.push(Undo {
+            xml: prev,
+            label: full.clone(),
+            source: who.source(),
+        });
         if o.undo.len() > UNDO_DEPTH {
             o.undo.remove(0);
         }
         o.version += 1;
-        o.changes.push(Change {
+        let change = Change {
             version: o.version,
             label: full.clone(),
-            source: format!("agent {}", grant.connection),
+            source: who.source(),
             commit: commit.clone(),
+        };
+        self.events.push(Event {
+            build: id.clone(),
+            version: change.version,
+            label: change.label.clone(),
+            source: change.source.clone(),
+            commit: change.commit.clone(),
         });
+        o.changes.push(change);
         Ok(json!({
             "build": name,
             "version": o.version,
@@ -206,28 +226,34 @@ impl<'d, S: Store> Agent<'d, S> {
         }))
     }
 
-    fn undo(&mut self, grant: &Grant, id: &BuildId, name: String, expect: Option<u64>) -> R<J> {
+    pub(crate) fn undo(
+        &mut self,
+        who: Who,
+        id: &BuildId,
+        name: String,
+        expect: Option<u64>,
+    ) -> R<J> {
         self.with_open(id, |agent, o| {
             check_version(o, expect)?;
-            let Some((xml, label)) = o.undo.pop() else {
+            let Some(step) = o.undo.pop() else {
                 return Err(
                     "nothing to undo since the build was opened; `history` and `restore` reach older versions"
                         .into(),
                 );
             };
             let before = stats(&mut o.session)?;
-            if let Err(e) = load(&mut o.session, &xml, &id.name) {
-                o.undo.push((xml, label));
+            if let Err(e) = load(&mut o.session, &step.xml, &id.name) {
+                o.undo.push(step);
                 reload(o)?;
                 return Err(e);
             }
             let r = agent.finish(
-                grant,
+                who,
                 id,
                 name,
                 o,
                 before,
-                format!("undo {label}"),
+                format!("undo {}", step.label),
                 vec![],
                 false,
             );
@@ -239,9 +265,9 @@ impl<'d, S: Store> Agent<'d, S> {
         })
     }
 
-    fn restore(
+    pub(crate) fn restore(
         &mut self,
-        grant: &Grant,
+        who: Who,
         id: &BuildId,
         name: String,
         expect: Option<u64>,
@@ -256,7 +282,7 @@ impl<'d, S: Store> Agent<'d, S> {
                 return Err(format!("version {version}: {e}"));
             }
             let label = format!("restore {}", short(version));
-            agent.finish(grant, id, name, o, before, label, vec![], true)
+            agent.finish(who, id, name, o, before, label, vec![], true)
         })
     }
 
@@ -616,11 +642,11 @@ fn check_version(o: &Open, expect: Option<u64>) -> R<()> {
     }
 }
 
-fn load(s: &mut Dispatcher, xml: &str, name: &str) -> R<()> {
+pub(crate) fn load(s: &mut Dispatcher, xml: &str, name: &str) -> R<()> {
     cmd(s, json!({ "cmd": "loadXml", "xml": xml, "name": name })).map(|_| ())
 }
 
-fn save(s: &mut Dispatcher) -> R<String> {
+pub(crate) fn save(s: &mut Dispatcher) -> R<String> {
     let v = cmd(s, json!({ "cmd": "saveXml" }))?;
     v["xml"]
         .as_str()
@@ -629,7 +655,7 @@ fn save(s: &mut Dispatcher) -> R<String> {
 }
 
 /// Puts the build back as it was last saved
-fn reload(o: &mut Open) -> R<()> {
+pub(crate) fn reload(o: &mut Open) -> R<()> {
     let name = cmd(&mut o.session, json!({ "cmd": "state" }))
         .ok()
         .and_then(|s| s["name"].as_str().map(String::from))

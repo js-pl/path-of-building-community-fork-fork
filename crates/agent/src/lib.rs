@@ -17,6 +17,7 @@
 //! answers are JSON values, so any transport (the control socket, MCP)
 //! can carry them.
 
+pub mod engine;
 mod evaluate;
 pub mod grant;
 mod read;
@@ -101,10 +102,17 @@ struct Open<'d> {
     xml: String,
     /// Bumped by each change
     version: u64,
-    /// The steps that can be undone: the XML before each, and its label
-    undo: Vec<(String, String)>,
+    /// The steps that can be undone, oldest first
+    undo: Vec<Undo>,
     /// Each change since the build was opened
     changes: Vec<Change>,
+}
+
+/// A step that can be undone: the XML before it, its label and who made it
+struct Undo {
+    xml: String,
+    label: String,
+    source: String,
 }
 
 /// A change to a build, as `changes_since` gives it
@@ -126,6 +134,36 @@ pub struct Agent<'d, S: Store> {
     gems: Option<HashSet<String>>,
     /// The unique items, `Title, Base`, once asked for
     uniques: Option<HashSet<String>>,
+    /// The changes not yet taken by [`Agent::take_events`]
+    events: Vec<Event>,
+}
+
+/// A change to a build, for the change events a host sends every client:
+/// the build's new version, the step's label and who made it (`user`,
+/// `agent <connection>`); the same as `changes_since` gives
+#[derive(Clone, Debug, PartialEq)]
+pub struct Event {
+    pub build: BuildId,
+    pub version: u64,
+    pub label: String,
+    pub source: String,
+    pub commit: Option<String>,
+}
+
+/// Who makes a step: an agent's connection, or the user in the UI
+#[derive(Clone, Copy)]
+pub(crate) enum Who<'a> {
+    Agent(&'a Grant),
+    User,
+}
+
+impl Who<'_> {
+    pub(crate) fn source(&self) -> String {
+        match self {
+            Who::Agent(g) => format!("agent {}", g.connection),
+            Who::User => "user".into(),
+        }
+    }
 }
 
 type R<T> = Result<T, String>;
@@ -152,6 +190,7 @@ impl<'d, S: Store> Agent<'d, S> {
             open: BTreeMap::new(),
             gems: None,
             uniques: None,
+            events: Vec::new(),
         }
     }
 

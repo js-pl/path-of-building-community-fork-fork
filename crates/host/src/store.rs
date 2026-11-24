@@ -18,11 +18,20 @@ use std::path::{Path, PathBuf};
 /// The directory of the agents' builds in the builds directory; no user's
 /// build has this name
 pub const AGENTS_DIR: &str = "agents";
+/// Where cleaned up agent directories go, which only the user empties; no
+/// user's build has this name either
+pub const TRASH_DIR: &str = "trash";
+
+/// Whether a name is one of the builds directory's own, never a build's
+pub fn reserved(name: &str) -> bool {
+    name == AGENTS_DIR || name == TRASH_DIR
+}
 
 pub struct FsStore {
     root: PathBuf,
     git: Option<Git>,
     recorders: HashMap<BuildId, Recorder>,
+    quiet: Option<std::time::Duration>,
 }
 
 impl FsStore {
@@ -32,6 +41,7 @@ impl FsStore {
             root: root.into(),
             git,
             recorders: HashMap::new(),
+            quiet: None,
         }
     }
 
@@ -56,7 +66,7 @@ impl FsStore {
             && id.name != "."
             && id.name != ".."
             && !id.name.contains(['/', '\\'])
-            && !(id.owner == Owner::User && id.name == AGENTS_DIR);
+            && !(id.owner == Owner::User && reserved(&id.name));
         if let Owner::Agent(d) = &id.owner
             && (d.is_empty() || d == "." || d == ".." || d.contains(['/', '\\']))
         {
@@ -76,7 +86,11 @@ impl FsStore {
                 }
                 None => None,
             };
-            self.recorders.insert(id.clone(), Recorder::new(repo));
+            let mut r = Recorder::new(repo);
+            if let Some(q) = self.quiet {
+                r = r.with_quiet(q);
+            }
+            self.recorders.insert(id.clone(), r);
         }
         Ok(self.recorders.get_mut(id).unwrap())
     }
@@ -110,12 +124,18 @@ impl FsStore {
                 .map(|v| v.map(|v| v.as_str().to_string()))
                 .map_err(|e| e.to_string());
         }
+        self.write(id, xml)?;
+        Ok(None)
+    }
+
+    /// Writes a build's file, whole, moved into place
+    fn write(&self, id: &BuildId, xml: &str) -> Result<()> {
         let dir = self.dir(id)?;
+        let file = dir.join(BUILD_FILE);
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let tmp = dir.join(format!("{BUILD_FILE}.tmp"));
         std::fs::write(&tmp, xml).map_err(|e| format!("{}: {e}", tmp.display()))?;
-        std::fs::rename(&tmp, &file).map_err(|e| format!("{}: {e}", file.display()))?;
-        Ok(None)
+        std::fs::rename(&tmp, &file).map_err(|e| format!("{}: {e}", file.display()))
     }
 }
 
@@ -131,7 +151,7 @@ impl Store for FsStore {
             .filter_map(|e| e.ok())
             .filter(|e| e.path().join(BUILD_FILE).is_file())
             .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| !(*owner == Owner::User && n == AGENTS_DIR))
+            .filter(|n| !(*owner == Owner::User && reserved(n)))
             .collect();
         names.sort();
         Ok(names)
@@ -158,6 +178,31 @@ impl Store for FsStore {
             return Err(format!("no build {}", id.name));
         }
         self.save(id, xml, step)
+    }
+
+    fn user_edit(&mut self, id: &BuildId, xml: &str, label: &str) -> Result<()> {
+        let file = self.dir(id)?.join(BUILD_FILE);
+        if !file.exists() {
+            return Err(format!("no build {}", id.name));
+        }
+        let rec = self.recorder(id)?;
+        if rec.is_enabled()
+            && !rec.is_pending()
+            && rec
+                .repo()
+                .is_some_and(|r| r.head().ok().flatten().is_none())
+            && let Ok(found) = std::fs::read_to_string(&file)
+        {
+            // As it was found, so the user's first edit can be undone from
+            // the history too
+            rec.user_edit(found, "as found before the first edit");
+            rec.flush().map_err(|e| e.to_string())?;
+        }
+        // The file is saved at once; its commit waits for the user's next
+        // edits (`Recorder`)
+        self.write(id, xml)?;
+        self.recorder(id)?.user_edit(xml, label);
+        Ok(())
     }
 
     fn log(&self, id: &BuildId, n: usize) -> Result<Vec<Entry>> {
@@ -192,6 +237,47 @@ impl Store for FsStore {
 }
 
 impl FsStore {
+    /// Commits the user's edits that waited long enough; call it often.
+    /// The versions committed, by build.
+    pub fn tick(&mut self) -> Vec<(BuildId, Result<String>)> {
+        let mut out = Vec::new();
+        for (id, r) in &mut self.recorders {
+            match r.tick() {
+                Ok(Some(v)) => out.push((id.clone(), Ok(v.as_str().to_string()))),
+                Ok(None) => {}
+                Err(e) => out.push((id.clone(), Err(e.to_string()))),
+            }
+        }
+        out
+    }
+
+    /// Commits a build's waiting edits now and forgets its recorder (its
+    /// directory is moved, say)
+    pub fn release(&mut self, id: &BuildId) -> Result<()> {
+        match self.recorders.remove(id) {
+            Some(r) => r.close().map(|_| ()).map_err(|e| e.to_string()),
+            None => Ok(()),
+        }
+    }
+
+    /// Waits `quiet` before committing the user's edits of builds opened
+    /// from now on (tests)
+    pub fn set_quiet(&mut self, quiet: std::time::Duration) {
+        self.quiet = Some(quiet);
+    }
+
+    /// Adds a user's build, committed at once; an error if one by that
+    /// name exists
+    pub fn add(&mut self, id: &BuildId, xml: &str, label: &str) -> Result<()> {
+        if self.dir(id)?.join(BUILD_FILE).exists() {
+            return Err(format!("a build {} exists already", id.name));
+        }
+        self.write(id, xml)?;
+        let rec = self.recorder(id)?;
+        rec.user_edit(xml, label);
+        rec.flush().map(|_| ()).map_err(|e| e.to_string())
+    }
+
     /// Commits whatever the recorders hold; the host stops
     pub fn close(&mut self) {
         for (_, r) in self.recorders.drain() {
