@@ -17,6 +17,8 @@
 //! answers are JSON values, so any transport (the control socket, MCP)
 //! can carry them.
 
+mod assume;
+mod eval;
 mod evaluate;
 pub mod grant;
 mod read;
@@ -64,6 +66,14 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "evaluate_item",
         "an item (pasted text or an id from `items`) in a slot, evaluated exactly on a copy of the build, and the mod weights of the slot; changes nothing",
+    ),
+    (
+        "eval",
+        "variants of the build, each a list of changes as `apply` takes them, evaluated exactly on copies on all cores: one row per variant with the stats, their changes and the warnings each adds; changes nothing",
+    ),
+    (
+        "assumptions",
+        "the configuration the numbers rest on and which numbers are exact; with `stat`, the options that change it and by how much, each evaluated exactly",
     ),
     ("history", "the build's last versions"),
     ("changes_since", "the changes after a version"),
@@ -122,9 +132,16 @@ pub struct Agent<'d, S: Store> {
     data: &'d TypedData,
     store: S,
     open: BTreeMap<BuildId, Open<'d>>,
-    /// The gem names, once asked for
+    names: Names,
+}
+
+/// The names the engine knows, which answers quote; asked for once. Its
+/// own value, so evaluations on other threads carry a copy.
+#[derive(Clone, Default)]
+pub(crate) struct Names {
+    /// The gem names
     gems: Option<HashSet<String>>,
-    /// The unique items, `Title, Base`, once asked for
+    /// The unique items, `Title, Base`
     uniques: Option<HashSet<String>>,
 }
 
@@ -150,8 +167,7 @@ impl<'d, S: Store> Agent<'d, S> {
             data,
             store,
             open: BTreeMap::new(),
-            gems: None,
-            uniques: None,
+            names: Names::default(),
         }
     }
 
@@ -198,6 +214,15 @@ impl<'d, S: Store> Agent<'d, S> {
                 let id = grant.resolve(build)?;
                 let name = grant.api_name(&id);
                 self.evaluate_item(&id, name, req)
+            }
+            "eval" | "assumptions" => {
+                let id = grant.resolve(build)?;
+                let name = grant.api_name(&id);
+                if verb == "eval" {
+                    self.eval(&id, name, req)
+                } else {
+                    self.assumptions(&id, name, req)
+                }
             }
             "copy" => self.copy(grant, req),
             "import" => self.import(grant, req),
@@ -274,6 +299,18 @@ impl<'d, S: Store> Agent<'d, S> {
 
     /// The gem names the engine knows
     fn gem_names(&mut self, s: &mut Dispatcher) -> R<&HashSet<String>> {
+        self.names.gems(s)
+    }
+
+    /// The unique items the engine knows, `Title, Base`
+    fn unique_names(&mut self, s: &mut Dispatcher) -> R<&HashSet<String>> {
+        self.names.uniques(s)
+    }
+}
+
+impl Names {
+    /// The gem names the engine knows
+    pub(crate) fn gems(&mut self, s: &mut Dispatcher) -> R<&HashSet<String>> {
         if self.gems.is_none() {
             let list = cmd(s, json!({ "cmd": "gemList" }))?;
             let names = list
@@ -288,7 +325,7 @@ impl<'d, S: Store> Agent<'d, S> {
     }
 
     /// The unique items the engine knows, `Title, Base`
-    fn unique_names(&mut self, s: &mut Dispatcher) -> R<&HashSet<String>> {
+    pub(crate) fn uniques(&mut self, s: &mut Dispatcher) -> R<&HashSet<String>> {
         if self.uniques.is_none() {
             let list = cmd(s, json!({ "cmd": "itemDb", "kind": "unique" }))?;
             let names = list

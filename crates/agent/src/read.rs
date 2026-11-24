@@ -162,43 +162,7 @@ impl<'d, S: Store> Agent<'d, S> {
             }
         }
         groups.retain(|g| !g.is_empty());
-        let mut warnings: Vec<String> = state["warnings"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(J::as_str)
-            .map(|w| {
-                // The jewel's name is the author's
-                if w.starts_with("You are exceeding jewel limit with the jewel") {
-                    "You are exceeding the jewel limit of a jewel".to_string()
-                } else if let Some((head, what)) = w.split_once(" requirement of ") {
-                    // A gem's or a known unique's name, else an item's the
-                    // author named
-                    let what = if gems.contains(what) || uniques.contains(what) {
-                        what
-                    } else {
-                        "an item"
-                    };
-                    clean(&format!("{head} requirement of {what}"), LINE_CAP, false)
-                } else {
-                    clean(w, LINE_CAP, false)
-                }
-            })
-            .collect();
-        for res in ["Fire", "Cold", "Lightning", "Chaos"] {
-            let missing = p[format!("Missing{res}Resist")].as_f64().unwrap_or(0.0);
-            if missing > 0.0 && res != "Chaos" {
-                warnings.push(format!("{res} resistance {missing} below its cap"));
-            }
-        }
-        for pool in ["Life", "Mana"] {
-            if p[format!("{pool}Unreserved")]
-                .as_f64()
-                .is_some_and(|v| v < 0.0)
-            {
-                warnings.push(format!("{pool} reserved over 100%"));
-            }
-        }
+        let warnings = warnings_of(&state, p, &gems, &uniques);
         let controls = &state["controls"];
         let main_skill = main_skill(controls, &skills);
         Ok(json!({
@@ -603,6 +567,54 @@ fn gem_label(gem: &J, known: &std::collections::HashSet<String>) -> String {
     s
 }
 
+/// The build's warnings: the sidebar's, with names only the engine knows,
+/// uncapped resistances and reservation over 100%
+pub(crate) fn warnings_of(
+    state: &J,
+    p: &J,
+    gems: &std::collections::HashSet<String>,
+    uniques: &std::collections::HashSet<String>,
+) -> Vec<String> {
+    let mut warnings: Vec<String> = state["warnings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(J::as_str)
+        .map(|w| {
+            // The jewel's name is the author's
+            if w.starts_with("You are exceeding jewel limit with the jewel") {
+                "You are exceeding the jewel limit of a jewel".to_string()
+            } else if let Some((head, what)) = w.split_once(" requirement of ") {
+                // A gem's or a known unique's name, else an item's the
+                // author named
+                let what = if gems.contains(what) || uniques.contains(what) {
+                    what
+                } else {
+                    "an item"
+                };
+                clean(&format!("{head} requirement of {what}"), LINE_CAP, false)
+            } else {
+                clean(w, LINE_CAP, false)
+            }
+        })
+        .collect();
+    for res in ["Fire", "Cold", "Lightning", "Chaos"] {
+        let missing = p[format!("Missing{res}Resist")].as_f64().unwrap_or(0.0);
+        if missing > 0.0 && res != "Chaos" {
+            warnings.push(format!("{res} resistance {missing} below its cap"));
+        }
+    }
+    for pool in ["Life", "Mana"] {
+        if p[format!("{pool}Unreserved")]
+            .as_f64()
+            .is_some_and(|v| v < 0.0)
+        {
+            warnings.push(format!("{pool} reserved over 100%"));
+        }
+    }
+    warnings
+}
+
 /// The main skill, by its gem's name: the sidebar's entry, or for one
 /// from an item (whose entry names the item) the main group's first skill
 fn main_skill(controls: &J, skills: &J) -> J {
@@ -624,7 +636,7 @@ fn main_skill(controls: &J, skills: &J) -> J {
 }
 
 /// A config option as `config` and `search` give it
-fn config_option(v: &J, sec: &J) -> J {
+pub(crate) fn config_option(v: &J, sec: &J) -> J {
     let mut o = Map::new();
     o.insert("option".into(), v["var"].clone());
     o.insert(
