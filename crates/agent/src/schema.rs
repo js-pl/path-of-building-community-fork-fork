@@ -20,6 +20,8 @@ pub const READING: &[&str] = &[
     "evaluate_item",
     "eval",
     "assumptions",
+    "best",
+    "improve",
 ];
 
 /// The verbs whose answers can carry the author's text under `untrusted`
@@ -54,6 +56,35 @@ fn stats() -> J {
         "maxItems": 12,
         "items": { "type": "string" },
         "description": "the stats to show, as the engine's outputs (FullDPS, TotalEHP, Life, EnergyShield, FireResist, ...); default Full DPS, EHP and the sidebar's stats that changed",
+    })
+}
+
+fn objective() -> J {
+    json!({
+        "description": "what to maximise: a preset (default: Full DPS 1, EHP 0.5, the trade weights; dps, ehp, balanced, max_hit, life), a power stat, or a list of {\"stat\", \"weight\"}; a negative weight minimises. Scored as upstream's WeightedRatioOutputs",
+        "anyOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["stat"], "additionalProperties": false, "properties": { "stat": { "type": "string" }, "weight": { "type": "number" } } },
+            { "type": "array", "minItems": 1, "maxItems": 10, "items": { "type": "object", "required": ["stat"], "additionalProperties": false, "properties": { "stat": { "type": "string" }, "weight": { "type": "number" } } } },
+        ],
+    })
+}
+
+fn constraints() -> J {
+    json!({
+        "type": "array",
+        "maxItems": 30,
+        "description": "hard constraints: \"res_capped\", \"requirements\", \"reservation\", \"no_new_warnings\", {\"stat\": \"Life\", \"min\": 5000}, {\"stat\": ..., \"max\": ...}, {\"keep\": \"TotalEHP\"} (no lower than now), {\"points\": 5} (at most 5 more passive points)",
+        "items": { "type": ["string", "object"] },
+    })
+}
+
+fn search_fields() -> J {
+    json!({
+        "depth": { "type": "number", "minimum": 1, "maximum": 12, "description": "tree: how many points away a node may be; default 3" },
+        "candidates": { "type": "integer", "minimum": 1, "maximum": 500, "description": "how many moves of a ranked or long generator are evaluated exactly; default 40" },
+        "group": index("supports: the socket group; default the main one"),
+        "gem": index("supports: one gem of the group to replace"),
     })
 }
 
@@ -261,9 +292,46 @@ pub fn input_schema(verb: &str) -> Option<J> {
                     "items": { "type": ["array", "object"] },
                 },
                 "stats": stats(),
+                "objective": objective(),
+                "constraints": constraints(),
             }),
             &["variants"],
         ),
+        "best" | "improve" => {
+            let mut props = json!({
+                "build": build(),
+                "objective": objective(),
+                "constraints": constraints(),
+                "stats": stats(),
+            });
+            for (k, v) in search_fields().as_object().unwrap() {
+                props[k] = v.clone();
+            }
+            let generators: Vec<&str> = crate::generate::GENERATORS
+                .iter()
+                .map(|(g, _)| *g)
+                .collect();
+            let about = crate::generate::GENERATORS
+                .iter()
+                .map(|(g, d)| format!("{g}: {d}"))
+                .collect::<Vec<_>>()
+                .join("; ");
+            if verb == "best" {
+                props["generator"] =
+                    json!({ "type": "string", "enum": generators, "description": about });
+                props["limit"] = json!({ "type": "integer", "minimum": 1, "maximum": 100, "description": "how many rows; default 10" });
+                (props, &["generator"])
+            } else {
+                props["generators"] = json!({
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string", "enum": generators },
+                    "description": format!("the generators each step takes moves from; default masteries and config; tree needs a points constraint. {about}"),
+                });
+                props["steps"] = json!({ "type": "integer", "minimum": 1, "maximum": 10, "description": "the most steps; default 3" });
+                (props, &[])
+            }
+        }
         "assumptions" => (
             json!({
                 "build": build(),
@@ -357,6 +425,8 @@ mod tests {
         for (v, fields) in [
             ("eval", crate::eval::FIELDS),
             ("assumptions", crate::assume::FIELDS),
+            ("best", crate::search::BEST_FIELDS),
+            ("improve", crate::search::IMPROVE_FIELDS),
         ] {
             let s = input_schema(v).unwrap();
             let mut props: Vec<&str> = s["properties"]

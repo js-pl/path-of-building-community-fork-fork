@@ -21,9 +21,12 @@ mod assume;
 pub mod engine;
 mod eval;
 mod evaluate;
+mod generate;
+mod goal;
 pub mod grant;
 mod read;
 pub mod schema;
+mod search;
 pub mod store;
 pub mod text;
 mod write;
@@ -75,6 +78,14 @@ pub const VERBS: &[(&str, &str)] = &[
     (
         "assumptions",
         "the configuration the numbers rest on and which numbers are exact; with `stat`, the options that change it and by how much, each evaluated exactly",
+    ),
+    (
+        "best",
+        "one generator's moves (tree, tree_remove, masteries, supports, gem_levels, config), each evaluated exactly and ranked by an objective under constraints; says how much it searched; changes nothing",
+    ),
+    (
+        "improve",
+        "greedy improvement by an objective under constraints: steps of the generators' best moves, each evaluated exactly, proposed as one `apply`; changes nothing",
     ),
     ("history", "the build's last versions"),
     ("changes_since", "the changes after a version"),
@@ -254,13 +265,14 @@ impl<'d, S: Store> Agent<'d, S> {
                 let name = grant.api_name(&id);
                 self.evaluate_item(&id, name, req)
             }
-            "eval" | "assumptions" => {
+            "eval" | "assumptions" | "best" | "improve" => {
                 let id = grant.resolve(build)?;
                 let name = grant.api_name(&id);
-                if verb == "eval" {
-                    self.eval(&id, name, req)
-                } else {
-                    self.assumptions(&id, name, req)
+                match verb {
+                    "eval" => self.eval(&id, name, req),
+                    "assumptions" => self.assumptions(&id, name, req),
+                    "best" => self.best(&id, name, req),
+                    _ => self.improve(&id, name, req),
                 }
             }
             "copy" => self.copy(grant, req),

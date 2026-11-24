@@ -178,6 +178,8 @@ pub(crate) struct Outcome {
     pub labels: Vec<String>,
     pub out: CalcOutput,
     pub warnings: Vec<String>,
+    /// The passive points used
+    pub points: Option<f64>,
 }
 
 impl Outcome {
@@ -200,6 +202,13 @@ pub(crate) struct Effort {
 }
 
 impl Effort {
+    pub fn add(&mut self, o: Effort) {
+        self.evaluations += o.evaluations;
+        self.failed += o.failed;
+        self.threads = self.threads.max(o.threads);
+        self.seconds += o.seconds;
+    }
+
     pub fn json(&self) -> J {
         json!({
             "evaluations": self.evaluations,
@@ -229,16 +238,21 @@ impl<'d> Evaluator<'d> {
             .as_str()
             .ok_or("saveXml gave no XML")?
             .to_string();
+        Ok(Evaluator::of(agent.data, xml, agent.names.clone()))
+    }
+
+    /// A build's saved XML
+    pub fn of(data: &'d TypedData, xml: String, names: Names) -> Evaluator<'d> {
         let threads = match Threads::available() {
             Threads::Pool(n) => n,
             _ => 1,
         };
-        Ok(Evaluator {
-            data: agent.data,
+        Evaluator {
+            data,
             xml,
-            names: agent.names.clone(),
+            names,
             threads,
-        })
+        }
     }
 
     /// The build as it is (its outcome), and each variant's
@@ -315,6 +329,7 @@ fn evaluate(names: &mut Names, s: &mut Dispatcher, changes: &[J]) -> R<Outcome> 
         labels,
         out,
         warnings,
+        points: state["points"]["used"].as_f64(),
     })
 }
 
@@ -391,7 +406,7 @@ pub(crate) fn row(stats: &[Stat], base: &Outcome, r: &Outcome) -> serde_json::Ma
 }
 
 /// The fields `eval` takes
-pub(crate) const FIELDS: &[&str] = &["build", "variants", "stats"];
+pub(crate) const FIELDS: &[&str] = &["build", "variants", "stats", "objective", "constraints"];
 
 impl<'d, S: Store> Agent<'d, S> {
     pub(crate) fn eval(&mut self, id: &BuildId, name: String, req: &J) -> R<J> {
@@ -410,6 +425,9 @@ impl<'d, S: Store> Agent<'d, S> {
         self.with_open(id, |agent, o| {
             let live = o.session.typed_output().ok_or("no build is open")?;
             let asked = stats_of(req, &live)?;
+            let scored = req.get("objective").is_some() || req.get("constraints").is_some();
+            let objective = crate::goal::Objective::of(req)?;
+            let constraints = crate::goal::Constraint::list(req, &live)?;
             let ev = Evaluator::new(agent, o)?;
             let (base, rows, effort) = ev.run(&variants);
             let base = base.map_err(|e| format!("the build can't be evaluated: {e}"))?;
@@ -419,7 +437,19 @@ impl<'d, S: Store> Agent<'d, S> {
                 .enumerate()
                 .map(|(i, r)| {
                     let mut m = match r {
-                        Ok(r) => row(&stats, &base, r),
+                        Ok(r) => {
+                            let mut m = row(&stats, &base, r);
+                            if scored {
+                                let gain = objective.score(&base.out, &r.out)
+                                    - objective.score(&base.out, &base.out);
+                                m.insert("gain".into(), json!((gain * 1e4).round() / 1e4));
+                                let b = crate::goal::broken(&constraints, &base, r);
+                                if !b.is_empty() {
+                                    m.insert("breaks".into(), json!(b));
+                                }
+                            }
+                            m
+                        }
                         Err(e) => {
                             let mut m = serde_json::Map::new();
                             m.insert("error".into(), json!(e));
@@ -430,7 +460,20 @@ impl<'d, S: Store> Agent<'d, S> {
                     J::Object(m)
                 })
                 .collect();
-            Ok(json!({
+            let mut extra = serde_json::Map::new();
+            if scored {
+                extra.insert("objective".into(), objective.json());
+                extra.insert(
+                    "constraints".into(),
+                    json!(
+                        constraints
+                            .iter()
+                            .map(crate::goal::Constraint::describe)
+                            .collect::<Vec<_>>()
+                    ),
+                );
+            }
+            let mut answer = json!({
                 "build": name,
                 "version": o.version,
                 "stats": stats.iter().map(|s| s.label.clone()).collect::<Vec<_>>(),
@@ -440,7 +483,9 @@ impl<'d, S: Store> Agent<'d, S> {
                 "rows": table,
                 "effort": effort.json(),
                 "exact": EXACT,
-            }))
+            });
+            answer.as_object_mut().unwrap().extend(extra);
+            Ok(answer)
         })
     }
 }
