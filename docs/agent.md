@@ -537,10 +537,18 @@ above was silent:
   (`nodes='["Heart of Thunder"]'`), else strings. Each call is a new
   connection, so builds made in an agent directory are reached again with
   `--agent <dir>`. Without a verb it lists them.
-- **Windows: not yet.** Rust's standard library has no named pipes, so
-  the control socket is Unix only for now; on Windows `pob host` and `pob
-  ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
-  comes with step 4 or 5, when Windows is tested.
+- **Windows: a named pipe** (`host::control::pipe`, step 5), by default
+  `\\.\pipe\path-of-building-fork-fork-<user>-control` (`--socket` takes
+  another `\\.\pipe\<name>`). Its security descriptor is
+  `O:<user>D:P(A;;GA;;;<user>)`: the user's SID alone has access, the
+  equivalent of 0600, and remote clients are rejected. The host makes the
+  first instance with `FILE_FLAG_FIRST_PIPE_INSTANCE`, so it never joins
+  a pipe someone else made, and a client checks that the pipe's owner is
+  the current user before it says hello (with identification-only
+  impersonation), so a pipe squatted by another user is refused, not
+  talked to. The same lines and hellos as the Unix socket; `pob mcp`
+  starts a host in a process group of its own with no console, its log
+  in the data directory. CI builds and tests it on `windows-latest`.
 - Not yet: the web app on the host (step 6), job and time budgets (step
   9; today's verbs are single edits).
 
@@ -938,11 +946,11 @@ Each one a PR, as usual:
 3. `crates/agent` with the reading and changing verbs, grants, agent
    directories, and the untrusted text kept apart from the start, on the
    history from the first edit; `pob host --headless` with the control
-   socket and `pob ctl`. Done (#191, #193), except the
-   Windows named pipe.
+   socket and `pob ctl`. Done (#191, #193); the Windows named pipe
+   came with step 5.
 4. The MCP endpoint on stdio (`pob mcp`) and HTTP (tokens), and `pob
    agents install`: any harness works on a build. Done (#194, #196,
-   #197), except the Windows named pipe, which `pob mcp` needs there too.
+   #197); the Windows named pipe came with step 5.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
    Linux, macOS and Windows.
 6. The web app on the host: the host serves it, the WebSocket transport in

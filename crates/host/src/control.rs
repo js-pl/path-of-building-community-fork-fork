@@ -1,5 +1,6 @@
 //! The control socket: the user's own processes (`pob ctl`, later `pob
-//! mcp`) call the agent API on it. A Unix socket only the user can open;
+//! mcp`) call the agent API on it. A Unix socket (a named pipe on
+//! Windows, [`pipe`]) only the user can open;
 //! one JSON line per request and per answer.
 //!
 //! A connection's first line is its hello, which fixes its grant:
@@ -198,6 +199,16 @@ pub fn now() -> i64 {
         .map_or(0, |d| d.as_secs() as i64)
 }
 
+#[cfg(windows)]
+pub use pipe as local;
+/// The control socket of this platform: [`unix`] or [`pipe`], each with
+/// `listen`, `accept`, `answers`, `admin` and `Client`
+#[cfg(unix)]
+pub use unix as local;
+
+#[cfg(windows)]
+pub mod pipe;
+
 #[cfg(unix)]
 pub mod unix {
     //! The control socket on Unix: a socket file in a directory only the
@@ -248,6 +259,11 @@ pub mod unix {
                 let _ = connection_in(stream, calls, now(), Some((&registry, close)));
             });
         }
+    }
+
+    /// Whether a host answers on `path`
+    pub fn answers(path: &Path) -> bool {
+        UnixStream::connect(path).is_ok()
     }
 
     /// An `admin` request to the host on `path`

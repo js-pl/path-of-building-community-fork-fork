@@ -508,21 +508,20 @@ fn http_endpoint(flags: &[(&str, &str)]) -> Option<HttpEndpoint> {
     })
 }
 
-#[cfg(unix)]
 fn serve_host(
     builds: PathBuf,
     socket: PathBuf,
     git: Option<history::Git>,
     http: Option<HttpEndpoint>,
 ) {
-    let listener = host::control::unix::listen(&socket).unwrap_or_else(|e| die(e));
+    let listener = host::control::local::listen(&socket).unwrap_or_else(|e| die(e));
     let (tx, rx) = std::sync::mpsc::channel();
     let registry = std::sync::Arc::new(host::connections::Registry::default());
     if let Some(h) = http {
         let endpoint = host::http::Http::new(h.tokens, tx.clone(), registry.clone());
         std::thread::spawn(move || endpoint.serve(h.listener, h.tls));
     }
-    std::thread::spawn(move || host::control::unix::accept(listener, tx, registry));
+    std::thread::spawn(move || host::control::local::accept(listener, tx, registry));
     let store = host::FsStore::new(&builds, git);
     let data = data();
     eprintln!(
@@ -532,11 +531,6 @@ fn serve_host(
     );
     let mut agent = agent::Agent::new(data, store);
     host::control::answer(&mut agent, rx);
-}
-
-#[cfg(not(unix))]
-fn serve_host(_: PathBuf, _: PathBuf, _: Option<history::Git>, _: Option<HttpEndpoint>) {
-    die("pob host: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
 }
 
 /// `pob agents`: tokens and connections
@@ -709,14 +703,8 @@ fn install_cmd(flags: &[(&str, &str)]) {
     }
 }
 
-#[cfg(unix)]
 fn admin(socket: &Path, req: serde_json::Value) -> Result<serde_json::Value, String> {
-    host::control::unix::admin(socket, req)
-}
-
-#[cfg(not(unix))]
-fn admin(_: &Path, _: serde_json::Value) -> Result<serde_json::Value, String> {
-    Err("the control socket is a Unix socket; the named pipe for Windows isn't built yet".into())
+    host::control::local::admin(socket, req)
 }
 
 fn ctl(args: &[String]) {
@@ -769,19 +757,13 @@ fn ctl(args: &[String]) {
     }
 }
 
-#[cfg(unix)]
 fn call_host(
     socket: &Path,
     hello: &serde_json::Value,
     req: &serde_json::Value,
 ) -> serde_json::Value {
-    let mut c = host::control::unix::Client::connect(socket, hello).unwrap_or_else(|e| die(e));
+    let mut c = host::control::local::Client::connect(socket, hello).unwrap_or_else(|e| die(e));
     c.call(req).unwrap_or_else(|e| die(e))
-}
-
-#[cfg(not(unix))]
-fn call_host(_: &Path, _: &serde_json::Value, _: &serde_json::Value) -> serde_json::Value {
-    die("pob ctl: the control socket is a Unix socket; the named pipe for Windows isn't built yet")
 }
 
 fn mcp(args: &[String]) {
@@ -817,14 +799,13 @@ fn mcp(args: &[String]) {
 }
 
 /// A relay to the host on `socket`, started when none runs and `start`
-#[cfg(unix)]
 fn relay(
     socket: &Path,
     hello: &serde_json::Value,
     start: bool,
     builds: Option<&str>,
 ) -> Result<host::mcp::Relay, String> {
-    use host::control::unix::Client;
+    use host::control::local::Client;
     let client = match Client::connect(socket, hello) {
         Ok(c) => c,
         Err(e) if !start || socket_answers(socket) => return Err(e),
@@ -857,21 +838,24 @@ fn relay(
 }
 
 /// Whether a host listens on `socket` (then a failed hello is its answer)
-#[cfg(unix)]
 fn socket_answers(socket: &Path) -> bool {
-    std::os::unix::net::UnixStream::connect(socket).is_ok()
+    host::control::local::answers(socket)
 }
 
 /// Starts `pob host --headless` on `socket`, on its own: its own process
-/// group, its output in `host.log` beside the socket
-#[cfg(unix)]
+/// group, its output in `host.log` beside the socket (in the data
+/// directory on Windows, where the socket is a named pipe)
 fn start_host(
     socket: &Path,
     builds: Option<&str>,
 ) -> Result<(std::process::Child, PathBuf), String> {
-    use std::os::unix::process::CommandExt;
     let exe = std::env::current_exe().map_err(|e| format!("starting a host: {e}"))?;
-    let dir = socket.parent().unwrap_or(Path::new("."));
+    let dir = if cfg!(windows) {
+        host::data_dir().ok_or("no data directory (%LOCALAPPDATA%)")?
+    } else {
+        socket.parent().unwrap_or(Path::new(".")).to_path_buf()
+    };
+    let dir = dir.as_path();
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let log_path = dir.join("host.log");
     let log = std::fs::OpenOptions::new()
@@ -884,11 +868,18 @@ fn start_host(
     if let Some(b) = builds {
         cmd.args(["--builds", b]);
     }
-    let child = cmd
-        .stdin(std::process::Stdio::null())
+    cmd.stdin(std::process::Stdio::null())
         .stdout(log.try_clone().map_err(|e| e.to_string())?)
-        .stderr(log)
-        .process_group(0)
+        .stderr(log);
+    #[cfg(unix)]
+    std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+    // A process group of its own, without a console: it outlives the harness
+    #[cfg(windows)]
+    std::os::windows::process::CommandExt::creation_flags(
+        &mut cmd,
+        0x0000_0200 | 0x0800_0000, // CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+    );
+    let child = cmd
         .spawn()
         .map_err(|e| format!("starting a host: {e} (start one with `pob host --headless`)"))?;
     eprintln!(
@@ -897,19 +888,6 @@ fn start_host(
         log_path.display()
     );
     Ok((child, log_path))
-}
-
-#[cfg(not(unix))]
-fn relay(
-    _: &Path,
-    _: &serde_json::Value,
-    _: bool,
-    _: Option<&str>,
-) -> Result<host::mcp::Relay, String> {
-    Err(
-        "pob mcp: the control socket is a Unix socket; the named pipe for Windows isn't built yet"
-            .into(),
-    )
 }
 
 /// An answer as indented text: `key: value`, lists as `- item`

@@ -111,6 +111,19 @@ jobs:
           name: tests
       - run: cargo nextest run --profile ci --archive-file tests.tar.zst --workspace-remap . -E '${{ matrix.filter }}'
 
+  # The host on Windows: the control socket as a named pipe, MCP over HTTP
+  windows:
+    runs-on: windows-latest
+    steps:
+      # The corpus and upstream's files byte for byte, as on Linux
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p host -p cli --all-targets -- -D warnings
+      - run: cargo test --release -p host
+
   web:
     runs-on: ubuntu-latest
     defaults:
