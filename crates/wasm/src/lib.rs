@@ -122,8 +122,9 @@ fn typed_data() -> Result<&'static TypedData, String> {
     if let Some(d) = DATA.with(|d| *d.borrow()) {
         return Ok(d);
     }
-    let d: &'static TypedData =
-        Box::leak(Box::new(TypedData::from_files(FILES.with(|f| f.clone()))?));
+    let d: &'static TypedData = Box::leak(Box::new(TypedData::from_files(
+        FILES.with(|f| (**f).clone()),
+    )?));
     DATA.with(|cell| *cell.borrow_mut() = Some(d));
     Ok(d)
 }

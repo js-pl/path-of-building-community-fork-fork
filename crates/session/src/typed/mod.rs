@@ -64,8 +64,8 @@ use engine::game_data::GameData;
 use engine::mod_parser::ModParser;
 use engine::tree::{NodeType, PassiveTree};
 use serde_json::{Map, Value as J, json};
-use std::cell::RefCell;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 pub use sidebar::Controls;
 
@@ -80,31 +80,33 @@ pub const UPSTREAM_ERROR: &str = "upstream error: ";
 pub type Result<T> = std::result::Result<T, String>;
 
 /// Loads a tree version's passive tree
-pub type TreeSource = dyn Fn(&str, &ModParser) -> Result<PassiveTree>;
+pub type TreeSource = dyn Fn(&str, &ModParser) -> Result<PassiveTree> + Send + Sync;
 
-/// The typed engine's game data, mod parser and passive trees
+/// The typed engine's game data, mod parser and passive trees. Shared by
+/// threads: sessions of their own on one data, as the agent's evaluations
+/// run them.
 pub struct TypedData {
     pub game: GameData,
     pub parser: ModParser,
     /// The jewel sockets of the latest tree
     socket_ids: Vec<u32>,
-    trees: RefCell<HashMap<String, &'static PassiveTree>>,
+    trees: Mutex<HashMap<String, &'static PassiveTree>>,
     source: Box<TreeSource>,
     /// Makes the timeless jewels' data, once a build needs it
     timeless_source: Option<Box<TimelessSource>>,
     /// The timeless jewels' data, once made (a source that fails, as on
     /// a missing data file, is asked again next time)
-    timeless: RefCell<Option<std::sync::Arc<engine::timeless::Timeless>>>,
+    timeless: Mutex<Option<std::sync::Arc<engine::timeless::Timeless>>>,
     /// The unique and rare item databases, once asked for
     item_dbs: (
-        std::cell::OnceCell<item_db::ItemDb>,
-        std::cell::OnceCell<item_db::ItemDb>,
+        std::sync::OnceLock<item_db::ItemDb>,
+        std::sync::OnceLock<item_db::ItemDb>,
     ),
     /// `main.uniqueDB.byTitle`, once asked for
-    unique_titles: std::cell::OnceCell<item_db::ItemDb>,
+    unique_titles: std::sync::OnceLock<item_db::ItemDb>,
 }
 
-pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless>;
+pub type TimelessSource = dyn Fn(&ModParser) -> Result<engine::timeless::Timeless> + Send + Sync;
 
 impl TypedData {
     pub fn new(game: GameData, parser: ModParser, source: Box<TreeSource>) -> Result<TypedData> {
@@ -112,7 +114,7 @@ impl TypedData {
             game,
             parser,
             socket_ids: Vec::new(),
-            trees: RefCell::default(),
+            trees: Mutex::default(),
             source,
             timeless_source: None,
             timeless: Default::default(),
@@ -134,7 +136,7 @@ impl TypedData {
     /// tree must be there; other tree versions and the timeless jewels'
     /// data are read when a build first needs them, and a missing one is
     /// recorded in `files` so the caller can add it and retry.
-    pub fn from_files(files: std::rc::Rc<crate::Files>) -> Result<TypedData> {
+    pub fn from_files(files: crate::Files) -> Result<TypedData> {
         use crate::bundle::{GAME_DATA, MOD_PARSER};
         let read = |path: &str| {
             files
@@ -156,7 +158,7 @@ impl TypedData {
         let mut data = TypedData::new(game, parser, Box::new(source))?;
         files.remove(GAME_DATA);
         files.remove(MOD_PARSER);
-        let timeless = (*files).clone();
+        let timeless = files.clone();
         data.timeless_source = Some(Box::new(move |_: &ModParser| {
             crate::bundle::decode_timeless(&timeless)
         }));
@@ -171,33 +173,36 @@ impl TypedData {
         let game = src.game_data()?;
         let parser = src.mod_parser()?;
         let latest = game.latest_tree_version().to_string();
-        let src = std::rc::Rc::new(src);
-        let trees = src.clone();
+        let trees = src.tree_loader()?;
         let source = move |v: &str, p: &ModParser| trees.tree(v, p, v == latest);
         let mut data = TypedData::new(game, parser, Box::new(source))?;
-        data.timeless_source = Some(Box::new(move |p: &ModParser| src.timeless(p)));
+        let dir = src.src_dir.clone();
+        data.timeless_source = Some(Box::new(move |p: &ModParser| gamedata::timeless(&dir, p)));
         Ok(data)
     }
 
     /// A tree version's passive tree, loaded once. Trees live as long as
     /// the process, as builds borrow them.
     pub fn tree(&self, version: &str) -> Result<&'static PassiveTree> {
-        if let Some(t) = self.trees.borrow().get(version) {
+        // Held while a tree loads, so each is loaded once
+        let mut trees = self.trees.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(t) = trees.get(version) {
             return Ok(t);
         }
         let tree: &'static PassiveTree = Box::leak(Box::new((self.source)(version, &self.parser)?));
-        self.trees.borrow_mut().insert(version.to_string(), tree);
+        trees.insert(version.to_string(), tree);
         Ok(tree)
     }
 
     /// The timeless jewels' data, if the session has a source of it
     fn timeless(&self) -> Option<std::sync::Arc<engine::timeless::Timeless>> {
-        if let Some(t) = &*self.timeless.borrow() {
+        let mut timeless = self.timeless.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(t) = &*timeless {
             return Some(t.clone());
         }
         let f = self.timeless_source.as_ref()?;
         let t = std::sync::Arc::new(f(&self.parser).ok()?);
-        *self.timeless.borrow_mut() = Some(t.clone());
+        *timeless = Some(t.clone());
         Some(t)
     }
 
@@ -269,6 +274,7 @@ impl Default for Ui {
 }
 
 /// A build on the typed engine
+#[derive(Clone)]
 pub struct TypedSession<'d> {
     data: &'d TypedData,
     build: Build<'d>,
@@ -478,6 +484,14 @@ impl<'d> TypedSession<'d> {
     }
 
     /// `outputs`: the sidebar calculation's player and minion outputs
+    /// The sidebar calculation's outputs, the player's and the minion's
+    pub fn output(&self) -> engine::calculator::CalcOutput {
+        engine::calculator::CalcOutput {
+            player: self.main.player.clone(),
+            minion: self.main.minion.clone(),
+        }
+    }
+
     pub fn outputs(&self) -> J {
         let mut o = Map::new();
         let mut player = output(&self.main.player);
@@ -676,3 +690,9 @@ pub fn gem_slots_enable_path(path: &str) -> bool {
 pub fn gem_slots_quality_path(path: &str) -> bool {
     gem_slots::parse(path).is_some_and(|(_, part)| part == "Quality")
 }
+
+/// The data is shared by threads
+const _: fn() = || {
+    fn shared<T: Send + Sync>() {}
+    shared::<TypedData>();
+};

@@ -6,7 +6,7 @@
 use crate::read::{DIFF_STATS, node_label, short};
 use crate::text::{LINE_CAP, NAME_CAP, clean, plain};
 use crate::{
-    Agent, BuildId, Change, Event, Grant, Open, R, Step, Store, UNDO_DEPTH, Undo, Who,
+    Agent, BuildId, Change, Event, Grant, Names, Open, R, Step, Store, UNDO_DEPTH, Undo, Who,
     check_fields, cmd, need_str, opt_bool, opt_str, opt_u64,
 };
 use serde_json::{Value as J, json};
@@ -37,7 +37,7 @@ const CHANGES: &[(&str, &[&str])] = &[
 /// An item's text cap
 pub(crate) const ITEM_CAP: usize = 20_000;
 /// Changes in one `apply`
-const MAX_CHANGES: usize = 200;
+pub(crate) const MAX_CHANGES: usize = 200;
 /// A label's cap
 const LABEL_CAP: usize = 200;
 
@@ -119,7 +119,7 @@ impl<'d, S: Store> Agent<'d, S> {
             let mut labels = Vec::new();
             let mut done = Vec::new();
             for c in changes {
-                match agent.change(&mut o.session, c) {
+                match agent.names.change(&mut o.session, c) {
                     Ok((label, d)) => {
                         labels.push(label);
                         done.push(d);
@@ -342,9 +342,11 @@ impl<'d, S: Store> Agent<'d, S> {
             "note": "a build of the agent directory: edit it freely; the user keeps it or cleans it up",
         }))
     }
+}
 
+impl Names {
     /// Runs one change: its label and what it did
-    fn change(&mut self, s: &mut Dispatcher<'d>, c: &J) -> R<(String, J)> {
+    pub(crate) fn change(&mut self, s: &mut Dispatcher, c: &J) -> R<(String, J)> {
         match c["verb"].as_str().unwrap_or_default() {
             "allocate" => allocate(s, &c["nodes"], true),
             "deallocate" => allocate(s, &c["nodes"], false),
@@ -391,7 +393,7 @@ impl<'d, S: Store> Agent<'d, S> {
                     .iter()
                     .map(|g| g.as_str().map(String::from).ok_or("a gem is its name"))
                     .collect::<Result<_, _>>()?;
-                let known = self.gem_names(s)?;
+                let known = self.gems(s)?;
                 for g in &gems {
                     if !known.contains(g) {
                         return Err(format!(
@@ -558,7 +560,7 @@ impl<'d, S: Store> Agent<'d, S> {
         }
     }
 
-    fn set_gem(&mut self, s: &mut Dispatcher<'d>, c: &J) -> R<(String, J)> {
+    fn set_gem(&mut self, s: &mut Dispatcher, c: &J) -> R<(String, J)> {
         let g = group(c)?;
         let skills = cmd(s, json!({ "cmd": "skills" }))?;
         check_group(&skills, g)?;
@@ -575,7 +577,7 @@ impl<'d, S: Store> Agent<'d, S> {
         let mut e = json!({ "cmd": "setGem", "group": g, "gem": k });
         let mut what = Vec::new();
         if let Some(name) = opt_str(c, "name")? {
-            if !self.gem_names(s)?.contains(name) {
+            if !self.gems(s)?.contains(name) {
                 return Err(format!(
                     "no gem {name:?}; `search` with kind `gems` finds them"
                 ));
@@ -621,9 +623,9 @@ impl<'d, S: Store> Agent<'d, S> {
     }
 
     /// A gem's name as answers give it
-    fn gem_name(&mut self, s: &mut Dispatcher<'d>, gem: &J) -> R<String> {
+    fn gem_name(&mut self, s: &mut Dispatcher, gem: &J) -> R<String> {
         let name = gem["name"].as_str().unwrap_or_default();
-        Ok(if self.gem_names(s)?.contains(name) {
+        Ok(if self.gems(s)?.contains(name) {
             name.to_string()
         } else {
             "a gem the engine doesn't know".into()
@@ -700,12 +702,12 @@ pub(crate) fn diff(
     (lines, trailers)
 }
 
-fn round(x: f64) -> f64 {
+pub(crate) fn round(x: f64) -> f64 {
     (x * 10.0).round() / 10.0
 }
 
 /// A number as answers show it: `2.41M`, `24.1k`, `312.5`
-fn num(x: f64) -> String {
+pub(crate) fn num(x: f64) -> String {
     let a = x.abs();
     if a >= 1e6 {
         format!("{:.2}M", x / 1e6)
@@ -787,8 +789,16 @@ fn pick(list: &J, want: &str, what: &str) -> R<usize> {
         .collect();
     names
         .iter()
-        .position(|n| plain(n).eq_ignore_ascii_case(want))
+        .position(|n| {
+            plain(n).eq_ignore_ascii_case(want)
+                || spaced(&plain(n)).eq_ignore_ascii_case(&spaced(want))
+        })
         .ok_or_else(|| format!("no {what} {want:?}; the choices: {}", names.join(", ")))
+}
+
+/// Words separated by single spaces, as answers show the game's choices
+pub(crate) fn spaced(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// A node a request names: its id, `#id`, `Name #id`, or a name only one
@@ -1042,7 +1052,7 @@ fn set_config(s: &mut Dispatcher, c: &J) -> R<(String, J)> {
 }
 
 /// A change in `apply`: a verb it takes, with that verb's fields
-fn check_change(c: &J) -> R<()> {
+pub(crate) fn check_change(c: &J) -> R<()> {
     let verb = c["verb"].as_str().ok_or("each change names its verb")?;
     let (_, fields) = CHANGES
         .iter()

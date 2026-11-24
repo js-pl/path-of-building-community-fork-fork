@@ -21,7 +21,7 @@ fn bundled_timeless_jewels_match_source() {
         files.insert(path, bytes);
     }
     let bundled: &'static TypedData = Box::leak(Box::new(
-        TypedData::from_files(files.clone()).unwrap_or_else(|e| panic!("{e}")),
+        TypedData::from_files((*files).clone()).unwrap_or_else(|e| panic!("{e}")),
     ));
     let source: &'static TypedData = Box::leak(Box::new(
         TypedData::from_source(&src).unwrap_or_else(|e| panic!("{e}")),
