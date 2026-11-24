@@ -585,7 +585,8 @@ above was silent:
   made them (the answer carries the build's `version`, so a client skips
   its own). They are the entries of `changes_since`. The UI re-renders on
   a change it didn't make. Host requests (`{"id", "host", "args"}`):
-  `builds`, `open`, `steps`, `history`, `restore`.
+  `builds`, `open`, `steps`, `history`, `restore`, `agents`, `keep`,
+  `clean`, `connections`, `disconnect`, `revoke`.
 - **The History tab** (on the host only): every change since the host
   opened the build, newest first, with who made it (`you`, the agent's
   connection), and an undo button naming the step it takes back
@@ -596,6 +597,19 @@ above was silent:
   after the user's waiting edits, so it can be undone too; a version
   equal to the build changes nothing and says so. Whether the user's
   latest edits still wait to be committed is shown.
+- **The Agents tab** (on the host only). The connections of the host's
+  registry (kind, connection, MCP client, grant, token, calls), looked at
+  again every 5 s, each with Disconnect and, for an HTTP one, Revoke
+  token, which revokes it in the tokens file and closes every connection
+  made with it at once. Below, the agent directories with their builds
+  and sizes (history included): Open shows one in the UI, Keep moves its
+  repository, with its history, among the user's builds (the next free
+  name when it's taken; the agent no longer reaches it), Clean up moves a
+  directory, or all of them, with what is left in it, to the builds'
+  `trash/` (a reserved name like `agents`), which only the user empties.
+  A client showing a build that moved follows it (or shows the first
+  build). Not yet: `pob agents clean` on the command line and `pob agent
+  --clean` (with step 5's container).
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),
