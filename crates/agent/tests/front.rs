@@ -367,6 +367,95 @@ fn author_text_stays_out(d: &'static TypedData) {
     }
 }
 
+/// The respec: swaps at a fixed number of points, each better, the final
+/// build's numbers the engine's, nothing changed
+fn respec_swaps(d: &'static TypedData) {
+    let mut a = agent(d, corpus(BUILD));
+    let g = grant();
+    let r = ok(
+        &mut a,
+        &g,
+        json!({
+            "verb": "respec", "objective": "dps", "points": 4, "steps": 2, "removals": 4,
+            "candidates": 6, "depth": 3, "stats": ["FullDPS", "Life"],
+            "constraints": ["keystones"], "wait": 120,
+        }),
+    );
+    assert_eq!(r["job"]["status"], "done", "{r}");
+    assert!(
+        r["claim"].as_str().unwrap().contains("not a proven best"),
+        "{r}"
+    );
+    let steps = r["steps"].as_array().unwrap();
+    assert!(!steps.is_empty(), "no swap improves: {r}");
+    let mut gain = 0.0;
+    for s in steps {
+        assert!(s["gain"].as_f64().unwrap() > gain, "{r}");
+        gain = s["gain"].as_f64().unwrap();
+        assert!(s["refunded"].as_u64().unwrap() <= 4, "{s}");
+    }
+    let f = &r["final"];
+    assert!(
+        f.get("points").is_none_or(|p| p.as_f64().unwrap() <= 0.0),
+        "{r}"
+    );
+    let changes = &r["apply"]["changes"];
+    let player = applied(d, changes);
+    let base = applied(d, &json!([]));
+    assert_eq!(f["values"][0], rounded(&player["FullDPS"]), "{r}");
+    assert_eq!(f["values"][1], rounded(&player["Life"]), "{r}");
+    assert!(player["FullDPS"].as_f64() > base["FullDPS"].as_f64(), "{r}");
+    // The keystones are kept
+    let mut b = agent(d, corpus(BUILD));
+    let before = ok(&mut b, &g, json!({ "verb": "tree" }))["keystones"].clone();
+    ok(&mut b, &g, json!({ "verb": "apply", "changes": changes }));
+    assert_eq!(
+        ok(&mut b, &g, json!({ "verb": "tree" }))["keystones"],
+        before,
+        "{r}"
+    );
+    assert_eq!(a.store().log(&BuildId::user("RF"), 10).unwrap().len(), 1);
+}
+
+/// The keystone constraints, checked on `eval`'s rows
+fn keystone_constraints(d: &'static TypedData) {
+    let mut a = agent(d, corpus(BUILD));
+    let g = grant();
+    let r = ok(
+        &mut a,
+        &g,
+        json!({
+            "verb": "eval", "variants": [[{ "verb": "set_level", "level": 90 }]],
+            "constraints": [{ "keystone": "Not A Keystone" }, "keystones"],
+        }),
+    );
+    let breaks = r["rows"][0]["breaks"].as_array().unwrap();
+    assert_eq!(breaks.len(), 1, "{r}");
+    assert!(breaks[0].as_str().unwrap().contains("not allocated"), "{r}");
+    let tree = ok(&mut a, &g, json!({ "verb": "tree" }));
+    let k = tree["keystones"].as_array().and_then(|l| l.first());
+    assert!(k.is_some(), "the build has a keystone: {tree}");
+    if let Some(k) = k {
+        let name = k.as_str().unwrap().split(" #").next().unwrap().to_string();
+        let r = ok(
+            &mut a,
+            &g,
+            json!({
+                "verb": "eval", "variants": [[{ "verb": "deallocate", "nodes": [k] }]],
+                "constraints": ["keystones", { "keystone": name }],
+            }),
+        );
+        assert_eq!(r["rows"][0]["breaks"].as_array().unwrap().len(), 2, "{r}");
+    }
+}
+
+#[test]
+fn respec() {
+    let d = data();
+    respec_swaps(d);
+    keystone_constraints(d);
+}
+
 #[test]
 fn front_and_dominating() {
     let d = data();

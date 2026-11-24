@@ -187,6 +187,10 @@ pub(crate) struct Outcome {
     pub warnings: Vec<String>,
     /// The passive points used
     pub points: Option<f64>,
+    /// The allocated nodes, by id, in order
+    pub alloc: Vec<u32>,
+    /// The allocated keystones, by name
+    pub keystones: Vec<String>,
 }
 
 impl Outcome {
@@ -427,11 +431,27 @@ fn evaluate(names: &mut Names, s: &mut Dispatcher, changes: &[J]) -> R<Outcome> 
     let gems = names.gems(s)?.clone();
     let uniques = names.uniques(s)?.clone();
     let warnings = warnings_of(&state, &outputs["player"], &gems, &uniques);
+    let (mut alloc, mut keystones) = (Vec::new(), Vec::new());
+    if let Some(b) = s.typed_build() {
+        for (i, n) in b.spec.nodes.iter().enumerate() {
+            if n.alloc {
+                alloc.push(n.id);
+                let tn = b.spec.tree_node(i);
+                if tn.kind == engine::tree::NodeType::Keystone {
+                    keystones.push(tn.dn.to_string());
+                }
+            }
+        }
+    }
+    alloc.sort_unstable();
+    keystones.sort();
     Ok(Outcome {
         labels,
         out,
         warnings,
         points: state["points"]["used"].as_f64(),
+        alloc,
+        keystones,
     })
 }
 
