@@ -126,10 +126,17 @@ oracle/  upstream itself, headless on LuaJIT: committed outputs and a live sessi
   history and serves agents an MCP endpoint. The browser-only way,
   engine in the workers, stays as it is. Built so far: `pob host
   --headless` (`crates/host`), the builds and the agent API on a control
-  socket for `pob ctl`, and as MCP: on stdio through `pob mcp`, and over
-  HTTP with tokens; `pob host` without `--headless` serves the web app,
-  which then uses the host's WebSocket instead of its workers, and every
-  change, the UI's or an agent's, reaches every client as a change event.
+  socket for `pob ctl` (a named pipe on Windows), and as MCP: on stdio
+  through `pob mcp`, and over HTTP with tokens; `pob host` without
+  `--headless` serves the web app, which then uses the host's WebSocket
+  instead of its workers, and every change, the UI's or an agent's,
+  reaches every client as a change event.
+- **The default agent container** (`container/`, `crates/proxy`,
+  [agent.md](agent.md#built-the-default-container)). `pob agent
+  claude|codex` runs the harness in Podman with defensive defaults, its
+  only way out a proxy container (`pob-proxy`) that allows the harness's
+  hosts and routes to the host's MCP endpoint; nothing of PoB's is
+  mounted.
 - **Build history** (`crates/history`, [history.md](history.md)). Every
   version of a build in a git repository of its own, written with the
   installed git; optional, without git nothing is recorded. Its git is

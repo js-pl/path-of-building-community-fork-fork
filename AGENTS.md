@@ -11,7 +11,7 @@ See `docs/design.md` before making architectural decisions.
   - `session`: the engine API (build sessions answering JSON commands) and
     the native and oracle `Session`s the tests compare it with
   - `wasm` (C ABI for the browser), `cli` (`pob`: serve, bundle, bench,
-    history, settings, host, ctl, mcp, agents)
+    history, settings, host, ctl, mcp, agents, agent)
   - `history` (a build's versions, one git repository per build, written
     with the installed git; optional), see `docs/history.md`
   - `settings` (the app's `settings.json`, e.g. the history's git), see
@@ -19,10 +19,13 @@ See `docs/design.md` before making architectural decisions.
   - `agent` (the agent API: build-level verbs on the session, grants,
     agent directories, author text kept apart; no I/O), see `docs/agent.md`
   - `host` (`pob host`: the builds directory with its history, the
-    control socket `pob ctl` and `pob mcp` call, the agent API as MCP on
-    stdio and over HTTP with tokens, and, without `--headless`, the web
-    app with its WebSocket for the engine API and change events), see
-    `docs/agent.md`
+    control socket `pob ctl` and `pob mcp` call (a named pipe on
+    Windows), the agent API as MCP on stdio and over HTTP with tokens,
+    and, without `--headless`, the web app with its WebSocket for the
+    engine API and change events), see `docs/agent.md`
+  - `proxy` (`pob-proxy`, the default agent container's way out: an HTTPS
+    allowlist and the route to the host's MCP endpoint; std only, its
+    manifest self-contained so it builds alone in the image)
   - `importer` (reads upstream's data and ModParser tables at build time),
     `gamedata` (the engine's typed game data from the importer's tables, in
     `engine::codec`'s binary form)
@@ -30,6 +33,8 @@ See `docs/design.md` before making architectural decisions.
     order, patterns, number formatting), `luai` (the interpreter the
     importer runs upstream's data files with)
   - `equivalence` (tests against the oracle), `testkit` (sharded test runs)
+- `container/` holds the default agent container `pob agent` builds (the
+  Containerfile, the harnesses' allowlists) and its Podman smoke tests
 - `upstream/PathOfBuilding` is upstream PoB Community as a submodule, pinned to a commit on upstream `dev`; never edit it
 - `docs/` holds design decisions; `docs/drop-translation.md` records how
   the translation of upstream's program was removed

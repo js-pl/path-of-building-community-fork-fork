@@ -8,11 +8,13 @@ which reshaped `session::dispatch`, is done. Step 3, the verbs
 (`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
 done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
-install` ([below](#built-mcp)), is done. Step 6, the web app on the
-host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the mod
-weights and `evaluate_item` ([below](#built-evaluate_item)), is done. Step
-8, `eval`, `assumptions`, objectives, constraints, the generators, `best`
-and `improve` ([below](#built-eval-and-assumptions)), is done.
+install` ([below](#built-mcp)), is done. Step 5, the default container
+and `pob agent` ([below](#built-the-default-container)) with the
+control socket's named pipe on Windows, is done. Step 6, the web app on
+the host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the
+mod weights and `evaluate_item` ([below](#built-evaluate_item)), is done.
+Step 8, `eval`, `assumptions`, objectives, constraints, the generators,
+`best` and `improve` ([below](#built-eval-and-assumptions)), is done.
 
 ## The question
 
@@ -278,15 +280,21 @@ can reach.
   user can open, and the web app is served on `127.0.0.1` as elsewhere.
 - **The default container** runs on Podman machine, in WSL 2. The agent
   and proxy containers are the same Linux images as everywhere.
-- **Reaching the host.** In WSL's mirrored networking mode (Windows 11
-  22H2 and later), WSL shares the host's `127.0.0.1`, so the endpoint can
-  stay on loopback. As far as we know NAT is still WSL's default and
-  mirrored is opted into in `.wslconfig`; to be checked against
-  Microsoft's current docs. In NAT mode the proxy reaches the host
-  through `host.containers.internal`, which lands on the WSL virtual
-  adapter, so the endpoint listens on that adapter's address only, never
-  on all interfaces. `pob agent` detects the mode and sets the endpoint
-  up accordingly. Both modes need testing before Windows is called
+- **Reaching the host.** NAT is WSL's default networking mode; mirrored
+  (Windows 11 22H2 and later) is opted into with `networkingMode=mirrored`
+  in `.wslconfig`'s `[wsl2]` section (checked November 2026: Microsoft
+  Learn, [Accessing network applications with
+  WSL](https://learn.microsoft.com/en-us/windows/wsl/networking), "by
+  default, WSL uses a NAT based architecture"; and the [WSL September 2023
+  update](https://devblogs.microsoft.com/commandline/windows-subsystem-for-linux-september-2023-update/),
+  where any other value means NAT). So `pob agent` is built for NAT: the
+  Windows side of the WSL adapter is the podman machine's default
+  gateway, and `pob agent` forwards a port on that address only (never
+  all interfaces) to the endpoint on `127.0.0.1`; the proxy routes to it.
+  `host.containers.internal` isn't used: on Windows it doesn't reliably
+  name the host. With mirrored mode on, `pob agent` stops and says so
+  (`--no-container` still works); supporting it is a later step. Both
+  need testing on a real Windows machine before Windows is called
   supported.
 - **The terminal.** `pob agent claude` works from Windows Terminal or
   PowerShell.
@@ -760,6 +768,113 @@ claude mcp add --transport http pob http://127.0.0.1:8731/mcp \
   --header "Authorization: Bearer pob_..."
 ```
 
+### Built: the default container
+
+Step 5: `container/` (the Containerfile and the allowlists), `crates/proxy`
+(`pob-proxy`) and `pob agent` (`crates/cli/src/container.rs`). Decided
+where the design above was silent:
+
+- **Two images from one Containerfile**, `pob-agent:<tag>` (`--target
+  agent`) and `pob-proxy:<tag>` (`--target proxy`), built locally with
+  Podman from the build context `pob` carries (the Containerfile, the
+  allowlists, the proxy's source), so an installed `pob` needs no
+  checkout. The tag is a hash of that context: a `pob` with other pinned
+  versions builds its own images, and otherwise nothing is rebuilt until
+  `--rebuild` (which pulls the bases again and ignores the cache). The
+  agent image is `node:24-trixie-slim` with Claude Code 2.1.330 and Codex
+  0.171.0 pinned, git, ripgrep, python3, curl and jq; the harness runs as
+  the image's `node` user (uid 1000), with its updater and nonessential
+  traffic off (`DISABLE_AUTOUPDATER`,
+  `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`). The proxy image is
+  `pob-proxy` on `debian:trixie-slim`, as uid 65534.
+- **The agent container:** `--read-only`, `--cap-drop all`,
+  `no-new-privileges`, Podman's default seccomp profile, `/tmp` a 1 GB
+  tmpfs, `--memory 4g --cpus 2 --pids-limit 512`. Two named volumes and
+  nothing else: `pob-login-<harness>` on the home directory (the login
+  and the harness's settings, kept across runs; `--reset-login` removes
+  it) and `pob-scratch-<harness>` on `/work`. No host path is mounted.
+- **The network:** a network per run, `pob-agent-<pid>`, `--internal`
+  (no route out) and without DNS (its resolver would have no upstream;
+  the agent needs none, as the proxy resolves names). The proxy is on it
+  and on Podman's default network; the agent finds it as `pob-proxy`
+  through `--add-host`. The harness's `HTTPS_PROXY` is
+  `http://pob-proxy:3128`; its MCP endpoint is
+  `http://pob-proxy:8731/mcp`.
+- **`pob-proxy`** (std only, a thread per connection, 256 at a time)
+  answers `CONNECT host:port` for the hosts of the harness's allowlist
+  (`/etc/pob-proxy/<harness>.txt`, plus `--allow <host>` from `pob
+  agent`), nothing else. Plain HTTP requests, other hosts and ports, and
+  names that resolve only to internal addresses (loopback, private,
+  link-local, CGNAT, unique local) get a 403, which it logs. An entry is
+  `host`, `host:port` (443 by default) or `*.domain`. The lists name the
+  API and login hosts: `api.anthropic.com`, `claude.ai`, `claude.com`,
+  `platform.claude.com` and `console.anthropic.com` for Claude Code;
+  `api.openai.com`, `auth.openai.com` and `chatgpt.com` for Codex. Its
+  route (`--route 0.0.0.0:8731=<upstream>`) passes bytes to the host's
+  endpoint, which checks the token, so a route to it carries no more
+  than the token does.
+- **The route to the host, per platform.**
+  - On Linux, `pob agent` listens on a Unix socket in
+    `$XDG_RUNTIME_DIR/pob-agent-<pid>/`, mounted into the proxy alone,
+    and forwards it to `127.0.0.1:8731`. That avoids
+    `host.containers.internal`, which rootless bridge networks don't
+    reliably route to the host's loopback. The proxy runs with
+    `label=disable`, because SELinux would refuse its connection to a
+    socket of a process outside. It runs only `pob-proxy`, never the
+    agent's code.
+  - On macOS, the route is to `host.containers.internal:8731`, which the
+    podman machine's gvproxy maps to the Mac's loopback.
+  - On Windows (WSL NAT), see [Windows](#windows).
+- **The token:** `pob agent` mints one for the run, named after the
+  harness (`claude-code` or `codex`, the commits' `Source: agent <name>`)
+  with the builds of `--build` and a new agent directory (or `--agent`).
+  It passes the token to the container in `POB_TOKEN`, from its own
+  environment, so the token is on no command line. Claude Code gets
+  `--mcp-config` with an `Authorization` header, which the container's
+  shell fills from `POB_TOKEN`. Codex gets `-c
+  mcp_servers.pob.url=...` and `bearer_token_env_var="POB_TOKEN"`. The
+  token is **revoked when `pob agent` ends** (decided), and the host
+  closes its sessions. If `pob agent` is killed, its token stays until
+  `pob agents revoke`; `pob agents tokens` lists it.
+- **The host:** `pob agent` starts one when none answers on the control
+  socket (as `pob mcp` does), waits for its MCP endpoint (`--endpoint`,
+  `127.0.0.1:8731` by default), and says so if the host stops or serves
+  no MCP over HTTP.
+- **`--no-container`** runs the harness in this terminal with `pob mcp`
+  on stdio (`claude --mcp-config` or `codex -c mcp_servers.pob.*`), after
+  saying it is not sandboxed. `--exec -- <command>` runs a command in the
+  container instead of the harness (a shell, or the smoke test).
+  Arguments after `--` otherwise go to the harness.
+- **Podman only** for now (`POB_PODMAN` names another binary). Without
+  Podman, `pob agent` says how to install it or to use `--no-container`.
+- Not built yet: `--clean` (removing the agent directory when the run
+  ends: the host cleans up only from the UI's Agents tab so far, so it
+  needs `pob agents clean` on the control socket first); the Agents tab's
+  "unsandboxed" mark for `--no-container` connections; Docker; WSL's
+  mirrored mode; changing the defaults in the host's config (today they
+  are fixed, except `--allow`).
+
+The commands, on each platform:
+
+```sh
+# Linux: Podman (rootless) from the distribution
+pob agent claude --build RF            # or: pob agent codex --build RF
+# macOS: Podman Desktop or `brew install podman`, then once:
+podman machine init && podman machine start
+pob agent claude --build RF
+# Windows (PowerShell or Windows Terminal): Podman for Windows on WSL 2
+# (NAT, WSL's default), then once:
+podman machine init; podman machine start
+pob agent claude --build RF
+# anywhere: the harness here, unsandboxed
+pob agent claude --build RF --no-container
+```
+
+The first run builds the images (a few minutes). Logging in is the
+harness's own, inside the container: Claude Code prints a URL and takes
+the code back; Codex logs in with `codex login --device-auth` (run `pob
+agent codex --exec -- codex login --device-auth` once).
+
 ### Evaluating
 
 The primitive every comparison is built on:
@@ -1130,7 +1245,19 @@ starts: read GGG's developer docs and terms from the source.
 - **The default container:** from inside it, the host's files and the
   control socket are absent, the root filesystem is read-only, and every
   host but the agent endpoint and the harness's allowlist is unreachable;
-  on Linux, macOS and Windows, there in both WSL networking modes.
+  on Linux, macOS and Windows, there in both WSL networking modes. Built
+  for Linux: `container/smoke.sh` (the images, and from inside: not root,
+  no capabilities, a read-only root filesystem, the harnesses installed,
+  HTTPS to an allowed host and nowhere else, no route out) and
+  `container/smoke-agent.sh` (`pob agent --exec` end to end: MCP through
+  the route with the token, another token refused, no host files, the
+  token revoked after), both on CI's `container` job (Ubuntu's rootless
+  Podman). The proxy's allowlist, CONNECT parsing and route have unit
+  tests (`crates/proxy`), as do `pob agent`'s arguments, harness configs,
+  `.wslconfig` reading and the token's lifecycle (`crates/cli`). macOS
+  and Windows are untested: by hand, run `container/smoke.sh` and
+  `container/smoke-agent.sh target/release/pob` there (Git Bash or WSL on
+  Windows for the scripts) and `pob agent claude --build <b>`.
 - **End to end:** Playwright drives the web app on a host while a script
   runs `pob ctl`; the agent's edit shows in the tree, the sidebar and the
   undo list.
@@ -1153,7 +1280,8 @@ Each one a PR, as usual:
    agents install`: any harness works on a build. Done (#194, #196,
    #197); the Windows named pipe came with step 5.
 5. The default container: the Containerfile, the proxy, `pob agent`, on
-   Linux, macOS and Windows.
+   Linux, macOS and Windows; the control socket's named pipe on Windows.
+   Done (#207, #200, #212); tested on Linux, macOS and Windows not yet.
 6. The web app on the host: the host serves it, the WebSocket transport in
    `client.ts`, change events, the undo list with sources, the history
    with restore, the agent directories with keep and clean. Done
@@ -1187,13 +1315,20 @@ Each one a PR, as usual:
 - `core.bin` is never published.
 - Trade and prices are deferred.
 - `pob agent` uses the default Podman container; `--no-container` is the
-  explicit override.
+  explicit override. Its token is for the run alone, revoked when it ends.
 - The backup push is optional, off by default.
 - The host is a second way to run the app, recorded in design.md.
 - Cloud sessions are deferred.
 
 ## Questions for the owner
 
-- **WSL's default networking mode.** The Windows section assumes NAT is
-  still the default and mirrored is opt-in; to be checked against
-  Microsoft's current docs before step 5's Windows work.
+- **WSL's mirrored mode.** NAT is WSL's default (answered, see
+  [Windows](#windows)); `pob agent` supports NAT and stops on mirrored.
+  Worth supporting mirrored, and how much Windows testing (a real
+  machine, or a Windows runner with nested virtualisation) is wanted
+  before Windows is called supported?
+- **The harnesses' hosts.** The allowlists hold the API and login hosts
+  only; MCP servers of the user's own, web fetches and package installs
+  in the container are refused unless `--allow`ed. Is that the default
+  wanted, or should the lists grow (e.g. npm and PyPI for the agent's
+  scripts)?
