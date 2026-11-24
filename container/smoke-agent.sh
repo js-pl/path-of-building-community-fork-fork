@@ -11,12 +11,15 @@ set -eu
 pob=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 root=$(cd "$(dirname "$0")/.." && pwd)
 data=$(mktemp -d)
-export XDG_DATA_HOME="$data" POB_SETTINGS="$data/settings.json"
-mkdir -p "$data/path-of-building-fork-fork/builds/RF"
-cp "$root/corpus/generated/gen-0003.xml" "$data/path-of-building-fork-fork/builds/RF/build.xml"
+# The host's files in a directory of their own (not XDG_DATA_HOME, which
+# rootless Podman keeps its images under)
+export POB_SETTINGS="$data/settings.json" POB_BUILDS="$data/builds" \
+    POB_SOCKET="$data/run/control.sock" POB_TOKENS="$data/tokens.json"
+mkdir -p "$data/builds/RF"
+cp "$root/corpus/generated/gen-0003.xml" "$data/builds/RF/build.xml"
 cleanup() {
     pkill -f "$pob host --headless" 2>/dev/null || true
-    rm -rf "$data"
+    rm -rf "$data" 2>/dev/null || true
 }
 trap cleanup EXIT
 
