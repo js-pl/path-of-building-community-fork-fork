@@ -72,6 +72,8 @@ pub struct Host<'d> {
     pub registry: Option<std::sync::Arc<crate::connections::Registry>>,
     /// The tokens, for the UI's revoke
     pub tokens: Option<crate::tokens::Tokens>,
+    /// The settings file, for the UI's Options
+    pub settings: Option<std::path::PathBuf>,
 }
 
 type R<T> = Result<T, String>;
@@ -108,6 +110,7 @@ impl<'d> Host<'d> {
             default_build: None,
             registry: None,
             tokens: None,
+            settings: None,
         }
     }
 
@@ -379,6 +382,29 @@ impl<'d> Host<'d> {
                 let closed = self.registry.as_ref().map_or(0, |r| r.disconnect_token(t));
                 json!({ "revoked": t, "closed": closed })
             }
+            "settings" => {
+                let path = self.settings.as_ref().ok_or("no settings file")?;
+                let s = settings::Settings::load(path).map_err(|e| e.to_string())?;
+                self.settings_json(path, &s)?
+            }
+            "setSettings" => {
+                let path = self.settings.clone().ok_or("no settings file")?;
+                let mut s = settings::Settings::load(&path).map_err(|e| e.to_string())?;
+                for (key, field) in [
+                    ("history.enabled", "enabled"),
+                    ("history.git", "git"),
+                    ("history.gitConfig", "gitConfig"),
+                ] {
+                    let v = match &req[field] {
+                        J::Null => continue,
+                        J::String(t) => t.clone(),
+                        v => v.to_string(),
+                    };
+                    s.set(key, &v).map_err(|e| e.to_string())?;
+                }
+                s.save(&path).map_err(|e| e.to_string())?;
+                self.settings_json(&path, &s)?
+            }
             "open" => {
                 let name = req["build"].as_str().ok_or("open names a build")?;
                 let id = parse_name(name)?;
@@ -391,6 +417,25 @@ impl<'d> Host<'d> {
             other => return Err(format!("no host request {other:?}")),
         };
         Ok(json!({ "ok": ok }))
+    }
+
+    /// The history's settings, what git they give, and whether the host
+    /// keeps a history now (settings take effect when it starts)
+    fn settings_json(&self, path: &std::path::Path, s: &settings::Settings) -> R<J> {
+        let h = &s.history;
+        let git = match h.git() {
+            Ok(Some(g)) => json!({ "ok": format!("{} ({})", g.program().display(), g.version()) }),
+            Ok(None) => json!({ "ok": "off" }),
+            Err(e) => json!({ "error": e.to_string() }),
+        };
+        Ok(json!({
+            "file": path.display().to_string(),
+            "enabled": h.enabled,
+            "git": h.git,
+            "gitConfig": h.git_config,
+            "found": git,
+            "active": self.agent.store().has_history(),
+        }))
     }
 
     /// The agent directories with their builds and sizes

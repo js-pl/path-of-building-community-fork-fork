@@ -8,9 +8,11 @@ which reshaped `session::dispatch`, is done. Step 3, the verbs
 (`crates/agent`, [below](#built-crates-agent)) and `pob host --headless`
 with `pob ctl` (`crates/host`, [below](#built-the-headless-host)), is
 done. Step 4, MCP on stdio and over HTTP with tokens and `pob agents
-install` ([below](#built-mcp)), is done. Step 10, the mod weights and
-`evaluate_item` ([below](#built-evaluate_item)), is done. Step 8 is being
-built: `eval` and `assumptions` are done ([below](#built-eval-and-assumptions)).
+install` ([below](#built-mcp)), is done. Step 6, the web app on the
+host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the mod
+weights and `evaluate_item` ([below](#built-evaluate_item)), is done. Step
+8 is being built: `eval` and `assumptions` are done
+([below](#built-eval-and-assumptions)).
 
 ## The question
 
@@ -549,7 +551,7 @@ above was silent:
 
 ### Built: the web app on the host
 
-`pob host` without `--headless` (step 6, first part):
+`pob host` without `--headless` (step 6):
 
 - **Serving.** The built `web/` bundle (`npm run build`; `--app <dir>`,
   `POB_APP`, else `web/dist` of this checkout) on `127.0.0.1:8730`
@@ -613,6 +615,17 @@ above was silent:
   A client showing a build that moved follows it (or shows the first
   build). Not yet: `pob agents clean` on the command line and `pob agent
   --clean` (with step 5's container).
+- **Options** (on the host only, a button in the top bar): a dialog laid
+  out like upstream's Options popup (`main:OpenOptionsPopup`: a header
+  per section, labels right-aligned before their controls, Save and
+  Cancel), with one section so far, the build history: `history.enabled`,
+  `history.git` and `history.gitConfig` from `crates/settings`, written to
+  the settings file (`settings`, `setSettings`), with the git they give
+  (or why none) and whether the running host keeps a history. They take
+  effect when the host starts again.
+- Not in step 6: `ui_context` and several open builds in one client
+  (step 7); a token's default build is still none, not the build the UI
+  shows.
 - Tests: `crates/host/tests/web.rs` (the key and origin guards, a UI and
   an agent client on one build, the events' order, `changes_since`, the
   history), `web/tests/client.test.mjs` (the transport switch),
@@ -1070,7 +1083,8 @@ Each one a PR, as usual:
    Linux, macOS and Windows.
 6. The web app on the host: the host serves it, the WebSocket transport in
    `client.ts`, change events, the undo list with sources, the history
-   with restore, the agent directories with keep and clean.
+   with restore, the agent directories with keep and clean. Done
+   ([below](#built-the-web-app-on-the-host)).
 7. `ui_context` and several open builds.
 8. `eval`, `assumptions`, objectives, constraints, the generators, `best`
    and `improve`.

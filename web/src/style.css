@@ -1039,3 +1039,41 @@ label.inline {
 .agents-tab .agent-dir {
   margin: 8px 0 16px;
 }
+
+/* The Options dialog, after upstream's popup: a header per section, labels
+   right-aligned at 45% before their controls */
+.options-section {
+  text-align: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 3px 0;
+  margin: 10px 0 8px;
+  font-weight: 600;
+}
+.option-row {
+  display: grid;
+  grid-template-columns: 45% 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.option-row > span {
+  text-align: right;
+}
+.option-row input[type="checkbox"] {
+  justify-self: start;
+}
+.option-note {
+  margin-top: 10px;
+}
+.options-buttons {
+  justify-content: center;
+  margin-top: 14px;
+}
+.options-button {
+  margin-left: auto;
+  align-self: center;
+}
+.history-tab .versions td.muted:first-child {
+  white-space: nowrap;
+}

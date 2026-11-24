@@ -55,6 +55,15 @@ npm run dev
 npm test             # the wasm engine against the native one, `pob serve` (cargo build --release -p cli first)
 ```
 
+The web app on `pob host`, with the builds and their history on disk and
+agents beside you (see [docs/agent.md](docs/agent.md)):
+
+```sh
+(cd web && npm install && npm run build)   # web/dist; build:art first for the tree's art
+cargo run --release -p cli -- host          # serves it on 127.0.0.1:8730 and opens the browser
+target/release/pob agents install --build <build>   # Claude Code or Codex beside you
+```
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Contains a port of code from Path of Building
