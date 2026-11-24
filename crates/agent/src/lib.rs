@@ -297,21 +297,6 @@ impl<'d, S: Store> Agent<'d, S> {
         if !VERBS.iter().any(|(v, _)| *v == verb) {
             return Err(format!("no verb {verb:?}; the verbs: {}", verb_names()));
         }
-        // A request naming no build goes to the one the UI shows, when the
-        // grant covers it
-        let with_default;
-        let req = match self.default_build(grant) {
-            Some(b)
-                if req.get("build").is_none_or(J::is_null)
-                    && !matches!(verb, "builds" | "ui_context" | "import") =>
-            {
-                let mut r = req.clone();
-                r["build"] = json!(b);
-                with_default = r;
-                &with_default
-            }
-            _ => req,
-        };
         let build = req.get("build").and_then(J::as_str);
         match verb {
             "builds" => self.builds(grant),
@@ -465,7 +450,7 @@ impl<'d, S: Store> Agent<'d, S> {
         }
         Ok(json!({
             "builds": out,
-            "default": self.default_build(grant).or_else(|| grant.builds.first().cloned()),
+            "default": grant.builds.first(),
             "agent_directory": grant.dir,
         }))
     }

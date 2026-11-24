@@ -725,14 +725,14 @@ fn ui_context_and_the_default_build() {
     let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
     assert_eq!(r["ok"]["tab"], J::Null, "{r}");
 
-    // Another build shown: the selection goes, requests naming no build
-    // follow it
+    // Another build shown: the selection goes; requests naming no build
+    // stay on the grant's first
     host_req(&mut h, &out, "open", json!({ "build": "Other" }));
     let r = agent_call_h(&mut h, &grant, json!({ "verb": "ui_context" }));
     assert_eq!(r["ok"]["build"], "Other", "{r}");
     assert_eq!(r["ok"]["selection"], J::Null, "{r}");
     let r = agent_call_h(&mut h, &grant, json!({ "verb": "summary" }));
-    assert_eq!(r["ok"]["build"], "Other", "{r}");
+    assert_eq!(r["ok"]["build"], "RF", "{r}");
 
     // A hello asking for the UI's build is granted it, fixed then
     let (calls, _rx) = mpsc::channel();

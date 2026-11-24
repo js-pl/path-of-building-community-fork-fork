@@ -639,7 +639,7 @@ fn view(build: BuildId, tab: &str, selection: Option<J>) -> agent::ui::UiView {
 }
 
 /// `ui_context` within the grant, the author's text only under
-/// `untrusted`, and requests naming no build going to the UI's
+/// `untrusted`; the UI's build moves no request
 fn ui_context(d: &'static TypedData) {
     let mut a = agent(d, hostile());
     let g = grant();
@@ -711,20 +711,16 @@ fn ui_context(d: &'static TypedData) {
     );
     assert_eq!(ok(&mut a, &g, json!({ "verb": "summary" }))["build"], "RF");
     assert_eq!(ok(&mut a, &g, json!({ "verb": "builds" }))["default"], "RF");
-    // Within the grant: requests naming no build go to the UI's
+    // Within the grant too: the UI's build is told of, but requests
+    // naming no build stay on the grant's first (the UI moves no grant)
     let g2 = grant().with_build("Other");
     assert_eq!(
-        ok(&mut a, &g2, json!({ "verb": "summary" }))["build"],
+        ok(&mut a, &g2, json!({ "verb": "ui_context" }))["build"],
         "Other"
     );
+    assert_eq!(ok(&mut a, &g2, json!({ "verb": "summary" }))["build"], "RF");
     assert_eq!(
         ok(&mut a, &g2, json!({ "verb": "builds" }))["default"],
-        "Other"
-    );
-    let r = ok(&mut a, &g2, json!({ "verb": "set_level", "level": 77 }));
-    assert_eq!(r["build"], "Other", "{r}");
-    assert_eq!(
-        ok(&mut a, &g2, json!({ "verb": "summary", "build": "RF" }))["build"],
         "RF"
     );
     // A selection a client can't send

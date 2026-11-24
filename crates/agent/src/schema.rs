@@ -31,7 +31,7 @@ pub const UNTRUSTED_TEXT: &[&str] = &["notes", "items", "export", "evaluate_item
 fn build() -> J {
     json!({
         "type": "string",
-        "description": "a build of the grant by name, or agent/<name> in the agent directory; default: the build the UI shows when the grant has it, else the grant's first",
+        "description": "a build of the grant by name, or agent/<name> in the agent directory; default: the grant's first build",
     })
 }
 

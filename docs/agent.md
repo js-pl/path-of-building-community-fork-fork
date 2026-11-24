@@ -218,7 +218,7 @@ marked untrusted.
 3. **Tokens and grants** (new): an HTTP client's token names the builds it
    may read and edit, plus its agent directory. `pob agent` and `pob
    agents token --build <build>` make one; the default is the build the UI
-   shows. A stdio client gets the same kind of grant, chosen by
+   shows when the token is minted, fixed in it. A stdio client gets the same kind of grant, chosen by
    `pob mcp --build`. The UI lists connected agents and revokes one at
    once.
 4. **Change events** (new): the host tells every client when a build
@@ -367,7 +367,8 @@ keeps the damage small and the text from reading like instructions:
   looking at: the build, the tab, the selected or hovered node, item, gem
   or socket group. "Why is this node bad?" then needs no ids.
 - **Several builds.** The host can hold several open builds. Tools take an
-  optional build and default to the one the UI shows.
+  optional build and default to the grant's first; a grant made without
+  a build gets the one the UI shows when it is made, fixed from then on.
 
 ## Build history
 
@@ -719,12 +720,12 @@ Step 7's second part:
   author's text (the item's name, the group's label) only under
   `untrusted`. A build outside the caller's grant is not named, nor is
   its tab or selection.
-- **Requests naming no build** go to the build the UI shows when the
-  grant covers it (a user's build it names, or one in its agent
-  directory), else to the grant's first build as before; `builds` gives
-  that as `default`. The grant itself doesn't change.
-- **The default grant (decided: fixed when the connection is made or
-  the token minted, never following the UI).** `pob mcp` without
+- **The UI moves no grant (decided by the owner: the builds an agent
+  may edit are chosen when its session or token is made).**
+  `ui_context` reports what the UI shows, but a request naming no build
+  goes to the grant's first build whatever the UI shows, and nothing
+  the UI does widens a grant or moves it to another build.
+- **The default grant.** `pob mcp` without
   `--build` says `"ui_build": true` in its hello, and the host grants the
   user's build the UI shows at that moment (none when no UI shows one,
   or it shows an agent's build). `pob agents token` without `--build`
@@ -735,7 +736,7 @@ Step 7's second part:
   grants it (`--build`, a new token).
 - Tests: `ui_context` in `crates/agent/tests/verbs.rs` (each selection,
   the author's text under `untrusted` only, a build outside the grant,
-  requests naming no build), `ui_context_and_the_default_build` in
+  requests naming no build staying on the grant's first), `ui_context_and_the_default_build` in
   `crates/host/tests/web.rs` (the reports, the hellos with and without
   `ui_build`, the admin request), and the Skills tab's context in
   `web/tests/host-smoke.mjs`.

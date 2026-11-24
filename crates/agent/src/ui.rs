@@ -1,8 +1,8 @@
 //! What the user is looking at in the UI, as a host reports it: the build
 //! a client shows, its tab and what is selected or hovered there. The
-//! `ui_context` verb answers it within the caller's grant, and a request
-//! that names no build goes to the build the UI shows when the grant has
-//! it (docs/agent.md, "Live sync").
+//! `ui_context` verb answers it within the caller's grant (docs/agent.md,
+//! "Live sync"). It never widens or moves a grant: a request that names no
+//! build goes to the grant's first build, whatever the UI shows.
 
 use crate::read::node_label;
 use crate::text::{LINE_CAP, NAME_CAP, clean, untrusted};
@@ -81,15 +81,6 @@ impl<'d, S: Store> Agent<'d, S> {
     /// host sets it before each request
     pub fn set_ui(&mut self, view: Option<UiView>) {
         self.ui = view;
-    }
-
-    /// The build a request naming none goes to: the one the UI shows when
-    /// the grant covers it, else the grant's first
-    pub(crate) fn default_build(&self, grant: &Grant) -> Option<String> {
-        self.ui
-            .as_ref()
-            .filter(|v| grant.covers(&v.build))
-            .map(|v| grant.api_name(&v.build))
     }
 
     pub(crate) fn ui_context(&mut self, grant: &Grant, req: &J) -> R<J> {
