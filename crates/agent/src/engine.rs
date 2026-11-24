@@ -87,8 +87,9 @@ impl<'d, S: Store> Agent<'d, S> {
         }
     }
 
-    /// A build's version and its undo list, newest first, each step with
-    /// its label and who made it
+    /// A build's version, its undo list (the steps `undo` takes back,
+    /// newest first) and every change since it was opened (newest
+    /// first), each with its label and who made it
     pub fn steps(&mut self, id: &BuildId) -> R<J> {
         let o = self.open(id)?;
         let steps: Vec<J> = o
@@ -97,7 +98,20 @@ impl<'d, S: Store> Agent<'d, S> {
             .rev()
             .map(|u| json!({ "label": u.label, "source": u.source }))
             .collect();
-        Ok(json!({ "build": id.name, "version": o.version, "steps": steps }))
+        let changes: Vec<J> = o
+            .changes
+            .iter()
+            .rev()
+            .map(|c| {
+                json!({
+                    "version": c.version,
+                    "label": c.label,
+                    "source": c.source,
+                    "commit": c.commit.as_deref().map(short),
+                })
+            })
+            .collect();
+        Ok(json!({ "build": id.name, "version": o.version, "steps": steps, "changes": changes }))
     }
 
     /// A build's version, opening it

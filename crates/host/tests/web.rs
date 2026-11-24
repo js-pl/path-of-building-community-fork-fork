@@ -243,6 +243,57 @@ fn ui_client(port: u16, key: String, msgs: mpsc::Sender<Msg>, xml: String, build
     );
     assert!(log[3].ends_with("|user"), "{log:?}");
 
+    // The undo list with its sources, the history, and a restore
+    ui.send(&json!({ "id": 10, "host": "steps", "args": {} }).to_string())
+        .unwrap();
+    let a = ui.recv().unwrap();
+    let sources = |key: &str| -> Vec<String> {
+        a["ok"][key]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["source"].as_str().unwrap().to_string())
+            .collect()
+    };
+    // The undo took the agent's step back
+    assert_eq!(sources("steps"), ["user"], "{a}");
+    assert_eq!(sources("changes"), ["user", "agent claude", "user"], "{a}");
+    ui.send(&json!({ "id": 11, "host": "history", "args": { "n": 10 } }).to_string())
+        .unwrap();
+    let a = ui.recv().unwrap();
+    assert_eq!(a["ok"]["enabled"], true, "{a}");
+    assert_eq!(a["ok"]["pending"], false, "{a}");
+    let versions = a["ok"]["versions"].as_array().unwrap();
+    assert_eq!(versions.len(), 4, "{a}");
+    let found = versions[3]["version"].as_str().unwrap();
+    ui.send(&json!({ "id": 12, "host": "restore", "args": { "version": found } }).to_string())
+        .unwrap();
+    let a = ui.recv().unwrap();
+    assert!(
+        a["ok"]["label"].as_str().unwrap().starts_with("restore "),
+        "{a}"
+    );
+    let e = ui.recv().unwrap();
+    assert_eq!(
+        (e["version"].as_u64(), e["source"].as_str()),
+        (Some(4), Some("user")),
+        "{e}"
+    );
+    other.recv().unwrap();
+    // Committed at once, on top: the history only grows
+    let log = git_log(&builds.join("RF"));
+    assert_eq!(log.len(), 5, "{log:?}");
+    assert!(
+        log[0].starts_with("restore ") && log[0].ends_with("|restore"),
+        "{log:?}"
+    );
+    // The session's save of that version, as committed
+    let restored = std::fs::read_to_string(builds.join("RF/build.xml")).unwrap();
+    assert_eq!(restored, xml_at(&builds, "HEAD"));
+    // Without the node the UI allocated, which the version before had
+    assert!(xml_at(&builds, "HEAD~1").contains("36634"));
+    assert!(!restored.contains("36634"));
+
     // The UI's file is the session's build
     ui.send(&json!({ "id": 5, "req": { "cmd": "saveXml" } }).to_string())
         .unwrap();
@@ -283,4 +334,15 @@ fn requests_keep_their_query() {
         .unwrap()
         .unwrap();
     assert_eq!((r.path.as_str(), r.query.as_str()), ("/", "key=abc&x=1"));
+}
+
+/// A build's XML at a version, from its repository
+fn xml_at(builds: &std::path::Path, version: &str) -> String {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(builds.join("RF"))
+        .args(["show", &format!("{version}:build.xml")])
+        .output()
+        .unwrap();
+    String::from_utf8(out.stdout).unwrap()
 }

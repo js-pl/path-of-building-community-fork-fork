@@ -292,6 +292,38 @@ impl<'d> Host<'d> {
                 }
                 json!({ "builds": list, "current": ui_name(&build) })
             }
+            "steps" => self.agent.steps(&build)?,
+            "history" => {
+                let n = req["n"].as_u64().unwrap_or(50).min(500) as usize;
+                let store = self.agent.store();
+                let versions: Vec<J> = store
+                    .log(&build, n)?
+                    .into_iter()
+                    .map(|e| {
+                        json!({
+                            "version": e.version,
+                            "time": e.time,
+                            "label": e.label,
+                            "source": e.source,
+                            "trailers": e.trailers.iter().map(|(k, v)| json!([k, v])).collect::<Vec<_>>(),
+                        })
+                    })
+                    .collect();
+                json!({
+                    "build": ui_name(&build),
+                    "enabled": store.has_history(),
+                    "pending": store.is_pending(&build),
+                    "versions": versions,
+                })
+            }
+            "restore" => {
+                let v = req["version"].as_str().ok_or("restore names a version")?;
+                let a = self.agent.restore_by_user(&build, v);
+                if let Some(e) = a.get("error") {
+                    return Err(e.as_str().unwrap_or_default().to_string());
+                }
+                a["ok"].clone()
+            }
             "open" => {
                 let name = req["build"].as_str().ok_or("open names a build")?;
                 let id = parse_name(name)?;
