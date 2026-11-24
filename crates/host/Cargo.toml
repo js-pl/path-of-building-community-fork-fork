@@ -19,3 +19,16 @@ ring = "0.17"
 
 [dev-dependencies]
 session = { path = "../session", default-features = false, features = ["source"] }
+
+# The control socket on Windows: a named pipe only the user can open
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Memory",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
