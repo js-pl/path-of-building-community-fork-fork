@@ -42,14 +42,14 @@ pub(crate) const IMPROVE_FIELDS: &[&str] = &[
 const IMPROVE_DEFAULT: &[&str] = &["masteries", "config"];
 
 /// A score better than another by more than rounding
-const EPS: f64 = 1e-9;
+pub(crate) const EPS: f64 = 1e-9;
 
-fn round4(x: f64) -> f64 {
+pub(crate) fn round4(x: f64) -> f64 {
     (x * 1e4).round() / 1e4
 }
 
 /// The generators' options from a request
-fn options(req: &J, objective: &Objective) -> R<Options> {
+pub(crate) fn options(req: &J, objective: &Objective) -> R<Options> {
     let depth = match req.get("depth") {
         None | Some(J::Null) => 3.0,
         Some(v) => v

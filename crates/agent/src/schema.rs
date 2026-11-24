@@ -22,6 +22,10 @@ pub const READING: &[&str] = &[
     "assumptions",
     "best",
     "improve",
+    "front",
+    "dominating",
+    "job",
+    "cancel",
 ];
 
 /// The verbs whose answers can carry the author's text under `untrusted`
@@ -85,6 +89,32 @@ fn search_fields() -> J {
         "candidates": { "type": "integer", "minimum": 1, "maximum": 500, "description": "how many moves of a ranked or long generator are evaluated exactly; default 40" },
         "group": index("supports: the socket group; default the main one"),
         "gem": index("supports: one gem of the group to replace"),
+    })
+}
+
+fn job_fields() -> J {
+    json!({
+        "seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 600, "description": "the search's time budget; it stops then and answers with the best found so far; default 30" },
+        "wait": { "type": "number", "minimum": 0, "maximum": 120, "description": "seconds to wait for the answer; a search still running then answers with its job's id and progress, which `job` asks for again; default 20" },
+        "threads": { "type": "integer", "minimum": 1, "maximum": 256, "description": "the most threads to evaluate on; default all cores. The answer is the same with any number" },
+    })
+}
+
+fn generators(what: &str) -> J {
+    let names: Vec<&str> = crate::generate::GENERATORS
+        .iter()
+        .map(|(g, _)| *g)
+        .collect();
+    let about = crate::generate::GENERATORS
+        .iter()
+        .map(|(g, d)| format!("{g}: {d}"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    json!({
+        "type": "array",
+        "minItems": 1,
+        "items": { "type": "string", "enum": names },
+        "description": format!("{what}. {about}"),
     })
 }
 
@@ -332,6 +362,52 @@ pub fn input_schema(verb: &str) -> Option<J> {
                 (props, &[])
             }
         }
+        "front" | "dominating" => {
+            let mut props = json!({
+                "build": build(),
+                "objectives": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "description": "two or more objectives, each a stat to maximise (\"FullDPS\"; one lower-is-better is minimised), {\"stat\", \"goal\": \"max\" | \"min\"}, or a cost to minimise: \"points\" (passive points added), \"moves\"; default Full DPS and EHP, and the points added when the tree is searched without a points constraint",
+                    "items": {
+                        "anyOf": [
+                            { "type": "string" },
+                            { "type": "object", "required": ["stat"], "additionalProperties": false, "properties": { "stat": { "type": "string" }, "goal": { "type": "string", "enum": ["max", "min"] } } },
+                        ],
+                    },
+                },
+                "constraints": constraints(),
+                "stats": stats(),
+                "generators": generators(&format!("the generators whose moves are combined; default {}", crate::front::DEFAULT_GENERATORS.join(", "))),
+                "combine": { "type": "integer", "minimum": 1, "maximum": 6, "description": "the most moves a candidate combines; default 3" },
+                "beam": { "type": "integer", "minimum": 1, "maximum": 100, "description": "the candidates each round of the beam search extends; default 12" },
+                "limit": { "type": "integer", "minimum": 1, "maximum": 50, "description": "how many rows; default 12" },
+            });
+            for (k, v) in search_fields()
+                .as_object()
+                .unwrap()
+                .iter()
+                .chain(job_fields().as_object().unwrap())
+            {
+                props[k] = v.clone();
+            }
+            (props, &[])
+        }
+        "job" => (
+            json!({
+                "job": { "type": "string", "description": "the job's id, as a search answered it; without it, the jobs of this connection's builds" },
+                "wait": { "type": "number", "minimum": 0, "maximum": 120, "description": "seconds to wait for the answer; default 0" },
+            }),
+            &[],
+        ),
+        "cancel" => (
+            json!({
+                "job": { "type": "string", "description": "the job's id" },
+                "wait": { "type": "number", "minimum": 0, "maximum": 120, "description": "seconds to wait for its answer, the best found so far; default 10" },
+            }),
+            &["job"],
+        ),
         "assumptions" => (
             json!({
                 "build": build(),
@@ -427,6 +503,8 @@ mod tests {
             ("assumptions", crate::assume::FIELDS),
             ("best", crate::search::BEST_FIELDS),
             ("improve", crate::search::IMPROVE_FIELDS),
+            ("front", crate::front::FIELDS),
+            ("dominating", crate::front::FIELDS),
         ] {
             let s = input_schema(v).unwrap();
             let mut props: Vec<&str> = s["properties"]

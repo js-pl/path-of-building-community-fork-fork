@@ -586,6 +586,7 @@ fn serve_host(
         socket.display()
     );
     let mut h = host::ui::Host::new(data, store);
+    h.agent.background_jobs();
     h.registry = Some(listed);
     h.tokens = Some(host::tokens::Tokens::new(tokens));
     h.settings = Some(settings);

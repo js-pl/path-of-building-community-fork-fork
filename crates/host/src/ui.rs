@@ -118,12 +118,15 @@ impl<'d> Host<'d> {
     /// when they have waited long enough
     pub fn run(&mut self, msgs: mpsc::Receiver<Msg>) {
         loop {
-            match msgs.recv_timeout(Duration::from_millis(500)) {
+            // Soon when calls wait for a search job's answer
+            let wait = if self.agent.waiting() { 20 } else { 500 };
+            match msgs.recv_timeout(Duration::from_millis(wait)) {
                 Ok(Msg::Stop) => break,
                 Ok(m) => self.handle(m),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => break,
             }
+            self.agent.poll();
             for (id, r) in self.agent.store_mut().tick() {
                 if let Err(e) = r {
                     eprintln!("pob host: {}: the history: {e}", ui_name(&id));
@@ -136,9 +139,13 @@ impl<'d> Host<'d> {
     pub fn handle(&mut self, m: Msg) {
         match m {
             Msg::Agent(c) => {
-                let answer = self.agent.call_str(&c.grant, &c.line);
-                // The answer first, then the events, as for the UI's own
-                let _ = c.reply.send(answer);
+                // The answer first, then the events, as for the UI's own.
+                // A call waiting for a search job is answered by `poll`
+                // once the job finishes, so it holds nothing up
+                let reply = c.reply;
+                self.agent.submit(&c.grant, &c.line, move |a| {
+                    let _ = reply.send(a);
+                });
             }
             Msg::Open { client, out } => {
                 self.clients.insert(client, Client { out, build: None });
@@ -361,6 +368,11 @@ impl<'d> Host<'d> {
                     moved.push(json!({ "dir": d, "trash": to.display().to_string() }));
                 }
                 json!({ "cleaned": moved })
+            }
+            "jobs" => json!({ "jobs": self.agent.jobs_json() }),
+            "cancel_job" => {
+                let id = req["job"].as_str().ok_or("cancel_job takes a job's id")?;
+                json!({ "cancelled": self.agent.cancel_job(id) })
             }
             "connections" => match &self.registry {
                 Some(r) => json!({ "connections": r.list() }),

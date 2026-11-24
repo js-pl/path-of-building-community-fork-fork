@@ -12,7 +12,9 @@ install` ([below](#built-mcp)), is done. Step 6, the web app on the
 host ([below](#built-the-web-app-on-the-host)), is done. Step 10, the mod
 weights and `evaluate_item` ([below](#built-evaluate_item)), is done. Step
 8, `eval`, `assumptions`, objectives, constraints, the generators, `best`
-and `improve` ([below](#built-eval-and-assumptions)), is done.
+and `improve` ([below](#built-eval-and-assumptions)), is done. Step 9 is
+being built: jobs, `front` and `dominating`
+([below](#built-jobs-front-and-dominating)) are done.
 
 ## The question
 
@@ -546,8 +548,9 @@ above was silent:
   the control socket is Unix only for now; on Windows `pob host` and `pob
   ctl` say so. The named pipe (user-only ACL) needs `windows-sys` and
   comes with step 4 or 5, when Windows is tested.
-- Not yet: job and time budgets (step 9; today's verbs are single
-  edits). The web app on the host is [below](#built-the-web-app-on-the-host).
+- Jobs: the searches run on threads of their own, and a call waiting for
+  one is answered when it is done without holding the engine thread
+  ([below](#built-jobs-front-and-dominating)). The web app on the host is [below](#built-the-web-app-on-the-host).
 
 ### Built: the web app on the host
 
@@ -999,6 +1002,92 @@ changes as `apply` takes them.
   fixed number of points (swapping nodes) is step 9's, with
   `dominating`, `front` and jobs.
 
+### Built: jobs, `front` and `dominating`
+
+`jobs.rs` and `front.rs`. Neither search changes the build: rows carry
+`apply`, the changes as `apply` takes them.
+
+```
+{"verb": "front" | "dominating", "build"?, "objectives"?: ["FullDPS", "TotalEHP",
+   {"stat", "goal": "max" | "min"}, "points", "moves"], "constraints"?, "generators"?,
+ "stats"?, "depth"?, "candidates"?, "group"?, "gem"?, "combine"?: 3, "beam"?: 12,
+ "limit"?: 12, "seconds"?: 30, "wait"?: 20, "threads"?}
+→ {"objectives": [{"objective", "stat"?, "goal", "cost"?}], "constraints", "stats",
+   "base", "base_breaks", "front": n, "build_on_front" | "dominating": n,
+   "rows": [{"apply", "changes", "values", "change", "moves", "points"?, "repaired"?,
+   "on_front"?, "warnings_added"?}], "search": {"generators", "moves",
+   "moves_possible", "combine", "beam", "pool", "rounds": [{"moves", "evaluated",
+   "feasible"}, {"repairs", "feasible"}], "candidates", "repaired", "complete",
+   "stop", "effort", "failed"}, "claim", "exact", "not_yet", "notes"?,
+   "job": {"id", "verb", "build", "version", "status", "seconds", "budget_seconds",
+   "evaluations", "phase"?, "best_so_far"?}}
+
+{"verb": "job", "job"?: "j1", "wait"?: 0}   {"verb": "cancel", "job": "j1", "wait"?: 10}
+```
+
+- **Objectives** are two to eight: stats of the engine, maximised unless
+  upstream's power stats call them lower-is-better or the request says
+  `"goal": "min"`, and costs, minimised: `points` (passive points added)
+  and `moves`. Default Full DPS and EHP; when the tree is searched without
+  a `{"points": n}` constraint, the points added are added as a cost, with
+  a note, since every allocation adds some.
+- **The search.** The generators' moves (those of `best`, deduplicated)
+  are each evaluated exactly. Then a beam search: each round extends each
+  of the beam's candidates (`beam`, the best of the last round by
+  non-dominated sorting, ties by the sum of the stat objectives' relative
+  changes) by one of the best `2 × beam` single moves (the pool, 8 to 40)
+  that touches nothing it touches (a mastery, a gem's field, a config
+  option, a node removed), up to `combine` moves; every new combination is
+  evaluated exactly as a whole build, never added up from its moves. Only
+  candidates that hold the constraints are extended.
+- **Repair.** Up to 6 candidates that break a constraint and that no
+  feasible candidate dominates each get up to 4 fixes: single moves that
+  hold a constraint it breaks better than the build does, cheapest in
+  points first. The fixed candidates are evaluated exactly; one that
+  holds every constraint is a candidate like the others, marked
+  `repaired`.
+- **The answer.** `front`: the candidates that hold the constraints and
+  that no other candidate evaluated dominates; whether the build itself
+  is on it. `dominating`: the candidates that hold the constraints and are
+  better than the build in at least one objective and worse in none,
+  those that no other of them dominates first (`on_front`). `claim`
+  calls the rows the exact front, or says nothing dominates, only when the
+  search left nothing out (`complete`): every generator kept all its
+  moves, the pool and the beam dropped none, every candidate held the
+  constraints, and the budget wasn't hit; otherwise they are the best
+  found, and the claim says what wasn't evaluated. Every row's numbers
+  are an exact evaluation. Searches are deterministic: the same build
+  gives the same rows with any `threads`, unless the budget stops them.
+- **Jobs.** Each search is a job (`j1`, ...) on a copy of the build: the
+  saved XML at the version it started on, which its answer gives. The
+  call waits up to `wait` seconds (default 20, at most 120) and answers
+  with the result, or with the job's state (status, evaluations, phase,
+  the best so far) and a note to call `job`. `job` with an id waits up to
+  `wait` (default 0) and gives the same; without one it lists the jobs of
+  the builds the connection may read, which are the only ones it can see.
+  `cancel` stops one; it answers with the best found so far, status
+  `cancelled`. The time budget, `seconds` (default 30, at most 600), stops
+  the search the same way (`out of time`): variants not begun by then
+  aren't evaluated (the effort's `skipped`), those running finish, and
+  the moves' generation (node power) isn't interrupted. At most 2 jobs run
+  at once; the last 32 are kept.
+- **On the host** (`Agent::background_jobs`, `pob host`), a job runs on a
+  thread of its own and evaluates on all cores. The engine thread starts
+  it (opening the build and checking the request, as for any verb) and
+  goes on; a call waiting for a job is answered by `Agent::poll`, which
+  the engine thread runs every 20 ms while a call waits, so it holds up no
+  other request on any transport. The UI's host requests `jobs` and
+  `cancel_job` list and cancel them. Without it (wasm, a caller whose
+  data isn't `'static`), a job runs to its end within the call, within its
+  budget.
+- Measured on 4 threads, `gen-0003`: the default `front` (150 single
+  moves of the five generators, combinations of up to 3 by a beam of 12,
+  593 candidates) in 16 s; config alone, exhaustive (179 combinations of
+  15 moves), in under 3 s.
+- Not yet: MCP progress notifications (the HTTP endpoint has no SSE
+  stream), the UI's view of jobs, the respec search and constraints on
+  keystones and flags (next).
+
 ### Answers sized for an LLM
 
 Every answer is short and self-describing: numbers with their deltas in
@@ -1155,7 +1244,7 @@ Each one a PR, as usual:
    and `improve`. Done (#204, #208), except the anoint, unique, craft and
    rare generators.
 9. `dominating` and `front` with the combination and respec search; jobs
-   with progress and cancelling.
+   with progress and cancelling. Jobs, `front` and `dominating` done.
 10. The port of the mod weights with its oracle test; `evaluate_item`.
     Done (#189, #195).
 11. Later: trade and prices, cloud sessions, an agent in the browser, a

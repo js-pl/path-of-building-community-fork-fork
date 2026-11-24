@@ -259,6 +259,32 @@ impl Constraint {
         }
     }
 
+    /// How well the variant holds the constraint, as a number: higher holds
+    /// it better; what a repair looks for in a move
+    pub fn margin(&self, base: &Outcome, r: &Outcome) -> f64 {
+        let v = |s: &Stat, o: &Outcome| s.value(&o.out).unwrap_or(f64::NEG_INFINITY);
+        let count =
+            |f: &dyn Fn(&String) -> bool| -(r.warnings.iter().filter(|w| f(w)).count() as f64);
+        match self {
+            Constraint::Min(s, m) => v(s, r) - m,
+            Constraint::Max(s, m) => m - s.value(&r.out).unwrap_or(f64::INFINITY),
+            Constraint::Keep(s) => v(s, r) - v(s, base),
+            Constraint::ResCapped => -["Fire", "Cold", "Lightning"]
+                .iter()
+                .map(|e| {
+                    r.out
+                        .num(&format!("Missing{e}Resist"))
+                        .unwrap_or(0.0)
+                        .max(0.0)
+                })
+                .sum::<f64>(),
+            Constraint::Requirements => count(&|w| w.contains("requirement")),
+            Constraint::Reservation => count(&|w| w.contains("reserved over 100%")),
+            Constraint::NoNewWarnings => count(&|w| !base.warnings.contains(w)),
+            Constraint::Points(p) => p - (r.points.unwrap_or(0.0) - base.points.unwrap_or(0.0)),
+        }
+    }
+
     /// The constraint as answers name it
     pub fn describe(&self) -> String {
         match self {
