@@ -513,6 +513,7 @@ impl Names {
                     None | Some(J::Null) => None,
                     Some(v) => Some(v.as_u64().ok_or("item is an item's id, or null")?),
                 };
+                let was = slot_item(s, slot)?;
                 if let Some(i) = item {
                     let items = cmd(s, json!({ "cmd": "items" }))?;
                     let fits = items["slots"]
@@ -535,7 +536,10 @@ impl Names {
                 )?;
                 let label = match item {
                     Some(i) => format!("equip {} in {slot}", item_base(s, Some(i as f64))?),
-                    None => format!("empty {slot}"),
+                    None => match was {
+                        Some(w) => format!("empty {slot} (was {})", item_base(s, Some(w))?),
+                        None => format!("empty {slot}"),
+                    },
                 };
                 Ok((label, json!({ "slot": slot, "item": item })))
             }
@@ -767,6 +771,17 @@ fn check_slot(s: &mut Dispatcher, slot: &str) -> R<()> {
 }
 
 /// An item's base, by its id
+/// The id of the item in a slot, if any
+fn slot_item(s: &mut Dispatcher, slot: &str) -> R<Option<f64>> {
+    let items = cmd(s, json!({ "cmd": "items" }))?;
+    Ok(items["slots"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|x| x["name"] == slot)
+        .and_then(|x| x["item"].as_f64()))
+}
+
 fn item_base(s: &mut Dispatcher, id: Option<f64>) -> R<String> {
     let items = cmd(s, json!({ "cmd": "items" }))?;
     let base = items["items"]

@@ -318,6 +318,26 @@ fn best_matches_the_engine(d: &'static TypedData) {
         json!({ "verb": "best", "generator": "masteries", "limit": 3 }),
     );
     check_rows(d, &r, &["FullDPS", "TotalEHP"], 2);
+    // The equipped items, each removed: the weakest first (an item that
+    // costs more than it gives ranks first), each named by the base it
+    // removes
+    let r = ok(
+        &mut a,
+        &g,
+        json!({ "verb": "best", "generator": "items_remove", "limit": 20, "stats": ["FullDPS", "TotalEHP"] }),
+    );
+    let n = r["search"]["evaluated"].as_u64().unwrap();
+    assert_eq!(r["search"]["moves_possible"], n, "{r}");
+    assert!(n >= 5, "{r}");
+    assert_eq!(r["rows"].as_array().unwrap().len() as u64, n, "{r}");
+    for row in r["rows"].as_array().unwrap() {
+        let label = row["changes"].as_str().unwrap();
+        assert!(
+            label.starts_with("empty ") && label.contains("(was "),
+            "{row}"
+        );
+    }
+    check_rows(d, &r, &["FullDPS", "TotalEHP"], 2);
     // Constraints: none can hold, so nothing is better
     let life = applied(d, &json!([]))["Life"].as_f64().unwrap();
     let r = ok(

@@ -943,7 +943,7 @@ changes as `apply` takes them.
 
 ```
 {"verb": "best", "build"?, "generator": "tree" | "tree_remove" | "masteries" | "supports"
-   | "gem_levels" | "config", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
+   | "gem_levels" | "items_remove" | "config", "objective"?, "constraints"?, "stats"?, "limit"?: 10,
  "depth"?: 3, "candidates"?: 40, "group"?, "gem"?}
 → {"objective", "constraints", "stats", "base", "base_breaks", "rows": [{"apply": [...],
    "changes": "label", "values", "change", "gain", "points"?, "estimate"?, "breaks"?}],
@@ -977,7 +977,10 @@ changes as `apply` takes them.
   it), `masteries` (every other effect of the allocated masteries and of
   those next to an allocated node), `supports` (each support the engine
   knows in place of each support of a group), `gem_levels` (each gem a
-  level higher, or at 20 quality) and `config` (bandit and pantheon). The
+  level higher, or at 20 quality), `items_remove` (each equipped slot of
+  the active item set emptied: what each item adds, so the first rows are
+  the weakest items, or one that costs more than it gives) and `config`
+  (bandit and pantheon). The
   tree's two rank by node power (`engine::power`, the misc calculator) and
   keep the best `candidates`; the others keep all, up to `candidates` for
   `supports`. Every move kept is evaluated exactly. Not yet: anoints,

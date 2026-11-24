@@ -37,6 +37,10 @@ pub(crate) const GENERATORS: &[(&str, &str)] = &[
         "gem_levels",
         "each gem one level higher, and at 20 quality, one at a time",
     ),
+    (
+        "items_remove",
+        "empties each slot of the active set that holds an item, one at a time: what each item is worth, the weakest (least lost) first",
+    ),
     ("config", "each other bandit and pantheon choice"),
 ];
 
@@ -92,6 +96,7 @@ pub(crate) fn generate(
         "masteries" => masteries(s),
         "supports" => supports(names, s, o),
         "gem_levels" => gem_levels(s),
+        "items_remove" => items_remove(s),
         "config" => config(s),
         k => Err(format!(
             "no generator {:?}; the generators: {}",
@@ -312,6 +317,30 @@ fn gem_levels(s: &mut Dispatcher) -> R<Generated> {
         moves,
         possible,
         how: "each enabled gem one level higher (up to 21) and at 20 quality, one at a time, all evaluated exactly".into(),
+    })
+}
+
+fn items_remove(s: &mut Dispatcher) -> R<Generated> {
+    let items = cmd(s, json!({ "cmd": "items" }))?;
+    let moves: Vec<Move> = items["slots"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|x| x["shown"] == true && x["item"].is_number())
+        .filter_map(|x| x["name"].as_str())
+        .map(|slot| Move {
+            changes: vec![json!({ "verb": "equip", "slot": slot, "item": null })],
+            estimate: None,
+        })
+        .collect();
+    if moves.is_empty() {
+        return Err("no item is equipped".into());
+    }
+    let possible = moves.len();
+    Ok(Generated {
+        moves,
+        possible,
+        how: "each equipped slot of the active item set emptied, one at a time, all evaluated exactly: a row's change is what that item adds, so the first rows are the weakest items, the upgrades to look at first; evaluate_item gives a slot's mod weights and checks a replacement".into(),
     })
 }
 
