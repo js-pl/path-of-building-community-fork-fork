@@ -730,7 +730,8 @@ Step 7's second part:
   user's build the UI shows at that moment (none when no UI shows one,
   or it shows an agent's build). `pob agents token` without `--build`
   asks a running host (`{"admin": "ui_build"}`) and mints the token
-  with that build, and says so; without a host or a UI the token has
+  with that build, and says so, as does `pob agent` without `--build`
+  for the token of its run; without a host or a UI the token has
   only its agent directory, as before. Switching builds in the UI later
   widens no grant: an agent reaches another build only when the user
   grants it (`--build`, a new token).

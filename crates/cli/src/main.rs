@@ -672,9 +672,7 @@ fn agents(args: &[String]) {
             // token; none when no UI shows one
             let mut from_ui = false;
             if grant.builds.is_empty()
-                && let Some(b) = admin(&socket_path(&flags), serde_json::json!("ui_build"))
-                    .ok()
-                    .and_then(|v| v["build"].as_str().map(String::from))
+                && let Some(b) = ui_build(&socket_path(&flags))
             {
                 grant = grant.with_build(b);
                 from_ui = true;
@@ -799,6 +797,13 @@ fn install_cmd(flags: &[(&str, &str)]) {
     if failed {
         std::process::exit(1);
     }
+}
+
+/// The user's build the UI of the host on `socket` shows, if any
+fn ui_build(socket: &Path) -> Option<String> {
+    admin(socket, serde_json::json!("ui_build"))
+        .ok()
+        .and_then(|v| v["build"].as_str().map(String::from))
 }
 
 fn admin(socket: &Path, req: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -1316,6 +1321,13 @@ fn agent_cmd(args: &[String]) {
             die("agents is not a build");
         }
         grant = grant.with_build(*b);
+    }
+    // Without --build, the build the UI shows now, fixed in the token
+    if grant.builds.is_empty()
+        && let Some(b) = ui_build(&socket)
+    {
+        eprintln!("pob agent: granted {b}, the build the UI shows (--build names another)");
+        grant = grant.with_build(b);
     }
     let command = if flag(&flags, "--exec").is_some() {
         if extra.is_empty() {
